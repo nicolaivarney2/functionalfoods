@@ -28,16 +28,107 @@
       {
         "id": 3,
         "title": "Implement Recipe Card and Detail Components",
-        "description": "Create reusable React components for displaying recipe cards in listings and detailed recipe information on individual pages.",
-        "details": "1. Create RecipeCard component with image, title, description, prep time, and category tags\n2. Implement RecipeDetail component with full recipe information\n3. Build IngredientsList and InstructionsList components\n4. Create NutritionalInfo component for displaying nutrition data\n5. Implement responsive layouts for all components using Tailwind CSS\n6. Add proper accessibility attributes (aria-labels, semantic HTML)\n7. Implement loading states and error handling\n8. Create storybook stories or component documentation",
-        "testStrategy": "1. Create unit tests for all components using React Testing Library\n2. Test responsive behavior across different screen sizes\n3. Verify accessibility with automated tools (axe, lighthouse)\n4. Test components with various recipe data configurations\n5. Verify proper error state handling with invalid data",
-        "priority": "high",
+        "description": "Create reusable React components for displaying recipe cards in listings and detailed recipe information on individual pages, following Arla-inspired design patterns.",
+        "status": "in-progress",
         "dependencies": [
           1,
           2
         ],
-        "status": "pending",
-        "subtasks": []
+        "priority": "high",
+        "details": "1. Create RecipeCard component with image, title, description, prep time, and category tags\n2. Implement RecipeDetail component with full recipe information\n3. Build IngredientsList and InstructionsList components with floating navigation buttons (Ingredienser first, then Sådan gør du)\n4. Create NutritionalInfo component for displaying nutrition data with serving size adjustment functionality\n5. Implement responsive layouts for all components using Tailwind CSS with mobile-first approach\n6. Add proper accessibility attributes (aria-labels, semantic HTML)\n7. Implement loading states and error handling\n8. Create storybook stories or component documentation\n9. Implement comment system for recipe feedback\n10. Add save/share icons for recipe sharing functionality\n11. Create \"Mine tips til opskriften\" section for user tips\n12. Implement \"Andre gode forslag\" section for related recipes\n13. Add \"Om functionalfoods\" section for educational content\n14. Design clean, modern UI consistent with Arla-inspired aesthetic",
+        "testStrategy": "1. Create unit tests for all components using React Testing Library\n2. Test responsive behavior across different screen sizes\n3. Verify accessibility with automated tools (axe, lighthouse)\n4. Test components with various recipe data configurations\n5. Verify proper error state handling with invalid data\n6. Test floating navigation functionality on mobile and desktop\n7. Verify comment system works correctly\n8. Test serving size adjustment calculations\n9. Verify save/share functionality works as expected\n10. Test all new sections render correctly with different content types",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create RecipeCard component",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement RecipeDetail component",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "<info added on 2025-08-01T05:38:29.379Z>\nSuccessfully implemented RecipeDetail component with Arla-inspired design featuring floating navigation for Ingredients and Instructions sections. Added nutrition facts box with \"Forstå Keto\" text and serving size adjustment controls. Implemented recipe action buttons (save, share, shopping list) and created sections for recipe tips, related suggestions, and \"Om functionalfoods\". Added comment system, breadcrumbs navigation, star rating, and personal recipe description. All components are modular, reusable, and follow mobile-first responsive design principles with functional foods branding (green colors, keto focus).\n</info added on 2025-08-01T05:38:29.379Z>",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Build IngredientsList and InstructionsList with floating navigation",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "<info added on 2025-08-01T06:45:03.903Z>\nSuccessfully implemented dynamic ingredients calculation system with the following features:\n\n- Moved \"Ingredienser\" and \"Sådan gør du\" sections up under serving size adjustment\n- Created DynamicIngredientsList component that automatically calculates ingredient amounts based on serving size\n- Implemented smart unit conversion (dl, g, kg, l, stk, tsk, spsk)\n- Added serving size adjustment that updates ingredient quantities in real-time\n- Maintained proper layout with ingredients on left, instructions on right\n- All calculations are based on original recipe servings vs current servings\n\nThe system now automatically adjusts ingredient quantities when users change the number of servings, making it perfect for recipes that are typically designed for 2 people but need to be scaled up or down.\n</info added on 2025-08-01T06:45:03.903Z>",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Create NutritionalInfo component with serving size adjustment",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement comment system",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Add save/share functionality",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "Create \"Mine tips til opskriften\" section",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "Implement \"Andre gode forslag\" section",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 9,
+            "title": "Add \"Om functionalfoods\" section",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 10,
+            "title": "Implement mobile-first responsive design",
+            "description": "",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 4,
@@ -222,7 +313,7 @@
     ],
     "metadata": {
       "created": "2025-08-01T04:56:48.940Z",
-      "updated": "2025-08-01T04:56:48.940Z",
+      "updated": "2025-08-01T05:38:19.168Z",
       "description": "Tasks for master context"
     }
   }

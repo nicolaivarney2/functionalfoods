@@ -1,43 +1,15 @@
 import { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Clock, Users, Share2, Printer, Star, Heart } from 'lucide-react'
+import { Clock, Star, MessageCircle } from 'lucide-react'
 import { getRecipeBySlugServer, getAllRecipesServer } from '@/lib/recipe-storage-server'
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import Script from 'next/script'
-import JumpToRecipeButton from '@/components/JumpToRecipeButton'
+import RecipePageClient from '@/components/RecipePageClient'
 
 interface RecipePageProps {
   params: {
     slug: string
-  }
-}
-
-export async function generateMetadata({ params }: RecipePageProps): Promise<Metadata> {
-  const recipe = getRecipeBySlugServer(params.slug)
-  
-  if (!recipe) {
-    return {
-      title: 'Opskrift ikke fundet | Functional Foods',
-    }
-  }
-
-  return {
-    title: recipe.metaTitle,
-    description: recipe.metaDescription,
-    keywords: recipe.keywords.join(', '),
-    openGraph: {
-      title: recipe.metaTitle,
-      description: recipe.metaDescription,
-      images: [recipe.imageUrl],
-    },
-    other: {
-      ...(recipe.prepTimeISO && { 'recipe:prepTime': recipe.prepTimeISO }),
-      ...(recipe.cookTimeISO && { 'recipe:cookTime': recipe.cookTimeISO }),
-      ...(recipe.totalTimeISO && { 'recipe:totalTime': recipe.totalTimeISO }),
-      'recipe:servings': recipe.servings.toString(),
-      'recipe:difficulty': recipe.difficulty,
-    }
   }
 }
 
@@ -57,10 +29,10 @@ export default function RecipePage({ params }: RecipePageProps) {
   }
 
   const formatTime = (minutes: number) => {
-    if (minutes < 60) return `${minutes} minutter`
+    if (minutes < 60) return `${minutes} MIN`
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
-    return mins > 0 ? `${hours} timer ${mins} minutter` : `${hours} timer`
+    return mins > 0 ? `${hours}T ${mins} MIN` : `${hours}T`
   }
 
   // Generate structured data for SEO
@@ -86,12 +58,52 @@ export default function RecipePage({ params }: RecipePageProps) {
       />
       
       <main className="min-h-screen bg-white">
-        {/* Hero Section */}
-        <section className="border-b border-gray-200">
-          <div className="container py-8">
-            <div className="grid md:grid-cols-2 gap-8">
+        {/* Header with Search */}
+        <section className="bg-white border-b border-gray-200">
+          <div className="container py-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Søg efter flere opskrifter"
+                className="w-full px-4 py-3 pl-12 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Breadcrumbs */}
+        <section className="bg-white border-b border-gray-200">
+          <div className="container py-2">
+            <nav className="text-sm text-gray-600">
+              <Link href="/" className="hover:text-gray-900">Functional Foods</Link>
+              <span className="mx-2">›</span>
+              <Link href="/opskriftsoversigt" className="hover:text-gray-900">Opskrifter</Link>
+              <span className="mx-2">›</span>
+              <span className="text-gray-900">{recipe.title}</span>
+            </nav>
+          </div>
+        </section>
+
+        {/* Recipe Header */}
+        <section className="bg-white">
+          <div className="container py-2">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 text-gray-900">
+              {recipe.title}
+            </h1>
+          </div>
+        </section>
+
+        {/* Main Recipe Image and Description */}
+        <section className="bg-white">
+          <div className="container py-4">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
               {/* Recipe Image */}
-              <div className="relative aspect-[4/3]">
+              <div className="relative aspect-[4/3] rounded-lg overflow-hidden">
                 <Image
                   src={recipe.imageUrl}
                   alt={recipe.imageAlt}
@@ -104,226 +116,70 @@ export default function RecipePage({ params }: RecipePageProps) {
                   quality={85}
                 />
               </div>
-
-              {/* Recipe Info */}
+              
+              {/* Recipe Description and Actions */}
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-                    {recipe.title}
-                  </h1>
-                  <p className="text-lg text-gray-600 mb-6">
-                    {recipe.description}
+                  <h2 className="text-xl font-semibold text-gray-800 mb-3">Sådan laver du det</h2>
+                  <p className="text-gray-700 leading-relaxed text-lg">
+                    En skål fuld af smag, farver og skønne råvarer. Nem og hurtig aftensmad - og du kan skifte ud, 
+                    så du både får brugt rester og undgår madspild. Denne {recipe.dietaryCategories[0]} opskrift er 
+                    perfekt til at holde dig mæt og tilfreds, samtidig med at du følger en sund livsstil.
                   </p>
                 </div>
-
-                {/* Recipe Meta */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Clock size={20} className="text-gray-500" />
-                    <div>
-                      <div className="text-sm text-gray-500">Tilberedningstid</div>
-                      <div className="font-medium">{formatTime(recipe.preparationTime)}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Clock size={20} className="text-gray-500" />
-                    <div>
-                      <div className="text-sm text-gray-500">Kogetid</div>
-                      <div className="font-medium">{formatTime(recipe.cookingTime)}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Users size={20} className="text-gray-500" />
-                    <div>
-                      <div className="text-sm text-gray-500">Antal personer</div>
-                      <div className="font-medium">{recipe.servings} pers</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-5 h-5"></div>
-                    <div>
-                      <div className="text-sm text-gray-500">Sværhedsgrad</div>
-                      <div className="font-medium">{recipe.difficulty}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Categories */}
-                <div className="flex flex-wrap gap-2">
-                  {recipe.dietaryCategories.map((category) => (
-                    <span
-                      key={category}
-                      className="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700"
-                    >
-                      {category}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Actions */}
-                <div className="flex space-x-4">
-                  <button className="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
-                    <Share2 size={20} />
-                    <span>Del</span>
-                  </button>
-                  <button className="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
-                    <Printer size={20} />
-                    <span>Print</span>
-                  </button>
-                  <button className="flex items-center space-x-2 text-gray-600 hover:text-gray-900">
-                    <Heart size={20} />
-                    <span>Gem</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Rich Content Section for SEO */}
-        <section className="py-12 bg-gray-50">
-          <div className="container">
-            <div className="max-w-4xl mx-auto">
-              <div className="prose prose-gray max-w-none">
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">
-                  Om denne {recipe.dietaryCategories[0]} opskrift
-                </h2>
                 
-                <div className="grid md:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4 text-gray-900">Fordele ved denne ret</h3>
-                    <ul className="space-y-2 text-gray-700">
-                      <li>• {recipe.dietaryCategories[0]} venlig og egnet til vægttab</li>
-                      <li>• Rig på protein og sunde fedtstoffer</li>
-                      <li>• Nem at tilberede på under {formatTime(recipe.totalTime)}</li>
-                      <li>• Perfekt til {recipe.servings} personer</li>
-                      <li>• Indeholder kun {recipe.carbs}g kulhydrater per portion</li>
-                    </ul>
+                {/* Recipe Meta Information */}
+                <div className="flex items-center space-x-6 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <Clock size={16} className="text-gray-500" />
+                    <span className="text-gray-700">{formatTime(recipe.preparationTime + recipe.cookingTime)}</span>
                   </div>
                   
-                  <div>
-                    <h3 className="text-xl font-semibold mb-4 text-gray-900">Næringsværdi per portion</h3>
-                    <div className="bg-white p-4 rounded-lg border">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-600">Kalorier:</span>
-                          <span className="ml-2 font-medium">{recipe.calories} kcal</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Protein:</span>
-                          <span className="ml-2 font-medium">{recipe.protein}g</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Kulhydrater:</span>
-                          <span className="ml-2 font-medium">{recipe.carbs}g</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Fedt:</span>
-                          <span className="ml-2 font-medium">{recipe.fat}g</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Fiber:</span>
-                          <span className="ml-2 font-medium">{recipe.fiber}g</span>
-                        </div>
-                      </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1" id="top-rating-stars">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          size={14}
+                          className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
+                        />
+                      ))}
                     </div>
+                    <span className="text-gray-600">(15)</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 text-gray-600" id="top-comments">
+                    <MessageCircle size={14} />
+                    <span>Kommentarer (0)</span>
                   </div>
                 </div>
-
-                <div className="mt-8">
-                  <h3 className="text-xl font-semibold mb-4 text-gray-900">Hvorfor vælge {recipe.dietaryCategories[0]}?</h3>
-                  <p className="text-gray-700 mb-4">
-                    {recipe.dietaryCategories[0]} diæten fokuserer på at reducere kulhydrater og øge indtaget af sunde fedtstoffer. 
-                    Dette hjælper kroppen med at brænde fedt i stedet for kulhydrater som primær energikilde.
-                  </p>
-                  <p className="text-gray-700">
-                    Denne {recipe.dietaryCategories[0]} opskrift er perfekt til at holde dig mæt og tilfreds, 
-                    samtidig med at du følger en sund livsstil. Den er nem at tilberede og smager fantastisk!
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Jump to Recipe Button */}
-        <section className="py-8 bg-white border-b border-gray-200">
-          <div className="container">
-            <div className="text-center">
-              <JumpToRecipeButton />
-            </div>
-          </div>
-        </section>
-
-        {/* Recipe Content */}
-        <section id="recipe-content" className="py-12">
-          <div className="container">
-            <div className="grid md:grid-cols-3 gap-12">
-              {/* Ingredients */}
-              <div className="md:col-span-1">
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">Ingredienser</h2>
-                <div className="space-y-4">
-                  {recipe.ingredients.map((ingredient) => (
-                    <div key={ingredient.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span className="text-gray-900">
-                        {ingredient.amount} {ingredient.unit} {ingredient.name}
+                
+                {/* Recipe Tags */}
+                <div>
+                  <span className="text-sm text-gray-600">Denne opskrift egner sig til: </span>
+                  <div className="inline-flex flex-wrap gap-2 ml-2">
+                    {recipe.dietaryCategories.map((category) => (
+                      <span
+                        key={category}
+                        className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
+                      >
+                        {category}
                       </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+                
 
-              {/* Instructions */}
-              <div className="md:col-span-2">
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">Fremgangsmåde</h2>
-                <div className="space-y-6">
-                  {recipe.instructions.map((step) => (
-                    <div key={step.id} className="flex space-x-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                        {step.stepNumber}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-gray-900 leading-relaxed">{step.instruction}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Related Recipes */}
-        <section className="py-12 bg-gray-50">
-          <div className="container">
-            <h2 className="text-2xl font-bold mb-8 text-gray-900">Lignende opskrifter</h2>
-            <div className="grid md:grid-cols-3 gap-8">
-              {allRecipes
-                .filter(r => r.id !== recipe.id && r.dietaryCategories.some(cat => recipe.dietaryCategories.includes(cat)))
-                .slice(0, 3)
-                .map((relatedRecipe) => (
-                  <Link key={relatedRecipe.id} href={`/opskrift/${relatedRecipe.slug}`} className="block">
-                    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                      <div className="relative aspect-[4/3]">
-                        <Image
-                          src={relatedRecipe.imageUrl}
-                          alt={relatedRecipe.imageAlt}
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 25vw"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 mb-2">{relatedRecipe.title}</h3>
-                        <p className="text-sm text-gray-600">{relatedRecipe.shortDescription}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-            </div>
-          </div>
-        </section>
+        {/* Client-side interactive components */}
+        <RecipePageClient 
+          recipe={recipe} 
+          allRecipes={allRecipes} 
+        />
       </main>
     </>
   )

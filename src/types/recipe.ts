@@ -7,12 +7,24 @@ export interface Ingredient {
   notes?: string;
 }
 
+export interface IngredientGroup {
+  id: string;
+  name: string;
+  ingredients: Ingredient[];
+}
+
 export interface RecipeStep {
   id: string;
   stepNumber: number;
   instruction: string;
   time?: number; // in minutes
   tips?: string;
+}
+
+export interface InstructionGroup {
+  id: string;
+  name: string;
+  steps: RecipeStep[];
 }
 
 export interface Recipe {
@@ -46,7 +58,9 @@ export interface Recipe {
   
   // Content
   ingredients: Ingredient[];
+  ingredientGroups?: IngredientGroup[];
   instructions: RecipeStep[];
+  instructionGroups?: InstructionGroup[];
   
   // Media
   imageUrl: string;
