@@ -1,16 +1,23 @@
-import { Metadata } from 'next'
 import Link from 'next/link'
-import { Search, Filter } from 'lucide-react'
-import { sampleRecipes, recipeCategories, dietaryCategories } from '@/lib/sample-data'
+import { Search, Filter, Clock, Users } from 'lucide-react'
+import { recipeCategories, dietaryCategories } from '@/lib/sample-data'
+import { getAllRecipesServer } from '@/lib/recipe-storage-server'
 import RecipeCard from '@/components/RecipeCard'
-
-export const metadata: Metadata = {
-  title: 'Opskriftsoversigt - Alle sunde opskrifter | Functional Foods',
-  description: 'Her finder du alle sunde opskrifter fra Functional Foods. Opskrifter til vægttab og en sund livsstil - Keto, Sense, Paleo og meget mere.',
-  keywords: ['opskrifter', 'vægttab', 'keto', 'sunde opskrifter', 'aftensmad', 'frokost'],
-}
+import { searchRecipes, sortRecipes, SearchFilters } from '@/lib/search'
 
 export default function RecipeOverviewPage() {
+  // Get all recipes (sample + imported)
+  const allRecipes = getAllRecipesServer()
+  
+  // Apply search and filters
+  const filters: SearchFilters = {
+    query: '', // Search query is handled by the server component
+    category: 'all', // Default to all categories
+    dietary: undefined, // Default to no dietary filters
+  }
+
+  const filteredRecipes = searchRecipes(allRecipes, filters)
+  const sortedRecipes = sortRecipes(filteredRecipes, 'newest') // Default sort
   return (
     <main className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -45,15 +52,71 @@ export default function RecipeOverviewPage() {
               <input
                 type="text"
                 placeholder="Søg i alle opskrifter her"
+                defaultValue=""
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
               />
             </div>
 
+            {/* Sort */}
+            <select
+              defaultValue="newest"
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+            >
+              <option value="newest">Nyeste først</option>
+              <option value="oldest">Ældste først</option>
+              <option value="time-asc">Kortest tid</option>
+              <option value="time-desc">Længste tid</option>
+              <option value="rating">Højeste rating</option>
+            </select>
+
             {/* Filter Button */}
-            <button className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-4 py-3 transition-colors">
+            <button 
+              className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-4 py-3 transition-colors"
+            >
               <Filter size={20} />
               <span>Filter</span>
             </button>
+          </div>
+
+          {/* Advanced Filters */}
+          {/* This section is now server-side, so it will always show the default filters */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                <select
+                  defaultValue="all"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                >
+                  <option value="all">Alle kategorier</option>
+                  <option value="Aftensmad">Aftensmad</option>
+                  <option value="Frokost">Frokost</option>
+                  <option value="Morgenmad">Morgenmad</option>
+                  <option value="Salater">Salater</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mad ideologi</label>
+                <select
+                  defaultValue="all"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                >
+                  <option value="all">Alle mad ideologier</option>
+                  <option value="Keto">Keto</option>
+                  <option value="LCHF">LCHF</option>
+                  <option value="Paleo">Paleo</option>
+                  <option value="Vegetar">Vegetar</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Resultater</label>
+                <p className="text-sm text-gray-600">
+                  {filteredRecipes.length} opskrifter fundet
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -111,18 +174,36 @@ export default function RecipeOverviewPage() {
         </div>
       </section>
 
-      {/* Latest Recipes */}
+      {/* Search Results */}
       <section className="py-12 bg-white">
         <div className="container">
-          <h2 className="text-2xl font-bold text-center mb-8 text-gray-900">
-            Nyeste opskrifter
-          </h2>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {sampleRecipes.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} />
-            ))}
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {filteredRecipes.length > 0 
+                ? `Søgeresultater (${filteredRecipes.length})` 
+                : 'Alle opskrifter'
+              }
+            </h2>
+            {/* No search query to display */}
           </div>
+          
+          {filteredRecipes.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredRecipes.map((recipe, index) => (
+                <RecipeCard 
+                  key={recipe.id} 
+                  recipe={recipe} 
+                  priority={index < 6} // Priority loading for first 6 images
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-600 text-lg">
+                Ingen opskrifter fundet. Prøv at ændre dine søgekriterier.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

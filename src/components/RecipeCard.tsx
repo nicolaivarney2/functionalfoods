@@ -6,9 +6,10 @@ import { Recipe } from '@/types/recipe'
 interface RecipeCardProps {
   recipe: Recipe;
   showRating?: boolean;
+  priority?: boolean; // For above-the-fold images
 }
 
-export default function RecipeCard({ recipe, showRating = true }: RecipeCardProps) {
+export default function RecipeCard({ recipe, showRating = true, priority = false }: RecipeCardProps) {
   const formatTime = (minutes: number) => {
     if (minutes < 60) return `${minutes} min`
     const hours = Math.floor(minutes / 60)
@@ -27,6 +28,11 @@ export default function RecipeCard({ recipe, showRating = true }: RecipeCardProp
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            priority={priority}
+            loading={priority ? 'eager' : 'lazy'}
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+            quality={75}
           />
         </div>
 

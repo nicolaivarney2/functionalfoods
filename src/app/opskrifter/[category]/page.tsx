@@ -1,8 +1,10 @@
-import { Metadata } from 'next'
 import Link from 'next/link'
 import { Search, Filter } from 'lucide-react'
-import { sampleRecipes, dietaryCategories } from '@/lib/sample-data'
+import { Metadata } from 'next'
+import { dietaryCategories } from '@/lib/sample-data'
+import { getRecipesByCategoryServer } from '@/lib/recipe-storage-server'
 import RecipeCard from '@/components/RecipeCard'
+import Script from 'next/script'
 
 interface CategoryPageProps {
   params: {
@@ -20,9 +22,14 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   }
 
   return {
-    title: `${category.name} opskrifter - ${category.description} | Functional Foods`,
-    description: `Find alle ${category.name} opskrifter fra Functional Foods. ${category.description}`,
-    keywords: [category.name.toLowerCase(), 'opskrifter', 'vægttab', 'sunde opskrifter'],
+    title: `${category.name} opskrifter | Functional Foods`,
+    description: category.description,
+    keywords: `${category.name}, opskrifter, vægttab, sunde opskrifter, danske opskrifter`,
+    openGraph: {
+      title: `${category.name} opskrifter`,
+      description: category.description,
+      type: 'website',
+    },
   }
 }
 
@@ -41,12 +48,42 @@ export default function CategoryPage({ params }: CategoryPageProps) {
   }
 
   // Filter recipes by this category
-  const categoryRecipes = sampleRecipes.filter(recipe => 
-    recipe.dietaryCategories.includes(category.name)
-  )
+  const categoryRecipes = getRecipesByCategoryServer(category.name)
+
+  // Generate structured data for SEO
+  const categoryStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "name": `${category.name} opskrifter`,
+    "description": category.description,
+    "url": `https://functionalfoods.dk/opskrifter/${category.slug}`,
+    "mainEntity": {
+      "@type": "ItemList",
+      "numberOfItems": categoryRecipes.length,
+      "itemListElement": categoryRecipes.map((recipe, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "item": {
+          "@type": "Recipe",
+          "name": recipe.title,
+          "url": `https://functionalfoods.dk/opskrift/${recipe.slug}`
+        }
+      }))
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-white">
+    <>
+      {/* Structured Data for SEO */}
+      <Script
+        id="category-structured-data"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(categoryStructuredData)
+        }}
+      />
+      
+      <main className="min-h-screen bg-white">
       {/* Hero Section */}
       <section className="bg-white py-16 border-b border-gray-200">
         <div className="container">
@@ -77,6 +114,7 @@ export default function CategoryPage({ params }: CategoryPageProps) {
               <input
                 type="text"
                 placeholder={`Søg i ${category.name} opskrifter`}
+                defaultValue=""
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
               />
             </div>
@@ -99,8 +137,12 @@ export default function CategoryPage({ params }: CategoryPageProps) {
           
           {categoryRecipes.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {categoryRecipes.map((recipe) => (
-                <RecipeCard key={recipe.id} recipe={recipe} />
+              {categoryRecipes.map((recipe, index) => (
+                <RecipeCard 
+                  key={recipe.id} 
+                  recipe={recipe} 
+                  priority={index < 3} // Priority loading for first 3 images
+                />
               ))}
             </div>
           ) : (
@@ -168,5 +210,6 @@ export default function CategoryPage({ params }: CategoryPageProps) {
         </div>
       </section>
     </main>
+    </>
   )
 } 

@@ -1,0 +1,124 @@
+[
+  {
+    "title": "Keto Laks med Citron",
+    "description": "En lækker keto laks med citron og urter",
+    "shortDescription": "Lækker keto laks med citron",
+    "preparationTime": 10,
+    "cookingTime": 15,
+    "calories": 320,
+    "protein": 25,
+    "carbs": 3,
+    "fat": 22,
+    "fiber": 2,
+    "mainCategory": "Aftensmad",
+    "subCategories": ["Fisk", "Keto"],
+    "dietaryCategories": ["Keto", "LCHF"],
+    "ingredients": [
+      {
+        "name": "laks",
+        "amount": 200,
+        "unit": "g",
+        "notes": "frisk"
+      },
+      {
+        "name": "citron",
+        "amount": 1,
+        "unit": "stk",
+        "notes": "frisk"
+      },
+      {
+        "name": "smør",
+        "amount": 30,
+        "unit": "g",
+        "notes": "saltet"
+      }
+    ],
+    "instructions": [
+      {
+        "stepNumber": 1,
+        "instruction": "Varm ovnen op til 200°C",
+        "time": 5,
+        "tips": "Brug medium varme"
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Steg laksen på panden med smør",
+        "time": 8,
+        "tips": "Steg på medium varme"
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Press citron over laksen og server",
+        "time": 2,
+        "tips": "Server med friske urter"
+      }
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop",
+    "imageAlt": "Keto laks med citron",
+    "servings": 2,
+    "difficulty": "Nem",
+    "author": "Functional Foods",
+    "publishedAt": "2024-01-15"
+  },
+  {
+    "title": "Keto Blomkålsgratin",
+    "description": "Cremet blomkålsgratin med bacon og ost",
+    "shortDescription": "Cremet keto blomkålsgratin",
+    "preparationTime": 15,
+    "cookingTime": 35,
+    "calories": 450,
+    "protein": 18,
+    "carbs": 8,
+    "fat": 35,
+    "fiber": 6,
+    "mainCategory": "Aftensmad",
+    "subCategories": ["Vegetar", "Gratin"],
+    "dietaryCategories": ["Keto", "LCHF"],
+    "ingredients": [
+      {
+        "name": "blomkål",
+        "amount": 500,
+        "unit": "g",
+        "notes": "frisk"
+      },
+      {
+        "name": "fløde",
+        "amount": 200,
+        "unit": "ml",
+        "notes": "38%"
+      },
+      {
+        "name": "ost",
+        "amount": 100,
+        "unit": "g",
+        "notes": "revet"
+      }
+    ],
+    "instructions": [
+      {
+        "stepNumber": 1,
+        "instruction": "Kog blomkålen i 5 minutter",
+        "time": 5,
+        "tips": "Ikke for blød"
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Bland med fløde og ost",
+        "time": 3,
+        "tips": "Brug håndmixer"
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Bag i ovnen i 30 minutter",
+        "time": 30,
+        "tips": "Guldbrun overflade"
+      }
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop",
+    "imageAlt": "Keto blomkålsgratin",
+    "servings": 4,
+    "difficulty": "Mellem",
+    "author": "Functional Foods",
+    "publishedAt": "2024-01-15"
+  }
+] 
