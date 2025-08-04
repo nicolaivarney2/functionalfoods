@@ -19,7 +19,7 @@ interface Recipe {
   cookingTime: number
   totalTime: number
   servings: number
-  difficulty: string
+  difficulty: 'Nem' | 'Mellem' | 'Svær'
   calories: number
   protein: number
   carbs: number
@@ -42,8 +42,12 @@ interface Recipe {
     time?: number
     tips?: string
   }>
-  publishedAt: string
-  updatedAt: string
+  publishedAt: Date
+  updatedAt: Date
+  metaTitle: string
+  metaDescription: string
+  keywords: string[]
+  author: string
 }
 
 // Extended dietary categories with images and 8th option - REORGANIZED
