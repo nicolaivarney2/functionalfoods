@@ -74,7 +74,7 @@ export default function Header() {
         <div className="container">
           <div className="relative">
             {/* Scrollable Navigation */}
-            <nav className="flex items-center h-12 text-sm font-medium overflow-x-auto scrollbar-hide">
+            <nav className="flex items-center h-12 text-sm font-medium overflow-x-auto scrollbar-hide hover:cursor-grab active:cursor-grabbing">
               <div className="flex items-center space-x-8 min-w-max px-4">
                 {dietaryCategories.map((category) => (
                   <Link
@@ -90,7 +90,14 @@ export default function Header() {
             
             {/* Scroll Indicators */}
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none">
+              {/* Swipe indicator dots */}
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex space-x-1">
+                <div className="w-1 h-1 bg-gray-400 rounded-full opacity-60 scroll-indicator"></div>
+                <div className="w-1 h-1 bg-gray-400 rounded-full opacity-40 scroll-indicator" style={{animationDelay: '0.5s'}}></div>
+                <div className="w-1 h-1 bg-gray-400 rounded-full opacity-20 scroll-indicator" style={{animationDelay: '1s'}}></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
