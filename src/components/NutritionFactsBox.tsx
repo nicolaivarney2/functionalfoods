@@ -54,15 +54,15 @@ export default function NutritionFactsBox({
   ]
 
   return (
-    <div className="bg-gray-100 rounded-lg p-6 space-y-4">
+    <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
       {/* Header */}
       <div className="flex items-center space-x-2">
-        <PieChart size={20} className="text-gray-600" />
-        <h3 className="text-lg font-semibold text-gray-900">NÆRINGSINDHOLD</h3>
+        <PieChart size={16} className="text-gray-500" />
+        <h3 className="text-sm font-medium text-gray-900">NÆRINGSINDHOLD</h3>
       </div>
 
       {/* Basic Nutrition Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-2 text-xs">
         <div className="flex justify-between">
           <span className="text-gray-600">Kalorier:</span>
           <span className="font-medium">{calories} kcal</span>
@@ -90,28 +90,28 @@ export default function NutritionFactsBox({
       </div>
 
       {/* Expandable Detailed Nutrition */}
-      <div className="border-t border-gray-200 pt-4">
+      <div className="border-t border-gray-200 pt-3">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left hover:bg-gray-200 rounded-lg p-2 transition-colors"
+          className="flex items-center justify-between w-full text-left hover:bg-gray-100 rounded px-2 py-1 transition-colors"
         >
-          <span className="font-medium text-gray-900">Detaljeret næringsindhold</span>
+          <span className="text-xs font-medium text-gray-700">Detaljeret næringsindhold</span>
           {isExpanded ? (
-            <ChevronUp size={20} className="text-gray-600" />
+            <ChevronUp size={14} className="text-gray-500" />
           ) : (
-            <ChevronDown size={20} className="text-gray-600" />
+            <ChevronDown size={14} className="text-gray-500" />
           )}
         </button>
 
         {isExpanded && (
-          <div className="mt-4 space-y-6">
+          <div className="mt-3 space-y-4">
             {/* Highlights */}
-            <div className="bg-green-50 rounded-lg p-4">
-              <h4 className="font-semibold text-green-800 mb-2">Næringshøjdepunkter</h4>
+            <div className="bg-green-50 rounded p-3">
+              <h4 className="text-xs font-medium text-green-800 mb-2">Næringshøjdepunkter</h4>
               <ul className="space-y-1">
                 {highlights.map((highlight, index) => (
-                  <li key={index} className="text-sm text-green-700 flex items-start">
-                    <span className="text-green-500 mr-2">•</span>
+                  <li key={index} className="text-xs text-green-700 flex items-start">
+                    <span className="text-green-500 mr-1">•</span>
                     {highlight}
                   </li>
                 ))}
@@ -120,13 +120,13 @@ export default function NutritionFactsBox({
 
             {/* Vitamins */}
             <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Vitaminer</h4>
-              <div className="space-y-2">
+              <h4 className="text-xs font-medium text-gray-900 mb-2">Vitaminer</h4>
+              <div className="space-y-1">
                 {Object.entries(vitamins).map(([vitamin, data]) => (
                   <div key={vitamin} className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">{vitamin}:</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-sm">{data.amount} {data.unit}</span>
+                    <span className="text-gray-600 text-xs">{vitamin}:</span>
+                    <div className="flex items-center space-x-1">
+                      <span className="font-medium text-xs">{data.amount} {data.unit}</span>
                       <span className="text-xs text-gray-500">({data.percentage}%)</span>
                     </div>
                   </div>
@@ -136,13 +136,13 @@ export default function NutritionFactsBox({
 
             {/* Minerals */}
             <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Mineraler</h4>
-              <div className="space-y-2">
+              <h4 className="text-xs font-medium text-gray-900 mb-2">Mineraler</h4>
+              <div className="space-y-1">
                 {Object.entries(minerals).map(([mineral, data]) => (
                   <div key={mineral} className="flex justify-between items-center">
-                    <span className="text-gray-600 text-sm">{mineral}:</span>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-sm">{data.amount} {data.unit}</span>
+                    <span className="text-gray-600 text-xs">{mineral}:</span>
+                    <div className="flex items-center space-x-1">
+                      <span className="font-medium text-xs">{data.amount} {data.unit}</span>
                       <span className="text-xs text-gray-500">({data.percentage}%)</span>
                     </div>
                   </div>
@@ -154,8 +154,8 @@ export default function NutritionFactsBox({
       </div>
 
       {/* Keto Education */}
-      <div className="pt-4 border-t border-gray-200">
-        <p className="text-sm text-gray-700">
+      <div className="pt-3 border-t border-gray-200">
+        <p className="text-xs text-gray-600">
           <strong>Forstå Keto:</strong> Læs om anbefalet næringsindhold på Keto til vægttab
         </p>
       </div>
