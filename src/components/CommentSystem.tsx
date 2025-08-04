@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { MessageCircle, Reply, Heart, Flag, Send, User } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import CommentCTA from './CommentCTA'
+import LoginModal from './LoginModal'
 
 interface Comment {
   id: string
@@ -18,6 +21,8 @@ interface CommentSystemProps {
 }
 
 export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
+  const { user } = useAuth()
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [comments, setComments] = useState<Comment[]>([
     {
       id: '1',
@@ -216,8 +221,16 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
         <p className="text-gray-600">Del dine erfaringer og tips med andre madentusiaster</p>
       </div>
 
-      {/* Comment Form */}
-      <div className="bg-white rounded-lg p-6 mb-8 shadow-sm border border-gray-100">
+      {/* Show CTA if user is not logged in */}
+      {!user && (
+        <div className="mb-8">
+          <CommentCTA onLoginClick={() => setIsLoginModalOpen(true)} />
+        </div>
+      )}
+
+      {/* Comment Form - Only show if user is logged in */}
+      {user && (
+        <div className="bg-white rounded-lg p-6 mb-8 shadow-sm border border-gray-100">
         <div className="flex space-x-3">
           <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
             <User size={20} className="text-green-600" />
@@ -258,6 +271,14 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
           <p className="text-gray-600">Vær den første til at dele dine erfaringer!</p>
         </div>
       )}
+        </div>
+      )}
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
+      />
     </div>
   )
 } 
