@@ -121,7 +121,6 @@ export default function RecipePage({ params }: RecipePageProps) {
               {/* Recipe Description and Actions */}
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-800 mb-3">Sådan laver du det</h2>
                   <p className="text-gray-700 leading-relaxed text-lg">
                     En skål fuld af smag, farver og skønne råvarer. Nem og hurtig aftensmad - og du kan skifte ud, 
                     så du både får brugt rester og undgår madspild. Denne {recipe.dietaryCategories[0]} opskrift er 
