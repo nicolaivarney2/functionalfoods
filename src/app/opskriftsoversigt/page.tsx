@@ -274,8 +274,7 @@ export default function RecipeOverviewPage() {
             Vælg mad ideologi
           </h2>
           <p className="text-gray-600 text-center mb-8">
-            Vælg din foretrukne mad ideologi og find opskrifter der passer til dig
-            <br />
+            Vælg din foretrukne mad ideologi og find opskrifter der passer til dig{' '}
             <span className="text-sm italic">
               ... Eller{' '}
               <button 
@@ -287,14 +286,14 @@ export default function RecipeOverviewPage() {
             </span>
           </p>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 justify-items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {extendedDietaryCategories.map((category) => (
               <Link
                 key={category.id}
                 href={`/opskrifter/${category.slug}`}
                 className="group block"
               >
-                <div className="bg-gray-50 border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors w-full max-w-sm">
+                <div className="bg-gray-50 border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors w-full">
                   {/* Category Image */}
                   <div className="relative h-48 bg-gray-200">
                     <Image
