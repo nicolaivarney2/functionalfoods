@@ -440,53 +440,14 @@ export default function RecipeOverviewPage() {
           
           {displayedRecipes.length > 0 ? (
             <>
-              <div className="grid lg:grid-cols-4 gap-8">
-                {/* Left Column - Nutrition Info */}
-                <div className="lg:col-span-1">
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 sticky top-4">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Næringsindhold</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Kalorier:</span>
-                        <span className="font-medium">417 kcal</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Protein:</span>
-                        <span className="font-medium">37g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Kulhydrater:</span>
-                        <span className="font-medium">8g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Fedt:</span>
-                        <span className="font-medium">23g</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Fiber:</span>
-                        <span className="font-medium">2g</span>
-                      </div>
-                    </div>
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
-                        <strong>Forstå Keto:</strong> Læs om anbefalet næringsindhold på Keto til vægttab
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Right Column - Recipes */}
-                <div className="lg:col-span-3">
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {displayedRecipes.map((recipe, index) => (
-                      <RecipeCard 
-                        key={recipe.id} 
-                        recipe={recipe} 
-                        priority={index < 6} // Priority loading for first 6 images
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {displayedRecipes.map((recipe, index) => (
+                  <RecipeCard 
+                    key={recipe.id} 
+                    recipe={recipe} 
+                    priority={index < 6} // Priority loading for first 6 images
+                  />
+                ))}
               </div>
               
               {/* Load More Button */}
