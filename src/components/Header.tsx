@@ -69,20 +69,29 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Sub Menu - White Background */}
+      {/* Sub Menu - White Background with Horizontal Scroll */}
       <div className="bg-white">
         <div className="container">
-          <nav className="flex items-center space-x-8 h-12 text-sm font-medium">
-            {dietaryCategories.map((category) => (
-              <Link
-                key={category.name}
-                href={category.href}
-                className="text-gray-900 hover:text-gray-600 transition-colors"
-              >
-                {category.name}
-              </Link>
-            ))}
-          </nav>
+          <div className="relative">
+            {/* Scrollable Navigation */}
+            <nav className="flex items-center h-12 text-sm font-medium overflow-x-auto scrollbar-hide">
+              <div className="flex items-center space-x-8 min-w-max px-4">
+                {dietaryCategories.map((category) => (
+                  <Link
+                    key={category.name}
+                    href={category.href}
+                    className="text-gray-900 hover:text-gray-600 transition-colors whitespace-nowrap"
+                  >
+                    {category.name}
+                  </Link>
+                ))}
+              </div>
+            </nav>
+            
+            {/* Scroll Indicators */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none"></div>
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none"></div>
+          </div>
         </div>
       </div>
 
