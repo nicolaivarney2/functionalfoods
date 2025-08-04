@@ -56,10 +56,10 @@ export default function NutritionFactsBox({
   return (
     <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
       {/* Header */}
-      <div className="flex items-center space-x-2">
-        <PieChart size={16} className="text-gray-500" />
-        <h3 className="text-sm font-medium text-gray-900">NÆRINGSINDHOLD</h3>
-      </div>
+              <div className="flex items-center space-x-2">
+          <PieChart size={16} className="text-gray-500" />
+          <h3 className="text-sm font-medium text-gray-900">NÆRINGSINDHOLD PR. PORTION</h3>
+        </div>
 
       {/* Basic Nutrition Grid */}
       <div className="grid grid-cols-3 gap-2 text-xs">
