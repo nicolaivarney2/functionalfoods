@@ -10,6 +10,7 @@ import RecipeTips from '@/components/RecipeTips'
 import RelatedRecipes from '@/components/RelatedRecipes'
 import AboutFunctionalFoods from '@/components/AboutFunctionalFoods'
 import CommentSystem from '@/components/CommentSystem'
+import SocialSharing from '@/components/SocialSharing'
 import DynamicIngredientsList from '@/components/DynamicIngredientsList'
 import InstructionsList from '@/components/InstructionsList'
 import RatingModal from '@/components/RatingModal'
@@ -92,7 +93,23 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
       </section>
 
       {/* Comment System - Moved up */}
-      <CommentSystem recipeId={recipe.id} comments={[]} />
+      <section id="comments-section" className="bg-gray-50 py-12">
+        <div className="container">
+          <CommentSystem recipeSlug={recipe.slug} />
+        </div>
+      </section>
+
+      {/* Social Sharing */}
+      <section className="bg-white py-8">
+        <div className="container">
+          <SocialSharing 
+            recipeTitle={recipe.title}
+            recipeUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/opskrift/${recipe.slug}`}
+            recipeImage={recipe.imageUrl}
+            recipeDescription={recipe.description}
+          />
+        </div>
+      </section>
 
       {/* Recipe Tips */}
       <section className="bg-white">
