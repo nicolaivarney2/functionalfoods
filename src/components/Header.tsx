@@ -13,13 +13,14 @@ const mainMenuItems = [
 ]
 
 const dietaryCategories = [
-  { name: 'SENSE', href: '/opskrifter/sense' },
   { name: 'KETO', href: '/opskrifter/keto' },
-  { name: 'PALEO/LCHF', href: '/opskrifter/paleo' },
-  { name: 'INTERMITTEN FASTE', href: '/opskrifter/intermittent-fasting' },
-  { name: 'KALORIETÆLLING', href: '/opskrifter/kalorietaelling' },
-  { name: 'MEALPREP', href: '/opskrifter/mealprep' },
-  { name: 'WHOLE30', href: '/opskrifter/whole30' },
+  { name: 'SENSE', href: '/opskrifter/sense' },
+  { name: 'LCHF/PALEO', href: '/opskrifter/lchf-paleo' },
+  { name: 'MEAL PREP', href: '/opskrifter/meal-prep' },
+  { name: 'ANTI-INFLAMMATORISK', href: '/opskrifter/anti-inflammatory' },
+  { name: 'MIDDELHAVSDIÆTEN', href: '/opskrifter/mediterranean' },
+  { name: 'FLEKSITARISK', href: '/opskrifter/flexitarian' },
+  { name: '5:2 DIÆT', href: '/opskrifter/5-2-diet' },
 ]
 
 export default function Header() {
