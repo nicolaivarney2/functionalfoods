@@ -6,6 +6,7 @@ import { getRecipeBySlugServer, getAllRecipesServer } from '@/lib/recipe-storage
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
+import NutritionFactsBox from '@/components/NutritionFactsBox'
 
 interface RecipePageProps {
   params: {
@@ -168,7 +169,18 @@ export default function RecipePage({ params }: RecipePageProps) {
                     ))}
                   </div>
                 </div>
-                
+
+                {/* Nutrition Facts Box - Moved up from client component */}
+                <div className="mt-6">
+                  <NutritionFactsBox
+                    calories={recipe.calories || 0}
+                    protein={recipe.protein || 0}
+                    carbs={recipe.carbs || 0}
+                    fat={recipe.fat || 0}
+                    fiber={recipe.fiber || 0}
+                    servings={recipe.servings || 4}
+                  />
+                </div>
 
               </div>
             </div>

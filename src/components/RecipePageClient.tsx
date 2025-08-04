@@ -5,7 +5,6 @@ import { Recipe } from '@/types/recipe'
 import { Star, MessageCircle } from 'lucide-react'
 import FloatingRecipeNavigation from '@/components/FloatingRecipeNavigation'
 import ServingSizeAdjuster from '@/components/ServingSizeAdjuster'
-import NutritionFactsBox from '@/components/NutritionFactsBox'
 import RecipeActions from '@/components/RecipeActions'
 import RecipeTips from '@/components/RecipeTips'
 import RelatedRecipes from '@/components/RelatedRecipes'
@@ -89,20 +88,6 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
             {/* Instructions */}
             <InstructionsList recipe={recipe} />
           </div>
-        </div>
-      </section>
-
-      {/* Nutrition Facts Box */}
-      <section className="bg-white">
-        <div className="container py-6">
-          <NutritionFactsBox
-            calories={recipe.calories || 0}
-            protein={recipe.protein || 0}
-            carbs={recipe.carbs || 0}
-            fat={recipe.fat || 0}
-            fiber={recipe.fiber || 0}
-            servings={servings}
-          />
         </div>
       </section>
 
