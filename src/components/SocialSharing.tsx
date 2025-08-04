@@ -1,6 +1,6 @@
 'use client'
 
-import { Share2, Facebook, Instagram, MessageCircle, Send, Pinterest } from 'lucide-react'
+import { Share2, Facebook, Instagram, MessageCircle, Send, Heart } from 'lucide-react'
 
 interface SocialSharingProps {
   recipeTitle: string
@@ -70,7 +70,7 @@ export default function SocialSharing({
     {
       platform: 'pinterest' as const,
       label: 'Pinterest',
-      icon: Pinterest,
+      icon: Heart,
       color: 'bg-red-600 hover:bg-red-700',
       textColor: 'text-white'
     },
