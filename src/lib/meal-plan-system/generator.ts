@@ -75,7 +75,7 @@ export class MealPlanGenerator {
           carbsPer100g: 8,
           fatPer100g: 28
         },
-        images: [],
+        images: ['/images/recipes/keto-avocado-egg-bowl.jpg'],
         slug: 'keto-avocado-egg-bowl',
         isActive: true,
         createdAt: new Date(),
@@ -106,7 +106,7 @@ export class MealPlanGenerator {
           carbsPer100g: 5,
           fatPer100g: 18
         },
-        images: [],
+        images: ['/images/recipes/keto-chicken-salad.jpg'],
         slug: 'keto-chicken-salad',
         isActive: true,
         createdAt: new Date(),
@@ -137,7 +137,7 @@ export class MealPlanGenerator {
           carbsPer100g: 8,
           fatPer100g: 22
         },
-        images: [],
+        images: ['/images/recipes/keto-salmon-vegetables.jpg'],
         slug: 'keto-salmon-vegetables',
         isActive: true,
         createdAt: new Date(),
@@ -167,7 +167,7 @@ export class MealPlanGenerator {
           carbsPer100g: 12,
           fatPer100g: 52
         },
-        images: [],
+        images: ['/images/recipes/keto-nuts-seeds-mix.jpg'],
         slug: 'keto-nuts-seeds-mix',
         isActive: true,
         createdAt: new Date(),

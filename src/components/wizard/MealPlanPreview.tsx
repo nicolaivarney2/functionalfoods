@@ -45,11 +45,11 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
         className="bg-white rounded-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white p-6">
+        <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white p-4 lg:p-6">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold">Your 6-Week Meal Plan</h2>
-              <p className="text-blue-100">
+              <h2 className="text-lg lg:text-2xl font-bold">Your 6-Week Meal Plan</h2>
+              <p className="text-blue-100 text-sm lg:text-base">
                 {dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name} • {Math.round(mealPlan.energyNeeds.targetCalories)} calories/day
               </p>
             </div>
@@ -57,7 +57,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
               onClick={onClose}
               className="text-white hover:text-blue-200 transition-colors"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -65,20 +65,21 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
         </div>
 
         {/* Navigation */}
-        <div className="bg-gray-50 p-4 border-b">
+        <div className="bg-gray-50 p-3 lg:p-4 border-b">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
               disabled={selectedWeek === 0}
-              className="flex items-center space-x-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm"
             >
-              <ChevronLeftIcon className="w-4 h-4" />
-              <span>Previous Week</span>
+              <ChevronLeftIcon className="w-3 h-3 lg:w-4 lg:h-4" />
+              <span className="hidden sm:inline">Previous Week</span>
+              <span className="sm:hidden">Prev</span>
             </button>
             
-            <div className="flex items-center space-x-4">
-              <CalendarIcon className="w-5 h-5 text-gray-600" />
-              <span className="font-semibold text-gray-900">
+            <div className="flex items-center space-x-2 lg:space-x-4">
+              <CalendarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+              <span className="font-semibold text-gray-900 text-sm lg:text-base">
                 Week {selectedWeek + 1} of {mealPlan.weeks.length}
               </span>
             </div>
@@ -86,76 +87,96 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             <button
               onClick={() => setSelectedWeek(Math.min(mealPlan.weeks.length - 1, selectedWeek + 1))}
               disabled={selectedWeek === mealPlan.weeks.length - 1}
-              className="flex items-center space-x-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm"
             >
-              <span>Next Week</span>
-              <ChevronRightIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">Next Week</span>
+              <span className="sm:hidden">Next</span>
+              <ChevronRightIcon className="w-3 h-3 lg:w-4 lg:h-4" />
             </button>
           </div>
         </div>
 
-        <div className="flex h-[70vh]">
+        <div className="flex flex-col lg:flex-row h-[70vh]">
           {/* Meal Plan */}
-          <div className="flex-1 p-6 overflow-y-auto">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Weekly Meal Plan</h3>
+          <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
+            <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">Weekly Meal Plan</h3>
             
             <div className="space-y-4">
-              {currentWeek.days.map((day: any, dayIndex: number) => (
-                <div key={dayIndex} className="border rounded-lg p-4 bg-white shadow-sm">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-semibold text-gray-900">
-                      {day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                    </h4>
-                    <div className="text-sm text-gray-600">
-                      {Math.round(day.totalCalories)} cal • P: {Math.round(day.totalProtein)}g • C: {Math.round(day.totalCarbs)}g • F: {Math.round(day.totalFat)}g
+              {currentWeek.days.map((day: any, dayIndex: number) => {
+                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                return (
+                  <div key={dayIndex} className="border rounded-lg p-4 bg-white shadow-sm">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-semibold text-gray-900">
+                        {dayNames[dayIndex]}
+                      </h4>
+                      <div className="text-xs lg:text-sm text-gray-600">
+                        {Math.round(day.totalCalories)} cal • P: {Math.round(day.totalProtein)}g • C: {Math.round(day.totalCarbs)}g • F: {Math.round(day.totalFat)}g
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {day.meals.map((meal: any, mealIndex: number) => (
-                      <div key={mealIndex} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-16 text-xs font-medium text-gray-600 uppercase tracking-wide">
-                          {meal.mealType}
-                        </div>
-                        <div className="flex-1">
-                          <h5 className="font-medium text-gray-900">{meal.recipe.title}</h5>
-                          <p className="text-sm text-gray-600">{meal.recipe.description}</p>
-                          <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>Servings: {meal.servings}</span>
-                            <span>Prep: {meal.recipe.prepTime}min</span>
-                            <span>Cook: {meal.recipe.cookTime}min</span>
+                    
+                    <div className="space-y-3">
+                      {day.meals.map((meal: any, mealIndex: number) => (
+                        <div key={mealIndex} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                          {/* Recipe Image */}
+                          <div className="w-16 h-16 flex-shrink-0">
+                            {meal.recipe.images && meal.recipe.images.length > 0 ? (
+                              <img 
+                                src={meal.recipe.images[0]} 
+                                alt={meal.recipe.title}
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-100 to-green-100 rounded-lg flex items-center justify-center">
+                                <span className="text-xs text-gray-600 font-medium">🍽️</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="w-12 text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
+                              {meal.mealType}
+                            </div>
+                            <h5 className="font-medium text-gray-900 text-sm lg:text-base">{meal.recipe.title}</h5>
+                            <p className="text-xs lg:text-sm text-gray-600 mt-1">{meal.recipe.description}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-gray-500">
+                              <span>Servings: {meal.servings}</span>
+                              <span>Prep: {meal.recipe.prepTime}min</span>
+                              <span>Cook: {meal.recipe.cookTime}min</span>
+                            </div>
+                          </div>
+                          
+                          <div className="text-right text-xs text-gray-600 flex-shrink-0">
+                            <div>{Math.round(meal.adjustedCalories)} cal</div>
+                            <div>P: {Math.round(meal.adjustedProtein)}g</div>
+                            <div>C: {Math.round(meal.adjustedCarbs)}g</div>
+                            <div>F: {Math.round(meal.adjustedFat)}g</div>
                           </div>
                         </div>
-                        <div className="text-right text-xs text-gray-600">
-                          <div>{Math.round(meal.adjustedCalories)} cal</div>
-                          <div>P: {Math.round(meal.adjustedProtein)}g</div>
-                          <div>C: {Math.round(meal.adjustedCarbs)}g</div>
-                          <div>F: {Math.round(meal.adjustedFat)}g</div>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
           {/* Shopping List */}
-          <div className="w-80 bg-gray-50 p-6 border-l">
+          <div className="w-full lg:w-80 bg-gray-50 p-4 lg:p-6 border-t lg:border-l lg:border-t-0">
             <div className="flex items-center space-x-2 mb-4">
               <ShoppingBagIcon className="w-5 h-5 text-gray-600" />
               <h3 className="text-lg font-semibold text-gray-900">Shopping List</h3>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-3">
               {currentWeek.shoppingList.categories.map((category: any, categoryIndex: number) => (
-                <div key={categoryIndex} className="bg-white rounded-lg p-4 shadow-sm">
-                  <h4 className="font-medium text-gray-900 mb-3">{category.name}</h4>
-                  <div className="space-y-2">
+                <div key={categoryIndex} className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 lg:mb-3 text-sm lg:text-base">{category.name}</h4>
+                  <div className="space-y-1 lg:space-y-2">
                     {category.items.map((item: any, itemIndex: number) => (
-                      <div key={itemIndex} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-700">{item.name}</span>
-                        <span className="text-gray-600 font-medium">
+                      <div key={itemIndex} className="flex justify-between items-center text-xs lg:text-sm">
+                        <span className="text-gray-700 truncate pr-2">{item.name}</span>
+                        <span className="text-gray-600 font-medium flex-shrink-0">
                           {item.amount} {item.unit}
                         </span>
                       </div>
@@ -166,13 +187,13 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             </div>
 
             {/* Nutrition Summary */}
-            <div className="mt-6 bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-3">
-                <ChartBarIcon className="w-5 h-5 text-gray-600" />
-                <h3 className="font-semibold text-gray-900">Weekly Nutrition</h3>
+            <div className="mt-4 lg:mt-6 bg-white rounded-lg p-3 lg:p-4 shadow-sm">
+              <div className="flex items-center space-x-2 mb-2 lg:mb-3">
+                <ChartBarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                <h3 className="font-semibold text-gray-900 text-sm lg:text-base">Weekly Nutrition</h3>
               </div>
               
-              <div className="space-y-2 text-sm">
+              <div className="space-y-1 lg:space-y-2 text-xs lg:text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Avg Daily Calories:</span>
                   <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCalories)}</span>
@@ -195,15 +216,15 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 p-4 border-t">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
+        <div className="bg-gray-50 p-3 lg:p-4 border-t">
+          <div className="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
+            <div className="text-xs lg:text-sm text-gray-600 text-center lg:text-left">
               Generated for {mealPlan.userProfile.gender}, {mealPlan.userProfile.age} years old, {mealPlan.userProfile.weight}kg
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-2 lg:space-x-3">
               <button
                 onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200"
+                className="px-4 lg:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 text-xs lg:text-sm"
               >
                 Close Preview
               </button>
@@ -212,7 +233,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
                   console.log('Download meal plan:', mealPlan);
                   alert('This would download the meal plan as PDF!');
                 }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200"
+                className="px-4 lg:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs lg:text-sm"
               >
                 Download PDF
               </button>
