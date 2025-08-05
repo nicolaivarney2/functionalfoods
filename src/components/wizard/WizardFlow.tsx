@@ -1080,14 +1080,6 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         >
           Vi har skabt din personlige 6-ugers vægttabsplan med {mealPlan.weeks * 7} dages måltider.
         </motion.p>
-        <motion.p 
-          className="text-sm text-gray-500 mb-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-        >
-          
-        </motion.p>
       </div>
 
       <motion.div 
@@ -1200,7 +1192,10 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button 
-            onClick={() => window.location.href = '/wizard/preview'}
+            onClick={() => {
+              // Show meal plan preview in a popup/modal
+              window.open('/wizard/preview', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            }}
             className="px-8 py-4 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200 hover:scale-105 font-semibold"
           >
             Se min plan
@@ -1229,7 +1224,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         Ekstra information
       </h3>
       <p className="text-gray-600">
-        Hjælp os med at tilpasse din plan endnu bedre til dine behov og livsstil.
+        Hjælp os med at tilpasse din plan endnu bedre til dine behov.
       </p>
     </div>
 
@@ -1241,7 +1236,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
     >
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
+          Vil du springe morgenmad over en gang imellem?
         </label>
         <motion.label
           className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
@@ -1265,7 +1260,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Hvor mange personer er denne plan til? Vi vil tilpasse opskrifter og indkøbsliste.
+          Hvor mange personer er denne plan til?
         </label>
         <select
           value={state.miscellaneous?.peopleCount || ''}
@@ -1287,7 +1282,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
+          Vil du spise samme mad 2 dage i træk nogle gange?
         </label>
         <motion.label
           className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
@@ -1311,7 +1306,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
+          Vil du have adgang til vores gratis online videokurs?
         </label>
         <motion.label
           className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
@@ -1335,7 +1330,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
+          Vil du have gratis personlig SMS-sparring?
         </label>
         <motion.label
           className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
