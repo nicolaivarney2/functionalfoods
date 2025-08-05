@@ -50,65 +50,51 @@ const WizardFlow: React.FC = () => {
   // Define wizard steps
   const steps: WizardStep[] = [
     {
-      id: 'welcome',
-      title: 'Welcome to Your Personalized 6-Week Plan',
-      description: 'Let\'s create your perfect nutrition journey',
-      component: WelcomeStep,
-      isCompleted: false
-    },
-    {
       id: 'profile',
-      title: 'Your Profile',
-      description: 'Tell us about yourself',
+      title: 'Din profil',
+      description: 'Fortæl os om dig selv',
       component: ProfileStep,
       isCompleted: false
     },
     {
-      id: 'goals',
-      title: 'Your Goals',
-      description: 'What do you want to achieve?',
-      component: GoalsStep,
-      isCompleted: false
-    },
-    {
       id: 'energy',
-      title: 'Energy Calculation',
-      description: 'Your personalized calorie needs',
+      title: 'Energiberegning',
+      description: 'Dine personlige kaloriebehov',
       component: EnergyStep,
       isCompleted: false
     },
     {
+      id: 'nutritional-assessment',
+      title: 'Ernæringsmæssig sundhed',
+      description: 'Hurtig vurdering for optimale resultater',
+      component: NutritionalAssessmentStep,
+      isCompleted: false
+    },
+    {
       id: 'dietary-approach',
-      title: 'Choose Your Approach',
-      description: 'Select your preferred dietary style',
+      title: 'Vælg din tilgang',
+      description: 'Vælg din foretrukne koststil',
       component: DietaryApproachStep,
       isCompleted: false
     },
     {
       id: 'preferences',
-      title: 'Food Preferences',
-      description: 'What foods do you want to avoid?',
+      title: 'Fødevarepræferencer',
+      description: 'Hvilke fødevarer vil du undgå?',
       component: PreferencesStep,
       isCompleted: false
     },
     {
-      id: 'nutritional-assessment',
-      title: 'Nutritional Health',
-      description: 'Quick assessment for optimal results',
-      component: NutritionalAssessmentStep,
-      isCompleted: false
-    },
-    {
-      id: 'review',
-      title: 'Review Your Plan',
-      description: 'Finalize your personalized plan',
-      component: ReviewStep,
+      id: 'miscellaneous',
+      title: 'Ekstra information',
+      description: 'Yderligere detaljer for din plan',
+      component: MiscellaneousStep,
       isCompleted: false
     },
     {
       id: 'generating',
-      title: 'Generating Your Plan',
-      description: 'Creating your personalized 6-week meal plan',
+      title: 'Genererer din plan',
+      description: 'Skaber din personlige 6-ugers plan',
       component: GeneratingStep,
       isCompleted: false
     }
@@ -153,20 +139,20 @@ const WizardFlow: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Your 6-Week Nutrition Plan
+              <h1 className="text-2xl font-bold text-white">
+                Din 6-ugers
               </h1>
-              <p className="text-gray-600 mt-1">
-                Personalized for your goals and preferences
+              <p className="text-[#FEFDF8] mt-1 text-sm">
+                personlige vægttabs-bog
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 font-semibold text-sm">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-white font-semibold text-sm">
                   {state.currentStep + 1}/{steps.length}
                 </span>
               </div>
@@ -178,47 +164,24 @@ const WizardFlow: React.FC = () => {
       {/* Progress Bar */}
       <div className="bg-white border-b">
         <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-center space-x-2">
             {steps.map((step, index) => (
               <div key={step.id} className="flex items-center">
                 <button
                   onClick={() => goToStep(index)}
-                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
+                  className={`w-3 h-3 rounded-full transition-all duration-200 ${
                     index <= state.currentStep
-                      ? 'bg-blue-500 border-blue-500 text-white'
-                      : 'bg-white border-gray-300 text-gray-400'
-                  } ${
-                    index < state.currentStep ? 'ring-2 ring-blue-200' : ''
+                      ? 'bg-[#87A96B]'
+                      : 'bg-gray-300'
                   }`}
-                >
-                  {index < state.currentStep ? (
-                    <CheckIcon className="w-5 h-5" />
-                  ) : (
-                    <span className="text-sm font-medium">{index + 1}</span>
-                  )}
-                </button>
+                />
                 {index < steps.length - 1 && (
                   <div
-                    className={`w-16 h-0.5 mx-2 ${
-                      index < state.currentStep ? 'bg-blue-500' : 'bg-gray-300'
+                    className={`w-8 h-0.5 mx-1 ${
+                      index < state.currentStep ? 'bg-[#87A96B]' : 'bg-gray-300'
                     }`}
                   />
                 )}
-              </div>
-            ))}
-          </div>
-          
-          {/* Step Labels */}
-          <div className="flex justify-between">
-            {steps.map((step, index) => (
-              <div
-                key={step.id}
-                className={`text-xs text-center transition-colors duration-200 ${
-                  index <= state.currentStep ? 'text-blue-600' : 'text-gray-400'
-                }`}
-                style={{ width: `${100 / steps.length}%` }}
-              >
-                {step.title}
               </div>
             ))}
           </div>
@@ -358,24 +321,24 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Gender
+          Køn
         </label>
         <select
           value={state.userProfile.gender || ''}
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, gender: e.target.value as 'male' | 'female' }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
         >
-          <option value="">Select gender</option>
-          <option value="male">Male</option>
-          <option value="female">Female</option>
+          <option value="">Vælg køn</option>
+          <option value="male">Mand</option>
+          <option value="female">Kvinde</option>
         </select>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Age
+          Alder
         </label>
         <input
           type="number"
@@ -383,14 +346,14 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, age: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Enter your age"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          placeholder="Indtast din alder"
         />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Height (cm)
+          Højde (cm)
         </label>
         <input
           type="number"
@@ -398,14 +361,14 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, height: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Enter your height"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          placeholder="Indtast din højde"
         />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Weight (kg)
+          Vægt (kg)
         </label>
         <input
           type="number"
@@ -413,42 +376,30 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, weight: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Enter your weight"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          placeholder="Indtast din vægt"
         />
       </div>
     </div>
 
     <div className="mt-6">
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Activity Level
+        Aktivitetsniveau
       </label>
-      <div className="grid grid-cols-1 gap-3">
-        {[
-          { value: ActivityLevel.Sedentary, label: 'Sedentary', desc: 'Little or no exercise' },
-          { value: ActivityLevel.LightlyActive, label: 'Lightly Active', desc: 'Light exercise 1-3 days/week' },
-          { value: ActivityLevel.ModeratelyActive, label: 'Moderately Active', desc: 'Moderate exercise 3-5 days/week' },
-          { value: ActivityLevel.VeryActive, label: 'Very Active', desc: 'Hard exercise 6-7 days/week' },
-          { value: ActivityLevel.ExtremelyActive, label: 'Extremely Active', desc: 'Very hard exercise, physical job' }
-        ].map((activity) => (
-          <label key={activity.value} className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-            <input
-              type="radio"
-              name="activityLevel"
-              value={activity.value}
-              checked={state.userProfile.activityLevel === activity.value}
-              onChange={(e) => updateState({ 
-                userProfile: { ...state.userProfile, activityLevel: parseFloat(e.target.value) }
-              })}
-              className="mr-3"
-            />
-            <div>
-              <div className="font-medium text-gray-900">{activity.label}</div>
-              <div className="text-sm text-gray-600">{activity.desc}</div>
-            </div>
-          </label>
-        ))}
-      </div>
+      <select
+        value={state.userProfile.activityLevel || ''}
+        onChange={(e) => updateState({ 
+          userProfile: { ...state.userProfile, activityLevel: parseFloat(e.target.value) }
+        })}
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+      >
+        <option value="">Vælg aktivitetsniveau</option>
+        <option value={ActivityLevel.Sedentary}>Stillesiddende - Lidt eller ingen motion</option>
+        <option value={ActivityLevel.LightlyActive}>Lidt aktiv - Let motion 1-3 dage/uge</option>
+        <option value={ActivityLevel.ModeratelyActive}>Moderat aktiv - Moderat motion 3-5 dage/uge</option>
+        <option value={ActivityLevel.VeryActive}>Meget aktiv - Hård motion 6-7 dage/uge</option>
+        <option value={ActivityLevel.ExtremelyActive}>Ekstremt aktiv - Meget hård motion, fysisk arbejde</option>
+      </select>
     </div>
   </div>
 );
@@ -457,9 +408,9 @@ const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   <div className="max-w-2xl mx-auto">
     <div className="grid grid-cols-1 gap-4">
       {[
-        { value: WeightGoal.WeightLoss, label: 'Weight Loss', desc: 'Lose weight and improve body composition', icon: '📉' },
-        { value: WeightGoal.Maintenance, label: 'Maintenance', desc: 'Maintain current weight and improve health', icon: '⚖️' },
-        { value: WeightGoal.MuscleGain, label: 'Muscle Gain', desc: 'Build muscle and increase strength', icon: '💪' }
+        { value: WeightGoal.WeightLoss, label: 'Vægt tab', desc: 'Tabe vægt og forbedre kropssammensætning', icon: '📉' },
+        { value: WeightGoal.Maintenance, label: 'Vedligeholdelse', desc: 'Vedligehold din nuværende vægt og forbedre sundhed', icon: '⚖️' },
+        { value: WeightGoal.MuscleGain, label: 'Muskelbygning', desc: 'Byg muskel og øge styrke', icon: '💪' }
       ].map((goal) => (
         <label key={goal.value} className="flex items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition-all duration-200">
           <input
@@ -485,74 +436,96 @@ const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   </div>
 );
 
-const EnergyStep: React.FC<any> = ({ state, nextStep }) => {
-  const [energyNeeds, setEnergyNeeds] = useState<any>(null);
+const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
+  const [isCalculating, setIsCalculating] = useState(true);
 
   useEffect(() => {
-    if (state.userProfile.gender && state.userProfile.age && state.userProfile.height && 
-        state.userProfile.weight && state.userProfile.activityLevel && state.userProfile.goal) {
-      const needs = DietaryCalculator.calculateTargetCalories(state.userProfile as UserProfile);
-      setEnergyNeeds(needs);
-    }
-  }, [state.userProfile]);
+    const calculateEnergy = async () => {
+      if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel) {
+        // Always use weight loss goal
+        const energyNeeds = DietaryCalculator.calculateTargetCalories(
+          state.userProfile as UserProfile,
+          WeightGoal.WeightLoss
+        );
+        
+        updateState({ 
+          userProfile: { 
+            ...state.userProfile, 
+            bmr: energyNeeds.bmr,
+            tdee: energyNeeds.tdee,
+            targetCalories: energyNeeds.targetCalories
+          }
+        });
+        setIsCalculating(false);
+      }
+    };
 
-  if (!energyNeeds) {
+    calculateEnergy();
+  }, [state.userProfile, updateState]);
+
+  if (isCalculating) {
     return (
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Calculating your energy needs...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B365D] mx-auto mb-4"></div>
+        <p className="text-gray-600">Beregner dine energibehov...</p>
       </div>
     );
   }
+
+  const energyNeeds = {
+    bmr: state.userProfile.bmr || 0,
+    tdee: state.userProfile.tdee || 0,
+    targetCalories: state.userProfile.targetCalories || 0
+  };
 
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Your Personalized Energy Needs
+          Dine personlige energibehov
         </h3>
         <p className="text-gray-600">
-          Based on your profile, here are your daily calorie targets:
+          Baseret på din profil, her er dine daglige kalorietargets:
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="text-center p-6 bg-blue-50 rounded-xl">
-          <div className="text-3xl font-bold text-blue-600 mb-2">
+        <div className="text-center p-6 bg-[#1B365D]/10 rounded-xl">
+          <div className="text-3xl font-bold text-[#1B365D] mb-2">
             {energyNeeds.bmr}
           </div>
-          <div className="text-sm text-gray-600">BMR (Base Metabolic Rate)</div>
+          <div className="text-sm text-gray-600">BMR (Grundstofskifte)</div>
         </div>
         
-        <div className="text-center p-6 bg-green-50 rounded-xl">
-          <div className="text-3xl font-bold text-green-600 mb-2">
+        <div className="text-center p-6 bg-[#87A96B]/10 rounded-xl">
+          <div className="text-3xl font-bold text-[#87A96B] mb-2">
             {energyNeeds.tdee}
           </div>
-          <div className="text-sm text-gray-600">TDEE (Total Daily Energy Expenditure)</div>
+          <div className="text-sm text-gray-600">TDEE (Total daglig energiforbrug)</div>
         </div>
         
-        <div className="text-center p-6 bg-purple-50 rounded-xl">
-          <div className="text-3xl font-bold text-purple-600 mb-2">
+        <div className="text-center p-6 bg-[#D4AF37]/10 rounded-xl">
+          <div className="text-3xl font-bold text-[#D4AF37] mb-2">
             {energyNeeds.targetCalories}
           </div>
-          <div className="text-sm text-gray-600">Target Calories</div>
+          <div className="text-sm text-gray-600">Målkalorier</div>
         </div>
       </div>
 
       <div className="bg-gray-50 rounded-xl p-6">
-        <h4 className="font-semibold text-gray-900 mb-4">What This Means:</h4>
+        <h4 className="font-semibold text-gray-900 mb-4">Hvad dette betyder:</h4>
         <ul className="space-y-2 text-gray-600">
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
-            Your body burns {energyNeeds.bmr} calories just to stay alive
+            <span className="text-[#87A96B] mr-2">✓</span>
+            Din krop forbrænder {energyNeeds.bmr} kalorier bare for at holde sig i live
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
-            With your activity level, you burn {energyNeeds.tdee} calories daily
+            <span className="text-[#87A96B] mr-2">✓</span>
+            Med dit aktivitetsniveau forbrænder du {energyNeeds.tdee} kalorier dagligt
           </li>
           <li className="flex items-start">
-            <span className="text-green-500 mr-2">✓</span>
-            For your goal, aim for {energyNeeds.targetCalories} calories daily
+            <span className="text-[#87A96B] mr-2">✓</span>
+            For dit mål, sigt efter {energyNeeds.targetCalories} kalorier dagligt
           </li>
         </ul>
       </div>
@@ -578,13 +551,13 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
             />
             <div className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
               state.selectedDietaryApproach === diet.id
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-[#1B365D] bg-[#1B365D]/5'
                 : 'border-gray-200 hover:border-gray-300'
             }`}>
               <div className="flex items-start justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 text-lg">{diet.name}</h3>
                 {state.selectedDietaryApproach === diet.id && (
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                  <div className="w-6 h-6 bg-[#1B365D] rounded-full flex items-center justify-center">
                     <CheckIcon className="w-4 h-4 text-white" />
                   </div>
                 )}
@@ -592,18 +565,34 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
               <p className="text-gray-600 mb-4">{diet.description}</p>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">
-                  {diet.macroRatios.carbohydrates.target}% carbs
+                  {diet.macroRatios.carbohydrates.target}% kulhydrater
                 </span>
                 <span className="text-gray-500">
                   {diet.macroRatios.protein.target}% protein
                 </span>
                 <span className="text-gray-500">
-                  {diet.macroRatios.fat.target}% fat
+                  {diet.macroRatios.fat.target}% fedt
                 </span>
               </div>
             </div>
           </label>
         ))}
+        
+        {/* Social Proof Box */}
+        <div className="p-6 border-2 border-[#87A96B] rounded-xl bg-[#87A96B]/5">
+          <div className="flex items-start justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 text-lg">Din personlige vægttabsbog</h3>
+            <div className="w-6 h-6 bg-[#87A96B] rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
+            </div>
+          </div>
+          <p className="text-gray-600 mb-4">
+            Den kostideologi du vælger er det, vi bygger din fysiske vægttabsbog omkring. Vi giver dig al den grundlæggende viden, du har brug for for at lykkes, og dette vil være i bogen, skrevet af os til dig.
+          </p>
+          <div className="text-sm text-[#87A96B] font-medium">
+            Inkluderet i din 6-ugers plan
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -613,50 +602,37 @@ const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   <div className="max-w-2xl mx-auto">
     <div className="space-y-6">
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Foods to Avoid</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Vælg fødevarer du ikke kan tåle eller lide</h3>
+        <p className="text-gray-600 mb-4">Afkryds dem vi skal ekskludere</p>
         <div className="grid grid-cols-2 gap-3">
-          {['pork', 'fish', 'dairy', 'nuts', 'gluten', 'soy'].map((food) => (
-            <label key={food} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+          {[
+            { id: 'red-meat', label: 'Rødt kød' },
+            { id: 'poultry', label: 'Fjerkræ' },
+            { id: 'pork', label: 'Svinekød' },
+            { id: 'fish', label: 'Fisk' },
+            { id: 'eggs', label: 'Æg' },
+            { id: 'shellfish', label: 'Skaldyr' },
+            { id: 'nuts', label: 'Nødder' },
+            { id: 'dairy', label: 'Mælkeprodukter' },
+            { id: 'gluten', label: 'Gluten' },
+            { id: 'soy', label: 'Soja' }
+          ].map((food) => (
+            <label key={food.id} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
               <input
                 type="checkbox"
-                checked={state.excludedIngredients.includes(food)}
-                                 onChange={(e) => {
-                   if (e.target.checked) {
-                     updateState({ excludedIngredients: [...state.excludedIngredients, food] });
-                   } else {
-                     updateState({ 
-                       excludedIngredients: state.excludedIngredients.filter((item: string) => item !== food)
-                     });
-                   }
-                 }}
+                checked={state.excludedIngredients.includes(food.id)}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    updateState({ excludedIngredients: [...state.excludedIngredients, food.id] });
+                  } else {
+                    updateState({ 
+                      excludedIngredients: state.excludedIngredients.filter((item: string) => item !== food.id)
+                    });
+                  }
+                }}
                 className="mr-3"
               />
-              <span className="capitalize">{food}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Allergies & Intolerances</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {['milk', 'eggs', 'fish', 'shellfish', 'tree nuts', 'peanuts', 'wheat', 'soy'].map((allergy) => (
-            <label key={allergy} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-              <input
-                type="checkbox"
-                checked={state.allergies.includes(allergy)}
-                                 onChange={(e) => {
-                   if (e.target.checked) {
-                     updateState({ allergies: [...state.allergies, allergy] });
-                   } else {
-                     updateState({ 
-                       allergies: state.allergies.filter((item: string) => item !== allergy)
-                     });
-                   }
-                 }}
-                className="mr-3"
-              />
-              <span className="capitalize">{allergy}</span>
+              <span>{food.label}</span>
             </label>
           ))}
         </div>
@@ -668,15 +644,21 @@ const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   <div className="max-w-2xl mx-auto">
     <div className="space-y-6">
+      <div className="text-center mb-6">
+        <p className="text-gray-600 mb-4">
+          Vores madplan er ikke kun interesseret i at give dig vægttab, men også med, at du får det fantastisk i din krop. Vi elsker funktionel mad, og er eksperter i, at strikke en madplan sammen, der dækker din krops fulde behov på ernæring og mineraler, samtidigt med, at vi giver dig et sundt og effektivt vægttab. Fortæl os derfor, om der er nogle af disse symptomer, du døjer med regelmæssigt:
+        </p>
+      </div>
+
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">How do you feel most days?</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Hvordan føler du dig de fleste dage?</h3>
         <div className="space-y-3">
           {[
-            'Energetic and focused',
-            'Tired but functional',
-            'Fatigued and sluggish',
-            'Mood swings and irritability',
-            'Brain fog and difficulty concentrating'
+            'Energisk og fokuseret',
+            'Træt men funktionel',
+            'Udmattet og sløv',
+            'Humørsvingninger og irritabilitet',
+            'Hjerne-tåge og svært ved at koncentrere sig'
           ].map((feeling, index) => (
             <label key={index} className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
               <input
@@ -692,15 +674,15 @@ const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep
       </div>
 
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Do you experience any of these?</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Oplever du nogle af disse?</h3>
         <div className="grid grid-cols-1 gap-3">
           {[
-            'Muscle cramps or spasms',
-            'Frequent headaches',
-            'Poor sleep quality',
-            'Digestive issues',
-            'Joint pain or stiffness',
-            'None of the above'
+            'Muskelkramper eller spasmer',
+            'Hyppige hovedpiner',
+            'Dårlig søvnkvalitet',
+            'Fordøjelsesproblemer',
+            'Led- eller stivhedssmerter',
+            'Ingen af ovenstående'
           ].map((symptom, index) => (
             <label key={index} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
               <input
@@ -744,9 +726,9 @@ const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
       <div className="bg-green-50 rounded-xl p-6">
         <h3 className="font-semibold text-gray-900 mb-4">Your Goals</h3>
         <p className="text-gray-600">
-          {state.userProfile.goal === 'weight-loss' && 'Weight Loss - Focus on calorie deficit and fat burning'}
-          {state.userProfile.goal === 'maintenance' && 'Maintenance - Balance calories and maintain current weight'}
-          {state.userProfile.goal === 'muscle-gain' && 'Muscle Gain - Calorie surplus and protein focus'}
+          {state.userProfile.goal === 'weight-loss' && 'Vægt tab - Fokus på kalorieunderskud og fedtforskydning'}
+          {state.userProfile.goal === 'maintenance' && 'Vedligeholdelse - Balancere kalorier og vedligeholde nuværende vægt'}
+          {state.userProfile.goal === 'muscle-gain' && 'Muskelbygning - Kalorieoverskud og proteinfokus'}
         </p>
       </div>
 
@@ -949,5 +931,73 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
 
   return null;
 };
+
+const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
+  <div className="max-w-2xl mx-auto">
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-semibold text-gray-900 mb-4">Ekstra information</h3>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
+            </label>
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+              <option value="">Vælg</option>
+              <option value="yes">Ja</option>
+              <option value="no">Nej</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Hvor mange personer er denne plan til? Vi vil tilpasse opskrifter og indkøbsliste.
+            </label>
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+              <option value="1">1 person</option>
+              <option value="2">2 personer</option>
+              <option value="3">3 personer</option>
+              <option value="4">4 personer</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
+            </label>
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+              <option value="">Vælg</option>
+              <option value="yes">Ja</option>
+              <option value="no">Nej</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
+            </label>
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+              <option value="">Vælg</option>
+              <option value="yes">Ja</option>
+              <option value="no">Nej</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
+            </label>
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+              <option value="">Vælg</option>
+              <option value="yes">Ja</option>
+              <option value="no">Nej</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default WizardFlow; 

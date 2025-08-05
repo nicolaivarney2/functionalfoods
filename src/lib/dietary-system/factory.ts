@@ -57,9 +57,9 @@ export class DietaryApproachFactory {
       name: 'Ketogenic Diet',
       description: 'High-fat, adequate-protein, low-carbohydrate diet that forces the body to burn fats rather than carbohydrates.',
       macroRatios: {
-        carbohydrates: { min: 5, target: 5, max: 10 },
-        protein: { min: 15, target: 20, max: 25 },
-        fat: { min: 70, target: 75, max: 80 }
+        carbohydrates: { min: 5, target: 7, max: 10 },
+        protein: { min: 30, target: 32, max: 35 },
+        fat: { min: 55, target: 61, max: 65 }
       },
       mealStructure: {
         mealsPerDay: 3,
@@ -67,9 +67,9 @@ export class DietaryApproachFactory {
           {
             mealType: MealType.Breakfast,
             macroDistribution: {
-              carbohydrates: { min: 5, target: 5, max: 10 },
-              protein: { min: 20, target: 25, max: 30 },
-              fat: { min: 65, target: 70, max: 75 }
+              carbohydrates: { min: 5, target: 7, max: 10 },
+              protein: { min: 30, target: 32, max: 35 },
+              fat: { min: 55, target: 61, max: 65 }
             },
             portionSize: { unit: 'calories', amount: 500 },
             isOptional: true
@@ -77,18 +77,18 @@ export class DietaryApproachFactory {
           {
             mealType: MealType.Lunch,
             macroDistribution: {
-              carbohydrates: { min: 5, target: 5, max: 10 },
-              protein: { min: 25, target: 30, max: 35 },
-              fat: { min: 60, target: 65, max: 70 }
+              carbohydrates: { min: 5, target: 7, max: 10 },
+              protein: { min: 30, target: 32, max: 35 },
+              fat: { min: 55, target: 61, max: 65 }
             },
             portionSize: { unit: 'calories', amount: 600 }
           },
           {
             mealType: MealType.Dinner,
             macroDistribution: {
-              carbohydrates: { min: 5, target: 5, max: 10 },
-              protein: { min: 25, target: 30, max: 35 },
-              fat: { min: 60, target: 65, max: 70 }
+              carbohydrates: { min: 5, target: 7, max: 10 },
+              protein: { min: 30, target: 32, max: 35 },
+              fat: { min: 55, target: 61, max: 65 }
             },
             portionSize: { unit: 'calories', amount: 700 }
           }
