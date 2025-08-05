@@ -8,6 +8,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '@heroicons/react/2
 import { dietaryFactory, DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
 import { ingredientService } from '@/lib/ingredient-system';
 import { mealPlanGenerator } from '@/lib/meal-plan-system';
+import MealPlanPreview from './MealPlanPreview';
 
 interface WizardStep {
   id: string;
@@ -786,6 +787,7 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
   const [progress, setProgress] = useState(0);
   const [mealPlan, setMealPlan] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     const generateMealPlan = async () => {
@@ -928,16 +930,19 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
           </button>
           
           <button
-            onClick={() => {
-              // Show preview of the meal plan
-              console.log('Preview meal plan:', mealPlan);
-              alert('This would show a preview of your meal plan!');
-            }}
+            onClick={() => setShowPreview(true)}
             className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200"
           >
             Preview My Plan
           </button>
         </div>
+
+        {showPreview && (
+          <MealPlanPreview 
+            mealPlan={mealPlan} 
+            onClose={() => setShowPreview(false)} 
+          />
+        )}
       </div>
     );
   }
