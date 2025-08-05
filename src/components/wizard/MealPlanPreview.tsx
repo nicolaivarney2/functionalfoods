@@ -108,7 +108,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             <div className="text-center p-4 bg-gradient-to-br from-[#87A96B]/10 to-[#D4AF37]/10 rounded-lg">
               <div className="text-2xl mb-2">🥗</div>
               <h3 className="font-semibold text-gray-900 mb-1">Ernæringsmæssigt optimal</h3>
-              <p className="text-sm text-gray-600">Højt indhold af vitamin B12, omega-3 og antioxidanter</p>
+              <p className="text-sm text-gray-600">Højt indhold af omega-3, protein og antioxidanter denne uge</p>
             </div>
             
             <div className="text-center p-4 bg-gradient-to-br from-[#D4AF37]/10 to-[#1B365D]/10 rounded-lg">
