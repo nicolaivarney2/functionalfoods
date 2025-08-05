@@ -137,7 +137,7 @@ const WizardFlow: React.FC = () => {
   const CurrentStepComponent = currentStep.component;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#FEFDF8] via-white to-[#87A96B]/10">
       {/* Header */}
       <div className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
@@ -198,18 +198,18 @@ const WizardFlow: React.FC = () => {
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
           >
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            <div className="bg-white rounded-2xl shadow-xl p-6 lg:p-8 border border-gray-100">
               {/* Step Header */}
               <motion.div 
-                className="text-center mb-8"
+                className="text-center mb-6 lg:mb-8"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1, duration: 0.3 }}
               >
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
                   {currentStep.title}
                 </h2>
-                <p className="text-gray-600 text-lg">
+                <p className="text-gray-600 text-base lg:text-lg">
                   {currentStep.description}
                 </p>
               </motion.div>
@@ -229,7 +229,7 @@ const WizardFlow: React.FC = () => {
 
               {/* Navigation */}
               <motion.div 
-                className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100"
+                className="flex flex-col sm:flex-row justify-between items-center mt-6 lg:mt-8 pt-6 border-t border-gray-100 space-y-4 sm:space-y-0"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.4 }}
@@ -237,7 +237,7 @@ const WizardFlow: React.FC = () => {
                 <button
                   onClick={prevStep}
                   disabled={state.currentStep === 0}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                     state.currentStep === 0
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-[#1B365D] hover:bg-[#1B365D]/5 hover:scale-105'
@@ -251,7 +251,7 @@ const WizardFlow: React.FC = () => {
                   <span className="text-sm text-gray-500">
                     Trin {state.currentStep + 1} af {steps.length}
                   </span>
-                  <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="w-24 lg:w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
                       initial={{ width: 0 }}
@@ -264,7 +264,7 @@ const WizardFlow: React.FC = () => {
                 <button
                   onClick={nextStep}
                   disabled={state.currentStep === steps.length - 1}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-4 lg:px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                     state.currentStep === steps.length - 1
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white hover:shadow-lg hover:scale-105'
@@ -278,6 +278,23 @@ const WizardFlow: React.FC = () => {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Floating Action Button for Mobile */}
+      <motion.div 
+        className="fixed bottom-6 right-6 lg:hidden"
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.5, duration: 0.3 }}
+      >
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="w-14 h-14 bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110"
+        >
+          <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+          </svg>
+        </button>
+      </motion.div>
     </div>
   );
 };
