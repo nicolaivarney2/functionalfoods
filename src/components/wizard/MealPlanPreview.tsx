@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { dietaryFactory } from '@/lib/dietary-system';
+import { pdfGenerator } from '@/lib/pdf-system';
 
 interface MealPlanPreviewProps {
   mealPlan: any;
@@ -13,6 +14,8 @@ interface MealPlanPreviewProps {
 const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) => {
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfGenerationError, setPdfGenerationError] = useState<string | null>(null);
 
   if (!mealPlan) {
     return (
@@ -38,6 +41,48 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
 
   const currentWeek = mealPlan.weeks[selectedWeek];
 
+  const handleGeneratePDF = async () => {
+    setIsGeneratingPDF(true);
+    setPdfGenerationError(null);
+    
+    try {
+      // Mock user profile - in real app this would come from wizard state
+      const userProfile = {
+        name: 'John Doe',
+        age: 35,
+        gender: 'male',
+        currentWeight: 80,
+        targetWeight: 70,
+        height: 175,
+        activityLevel: 'moderate',
+        dietaryApproach: mealPlan.dietaryApproach?.id || 'keto'
+      };
+
+      const result = await pdfGenerator.generateMealPlanPDF(
+        'user-123',
+        'meal-plan-456',
+        mealPlan,
+        userProfile,
+        {
+          quality: 'premium',
+          format: 'a4',
+          includeSections: ['cover', 'user-profile', 'meal-plan', 'shopping-list', 'nutrition-guide', 'progress-tracking', 'educational-content']
+        }
+      );
+
+      if (result.success) {
+        // In a real app, you would trigger download or show success message
+        alert('PDF generated successfully! This would download your personalized meal plan book.');
+      } else {
+        setPdfGenerationError(result.error || 'Failed to generate PDF');
+      }
+    } catch (error) {
+      setPdfGenerationError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <motion.div 
@@ -54,14 +99,35 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
                 {dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name} • {Math.round(mealPlan.energyNeeds.targetCalories)} calories/day
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="text-white hover:text-blue-200 transition-colors"
-            >
-              <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center space-x-3">
+              {/* PDF Generation Button */}
+              <button
+                onClick={handleGeneratePDF}
+                disabled={isGeneratingPDF}
+                className="flex items-center space-x-2 px-3 lg:px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-xs lg:text-sm font-medium"
+              >
+                {isGeneratingPDF ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <DocumentArrowDownIcon className="w-4 h-4" />
+                    <span>Generate PDF</span>
+                  </>
+                )}
+              </button>
+              
+              <button
+                onClick={onClose}
+                className="text-white hover:text-blue-200 transition-colors"
+              >
+                <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -96,6 +162,25 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             </button>
           </div>
         </div>
+
+        {/* PDF Generation Error */}
+        {pdfGenerationError && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">PDF Generation Failed</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{pdfGenerationError}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col h-[70vh]">
           {/* Meal Plan - Full Width */}
