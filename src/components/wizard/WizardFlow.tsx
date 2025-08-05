@@ -46,6 +46,7 @@ const WizardFlow: React.FC = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   // Define wizard steps
   const steps: WizardStep[] = [
@@ -296,6 +297,49 @@ const WizardFlow: React.FC = () => {
           </svg>
         </button>
       </motion.div>
+
+      {/* Preview Modal */}
+      {showPreviewModal && (
+        <motion.div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <motion.div
+            className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-900">Din personlige 6-ugers plan</h2>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <MealPlanPreview 
+                userProfile={state.userProfile}
+                selectedDietaryApproach={state.selectedDietaryApproach}
+                excludedIngredients={state.excludedIngredients}
+                excludedCategories={state.excludedCategories}
+                allergies={state.allergies}
+                intolerances={state.intolerances}
+                dietaryRestrictions={state.dietaryRestrictions}
+                nutritionalAssessment={state.nutritionalAssessment}
+              />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };
@@ -1153,10 +1197,7 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button 
-            onClick={() => {
-              // Show meal plan preview in a popup/modal
-              window.open('/wizard/preview', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
-            }}
+            onClick={() => setShowPreviewModal(true)}
             className="px-8 py-4 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200 hover:scale-105 font-semibold"
           >
             Se min plan
