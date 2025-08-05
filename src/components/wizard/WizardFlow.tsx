@@ -674,12 +674,6 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
 const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) => {
   const dietaryApproaches = [
     {
-      id: 'social-proof',
-      name: 'Vi bygger din laver og printer din fysiske vægttabsbog omkring dine madønsker. Du får al den viden i bogen du har brug for at lykkedes. Fra os til dig ❤️',
-      description: 'Social proof box',
-      color: 'from-[#D4AF37] to-[#87A96B]'
-    },
-    {
       id: 'keto',
       name: 'Ketogenisk diæt',
       description: 'Højt fedt, moderat protein, meget lavt kulhydrat. Fokuserer på at få kroppen til at brænde fedt i stedet for kulhydrater.',
@@ -725,9 +719,7 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
 
   const handleApproachSelect = (approachId: string) => {
     updateState({ selectedDietaryApproach: approachId });
-    if (approachId !== 'social-proof') {
-      nextStep();
-    }
+    nextStep();
   };
 
   return (
@@ -737,15 +729,6 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="text-center mb-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Vælg din tilgang
-        </h3>
-        <p className="text-gray-600">
-          Vælg den kosttilgang, der passer bedst til dine mål og præferencer. Vi vil tilpasse din madplan derefter.
-        </p>
-      </div>
-
       <motion.div 
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         initial={{ opacity: 0, y: 20 }}
@@ -770,28 +753,17 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1, duration: 0.4 }}
           >
-            {approach.id === 'social-proof' ? (
-              <div className="text-center">
-                <div className="text-2xl mb-3">❤️</div>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {approach.name}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${approach.color} mb-4 flex items-center justify-center`}>
-                  <span className="text-white font-bold text-lg">
-                    {approach.name.charAt(0)}
-                  </span>
-                </div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                  {approach.name}
-                </h4>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {approach.description}
-                </p>
-              </>
-            )}
+            <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${approach.color} mb-4 flex items-center justify-center`}>
+              <span className="text-white font-bold text-lg">
+                {approach.name.charAt(0)}
+              </span>
+            </div>
+            <h4 className="text-lg font-semibold text-gray-900 mb-2">
+              {approach.name}
+            </h4>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {approach.description}
+            </p>
             
             {state.selectedDietaryApproach === approach.id && (
               <motion.div
@@ -1159,33 +1131,6 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
       </motion.div>
 
       <motion.div 
-        className="bg-white rounded-xl border border-gray-200 p-6 mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
-      >
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Hvad du får ud af denne plan:</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mealPlan.nutritionalBenefits.map((benefit: string, index: number) => (
-            <motion.div 
-              key={index}
-              className="flex items-start space-x-3"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 + index * 0.1, duration: 0.4 }}
-            >
-              <div className="w-5 h-5 bg-[#87A96B] rounded-full flex items-center justify-center mt-0.5">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <span className="text-gray-700">{benefit}</span>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      <motion.div 
         className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] rounded-xl p-6 mb-8 text-white"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1193,6 +1138,22 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
       >
         <h3 className="text-xl font-semibold mb-4">Din personlige 6-ugers vægttabsbog inkluderer:</h3>
         <div className="space-y-3">
+          <div className="flex items-center space-x-3">
+            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span>Madplan til 6 uger</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <span>Budgetvenlig indkøbsliste uge-for-uge</span>
+          </div>
           <div className="flex items-center space-x-3">
             <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
               <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
@@ -1282,34 +1243,24 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
         </label>
-        <div className="space-y-3">
-          {[
-            { value: 'skip-breakfast', label: 'Ja, jeg vil gerne springe morgenmad over nogle gange' },
-            { value: 'no-skip-breakfast', label: 'Nej, jeg vil have morgenmad hver dag' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="radio"
-                name="skipBreakfast"
-                value={option.value}
-                checked={state.miscellaneous?.skipBreakfast === option.value}
-                onChange={(e) => updateState({
-                  miscellaneous: {
-                    ...state.miscellaneous,
-                    skipBreakfast: e.target.value
-                  }
-                })}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
+        <motion.label
+          className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <input
+            type="checkbox"
+            checked={state.miscellaneous?.skipBreakfast || false}
+            onChange={(e) => updateState({
+              miscellaneous: {
+                ...state.miscellaneous,
+                skipBreakfast: e.target.checked
+              }
+            })}
+            className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
+          />
+          <span className="text-gray-700">Ja, jeg vil gerne springe morgenmad over nogle gange</span>
+        </motion.label>
       </div>
 
       <div>
@@ -1338,102 +1289,72 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
         </label>
-        <div className="space-y-3">
-          {[
-            { value: 'repeat-meals', label: 'Ja, jeg vil gerne spise samme mad 2 dage i træk' },
-            { value: 'no-repeat-meals', label: 'Nej, jeg vil have forskellig mad hver dag' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="radio"
-                name="repeatMeals"
-                value={option.value}
-                checked={state.miscellaneous?.repeatMeals === option.value}
-                onChange={(e) => updateState({
-                  miscellaneous: {
-                    ...state.miscellaneous,
-                    repeatMeals: e.target.value
-                  }
-                })}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
+        <motion.label
+          className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <input
+            type="checkbox"
+            checked={state.miscellaneous?.repeatMeals || false}
+            onChange={(e) => updateState({
+              miscellaneous: {
+                ...state.miscellaneous,
+                repeatMeals: e.target.checked
+              }
+            })}
+            className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
+          />
+          <span className="text-gray-700">Ja, jeg vil gerne spise samme mad 2 dage i træk</span>
+        </motion.label>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
         </label>
-        <div className="space-y-3">
-          {[
-            { value: 'video-course', label: 'Ja, jeg vil gerne have adgang til videokurset' },
-            { value: 'no-video-course', label: 'Nej tak, jeg vil kun have den fysiske bog' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="radio"
-                name="videoCourse"
-                value={option.value}
-                checked={state.miscellaneous?.videoCourse === option.value}
-                onChange={(e) => updateState({
-                  miscellaneous: {
-                    ...state.miscellaneous,
-                    videoCourse: e.target.value
-                  }
-                })}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
+        <motion.label
+          className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <input
+            type="checkbox"
+            checked={state.miscellaneous?.videoCourse || false}
+            onChange={(e) => updateState({
+              miscellaneous: {
+                ...state.miscellaneous,
+                videoCourse: e.target.checked
+              }
+            })}
+            className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
+          />
+          <span className="text-gray-700">Ja, jeg vil gerne have adgang til videokurset</span>
+        </motion.label>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
           Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
         </label>
-        <div className="space-y-3">
-          {[
-            { value: 'sms-sparring', label: 'Ja, jeg vil gerne have SMS-sparring' },
-            { value: 'no-sms-sparring', label: 'Nej tak, jeg vil kun have den fysiske bog' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="radio"
-                name="smsSparring"
-                value={option.value}
-                checked={state.miscellaneous?.smsSparring === option.value}
-                onChange={(e) => updateState({
-                  miscellaneous: {
-                    ...state.miscellaneous,
-                    smsSparring: e.target.value
-                  }
-                })}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
+        <motion.label
+          className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <input
+            type="checkbox"
+            checked={state.miscellaneous?.smsSparring || false}
+            onChange={(e) => updateState({
+              miscellaneous: {
+                ...state.miscellaneous,
+                smsSparring: e.target.checked
+              }
+            })}
+            className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
+          />
+          <span className="text-gray-700">Ja, jeg vil gerne have SMS-sparring</span>
+        </motion.label>
       </div>
     </motion.div>
   </motion.div>
