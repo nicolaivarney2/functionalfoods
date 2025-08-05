@@ -1,4 +1,4 @@
-import { IngredientTag, IngredientCategory, NutritionalInfo } from './types'
+import { IngredientTag, IngredientCategory, NutritionalInfo, VitaminInfo, MineralInfo } from './types'
 
 // Frida API integration for Danish nutritional data
 export class FridaIntegration {
@@ -89,164 +89,264 @@ export class FridaIntegration {
   }
 
   /**
-   * Extract vitamin information from Frida data
+   * Extract vitamins from Frida nutrient data
    */
-  private extractVitamins(nutrients: any): any[] {
-    const vitamins = []
-    const vitaminMap: { [key: string]: string } = {
-      'vitamin_a': 'Vitamin A',
-      'vitamin_d': 'Vitamin D',
-      'vitamin_e': 'Vitamin E',
-      'vitamin_k': 'Vitamin K',
-      'vitamin_c': 'Vitamin C',
-      'vitamin_b1': 'Vitamin B1',
-      'vitamin_b2': 'Vitamin B2',
-      'vitamin_b3': 'Vitamin B3',
-      'vitamin_b6': 'Vitamin B6',
-      'vitamin_b12': 'Vitamin B12',
-      'folate': 'Folate'
+  private extractVitamins(nutrients: any): VitaminInfo[] {
+    const vitamins: VitaminInfo[] = []
+    
+    const vitaminMapping: Record<string, string> = {
+      'Vitamin A': 'A',
+      'Vitamin D': 'D', 
+      'Vitamin E': 'E',
+      'Vitamin K': 'K',
+      'Vitamin C': 'C',
+      'Thiamin': 'B1',
+      'Riboflavin': 'B2',
+      'Niacin': 'B3',
+      'Vitamin B-6': 'B6',
+      'Folate': 'B9',
+      'Vitamin B-12': 'B12',
+      'Pantothenic acid': 'B5',
+      'Biotin': 'B7'
     }
-
-    Object.entries(nutrients).forEach(([key, value]) => {
-      if (vitaminMap[key] && value) {
+    
+    for (const [nutrientName, value] of Object.entries(nutrients)) {
+      if (vitaminMapping[nutrientName] && typeof value === 'number') {
         vitamins.push({
-          vitamin: vitaminMap[key],
-          amountPer100g: Number(value),
+          vitamin: vitaminMapping[nutrientName],
+          amountPer100g: value,
           unit: 'mg'
         })
       }
-    })
-
+    }
+    
     return vitamins
   }
-
+  
   /**
-   * Extract mineral information from Frida data
+   * Extract minerals from Frida nutrient data
    */
-  private extractMinerals(nutrients: any): any[] {
-    const minerals = []
-    const mineralMap: { [key: string]: string } = {
-      'calcium': 'Calcium',
-      'iron': 'Iron',
-      'magnesium': 'Magnesium',
-      'phosphorus': 'Phosphorus',
-      'potassium': 'Potassium',
-      'zinc': 'Zinc',
-      'selenium': 'Selenium'
+  private extractMinerals(nutrients: any): MineralInfo[] {
+    const minerals: MineralInfo[] = []
+    
+    const mineralMapping: Record<string, string> = {
+      'Calcium': 'Calcium',
+      'Iron': 'Jern',
+      'Magnesium': 'Magnesium',
+      'Phosphorus': 'Fosfor',
+      'Potassium': 'Kalium',
+      'Sodium': 'Natrium',
+      'Zinc': 'Zink',
+      'Copper': 'Kobber',
+      'Manganese': 'Mangan',
+      'Selenium': 'Selen',
+      'Iodine': 'Jod',
+      'Chromium': 'Krom',
+      'Molybdenum': 'Molybdæn'
     }
-
-    Object.entries(nutrients).forEach(([key, value]) => {
-      if (mineralMap[key] && value) {
+    
+    for (const [nutrientName, value] of Object.entries(nutrients)) {
+      if (mineralMapping[nutrientName] && typeof value === 'number') {
         minerals.push({
-          mineral: mineralMap[key],
-          amountPer100g: Number(value),
+          mineral: mineralMapping[nutrientName],
+          amountPer100g: value,
           unit: 'mg'
         })
       }
-    })
-
+    }
+    
     return minerals
   }
 
   /**
    * Determine ingredient category based on name and Frida data
    */
-  determineIngredientCategory(ingredientName: string, fridaData?: any): IngredientCategory {
+  determineIngredientCategory(ingredientName: string, fridaData: any): IngredientCategory {
     const name = ingredientName.toLowerCase()
     
     // Protein sources
     if (name.includes('kylling') || name.includes('høne') || name.includes('kalkun') ||
-        name.includes('laks') || name.includes('torsk') || name.includes('ørred') ||
-        name.includes('æg') || name.includes('bønne') || name.includes('linser') ||
-        name.includes('kød') || name.includes('hakket')) {
+        name.includes('and') || name.includes('gås') || name.includes('fasan')) {
+      return IngredientCategory.Protein
+    }
+    if (name.includes('svin') || name.includes('flæsk') || name.includes('hakket') ||
+        name.includes('pølse') || name.includes('skinke') || name.includes('bacon')) {
+      return IngredientCategory.Protein
+    }
+    if (name.includes('okse') || name.includes('kalv') || name.includes('lam') ||
+        name.includes('hakket') || name.includes('bøf') || name.includes('steak')) {
+      return IngredientCategory.Protein
+    }
+    if (name.includes('fisk') || name.includes('laks') || name.includes('torsk') ||
+        name.includes('makrel') || name.includes('sild') || name.includes('rødspætte') ||
+        name.includes('hornfisk') || name.includes('ørred') || name.includes('ørred')) {
+      return IngredientCategory.Protein
+    }
+    if (name.includes('æg') || name.includes('egg')) {
       return IngredientCategory.Protein
     }
     
     // Vegetables
-    if (name.includes('broccoli') || name.includes('spinat') || name.includes('salat') ||
-        name.includes('tomat') || name.includes('agurk') || name.includes('løg') ||
-        name.includes('hvidløg') || name.includes('gulerod') || name.includes('kartoffel')) {
-      return IngredientCategory.Vegetable
+    if (name.includes('broccoli') || name.includes('blomkål') || name.includes('kål') ||
+        name.includes('spinat') || name.includes('salat') || name.includes('agurk') ||
+        name.includes('tomat') || name.includes('peber') || name.includes('løg') ||
+        name.includes('hvidløg') || name.includes('gulerod') || name.includes('selleri') ||
+        name.includes('asparges') || name.includes('artiskok') || name.includes('aubergine') ||
+        name.includes('squash') || name.includes('zucchini') || name.includes('bønne') ||
+        name.includes('ærter') || name.includes('majs')) {
+      return IngredientCategory.Groent
     }
     
     // Fruits
-    if (name.includes('æble') || name.includes('banan') || name.includes('bær') ||
-        name.includes('citron') || name.includes('lime') || name.includes('appelsin')) {
-      return IngredientCategory.Fruit
-    }
-    
-    // Dairy
-    if (name.includes('mælk') || name.includes('ost') || name.includes('fløde') ||
-        name.includes('yoghurt') || name.includes('smør')) {
-      return IngredientCategory.Dairy
+    if (name.includes('æble') || name.includes('banan') || name.includes('pære') ||
+        name.includes('appelsin') || name.includes('citron') || name.includes('lime') ||
+        name.includes('druer') || name.includes('jordbær') || name.includes('hindbær') ||
+        name.includes('blåbær') || name.includes('kirsebær') || name.includes('fersken') ||
+        name.includes('abrikos') || name.includes('mango') || name.includes('ananas') ||
+        name.includes('kiwi') || name.includes('granatæble') || name.includes('figen')) {
+      return IngredientCategory.Frugt
     }
     
     // Grains
-    if (name.includes('havregryn') || name.includes('ris') || name.includes('quinoa') ||
-        name.includes('pasta') || name.includes('brød')) {
-      return IngredientCategory.Grain
+    if (name.includes('ris') || name.includes('pasta') || name.includes('havregryn') ||
+        name.includes('rug') || name.includes('hvede') || name.includes('byg') ||
+        name.includes('majs') || name.includes('quinoa') || name.includes('buckwheat') ||
+        name.includes('bulgur') || name.includes('couscous') || name.includes('polenta')) {
+      return IngredientCategory.Korn
     }
     
-    // Nuts and seeds
-    if (name.includes('mandel') || name.includes('nød') || name.includes('frø') ||
-        name.includes('chia') || name.includes('pumpkinfrø')) {
-      return IngredientCategory.Nut
+    // Dairy
+    if (name.includes('mælk') || name.includes('fløde') || name.includes('ost') ||
+        name.includes('yoghurt') || name.includes('smør') || name.includes('creme') ||
+        name.includes('kærnemælk') || name.includes('kefir') || name.includes('quark')) {
+      return IngredientCategory.Mejeri
     }
     
-    // Fats and oils
-    if (name.includes('olie') || name.includes('oliven') || name.includes('kokos')) {
-      return IngredientCategory.Fat
+    // Fats and Oils
+    if (name.includes('olie') || name.includes('oliven') || name.includes('kokos') ||
+        name.includes('raps') || name.includes('solskin') || name.includes('sesam') ||
+        name.includes('nødde') || name.includes('avocado') || name.includes('margarine')) {
+      return IngredientCategory.Fedt
     }
     
-    // Spices and herbs
-    if (name.includes('peber') || name.includes('salt') || name.includes('timian') ||
-        name.includes('rosmarin') || name.includes('persille') || name.includes('dild')) {
-      return IngredientCategory.Spice
+    // Spices
+    if (name.includes('peber') || name.includes('salt') || name.includes('kardemomme') ||
+        name.includes('kanel') || name.includes('muskat') || name.includes('kurkuma') ||
+        name.includes('ingefær') || name.includes('chili') || name.includes('paprika') ||
+        name.includes('oregano') || name.includes('basilikum') || name.includes('timian') ||
+        name.includes('rosmarin') || name.includes('salvie') || name.includes('løvstikke')) {
+      return IngredientCategory.Krydderi
     }
     
-    return IngredientCategory.Other
+    // Herbs
+    if (name.includes('persille') || name.includes('dild') || name.includes('karse') ||
+        name.includes('mynte') || name.includes('citronmelisse') || name.includes('kamille')) {
+      return IngredientCategory.Urter
+    }
+    
+    // Nuts and Seeds
+    if (name.includes('mandel') || name.includes('valnød') || name.includes('cashew') ||
+        name.includes('pistacie') || name.includes('hasselnød') || name.includes('pekan') ||
+        name.includes('macadamia') || name.includes('paranød') || name.includes('kastanje')) {
+      return IngredientCategory.Nodder
+    }
+    if (name.includes('frø') || name.includes('solsikke') || name.includes('pumpkin') ||
+        name.includes('chia') || name.includes('hamp') || name.includes('sesam') ||
+        name.includes('lin') || name.includes('poppy')) {
+      return IngredientCategory.Fro
+    }
+    
+    // Legumes
+    if (name.includes('bønne') || name.includes('linser') || name.includes('kikærter') ||
+        name.includes('ærter') || name.includes('soja') || name.includes('edamame')) {
+      return IngredientCategory.Balg
+    }
+    
+    // Sweeteners
+    if (name.includes('sukker') || name.includes('honning') || name.includes('sirap') ||
+        name.includes('agave') || name.includes('stevia') || name.includes('aspartam') ||
+        name.includes('saccharin') || name.includes('xylitol') || name.includes('erythritol')) {
+      return IngredientCategory.Soedstof
+    }
+    
+    // Beverages
+    if (name.includes('vand') || name.includes('juice') || name.includes('saft') ||
+        name.includes('te') || name.includes('kaffe') || name.includes('kakao') ||
+        name.includes('smoothie') || name.includes('shake')) {
+      return IngredientCategory.Drikke
+    }
+    
+    // Default to other if no match
+    return IngredientCategory.Andre
   }
 
   /**
-   * Determine exclusions and allergens based on ingredient
+   * Determine exclusions and allergens based on ingredient name and category
    */
-  determineExclusionsAndAllergens(ingredientName: string, category: IngredientCategory): {
-    exclusions: string[]
-    allergens: string[]
-  } {
+  determineExclusionsAndAllergens(ingredientName: string, category: IngredientCategory): { exclusions: string[], allergens: string[] } {
     const name = ingredientName.toLowerCase()
     const exclusions: string[] = []
     const allergens: string[] = []
-
+    
     // Pork exclusions
-    if (name.includes('svin') || name.includes('flæsk') || name.includes('bacon')) {
-      exclusions.push('pork')
+    if (name.includes('svin') || name.includes('flæsk') || name.includes('hakket') ||
+        name.includes('pølse') || name.includes('skinke') || name.includes('bacon') ||
+        name.includes('svinemørbrad') || name.includes('svinesteg')) {
+      exclusions.push('svinekød')
     }
-
-    // Dairy exclusions
-    if (category === IngredientCategory.Dairy || 
-        name.includes('mælk') || name.includes('ost') || name.includes('fløde')) {
-      exclusions.push('dairy')
-      allergens.push('milk')
+    
+    // Dairy exclusions and allergens
+    if (name.includes('mælk') || name.includes('fløde') || name.includes('ost') ||
+        name.includes('yoghurt') || name.includes('smør') || name.includes('creme') ||
+        name.includes('kærnemælk') || name.includes('kefir') || name.includes('quark')) {
+      exclusions.push('mejeri')
+      allergens.push('mælk')
     }
-
-    // Nut exclusions
-    if (category === IngredientCategory.Nut || name.includes('nød')) {
-      exclusions.push('nuts')
-      allergens.push('nuts')
-    }
-
+    
     // Fish allergens
-    if (name.includes('laks') || name.includes('torsk') || name.includes('fisk')) {
-      allergens.push('fish')
+    if (name.includes('fisk') || name.includes('laks') || name.includes('torsk') ||
+        name.includes('makrel') || name.includes('sild') || name.includes('rødspætte') ||
+        name.includes('hornfisk') || name.includes('ørred')) {
+      allergens.push('fisk')
     }
-
+    
+    // Nut allergens and exclusions
+    if (name.includes('mandel') || name.includes('valnød') || name.includes('cashew') ||
+        name.includes('pistacie') || name.includes('hasselnød') || name.includes('pekan') ||
+        name.includes('macadamia') || name.includes('paranød') || name.includes('kastanje')) {
+      exclusions.push('nødder')
+      allergens.push('nødder')
+    }
+    
     // Gluten exclusions
-    if (name.includes('hvede') || name.includes('rug') || name.includes('byg')) {
+    if (name.includes('hvede') || name.includes('rug') || name.includes('byg') ||
+        name.includes('havre') || name.includes('spelt') || name.includes('kamut')) {
       exclusions.push('gluten')
       allergens.push('gluten')
     }
-
+    
+    // Egg allergens
+    if (name.includes('æg') || name.includes('egg')) {
+      allergens.push('æg')
+    }
+    
+    // Soy allergens
+    if (name.includes('soja') || name.includes('edamame') || name.includes('tofu')) {
+      exclusions.push('soja')
+      allergens.push('soja')
+    }
+    
+    // Shellfish allergens
+    if (name.includes('reje') || name.includes('krabbe') || name.includes('hummer') ||
+        name.includes('musling') || name.includes('østers')) {
+      allergens.push('skaldyr')
+    }
+    
+    // Sulfite allergens
+    if (name.includes('vin') || name.includes('øl') || name.includes('druer')) {
+      allergens.push('sulfitter')
+    }
+    
     return { exclusions, allergens }
   }
 

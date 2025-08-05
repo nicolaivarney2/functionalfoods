@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Search, Plus, Edit, Trash2, Filter, Tag, BarChart3 } from 'lucide-react'
-import { IngredientTag, IngredientCategory, NutritionalInfo } from '@/lib/ingredient-system/types'
+import { IngredientTag, IngredientCategory, NutritionalInfo, INGREDIENT_CATEGORY_NAMES } from '@/lib/ingredient-system/types'
 import { ingredientService } from '@/lib/ingredient-system'
 
 export default function IngredientsAdminPage() {
@@ -154,20 +154,20 @@ export default function IngredientsAdminPage() {
   const getCategoryColor = (category: IngredientCategory) => {
     const colors = {
       [IngredientCategory.Protein]: 'bg-red-100 text-red-800',
-      [IngredientCategory.Vegetable]: 'bg-green-100 text-green-800',
-      [IngredientCategory.Fruit]: 'bg-yellow-100 text-yellow-800',
-      [IngredientCategory.Grain]: 'bg-orange-100 text-orange-800',
-      [IngredientCategory.Dairy]: 'bg-blue-100 text-blue-800',
-      [IngredientCategory.Fat]: 'bg-purple-100 text-purple-800',
-      [IngredientCategory.Spice]: 'bg-pink-100 text-pink-800',
-      [IngredientCategory.Herb]: 'bg-teal-100 text-teal-800',
-      [IngredientCategory.Nut]: 'bg-brown-100 text-brown-800',
-      [IngredientCategory.Seed]: 'bg-indigo-100 text-indigo-800',
-      [IngredientCategory.Legume]: 'bg-lime-100 text-lime-800',
-      [IngredientCategory.ProcessedFood]: 'bg-gray-100 text-gray-800',
-      [IngredientCategory.Sweetener]: 'bg-pink-100 text-pink-800',
-      [IngredientCategory.Beverage]: 'bg-cyan-100 text-cyan-800',
-      [IngredientCategory.Other]: 'bg-gray-100 text-gray-800'
+      [IngredientCategory.Groent]: 'bg-green-100 text-green-800',
+      [IngredientCategory.Frugt]: 'bg-yellow-100 text-yellow-800',
+      [IngredientCategory.Korn]: 'bg-orange-100 text-orange-800',
+      [IngredientCategory.Mejeri]: 'bg-blue-100 text-blue-800',
+      [IngredientCategory.Fedt]: 'bg-purple-100 text-purple-800',
+      [IngredientCategory.Krydderi]: 'bg-pink-100 text-pink-800',
+      [IngredientCategory.Urter]: 'bg-teal-100 text-teal-800',
+      [IngredientCategory.Nodder]: 'bg-amber-100 text-amber-800',
+      [IngredientCategory.Fro]: 'bg-indigo-100 text-indigo-800',
+      [IngredientCategory.Balg]: 'bg-lime-100 text-lime-800',
+      [IngredientCategory.Forarbejdet]: 'bg-gray-100 text-gray-800',
+      [IngredientCategory.Soedstof]: 'bg-rose-100 text-rose-800',
+      [IngredientCategory.Drikke]: 'bg-cyan-100 text-cyan-800',
+      [IngredientCategory.Andre]: 'bg-slate-100 text-slate-800'
     }
     return colors[category] || 'bg-gray-100 text-gray-800'
   }
@@ -340,7 +340,7 @@ export default function IngredientsAdminPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(ingredient.category)}`}>
-                        {ingredient.category}
+                        {INGREDIENT_CATEGORY_NAMES[ingredient.category] || ingredient.category}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -491,7 +491,7 @@ function IngredientModal({
               >
                 {Object.values(IngredientCategory).map(category => (
                   <option key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                    {INGREDIENT_CATEGORY_NAMES[category] || category.charAt(0).toUpperCase() + category.slice(1)}
                   </option>
                 ))}
               </select>

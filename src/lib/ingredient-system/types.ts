@@ -16,20 +16,39 @@ export interface IngredientTag {
 
 export enum IngredientCategory {
   Protein = 'protein',
-  Vegetable = 'vegetable',
-  Fruit = 'fruit',
-  Grain = 'grain',
-  Dairy = 'dairy',
-  Fat = 'fat',
-  Spice = 'spice',
-  Herb = 'herb',
-  Nut = 'nut',
-  Seed = 'seed',
-  Legume = 'legume',
-  ProcessedFood = 'processed-food',
-  Sweetener = 'sweetener',
-  Beverage = 'beverage',
-  Other = 'other'
+  Groent = 'groent',
+  Frugt = 'frugt',
+  Korn = 'korn',
+  Mejeri = 'mejeri',
+  Fedt = 'fedt',
+  Krydderi = 'krydderi',
+  Urter = 'urter',
+  Nodder = 'nodder',
+  Fro = 'fro',
+  Balg = 'balg',
+  Forarbejdet = 'forarbejdet',
+  Soedstof = 'soedstof',
+  Drikke = 'drikke',
+  Andre = 'andre'
+}
+
+// Danish display names for categories
+export const INGREDIENT_CATEGORY_NAMES: Record<IngredientCategory, string> = {
+  [IngredientCategory.Protein]: 'Protein',
+  [IngredientCategory.Groent]: 'Grøntsager',
+  [IngredientCategory.Frugt]: 'Frugt',
+  [IngredientCategory.Korn]: 'Korn & Cerealer',
+  [IngredientCategory.Mejeri]: 'Mejeri',
+  [IngredientCategory.Fedt]: 'Fedt & Olie',
+  [IngredientCategory.Krydderi]: 'Krydderier',
+  [IngredientCategory.Urter]: 'Urter',
+  [IngredientCategory.Nodder]: 'Nødder & Frø',
+  [IngredientCategory.Fro]: 'Frø',
+  [IngredientCategory.Balg]: 'Bælgfrugter',
+  [IngredientCategory.Forarbejdet]: 'Forarbejdede fødevarer',
+  [IngredientCategory.Soedstof]: 'Sødstoffer',
+  [IngredientCategory.Drikke]: 'Drikkevarer',
+  [IngredientCategory.Andre]: 'Andre'
 }
 
 export interface NutritionalInfo {
