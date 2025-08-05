@@ -336,6 +336,8 @@ const WizardFlow: React.FC = () => {
                 intolerances={state.intolerances}
                 dietaryRestrictions={state.dietaryRestrictions}
                 nutritionalAssessment={state.nutritionalAssessment}
+                realMealPlan={mealPlan?.realMealPlan}
+                onClose={() => setShowPreviewModal(false)}
               />
             </div>
           </motion.div>
@@ -998,13 +1000,21 @@ const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
   useEffect(() => {
     const generateMealPlan = async () => {
       try {
-        // Simulate meal plan generation
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Use real meal plan generator
+        const realMealPlan = await mealPlanGenerator.generateMealPlan(
+          'user-' + Date.now(), // Generate unique user ID
+          state.userProfile as UserProfile,
+          state.selectedDietaryApproach,
+          state.excludedIngredients,
+          state.allergies,
+          state.nutritionalAssessment
+        );
         
-        const mockMealPlan = {
+        // Transform to preview format
+        const previewMealPlan = {
           userProfile: state.userProfile,
           dietaryApproach: state.selectedDietaryApproach,
-          weeks: 6,
+          weeks: realMealPlan.weeks.length,
           dailyCalories: state.userProfile.targetCalories || 1800,
           expectedWeightLoss: Math.round((state.userProfile.weight || 80) * 0.06), // 6% of body weight
           nutritionalBenefits: [
@@ -1012,12 +1022,15 @@ const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
             'Optimalt proteinindhold for muskelbevarelse',
             'Rig på antioxidanter og anti-inflammatoriske stoffer',
             'Balanceret fiberindhold for god fordøjelse'
-          ]
+          ],
+          // Add real meal plan data
+          realMealPlan: realMealPlan
         };
         
-        setMealPlan(mockMealPlan);
+        setMealPlan(previewMealPlan);
         setIsGenerating(false);
       } catch (err) {
+        console.error('Meal plan generation error:', err);
         setError('Der opstod en fejl under generering af din plan. Prøv venligst igen.');
         setIsGenerating(false);
       }

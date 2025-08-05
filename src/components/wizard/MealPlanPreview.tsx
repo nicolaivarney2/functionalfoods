@@ -5,9 +5,10 @@ import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { dietaryFactory } from '@/lib/dietary-system';
 import { pdfGenerator } from '@/lib/pdf-system';
+import { UserProfile } from '@/types/user';
 
 interface MealPlanPreviewProps {
-  userProfile: any;
+  userProfile: Partial<UserProfile>;
   selectedDietaryApproach: string;
   excludedIngredients: string[];
   excludedCategories: string[];
@@ -15,357 +16,109 @@ interface MealPlanPreviewProps {
   intolerances: string[];
   dietaryRestrictions: string[];
   nutritionalAssessment: any;
+  realMealPlan?: any; // Add real meal plan data
+  onClose: () => void;
 }
 
-const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ 
-  userProfile, 
-  selectedDietaryApproach, 
-  excludedIngredients, 
-  excludedCategories, 
-  allergies, 
-  intolerances, 
-  dietaryRestrictions, 
-  nutritionalAssessment 
+const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
+  userProfile,
+  selectedDietaryApproach,
+  excludedIngredients,
+  allergies,
+  nutritionalAssessment,
+  realMealPlan,
+  onClose
 }) => {
-  const [selectedWeek, setSelectedWeek] = useState(0);
+  const [currentWeek, setCurrentWeek] = useState(1);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfGenerationError, setPdfGenerationError] = useState<string | null>(null);
 
-  // Create meal plan data from props
-  const mealPlan = {
+  // Use real meal plan data if available, otherwise fall back to mock data
+  const mealPlan = realMealPlan ? {
     userProfile,
-    dietaryApproach: { id: selectedDietaryApproach },
-    weeks: [
-      {
-        weekNumber: 1,
-        days: [
-          {
-            day: 'Mandag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Keto morgenmad',
-                  type: 'breakfast',
-                  calories: 450,
-                  protein: 25,
-                  carbs: 8,
-                  fat: 35,
-                  ingredients: ['æg', 'bacon', 'avocado'],
-                  instructions: 'Steg æg og bacon, server med avocado',
-                  images: ['/images/recipes/keto-breakfast.jpg']
+    dietaryApproach: selectedDietaryApproach,
+    weeks: realMealPlan.weeks.length,
+    dailyCalories: userProfile.targetCalories || 1800,
+    expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
+    nutritionalBenefits: [
+      'Højt indhold af vitamin B12 og omega-3',
+      'Optimalt proteinindhold for muskelbevarelse',
+      'Rig på antioxidanter og anti-inflammatoriske stoffer',
+      'Balanceret fiberindhold for god fordøjelse'
+    ],
+    realMealPlan
+  } : {
+    userProfile,
+    dietaryApproach: selectedDietaryApproach,
+    weeks: 3,
+    dailyCalories: userProfile.targetCalories || 1800,
+    expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
+    nutritionalBenefits: [
+      'Højt indhold af vitamin B12 og omega-3',
+      'Optimalt proteinindhold for muskelbevarelse',
+      'Rig på antioxidanter og anti-inflammatoriske stoffer',
+      'Balanceret fiberindhold for god fordøjelse'
+    ],
+    // Mock data structure for fallback
+    realMealPlan: {
+      weeks: [
+        {
+          weekNumber: 1,
+          days: [
+            {
+              date: new Date(),
+              meals: [
+                {
+                  mealType: 'breakfast',
+                  recipe: {
+                    title: 'Keto Avocado & Egg Bowl',
+                    description: 'A satisfying keto breakfast with healthy fats',
+                    images: ['/images/recipes/keto-avocado-egg-bowl.jpg'],
+                    protein: 15,
+                    carbs: 8,
+                    fat: 28,
+                    calories: 320
+                  }
+                },
+                {
+                  mealType: 'lunch',
+                  recipe: {
+                    title: 'Keto Chicken Salad',
+                    description: 'High-protein lunch with mixed greens',
+                    images: ['/images/recipes/keto-chicken-salad.jpg'],
+                    protein: 25,
+                    carbs: 5,
+                    fat: 15,
+                    calories: 280
+                  }
+                },
+                {
+                  mealType: 'dinner',
+                  recipe: {
+                    title: 'Salmon with Vegetables',
+                    description: 'Omega-3 rich dinner with seasonal vegetables',
+                    images: ['/images/recipes/salmon-vegetables.jpg'],
+                    protein: 30,
+                    carbs: 10,
+                    fat: 20,
+                    calories: 350
+                  }
                 }
-              },
-              {
-                recipe: {
-                  title: 'Keto frokost',
-                  type: 'lunch',
-                  calories: 550,
-                  protein: 30,
-                  carbs: 10,
-                  fat: 40,
-                  ingredients: ['kylling', 'salat', 'olivenolie'],
-                  instructions: 'Grill kylling, server med salat og olivenolie',
-                  images: ['/images/recipes/keto-lunch.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Keto aftensmad',
-                  type: 'dinner',
-                  calories: 600,
-                  protein: 35,
-                  carbs: 12,
-                  fat: 45,
-                  ingredients: ['laks', 'broccoli', 'smør'],
-                  instructions: 'Steg laks, server med broccoli og smør',
-                  images: ['/images/recipes/keto-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Tirsdag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Protein morgenmad',
-                  type: 'breakfast',
-                  calories: 480,
-                  protein: 28,
-                  carbs: 6,
-                  fat: 38,
-                  ingredients: ['æg', 'ost', 'spinat'],
-                  instructions: 'Lav omelet med ost og spinat',
-                  images: ['/images/recipes/protein-breakfast.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Salat frokost',
-                  type: 'lunch',
-                  calories: 520,
-                  protein: 32,
-                  carbs: 8,
-                  fat: 42,
-                  ingredients: ['tun', 'salat', 'oliven'],
-                  instructions: 'Tun salat med oliven og dressing',
-                  images: ['/images/recipes/tuna-salad.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Kylling aftensmad',
-                  type: 'dinner',
-                  calories: 580,
-                  protein: 38,
-                  carbs: 10,
-                  fat: 48,
-                  ingredients: ['kylling', 'grøntsager', 'olivenolie'],
-                  instructions: 'Grill kylling med grøntsager',
-                  images: ['/images/recipes/chicken-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Onsdag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Avocado morgenmad',
-                  type: 'breakfast',
-                  calories: 460,
-                  protein: 26,
-                  carbs: 7,
-                  fat: 36,
-                  ingredients: ['avocado', 'æg', 'bacon'],
-                  instructions: 'Avocado toast med æg og bacon',
-                  images: ['/images/recipes/avocado-breakfast.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Kylling salat',
-                  type: 'lunch',
-                  calories: 540,
-                  protein: 34,
-                  carbs: 9,
-                  fat: 44,
-                  ingredients: ['kylling', 'salat', 'tomat'],
-                  instructions: 'Kylling salat med friske grøntsager',
-                  images: ['/images/recipes/chicken-salad.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Laks aftensmad',
-                  type: 'dinner',
-                  calories: 620,
-                  protein: 40,
-                  carbs: 11,
-                  fat: 50,
-                  ingredients: ['laks', 'asparges', 'citron'],
-                  instructions: 'Steg laks med asparges og citron',
-                  images: ['/images/recipes/salmon-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Torsdag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Protein shake morgenmad',
-                  type: 'breakfast',
-                  calories: 440,
-                  protein: 30,
-                  carbs: 5,
-                  fat: 34,
-                  ingredients: ['protein pulver', 'mandel mælk', 'bær'],
-                  instructions: 'Protein shake med bær og mandel mælk',
-                  images: ['/images/recipes/protein-shake.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Tun salat',
-                  type: 'lunch',
-                  calories: 560,
-                  protein: 36,
-                  carbs: 8,
-                  fat: 46,
-                  ingredients: ['tun', 'salat', 'agurk'],
-                  instructions: 'Tun salat med agurk og dressing',
-                  images: ['/images/recipes/tuna-lunch.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Bøf aftensmad',
-                  type: 'dinner',
-                  calories: 640,
-                  protein: 44,
-                  carbs: 12,
-                  fat: 52,
-                  ingredients: ['bøf', 'broccoli', 'smør'],
-                  instructions: 'Steg bøf med broccoli og smør',
-                  images: ['/images/recipes/steak-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Fredag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Omelet morgenmad',
-                  type: 'breakfast',
-                  calories: 470,
-                  protein: 27,
-                  carbs: 6,
-                  fat: 37,
-                  ingredients: ['æg', 'ost', 'skinke'],
-                  instructions: 'Omelet med ost og skinke',
-                  images: ['/images/recipes/omelet-breakfast.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Kylling wrap',
-                  type: 'lunch',
-                  calories: 530,
-                  protein: 33,
-                  carbs: 7,
-                  fat: 43,
-                  ingredients: ['kylling', 'salat', 'tortilla'],
-                  instructions: 'Kylling wrap med salat',
-                  images: ['/images/recipes/chicken-wrap.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Fisk aftensmad',
-                  type: 'dinner',
-                  calories: 590,
-                  protein: 39,
-                  carbs: 9,
-                  fat: 49,
-                  ingredients: ['torsk', 'grøntsager', 'citron'],
-                  instructions: 'Steg torsk med grøntsager og citron',
-                  images: ['/images/recipes/fish-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Lørdag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Pancakes morgenmad',
-                  type: 'breakfast',
-                  calories: 490,
-                  protein: 29,
-                  carbs: 8,
-                  fat: 39,
-                  ingredients: ['æg', 'mel', 'bær'],
-                  instructions: 'Protein pancakes med bær',
-                  images: ['/images/recipes/pancakes-breakfast.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Burger frokost',
-                  type: 'lunch',
-                  calories: 570,
-                  protein: 35,
-                  carbs: 10,
-                  fat: 45,
-                  ingredients: ['bøf', 'salat', 'ost'],
-                  instructions: 'Protein burger med salat og ost',
-                  images: ['/images/recipes/burger-lunch.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Pizza aftensmad',
-                  type: 'dinner',
-                  calories: 610,
-                  protein: 41,
-                  carbs: 13,
-                  fat: 51,
-                  ingredients: ['kylling', 'ost', 'grøntsager'],
-                  instructions: 'Protein pizza med kylling og grøntsager',
-                  images: ['/images/recipes/pizza-dinner.jpg']
-                }
-              }
-            ]
-          },
-          {
-            day: 'Søndag',
-            meals: [
-              {
-                recipe: {
-                  title: 'Yoghurt morgenmad',
-                  type: 'breakfast',
-                  calories: 460,
-                  protein: 26,
-                  carbs: 7,
-                  fat: 36,
-                  ingredients: ['yoghurt', 'nødder', 'bær'],
-                  instructions: 'Protein yoghurt med nødder og bær',
-                  images: ['/images/recipes/yoghurt-breakfast.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Salat frokost',
-                  type: 'lunch',
-                  calories: 540,
-                  protein: 34,
-                  carbs: 9,
-                  fat: 44,
-                  ingredients: ['kylling', 'salat', 'avocado'],
-                  instructions: 'Kylling salat med avocado',
-                  images: ['/images/recipes/salad-lunch.jpg']
-                }
-              },
-              {
-                recipe: {
-                  title: 'Laks aftensmad',
-                  type: 'dinner',
-                  calories: 600,
-                  protein: 38,
-                  carbs: 11,
-                  fat: 48,
-                  ingredients: ['laks', 'ris', 'grøntsager'],
-                  instructions: 'Steg laks med ris og grøntsager',
-                  images: ['/images/recipes/salmon-dinner.jpg']
-                }
-              }
+              ]
+            }
+          ],
+          shoppingList: {
+            items: [
+              { name: 'Avocado', category: 'Fruits', amount: '2 pieces' },
+              { name: 'Eggs', category: 'Dairy', amount: '12 pieces' },
+              { name: 'Chicken Breast', category: 'Meat', amount: '500g' },
+              { name: 'Salmon', category: 'Fish', amount: '400g' }
             ]
           }
-        ],
-        shoppingList: {
-          items: [
-            { name: 'æg', amount: '24 stk' },
-            { name: 'bacon', amount: '400g' },
-            { name: 'avocado', amount: '4 stk' },
-            { name: 'kylling', amount: '1kg' },
-            { name: 'salat', amount: '3 stk' },
-            { name: 'olivenolie', amount: '200ml' },
-            { name: 'laks', amount: '800g' },
-            { name: 'broccoli', amount: '1kg' },
-            { name: 'smør', amount: '200g' }
-          ]
         }
-      }
-    ],
-    expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
-    dailyCalories: userProfile.targetCalories || 1800
+      ]
+    }
   };
 
   if (!userProfile || !selectedDietaryApproach) {
@@ -379,7 +132,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             <h3 className="text-xl font-bold text-gray-900 mb-2">No Meal Plan Available</h3>
             <p className="text-gray-600 mb-4">Please generate a meal plan first.</p>
             <button
-              onClick={() => window.close()}
+              onClick={onClose}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200"
             >
               Close
@@ -390,10 +143,10 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
     );
   }
 
-  const currentWeek = mealPlan.weeks[selectedWeek];
+  const currentWeekData = mealPlan.realMealPlan.weeks[currentWeek - 1];
   const mealPlanUserProfile = mealPlan.userProfile;
-  const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name;
-  const shoppingList = currentWeek.shoppingList;
+  const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach)?.name;
+  const shoppingList = currentWeekData.shoppingList;
 
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
@@ -409,7 +162,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
         targetWeight: 70,
         height: 175,
         activityLevel: 'moderate',
-        dietaryApproach: mealPlan.dietaryApproach?.id || 'keto'
+        dietaryApproach: mealPlan.dietaryApproach || 'keto'
       };
 
       const result = await pdfGenerator.generateMealPlanPDF(
@@ -484,10 +237,10 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
               {/* Week Navigation - Mobile Friendly */}
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
-                  disabled={selectedWeek === 0}
+                  onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}
+                  disabled={currentWeek === 1}
                   className={`p-2 rounded-lg transition-all duration-200 ${
-                    selectedWeek === 0 
+                    currentWeek === 1 
                       ? 'text-gray-400 cursor-not-allowed' 
                       : 'text-[#1B365D] hover:bg-[#1B365D]/10'
                   }`}
@@ -497,12 +250,12 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 
                 {/* Mobile: Scrollable week buttons */}
                 <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
-                  {mealPlan.weeks.map((week: any, index: number) => (
+                  {mealPlan.realMealPlan.weeks.map((week: any, index: number) => (
                     <button
                       key={index}
-                      onClick={() => setSelectedWeek(index)}
+                      onClick={() => setCurrentWeek(index + 1)}
                       className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                        selectedWeek === index
+                        currentWeek === index + 1
                           ? 'bg-[#1B365D] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
                       }`}
@@ -513,17 +266,17 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 </div>
                 
                 <button
-                  onClick={() => setSelectedWeek(Math.min(mealPlan.weeks.length - 1, selectedWeek + 1))}
-                  disabled={selectedWeek === mealPlan.weeks.length - 1}
+                  onClick={() => setCurrentWeek(Math.min(mealPlan.realMealPlan.weeks.length, currentWeek + 1))}
+                  disabled={currentWeek === mealPlan.realMealPlan.weeks.length}
                   className={`p-2 rounded-lg transition-all duration-200 relative group ${
-                    selectedWeek === mealPlan.weeks.length - 1 
+                    currentWeek === mealPlan.realMealPlan.weeks.length 
                       ? 'text-gray-400 cursor-not-allowed' 
                       : 'text-[#1B365D] hover:bg-[#1B365D]/10'
                   }`}
-                  title={selectedWeek === mealPlan.weeks.length - 1 ? "De andre uger er skjult" : ""}
+                  title={currentWeek === mealPlan.realMealPlan.weeks.length ? "De andre uger er skjult" : ""}
                 >
                   <ChevronRightIcon className="w-5 h-5" />
-                  {selectedWeek === mealPlan.weeks.length - 1 && (
+                  {currentWeek === mealPlan.realMealPlan.weeks.length && (
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
                       De andre uger er skjult
                       <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
@@ -577,7 +330,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-            {mealPlan.weeks[selectedWeek].days.map((day: any, dayIndex: number) => (
+            {currentWeekData.days.map((day: any, dayIndex: number) => (
               <motion.div
                 key={dayIndex}
                 className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 lg:p-6 border border-gray-200"
@@ -587,7 +340,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
               >
                 <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                   <CalendarIcon className="w-5 h-5 mr-2 text-[#1B365D]" />
-                  {['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'][dayIndex]}
+                  {day.date.toLocaleDateString('da-DK', { weekday: 'long' })}
                 </h4>
                 
                 <div className="space-y-3">
