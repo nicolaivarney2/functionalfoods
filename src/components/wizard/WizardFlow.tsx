@@ -7,6 +7,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '@heroicons/react/2
 // Import our systems
 import { dietaryFactory, DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
 import { ingredientService } from '@/lib/ingredient-system';
+import { mealPlanGenerator } from '@/lib/meal-plan-system';
 
 interface WizardStep {
   id: string;
@@ -101,6 +102,13 @@ const WizardFlow: React.FC = () => {
       title: 'Review Your Plan',
       description: 'Finalize your personalized plan',
       component: ReviewStep,
+      isCompleted: false
+    },
+    {
+      id: 'generating',
+      title: 'Generating Your Plan',
+      description: 'Creating your personalized 6-week meal plan',
+      component: GeneratingStep,
       isCompleted: false
     }
   ];
@@ -275,10 +283,7 @@ const WizardFlow: React.FC = () => {
                     </button>
                   ) : (
                     <button
-                      onClick={() => {
-                        // Handle final submission
-                        console.log('Final submission:', state);
-                      }}
+                      onClick={nextStep}
                       disabled={isLoading}
                       className="flex items-center space-x-2 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:opacity-50"
                     >
@@ -755,16 +760,189 @@ const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
         <div className="bg-yellow-50 rounded-xl p-6">
           <h3 className="font-semibold text-gray-900 mb-4">Foods to Avoid</h3>
           <div className="flex flex-wrap gap-2">
-                       {state.excludedIngredients.map((food: string) => (
-             <span key={food} className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-               {food}
-             </span>
-           ))}
+            {state.excludedIngredients.map((food: string) => (
+              <span key={food} className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                {food}
+              </span>
+            ))}
           </div>
         </div>
       )}
+
+      <div className="text-center">
+        <button
+          onClick={nextStep}
+          className="px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+        >
+          Generate My 6-Week Plan
+        </button>
+      </div>
     </div>
   </div>
 );
+
+const GeneratingStep: React.FC<any> = ({ state }) => {
+  const [isGenerating, setIsGenerating] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [mealPlan, setMealPlan] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const generateMealPlan = async () => {
+      try {
+        setProgress(10);
+        
+        // Validate required data
+        if (!state.userProfile.gender || !state.userProfile.age || !state.userProfile.height || 
+            !state.userProfile.weight || !state.userProfile.activityLevel || !state.userProfile.goal) {
+          throw new Error('Missing required profile information');
+        }
+
+        if (!state.selectedDietaryApproach) {
+          throw new Error('No dietary approach selected');
+        }
+
+        setProgress(30);
+
+        // Generate the meal plan
+        const generatedMealPlan = await mealPlanGenerator.generateMealPlan(
+          'user-123', // Mock user ID
+          state.userProfile as UserProfile,
+          state.selectedDietaryApproach,
+          state.excludedIngredients,
+          state.allergies,
+          state.nutritionalAssessment
+        );
+
+        setProgress(80);
+        
+        // Simulate additional processing
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setProgress(100);
+        setMealPlan(generatedMealPlan);
+        setIsGenerating(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        setIsGenerating(false);
+      }
+    };
+
+    generateMealPlan();
+  }, [state]);
+
+  if (error) {
+    return (
+      <div className="text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+          <span className="text-red-600 text-2xl">❌</span>
+        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Oops! Something went wrong</h3>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (isGenerating) {
+    return (
+      <div className="text-center">
+        <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">
+          Creating Your Personalized Plan
+        </h3>
+        <p className="text-gray-600 mb-6">
+          We're analyzing your preferences and generating your perfect 6-week nutrition plan...
+        </p>
+        
+        {/* Progress bar */}
+        <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
+          <div 
+            className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+        
+        <div className="text-sm text-gray-500">
+          {progress < 30 && 'Validating your information...'}
+          {progress >= 30 && progress < 80 && 'Generating meal plans...'}
+          {progress >= 80 && 'Finalizing your plan...'}
+        </div>
+      </div>
+    );
+  }
+
+  if (mealPlan) {
+    return (
+      <div className="text-center">
+        <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+          <span className="text-white text-3xl">✅</span>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">
+          Your Plan is Ready!
+        </h3>
+        <p className="text-gray-600 mb-6">
+          We've created your personalized 6-week nutrition plan with {mealPlan.weeks.length} weeks of meals.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="text-center p-6 bg-blue-50 rounded-xl">
+            <div className="text-3xl font-bold text-blue-600 mb-2">
+              {mealPlan.weeks.length}
+            </div>
+            <div className="text-sm text-gray-600">Weeks of Meals</div>
+          </div>
+          
+          <div className="text-center p-6 bg-green-50 rounded-xl">
+            <div className="text-3xl font-bold text-green-600 mb-2">
+              {mealPlan.weeks.reduce((total: number, week: any) => total + week.days.length, 0)}
+            </div>
+            <div className="text-sm text-gray-600">Days Planned</div>
+          </div>
+          
+          <div className="text-center p-6 bg-purple-50 rounded-xl">
+            <div className="text-3xl font-bold text-purple-600 mb-2">
+              {Math.round(mealPlan.energyNeeds.targetCalories)}
+            </div>
+            <div className="text-sm text-gray-600">Daily Calories</div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <button
+            onClick={() => {
+              // Here we would typically save to database and redirect to payment
+              console.log('Meal plan generated:', mealPlan);
+              alert('Meal plan generated successfully! This would typically redirect to payment.');
+            }}
+            className="px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl text-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+          >
+            Get My Plan (1195 DKK)
+          </button>
+          
+          <button
+            onClick={() => {
+              // Show preview of the meal plan
+              console.log('Preview meal plan:', mealPlan);
+              alert('This would show a preview of your meal plan!');
+            }}
+            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200"
+          >
+            Preview My Plan
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
 
 export default WizardFlow; 
