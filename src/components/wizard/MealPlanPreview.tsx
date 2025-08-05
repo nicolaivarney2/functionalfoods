@@ -127,27 +127,9 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 }
               }
             ]
-          }
-        ],
-        shoppingList: {
-          items: [
-            { name: 'æg', amount: '12 stk' },
-            { name: 'bacon', amount: '200g' },
-            { name: 'avocado', amount: '2 stk' },
-            { name: 'kylling', amount: '500g' },
-            { name: 'salat', amount: '1 stk' },
-            { name: 'olivenolie', amount: '100ml' },
-            { name: 'laks', amount: '400g' },
-            { name: 'broccoli', amount: '500g' },
-            { name: 'smør', amount: '100g' }
-          ]
-        }
-      },
-      {
-        weekNumber: 2,
-        days: [
+          },
           {
-            day: 'Mandag',
+            day: 'Onsdag',
             meals: [
               {
                 recipe: {
@@ -189,27 +171,9 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 }
               }
             ]
-          }
-        ],
-        shoppingList: {
-          items: [
-            { name: 'avocado', amount: '4 stk' },
-            { name: 'æg', amount: '8 stk' },
-            { name: 'bacon', amount: '150g' },
-            { name: 'kylling', amount: '600g' },
-            { name: 'salat', amount: '2 stk' },
-            { name: 'tomat', amount: '4 stk' },
-            { name: 'laks', amount: '500g' },
-            { name: 'asparges', amount: '300g' },
-            { name: 'citron', amount: '2 stk' }
-          ]
-        }
-      },
-      {
-        weekNumber: 3,
-        days: [
+          },
           {
-            day: 'Mandag',
+            day: 'Torsdag',
             meals: [
               {
                 recipe: {
@@ -251,19 +215,151 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 }
               }
             ]
+          },
+          {
+            day: 'Fredag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Omelet morgenmad',
+                  type: 'breakfast',
+                  calories: 470,
+                  protein: 27,
+                  carbs: 6,
+                  fat: 37,
+                  ingredients: ['æg', 'ost', 'skinke'],
+                  instructions: 'Omelet med ost og skinke',
+                  images: ['/images/recipes/omelet-breakfast.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Kylling wrap',
+                  type: 'lunch',
+                  calories: 530,
+                  protein: 33,
+                  carbs: 7,
+                  fat: 43,
+                  ingredients: ['kylling', 'salat', 'tortilla'],
+                  instructions: 'Kylling wrap med salat',
+                  images: ['/images/recipes/chicken-wrap.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Fisk aftensmad',
+                  type: 'dinner',
+                  calories: 590,
+                  protein: 39,
+                  carbs: 9,
+                  fat: 49,
+                  ingredients: ['torsk', 'grøntsager', 'citron'],
+                  instructions: 'Steg torsk med grøntsager og citron',
+                  images: ['/images/recipes/fish-dinner.jpg']
+                }
+              }
+            ]
+          },
+          {
+            day: 'Lørdag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Pancakes morgenmad',
+                  type: 'breakfast',
+                  calories: 490,
+                  protein: 29,
+                  carbs: 8,
+                  fat: 39,
+                  ingredients: ['æg', 'mel', 'bær'],
+                  instructions: 'Protein pancakes med bær',
+                  images: ['/images/recipes/pancakes-breakfast.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Burger frokost',
+                  type: 'lunch',
+                  calories: 570,
+                  protein: 35,
+                  carbs: 10,
+                  fat: 45,
+                  ingredients: ['bøf', 'salat', 'ost'],
+                  instructions: 'Protein burger med salat og ost',
+                  images: ['/images/recipes/burger-lunch.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Pizza aftensmad',
+                  type: 'dinner',
+                  calories: 610,
+                  protein: 41,
+                  carbs: 13,
+                  fat: 51,
+                  ingredients: ['kylling', 'ost', 'grøntsager'],
+                  instructions: 'Protein pizza med kylling og grøntsager',
+                  images: ['/images/recipes/pizza-dinner.jpg']
+                }
+              }
+            ]
+          },
+          {
+            day: 'Søndag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Yoghurt morgenmad',
+                  type: 'breakfast',
+                  calories: 460,
+                  protein: 26,
+                  carbs: 7,
+                  fat: 36,
+                  ingredients: ['yoghurt', 'nødder', 'bær'],
+                  instructions: 'Protein yoghurt med nødder og bær',
+                  images: ['/images/recipes/yoghurt-breakfast.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Salat frokost',
+                  type: 'lunch',
+                  calories: 540,
+                  protein: 34,
+                  carbs: 9,
+                  fat: 44,
+                  ingredients: ['kylling', 'salat', 'avocado'],
+                  instructions: 'Kylling salat med avocado',
+                  images: ['/images/recipes/salad-lunch.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Laks aftensmad',
+                  type: 'dinner',
+                  calories: 600,
+                  protein: 38,
+                  carbs: 11,
+                  fat: 48,
+                  ingredients: ['laks', 'ris', 'grøntsager'],
+                  instructions: 'Steg laks med ris og grøntsager',
+                  images: ['/images/recipes/salmon-dinner.jpg']
+                }
+              }
+            ]
           }
         ],
         shoppingList: {
           items: [
-            { name: 'protein pulver', amount: '200g' },
-            { name: 'mandel mælk', amount: '1L' },
-            { name: 'bær', amount: '300g' },
-            { name: 'tun', amount: '400g' },
-            { name: 'salat', amount: '1 stk' },
-            { name: 'agurk', amount: '2 stk' },
-            { name: 'bøf', amount: '600g' },
-            { name: 'broccoli', amount: '400g' },
-            { name: 'smør', amount: '150g' }
+            { name: 'æg', amount: '24 stk' },
+            { name: 'bacon', amount: '400g' },
+            { name: 'avocado', amount: '4 stk' },
+            { name: 'kylling', amount: '1kg' },
+            { name: 'salat', amount: '3 stk' },
+            { name: 'olivenolie', amount: '200ml' },
+            { name: 'laks', amount: '800g' },
+            { name: 'broccoli', amount: '1kg' },
+            { name: 'smør', amount: '200g' }
           ]
         }
       }
@@ -382,10 +478,10 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
           transition={{ delay: 0.2, duration: 0.5 }}
         >
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <h3 className="text-xl font-semibold text-gray-900">Din ugeplan</h3>
               
-              {/* Week Navigation */}
+              {/* Week Navigation - Mobile Friendly */}
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
@@ -399,12 +495,13 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                   <ChevronLeftIcon className="w-5 h-5" />
                 </button>
                 
-                <div className="flex items-center space-x-1">
+                {/* Mobile: Scrollable week buttons */}
+                <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
                   {mealPlan.weeks.map((week: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => setSelectedWeek(index)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                         selectedWeek === index
                           ? 'bg-[#1B365D] text-white'
                           : 'text-gray-600 hover:bg-gray-100'
@@ -429,40 +526,44 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
               </div>
             </div>
             
-            <div className="flex space-x-2">
+            {/* Action Buttons - Mobile Friendly */}
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
               <button
                 onClick={() => setShowShoppingList(!showShoppingList)}
-                className="flex items-center space-x-2 px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors text-sm"
               >
                 <ShoppingBagIcon className="w-4 h-4" />
-                <span>{showShoppingList ? 'Skjul indkøbsliste' : 'Vis indkøbsliste'}</span>
+                <span className="hidden sm:inline">{showShoppingList ? 'Skjul indkøbsliste' : 'Vis indkøbsliste'}</span>
+                <span className="sm:hidden">{showShoppingList ? 'Skjul' : 'Liste'}</span>
               </button>
               
               <button
                 onClick={handleGeneratePDF}
                 disabled={isGeneratingPDF}
-                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 text-sm"
               >
                 {isGeneratingPDF ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    <span>Genererer PDF...</span>
+                    <span className="hidden sm:inline">Genererer PDF...</span>
+                    <span className="sm:hidden">Genererer...</span>
                   </>
                 ) : (
                   <>
                     <DocumentArrowDownIcon className="w-4 h-4" />
-                    <span>Download PDF</span>
+                    <span className="hidden sm:inline">Download PDF</span>
+                    <span className="sm:hidden">PDF</span>
                   </>
                 )}
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             {mealPlan.weeks[selectedWeek].days.map((day: any, dayIndex: number) => (
               <motion.div
                 key={dayIndex}
-                className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 border border-gray-200"
+                className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 lg:p-6 border border-gray-200"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 + dayIndex * 0.1, duration: 0.5 }}
@@ -472,58 +573,58 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                   {['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'][dayIndex]}
                 </h4>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {day.meals.map((meal: any, mealIndex: number) => (
                     <motion.div 
                       key={mealIndex} 
-                      className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
+                      className="bg-white rounded-lg p-3 lg:p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200"
+                      whileHover={{ scale: 1.01 }}
                     >
-                      <div className="flex items-start space-x-4">
+                      <div className="flex items-start space-x-3 lg:space-x-4">
                         <div className="flex-shrink-0">
                           {meal.recipe.images && meal.recipe.images.length > 0 ? (
                             <img 
                               src={meal.recipe.images[0]} 
                               alt={meal.recipe.title}
-                              className="w-16 h-16 rounded-lg object-cover"
+                              className="w-12 h-12 lg:w-16 lg:h-16 rounded-lg object-cover"
                             />
                           ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-[#1B365D]/20 to-[#87A96B]/20 flex items-center justify-center">
-                              <span className="text-2xl">🍽️</span>
+                            <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-lg bg-gradient-to-br from-[#1B365D]/20 to-[#87A96B]/20 flex items-center justify-center">
+                              <span className="text-lg lg:text-2xl">🍽️</span>
                             </div>
                           )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-[#1B365D] bg-[#1B365D]/10 px-2 py-1 rounded-full">
+                            <span className="text-xs lg:text-sm font-medium text-[#1B365D] bg-[#1B365D]/10 px-2 py-1 rounded-full">
                               {['Morgenmad', 'Frokost', 'Aftensmad'][mealIndex]}
                             </span>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-xs lg:text-sm text-gray-500">
                               {meal.recipe.calories} kalorier
                             </span>
                           </div>
                           
-                          <h5 className="text-lg font-semibold text-gray-900 mb-2">
+                          <h5 className="text-sm lg:text-lg font-semibold text-gray-900 mb-2">
                             {meal.recipe.title}
                           </h5>
                           
-                          <div className="grid grid-cols-3 gap-4 mb-3">
+                          <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-3">
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900">{meal.recipe.protein}g</div>
+                              <div className="text-xs lg:text-sm font-medium text-gray-900">{meal.recipe.protein}g</div>
                               <div className="text-xs text-gray-500">Protein</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900">{meal.recipe.carbs}g</div>
+                              <div className="text-xs lg:text-sm font-medium text-gray-900">{meal.recipe.carbs}g</div>
                               <div className="text-xs text-gray-500">Kulhydrater</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900">{meal.recipe.fat}g</div>
+                              <div className="text-xs lg:text-sm font-medium text-gray-900">{meal.recipe.fat}g</div>
                               <div className="text-xs text-gray-500">Fedt</div>
                             </div>
                           </div>
                           
-                          <div className="text-sm text-gray-600">
+                          <div className="text-xs lg:text-sm text-gray-600">
                             <strong>Ingredienser:</strong> {meal.recipe.ingredients.join(', ')}
                           </div>
                         </div>
