@@ -741,7 +741,7 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
             </div>
           </div>
           <p className="text-gray-600 mb-4">
-            Den kostideologi du vælger er det, vi bygger din fysiske vægttabsbog omkring. Vi giver dig al den grundlæggende viden, du har brug for for at lykkes, og dette vil være i bogen, skrevet af os til dig.
+            Vi bygger din laver og printer din fysiske vægttabsbog omkring dine madønsker. Du får al den viden i bogen du har brug for at lykkedes. Fra os til dig ❤️
           </p>
           <div className="text-sm text-[#87A96B] font-medium">
             Inkluderet i din 6-ugers plan
@@ -800,7 +800,9 @@ const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep
     <div className="space-y-6">
       <div className="text-center mb-6">
         <p className="text-gray-600 mb-4">
-          Vores madplan er ikke kun interesseret i at give dig vægttab, men også med, at du får det fantastisk i din krop. Vi elsker funktionel mad, og er eksperter i, at strikke en madplan sammen, der dækker din krops fulde behov på ernæring og mineraler, samtidigt med, at vi giver dig et sundt og effektivt vægttab. Fortæl os derfor, om der er nogle af disse symptomer, du døjer med regelmæssigt:
+          Vi er ikke kun interesseret i at hjælpe med vægttab, men også at du får det fantastisk i din krop.
+          <br /><br />
+          Vi elsker funktionel mad, og er eksperter i, at strikke en madplan sammen, der dækker dine funktionelle og ernæringsmæssige behov, samtidigt med et sundt og effektivt vægttab.
         </p>
       </div>
 
@@ -932,12 +934,12 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         
         // Validate required data
         if (!state.userProfile.gender || !state.userProfile.age || !state.userProfile.height || 
-            !state.userProfile.weight || !state.userProfile.activityLevel || !state.userProfile.goal) {
-          throw new Error('Missing required profile information');
+            !state.userProfile.weight || !state.userProfile.activityLevel) {
+          throw new Error('Manglende profilinformation');
         }
 
         if (!state.selectedDietaryApproach) {
-          throw new Error('No dietary approach selected');
+          throw new Error('Intet kosttilgang valgt');
         }
 
         setProgress(30);
@@ -961,7 +963,7 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         setMealPlan(generatedMealPlan);
         setIsGenerating(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setError(err instanceof Error ? err.message : 'Der opstod en fejl');
         setIsGenerating(false);
       }
     };
@@ -975,13 +977,13 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
         <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
           <span className="text-red-600 text-2xl">❌</span>
         </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Oops! Something went wrong</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Ups! Noget gik galt</h3>
         <p className="text-gray-600 mb-4">{error}</p>
         <button
           onClick={() => window.location.reload()}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200"
+          className="px-6 py-3 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200"
         >
-          Try Again
+          Prøv igen
         </button>
       </div>
     );
@@ -990,28 +992,28 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
   if (isGenerating) {
     return (
       <div className="text-center">
-        <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-6 flex items-center justify-center">
+        <div className="w-24 h-24 bg-gradient-to-r from-[#1B365D] to-[#87A96B] rounded-full mx-auto mb-6 flex items-center justify-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
         </div>
         <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Creating Your Personalized Plan
+          Skaber din personlige plan
         </h3>
         <p className="text-gray-600 mb-6">
-          We're analyzing your preferences and generating your perfect 6-week nutrition plan...
+          Vi analyserer dine præferencer og genererer din perfekte 6-ugers ernæringsplan...
         </p>
         
         {/* Progress bar */}
         <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
           <div 
-            className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] h-3 rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
         
         <div className="text-sm text-gray-500">
-          {progress < 30 && 'Validating your information...'}
-          {progress >= 30 && progress < 80 && 'Generating meal plans...'}
-          {progress >= 80 && 'Finalizing your plan...'}
+          {progress < 30 && 'Validerer din information...'}
+          {progress >= 30 && progress < 80 && 'Genererer madplaner...'}
+          {progress >= 80 && 'Finaliserer din plan...'}
         </div>
       </div>
     );
@@ -1095,9 +1097,9 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
+              Vil du springe morgenmad over en gang imellem?
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -1106,9 +1108,9 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hvor mange personer er denne plan til? Vi vil tilpasse opskrifter og indkøbsliste.
+              Hvor mange personer er denne plan til?
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
               <option value="1">1 person</option>
               <option value="2">2 personer</option>
               <option value="3">3 personer</option>
@@ -1118,9 +1120,9 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
+              Vil du spise samme mad 2 dage i træk nogle gange?
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -1129,9 +1131,9 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
+              Vil du have adgang til vores gratis online videokurs?
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -1140,9 +1142,9 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
+              Vil du have gratis personlig SMS-sparring?
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
