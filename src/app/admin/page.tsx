@@ -41,6 +41,38 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container">
+          <nav className="flex space-x-8">
+            <Link 
+              href="/admin" 
+              className="px-3 py-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600"
+            >
+              Dashboard
+            </Link>
+            <Link 
+              href="/admin/ingredients" 
+              className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+            >
+              Ingredients
+            </Link>
+            <Link 
+              href="/admin/import" 
+              className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+            >
+              Import
+            </Link>
+            <Link 
+              href="/admin/recipes" 
+              className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+            >
+              Recipes
+            </Link>
+          </nav>
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="container py-8">
         {/* Loading state removed as per new_code */}
