@@ -90,6 +90,56 @@ export default function ImportPage() {
     }
   }
 
+  const handleFridaTest = async () => {
+    setIsProcessing(true)
+    setError(null)
+
+    try {
+      // Test with a single recipe
+      const testRecipe: RawRecipeData = {
+        title: 'Test Kyllingesalat',
+        description: 'En sund salat med kylling og grøntsager',
+        shortDescription: 'Sund kyllingesalat',
+        preparationTime: 15,
+        cookingTime: 20,
+        calories: 320,
+        protein: 28,
+        carbs: 8,
+        fat: 22,
+        fiber: 6,
+        mainCategory: 'Frokost',
+        subCategories: ['Salat', 'Proteinrig'],
+        dietaryCategories: ['Keto', 'LCHF'],
+        ingredients: [
+          { name: 'kyllingebryst', amount: 200, unit: 'g' },
+          { name: 'salat', amount: 100, unit: 'g' },
+          { name: 'tomat', amount: 2, unit: 'stk' },
+          { name: 'olivenolie', amount: 2, unit: 'spsk' }
+        ],
+        instructions: [
+          { stepNumber: 1, instruction: 'Steg kyllingen' },
+          { stepNumber: 2, instruction: 'Bland med salat' }
+        ],
+        imageUrl: 'https://example.com/test.jpg',
+        imageAlt: 'Test kyllingesalat',
+        servings: 2,
+        difficulty: 'Nem',
+        author: 'Test',
+        publishedAt: '2024-01-01'
+      }
+
+      const result = await importProcessor.processSingleRecipe(testRecipe)
+      setImportResult({ recipes: [result], ingredients: [], stats: { totalRecipes: 1, totalIngredients: 4, processedIngredients: 4, recipesWithNutrition: 1, processingTime: 1000 } })
+      setStats(importProcessor.getImportStats())
+      
+    } catch (err) {
+      console.error('❌ Frida test import failed:', err)
+      setError(err instanceof Error ? err.message : 'Frida test import failed')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -204,6 +254,14 @@ export default function ImportPage() {
                 >
                   <FileText size={16} />
                   <span>Test Import</span>
+                </button>
+                <button
+                  onClick={handleFridaTest}
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
+                >
+                  <BarChart3 size={16} />
+                  <span>Test Frida</span>
                 </button>
               </div>
             </div>

@@ -98,6 +98,59 @@ export default function IngredientsAdminPage() {
     }
   }
 
+  const handleFetchFridaData = async () => {
+    setLoading(true)
+    try {
+      const { FridaIntegration } = await import('@/lib/ingredient-system/frida-integration')
+      const fridaIntegration = new FridaIntegration()
+      
+      console.log('🔍 Fetching Frida data for existing ingredients...')
+      
+      // Get ingredients without nutritional data
+      const ingredientsWithoutData = ingredients.filter(ing => !ing.nutritionalInfo)
+      
+      for (const ingredient of ingredientsWithoutData.slice(0, 5)) { // Limit to 5 for demo
+        try {
+          console.log(`🔍 Searching for: ${ingredient.name}`)
+          const fridaData = await fridaIntegration.searchFridaIngredient(ingredient.name)
+          
+          if (fridaData) {
+            const nutritionalInfo = fridaIntegration.convertFridaToNutritionalInfo(fridaData)
+            const category = fridaIntegration.determineIngredientCategory(ingredient.name, fridaData)
+            const { exclusions, allergens } = fridaIntegration.determineExclusionsAndAllergens(ingredient.name, category)
+            
+            // Update ingredient with Frida data
+            const updatedIngredient = ingredientService.updateIngredientTag(ingredient.id, {
+              nutritionalInfo,
+              category,
+              exclusions,
+              allergens,
+              description: fridaData.description || ingredient.description
+            })
+            
+            if (updatedIngredient) {
+              console.log(`✅ Updated ${ingredient.name} with Frida data`)
+            }
+          }
+          
+          // Add delay to avoid overwhelming the API
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+        } catch (error) {
+          console.error(`❌ Error processing ${ingredient.name}:`, error)
+        }
+      }
+      
+      // Reload ingredients
+      loadIngredients()
+      
+    } catch (error) {
+      console.error('Error fetching Frida data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getCategoryColor = (category: IngredientCategory) => {
     const colors = {
       [IngredientCategory.Protein]: 'bg-red-100 text-red-800',
@@ -144,6 +197,13 @@ export default function IngredientsAdminPage() {
               >
                 <Plus size={16} />
                 <span>Add Ingredient</span>
+              </button>
+              <button 
+                onClick={handleFetchFridaData}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+              >
+                <BarChart3 size={16} />
+                <span>Fetch Frida Data</span>
               </button>
             </div>
           </div>
