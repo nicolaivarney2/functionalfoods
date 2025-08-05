@@ -1,4 +1,5 @@
-import puppeteer, { Browser, Page } from 'puppeteer';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { 
   PDFDocument, 
   PDFGenerationOptions, 
@@ -20,24 +21,10 @@ import { dietaryFactory } from '../dietary-system';
 import { mealPlanGenerator } from '../meal-plan-system';
 
 export class PDFGenerator {
-  private browser: Browser | null = null;
-  private isInitialized = false;
+  private isInitialized = true;
 
   constructor() {
-    this.initialize();
-  }
-
-  private async initialize(): Promise<void> {
-    try {
-      this.browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      });
-      this.isInitialized = true;
-    } catch (error) {
-      console.error('Failed to initialize PDF generator:', error);
-      throw new Error('PDF generator initialization failed');
-    }
+    // jsPDF doesn't need initialization
   }
 
   async generateMealPlanPDF(
@@ -50,35 +37,61 @@ export class PDFGenerator {
     const startTime = Date.now();
 
     try {
-      if (!this.isInitialized || !this.browser) {
-        await this.initialize();
-      }
-
-      const page = await this.browser!.newPage();
+      // Create a temporary div element to render the HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.width = '1200px';
+      tempDiv.style.height = '1600px';
+      tempDiv.style.backgroundColor = 'white';
+      tempDiv.style.padding = '20px';
+      tempDiv.style.fontFamily = 'Arial, sans-serif';
+      tempDiv.style.fontSize = '14px';
+      tempDiv.style.lineHeight = '1.6';
       
-      // Set viewport for consistent rendering
-      await page.setViewport({ width: 1200, height: 1600 });
-
       // Generate HTML content
       const htmlContent = await this.generateHTMLContent(mealPlan, userProfile, options);
+      tempDiv.innerHTML = htmlContent;
       
-      // Set content and wait for rendering
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-      // Generate PDF
-      const pdfBuffer = await page.pdf({
-        format: options.format || PDFFormat.A4,
-        printBackground: true,
-        margin: {
-          top: '20mm',
-          right: '20mm',
-          bottom: '20mm',
-          left: '20mm'
-        },
-        preferCSSPageSize: true
+      // Add to DOM temporarily
+      document.body.appendChild(tempDiv);
+      
+      // Convert to canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
       });
-
-      await page.close();
+      
+      // Remove from DOM
+      document.body.removeChild(tempDiv);
+      
+      // Create PDF
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pdfWidth;
+      const pageHeight = pdfHeight;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+      
+      const pdfBuffer = pdf.output('arraybuffer');
 
       // Create PDF document metadata
       const metadata: PDFMetadata = {
@@ -577,10 +590,6 @@ export class PDFGenerator {
   }
 
   async close(): Promise<void> {
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-      this.isInitialized = false;
-    }
+    // jsPDF doesn't need cleanup
   }
 } 
