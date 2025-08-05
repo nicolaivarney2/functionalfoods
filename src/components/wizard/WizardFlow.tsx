@@ -247,11 +247,27 @@ const WizardFlow: React.FC = () => {
                   <span>Tilbage</span>
                 </button>
 
-                <div className="flex items-center space-x-4">
+                {/* Mobile: Step counter below buttons */}
+                <div className="flex flex-col items-center space-y-2 sm:hidden">
                   <span className="text-sm text-gray-500">
                     Trin {state.currentStep + 1} af {steps.length}
                   </span>
-                  <div className="w-24 lg:w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${((state.currentStep + 1) / steps.length) * 100}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Desktop: Step counter between buttons */}
+                <div className="hidden sm:flex items-center space-x-4">
+                  <span className="text-sm text-gray-500">
+                    Trin {state.currentStep + 1} af {steps.length}
+                  </span>
+                  <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
                     <motion.div
                       className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
                       initial={{ width: 0 }}
@@ -505,8 +521,7 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
       if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel) {
         // Always use weight loss goal
         const energyNeeds = DietaryCalculator.calculateTargetCalories(
-          state.userProfile as UserProfile,
-          WeightGoal.WeightLoss
+          { ...state.userProfile as UserProfile, goal: WeightGoal.WeightLoss }
         );
         
         updateState({ 
@@ -526,7 +541,7 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
     };
 
     calculateEnergy();
-  }, [state.userProfile, updateState]);
+  }, [state.userProfile]);
 
   if (isCalculating) {
     return (
