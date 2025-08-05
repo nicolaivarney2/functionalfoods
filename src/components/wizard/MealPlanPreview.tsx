@@ -416,7 +416,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-semibold text-gray-900">Indkøbsliste for uge 1</h3>
               <div className="text-sm text-gray-500">
-                {shoppingList.items.length} varer
+                {shoppingList?.items?.length || 0} varer
               </div>
             </div>
             
@@ -437,7 +437,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-30">
-              {shoppingList.items.map((item: any, index: number) => (
+              {shoppingList?.items?.map((item: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <span className="text-sm text-gray-700">{item.name}</span>
                   <span className="text-sm text-gray-500">{item.amount}</span>
