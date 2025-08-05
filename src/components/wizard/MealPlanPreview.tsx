@@ -44,39 +44,60 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             day: 'Mandag',
             meals: [
               {
-                name: 'Keto morgenmad',
-                type: 'breakfast',
-                calories: 450,
-                protein: 25,
-                carbs: 8,
-                fat: 35,
-                ingredients: ['æg', 'bacon', 'avocado'],
-                instructions: 'Steg æg og bacon, server med avocado'
+                recipe: {
+                  title: 'Keto morgenmad',
+                  type: 'breakfast',
+                  calories: 450,
+                  protein: 25,
+                  carbs: 8,
+                  fat: 35,
+                  ingredients: ['æg', 'bacon', 'avocado'],
+                  instructions: 'Steg æg og bacon, server med avocado',
+                  images: ['/images/recipes/keto-breakfast.jpg']
+                }
               },
               {
-                name: 'Keto frokost',
-                type: 'lunch',
-                calories: 550,
-                protein: 30,
-                carbs: 10,
-                fat: 40,
-                ingredients: ['kylling', 'salat', 'olivenolie'],
-                instructions: 'Grill kylling, server med salat og olivenolie'
+                recipe: {
+                  title: 'Keto frokost',
+                  type: 'lunch',
+                  calories: 550,
+                  protein: 30,
+                  carbs: 10,
+                  fat: 40,
+                  ingredients: ['kylling', 'salat', 'olivenolie'],
+                  instructions: 'Grill kylling, server med salat og olivenolie',
+                  images: ['/images/recipes/keto-lunch.jpg']
+                }
               },
               {
-                name: 'Keto aftensmad',
-                type: 'dinner',
-                calories: 600,
-                protein: 35,
-                carbs: 12,
-                fat: 45,
-                ingredients: ['laks', 'broccoli', 'smør'],
-                instructions: 'Steg laks, server med broccoli og smør'
+                recipe: {
+                  title: 'Keto aftensmad',
+                  type: 'dinner',
+                  calories: 600,
+                  protein: 35,
+                  carbs: 12,
+                  fat: 45,
+                  ingredients: ['laks', 'broccoli', 'smør'],
+                  instructions: 'Steg laks, server med broccoli og smør',
+                  images: ['/images/recipes/keto-dinner.jpg']
+                }
               }
             ]
           }
         ],
-        shoppingList: ['æg', 'bacon', 'avocado', 'kylling', 'salat', 'olivenolie', 'laks', 'broccoli', 'smør']
+        shoppingList: {
+          items: [
+            { name: 'æg', amount: '12 stk' },
+            { name: 'bacon', amount: '200g' },
+            { name: 'avocado', amount: '2 stk' },
+            { name: 'kylling', amount: '500g' },
+            { name: 'salat', amount: '1 stk' },
+            { name: 'olivenolie', amount: '100ml' },
+            { name: 'laks', amount: '400g' },
+            { name: 'broccoli', amount: '500g' },
+            { name: 'smør', amount: '100g' }
+          ]
+        }
       }
     ],
     expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
