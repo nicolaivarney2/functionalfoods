@@ -199,21 +199,6 @@ const WizardFlow: React.FC = () => {
             transition={{ duration: 0.4, ease: "easeInOut" }}
           >
             <div className="bg-white rounded-2xl shadow-xl p-6 lg:p-8 border border-gray-100">
-              {/* Step Header */}
-              <motion.div 
-                className="text-center mb-6 lg:mb-8"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.3 }}
-              >
-                <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
-                  {currentStep.title}
-                </h2>
-                <p className="text-gray-600 text-base lg:text-lg">
-                  {currentStep.description}
-                </p>
-              </motion.div>
-
               {/* Step Content */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -513,10 +498,19 @@ const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 );
 
 const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
-  const [isCalculating, setIsCalculating] = useState(true);
+  const [isCalculating, setIsCalculating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
+    if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel) {
+      setIsCalculating(true);
+      setShowSuccess(false);
+    }
+  }, [state.userProfile]);
+
+  useEffect(() => {
+    if (!isCalculating) return;
+
     const calculateEnergy = async () => {
       if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel) {
         // Always use weight loss goal
@@ -551,22 +545,6 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
-        <motion.p 
-          className="text-gray-600 text-lg"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          Beregner dine energibehov...
-        </motion.p>
-        <motion.div 
-          className="mt-4 text-sm text-gray-500"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.5 }}
-        >
-          Dette tager kun et øjeblik
-        </motion.div>
       </div>
     );
   }
@@ -619,9 +597,9 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
           <div className="text-3xl font-bold text-[#1B365D] mb-2">
             {energyNeeds.bmr}
           </div>
-          <div className="text-sm text-gray-600">BMR (Grundstofskifte)</div>
+          <p className="text-sm text-gray-600">Basal stofskifte</p>
         </motion.div>
-        
+
         <motion.div 
           className="text-center p-6 bg-[#87A96B]/10 rounded-xl border border-[#87A96B]/20"
           whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(135, 169, 107, 0.15)" }}
@@ -630,9 +608,9 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
           <div className="text-3xl font-bold text-[#87A96B] mb-2">
             {energyNeeds.tdee}
           </div>
-          <div className="text-sm text-gray-600">TDEE (Total daglig energiforbrug)</div>
+          <p className="text-sm text-gray-600">Dagligt energiforbrug</p>
         </motion.div>
-        
+
         <motion.div 
           className="text-center p-6 bg-[#D4AF37]/10 rounded-xl border border-[#D4AF37]/20"
           whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(212, 175, 55, 0.15)" }}
@@ -641,32 +619,15 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
           <div className="text-3xl font-bold text-[#D4AF37] mb-2">
             {energyNeeds.targetCalories}
           </div>
-          <div className="text-sm text-gray-600">Målkalorier</div>
+          <p className="text-sm text-gray-600">Dagligt kalorietarget</p>
         </motion.div>
       </motion.div>
 
-      <motion.div 
-        className="bg-gray-50 rounded-xl p-6 border border-gray-200"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.5 }}
-      >
-        <h4 className="font-semibold text-gray-900 mb-4">Hvad dette betyder:</h4>
-        <ul className="space-y-2 text-gray-600">
-          <li className="flex items-start">
-            <span className="text-[#87A96B] mr-2">✓</span>
-            Din krop forbrænder {energyNeeds.bmr} kalorier bare for at holde sig i live
-          </li>
-          <li className="flex items-start">
-            <span className="text-[#87A96B] mr-2">✓</span>
-            Med dit aktivitetsniveau forbrænder du {energyNeeds.tdee} kalorier dagligt
-          </li>
-          <li className="flex items-start">
-            <span className="text-[#87A96B] mr-2">✓</span>
-            For dit mål, sigt efter {energyNeeds.targetCalories} kalorier dagligt
-          </li>
-        </ul>
-      </motion.div>
+      <div className="text-center">
+        <p className="text-sm text-gray-500 mb-4">
+          Disse tal vil blive brugt til at tilpasse din madplan præcist til dine behov.
+        </p>
+      </div>
     </motion.div>
   );
 };
