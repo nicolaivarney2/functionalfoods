@@ -7,17 +7,83 @@ import { dietaryFactory } from '@/lib/dietary-system';
 import { pdfGenerator } from '@/lib/pdf-system';
 
 interface MealPlanPreviewProps {
-  mealPlan: any;
-  onClose: () => void;
+  userProfile: any;
+  selectedDietaryApproach: string;
+  excludedIngredients: string[];
+  excludedCategories: string[];
+  allergies: string[];
+  intolerances: string[];
+  dietaryRestrictions: string[];
+  nutritionalAssessment: any;
 }
 
-const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) => {
+const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ 
+  userProfile, 
+  selectedDietaryApproach, 
+  excludedIngredients, 
+  excludedCategories, 
+  allergies, 
+  intolerances, 
+  dietaryRestrictions, 
+  nutritionalAssessment 
+}) => {
   const [selectedWeek, setSelectedWeek] = useState(0);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfGenerationError, setPdfGenerationError] = useState<string | null>(null);
 
-  if (!mealPlan) {
+  // Create meal plan data from props
+  const mealPlan = {
+    userProfile,
+    dietaryApproach: { id: selectedDietaryApproach },
+    weeks: [
+      {
+        weekNumber: 1,
+        days: [
+          {
+            day: 'Mandag',
+            meals: [
+              {
+                name: 'Keto morgenmad',
+                type: 'breakfast',
+                calories: 450,
+                protein: 25,
+                carbs: 8,
+                fat: 35,
+                ingredients: ['æg', 'bacon', 'avocado'],
+                instructions: 'Steg æg og bacon, server med avocado'
+              },
+              {
+                name: 'Keto frokost',
+                type: 'lunch',
+                calories: 550,
+                protein: 30,
+                carbs: 10,
+                fat: 40,
+                ingredients: ['kylling', 'salat', 'olivenolie'],
+                instructions: 'Grill kylling, server med salat og olivenolie'
+              },
+              {
+                name: 'Keto aftensmad',
+                type: 'dinner',
+                calories: 600,
+                protein: 35,
+                carbs: 12,
+                fat: 45,
+                ingredients: ['laks', 'broccoli', 'smør'],
+                instructions: 'Steg laks, server med broccoli og smør'
+              }
+            ]
+          }
+        ],
+        shoppingList: ['æg', 'bacon', 'avocado', 'kylling', 'salat', 'olivenolie', 'laks', 'broccoli', 'smør']
+      }
+    ],
+    expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
+    dailyCalories: userProfile.targetCalories || 1800
+  };
+
+  if (!userProfile || !selectedDietaryApproach) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-xl p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -28,7 +94,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             <h3 className="text-xl font-bold text-gray-900 mb-2">No Meal Plan Available</h3>
             <p className="text-gray-600 mb-4">Please generate a meal plan first.</p>
             <button
-              onClick={onClose}
+              onClick={() => window.close()}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200"
             >
               Close
