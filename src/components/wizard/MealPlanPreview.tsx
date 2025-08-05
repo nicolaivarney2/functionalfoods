@@ -47,11 +47,15 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
       'Rig på antioxidanter og anti-inflammatoriske stoffer',
       'Balanceret fiberindhold for god fordøjelse'
     ],
-    realMealPlan
+    realMealPlan: {
+      ...realMealPlan,
+      // Only show week 1 in preview, restrict others
+      weeks: realMealPlan.weeks.slice(0, 1) // Only show first week
+    }
   } : {
     userProfile,
     dietaryApproach: selectedDietaryApproach,
-    weeks: 3,
+    weeks: 6, // Show total weeks available
     dailyCalories: userProfile.targetCalories || 1800,
     expectedWeightLoss: Math.round((userProfile.weight || 80) * 0.06),
     nutritionalBenefits: [
@@ -60,7 +64,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
       'Rig på antioxidanter og anti-inflammatoriske stoffer',
       'Balanceret fiberindhold for god fordøjelse'
     ],
-    // Mock data structure for fallback
+    // Mock data structure for fallback - only week 1
     realMealPlan: {
       weeks: [
         {
@@ -239,7 +243,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 <button
                   onClick={() => setCurrentWeek(Math.max(1, currentWeek - 1))}
                   disabled={currentWeek === 1}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
+                  className={`p-2 rounded-lg transition-all duration-200 relative group ${
                     currentWeek === 1 
                       ? 'text-gray-400 cursor-not-allowed' 
                       : 'text-[#1B365D] hover:bg-[#1B365D]/10'
@@ -250,38 +254,47 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 
                 {/* Mobile: Scrollable week buttons */}
                 <div className="flex items-center space-x-1 overflow-x-auto scrollbar-hide">
-                  {mealPlan.realMealPlan.weeks.map((week: any, index: number) => (
+                  {/* Show all 6 weeks but restrict access to weeks 2-6 */}
+                  {[1, 2, 3, 4, 5, 6].map((weekNumber) => (
                     <button
-                      key={index}
-                      onClick={() => setCurrentWeek(index + 1)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                        currentWeek === index + 1
+                      key={weekNumber}
+                      onClick={() => weekNumber === 1 ? setCurrentWeek(1) : null}
+                      disabled={weekNumber > 1}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap relative group ${
+                        currentWeek === weekNumber
                           ? 'bg-[#1B365D] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
+                          : weekNumber === 1
+                          ? 'text-gray-600 hover:bg-gray-100'
+                          : 'text-gray-400 cursor-not-allowed opacity-50'
                       }`}
+                      title={weekNumber > 1 ? "Uge 2-6 er tilgængelig efter betaling" : ""}
                     >
-                      Uge {week.weekNumber}
+                      Uge {weekNumber}
+                      {weekNumber > 1 && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                          Uge {weekNumber} er tilgængelig efter betaling
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                        </div>
+                      )}
                     </button>
                   ))}
                 </div>
                 
                 <button
-                  onClick={() => setCurrentWeek(Math.min(mealPlan.realMealPlan.weeks.length, currentWeek + 1))}
-                  disabled={currentWeek === mealPlan.realMealPlan.weeks.length}
+                  onClick={() => setCurrentWeek(Math.min(1, currentWeek + 1))}
+                  disabled={currentWeek === 1}
                   className={`p-2 rounded-lg transition-all duration-200 relative group ${
-                    currentWeek === mealPlan.realMealPlan.weeks.length 
+                    currentWeek === 1 
                       ? 'text-gray-400 cursor-not-allowed' 
                       : 'text-[#1B365D] hover:bg-[#1B365D]/10'
                   }`}
-                  title={currentWeek === mealPlan.realMealPlan.weeks.length ? "De andre uger er skjult" : ""}
+                  title="De andre uger er skjult"
                 >
                   <ChevronRightIcon className="w-5 h-5" />
-                  {currentWeek === mealPlan.realMealPlan.weeks.length && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-                      De andre uger er skjult
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
-                    </div>
-                  )}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                    De andre uger er skjult
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                  </div>
                 </button>
               </div>
             </div>
