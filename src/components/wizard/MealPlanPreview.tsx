@@ -641,9 +641,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                             </div>
                           </div>
                           
-                          <div className="text-xs lg:text-sm text-gray-600">
-                            <strong>Ingredienser:</strong> {meal.recipe.ingredients.join(', ')}
-                          </div>
+                          {/* Removed ingredients list for cleaner preview */}
                         </div>
                       </div>
                     </motion.div>
@@ -710,7 +708,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button className="px-8 py-4 bg-white text-[#1B365D] rounded-lg hover:bg-gray-100 transition-all duration-200 font-semibold">
-                Se hele planen
+                Læs mere om planen
               </button>
               <button className="px-8 py-4 bg-[#D4AF37] text-white rounded-lg hover:bg-[#D4AF37]/90 transition-all duration-200 font-semibold">
                 Få min plan nu - 1195 DKK
