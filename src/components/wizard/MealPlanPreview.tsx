@@ -515,13 +515,20 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 <button
                   onClick={() => setSelectedWeek(Math.min(mealPlan.weeks.length - 1, selectedWeek + 1))}
                   disabled={selectedWeek === mealPlan.weeks.length - 1}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
+                  className={`p-2 rounded-lg transition-all duration-200 relative group ${
                     selectedWeek === mealPlan.weeks.length - 1 
                       ? 'text-gray-400 cursor-not-allowed' 
                       : 'text-[#1B365D] hover:bg-[#1B365D]/10'
                   }`}
+                  title={selectedWeek === mealPlan.weeks.length - 1 ? "De andre uger er skjult" : ""}
                 >
                   <ChevronRightIcon className="w-5 h-5" />
+                  {selectedWeek === mealPlan.weeks.length - 1 && (
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                      De andre uger er skjult
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  )}
                 </button>
               </div>
             </div>
@@ -530,17 +537,23 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
               <button
                 onClick={() => setShowShoppingList(!showShoppingList)}
-                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors text-sm"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors text-sm relative group"
+                title="Indkøbsliste er begrænset i forhåndsvisning"
               >
                 <ShoppingBagIcon className="w-4 h-4" />
                 <span className="hidden sm:inline">{showShoppingList ? 'Skjul indkøbsliste' : 'Vis indkøbsliste'}</span>
                 <span className="sm:hidden">{showShoppingList ? 'Skjul' : 'Liste'}</span>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                  Indkøbsliste er begrænset i forhåndsvisning
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                </div>
               </button>
               
               <button
                 onClick={handleGeneratePDF}
                 disabled={isGeneratingPDF}
-                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 text-sm"
+                className="flex items-center justify-center space-x-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50 text-sm relative group"
+                title="PDF download er begrænset i forhåndsvisning"
               >
                 {isGeneratingPDF ? (
                   <>
@@ -553,6 +566,10 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                     <DocumentArrowDownIcon className="w-4 h-4" />
                     <span className="hidden sm:inline">Download PDF</span>
                     <span className="sm:hidden">PDF</span>
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                      PDF download er begrænset i forhåndsvisning
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    </div>
                   </>
                 )}
               </button>
