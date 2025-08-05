@@ -1,20 +1,64 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Heart, Share2, List, ShoppingCart } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface RecipeActionsProps {
   recipeId: string
   recipeTitle: string
+  recipeSlug: string
+  recipeImage?: string
+  recipeDescription?: string
 }
 
-export default function RecipeActions({ recipeId, recipeTitle }: RecipeActionsProps) {
+export default function RecipeActions({ 
+  recipeId, 
+  recipeTitle, 
+  recipeSlug, 
+  recipeImage, 
+  recipeDescription 
+}: RecipeActionsProps) {
+  const { user } = useAuth()
   const [isSaved, setIsSaved] = useState(false)
   const [isInShoppingList, setIsInShoppingList] = useState(false)
 
+  // Load saved state from localStorage
+  useEffect(() => {
+    if (user) {
+      const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+      setIsSaved(savedRecipes.some((recipe: any) => recipe.id === recipeId))
+    }
+  }, [user, recipeId])
+
   const handleSave = () => {
-    setIsSaved(!isSaved)
-    // TODO: Implement save functionality
+    if (!user) {
+      // TODO: Show login modal
+      alert('Du skal være logget ind for at gemme opskrifter')
+      return
+    }
+
+    const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+    
+    if (isSaved) {
+      // Remove from favorites
+      const updatedRecipes = savedRecipes.filter((recipe: any) => recipe.id !== recipeId)
+      localStorage.setItem('favorite_recipes', JSON.stringify(updatedRecipes))
+      setIsSaved(false)
+    } else {
+      // Add to favorites
+      const newRecipe = {
+        id: recipeId,
+        title: recipeTitle,
+        slug: recipeSlug,
+        image: recipeImage,
+        description: recipeDescription,
+        savedAt: new Date().toISOString()
+      }
+      const updatedRecipes = [...savedRecipes, newRecipe]
+      localStorage.setItem('favorite_recipes', JSON.stringify(updatedRecipes))
+      setIsSaved(true)
+    }
   }
 
   const handleShare = async () => {
@@ -30,14 +74,24 @@ export default function RecipeActions({ recipeId, recipeTitle }: RecipeActionsPr
       }
     } else {
       // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href)
-      // TODO: Show toast notification
+      try {
+        await navigator.clipboard.writeText(window.location.href)
+        alert('Link kopieret til udklipsholder!')
+      } catch (error) {
+        console.log('Error copying to clipboard:', error)
+      }
     }
   }
 
   const handleAddToShoppingList = () => {
+    if (!user) {
+      alert('Du skal være logget ind for at bruge indkøbslisten')
+      return
+    }
+    
     setIsInShoppingList(!isInShoppingList)
     // TODO: Implement shopping list functionality
+    alert('Indkøbsliste funktionalitet kommer snart!')
   }
 
   return (

@@ -40,6 +40,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Handle redirect after email verification
+  useEffect(() => {
+    const handleRedirect = () => {
+      const savedUrl = localStorage.getItem('auth_redirect_url')
+      if (savedUrl && user) {
+        localStorage.removeItem('auth_redirect_url')
+        // Use router.push if available, otherwise window.location
+        if (typeof window !== 'undefined') {
+          window.location.href = savedUrl
+        }
+      }
+    }
+
+    if (user) {
+      handleRedirect()
+    }
+  }, [user])
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -49,6 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signUp = async (email: string, password: string, name: string) => {
+    // Save current URL before signup
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_redirect_url', window.location.href)
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -56,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data: {
           name,
         },
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
       },
     })
     return { error }

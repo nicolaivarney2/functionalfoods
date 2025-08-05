@@ -6,6 +6,7 @@ import { getRecipeBySlugServer, getAllRecipesServer } from '@/lib/recipe-storage
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
+import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
 
 interface RecipePageProps {
@@ -129,30 +130,7 @@ export default function RecipePage({ params }: RecipePageProps) {
                 </div>
                 
                 {/* Recipe Meta Information */}
-                <div className="flex items-center space-x-6 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Clock size={16} className="text-gray-500" />
-                    <span className="text-gray-700">{formatTime(recipe.preparationTime + recipe.cookingTime)}</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1" id="top-rating-stars">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={14}
-                          className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-gray-600">(15)</span>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2 text-gray-600" id="top-comments">
-                    <MessageCircle size={14} />
-                    <span>Kommentarer (0)</span>
-                  </div>
-                </div>
+                <RecipeHeaderActions recipe={recipe} />
                 
                 {/* Recipe Tags */}
                 <div>

@@ -1,19 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Recipe } from '@/types/recipe'
 import { Star, MessageCircle } from 'lucide-react'
-import FloatingRecipeNavigation from '@/components/FloatingRecipeNavigation'
-import ServingSizeAdjuster from '@/components/ServingSizeAdjuster'
-import RecipeActions from '@/components/RecipeActions'
-import RecipeTips from '@/components/RecipeTips'
-import RelatedRecipes from '@/components/RelatedRecipes'
-import AboutFunctionalFoods from '@/components/AboutFunctionalFoods'
-import CommentSystem from '@/components/CommentSystem'
-import SocialSharing from '@/components/SocialSharing'
-import DynamicIngredientsList from '@/components/DynamicIngredientsList'
-import InstructionsList from '@/components/InstructionsList'
-import RatingModal from '@/components/RatingModal'
+import { Recipe } from '@/types/recipe'
+import RecipeActions from './RecipeActions'
+import DynamicIngredientsList from './DynamicIngredientsList'
+import InstructionsList from './InstructionsList'
+import CommentSystem from './CommentSystem'
+import SocialSharing from './SocialSharing'
+import RecipeTips from './RecipeTips'
+import RelatedRecipes from './RelatedRecipes'
+import AboutFunctionalFoods from './AboutFunctionalFoods'
+import FloatingRecipeNavigation from './FloatingRecipeNavigation'
+import RatingModal from './RatingModal'
 
 interface RecipePageClientProps {
   recipe: Recipe
@@ -21,47 +20,39 @@ interface RecipePageClientProps {
 }
 
 export default function RecipePageClient({ recipe, allRecipes }: RecipePageClientProps) {
-  const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
-  const [servings, setServings] = useState(recipe.servings || 4)
+  const [servings, setServings] = useState(recipe.servings || 2)
+  const [currentRating, setCurrentRating] = useState(4)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false)
-  const [currentRating, setCurrentRating] = useState(4) // Default rating
+  const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
+  const [commentCount, setCommentCount] = useState(2) // Start with dummy data count
 
-  // Add event listeners for top elements when component mounts
+  // Update comment count when comments change
+  const handleCommentUpdate = (newCount: number) => {
+    setCommentCount(newCount)
+  }
+
   useEffect(() => {
-    const topRatingStars = document.getElementById('top-rating-stars')
-    const topComments = document.getElementById('top-comments')
+    const handleScroll = () => {
+      const ingredientsSection = document.getElementById('ingredients')
+      const instructionsSection = document.getElementById('instructions')
 
-    if (topRatingStars) {
-      topRatingStars.addEventListener('click', () => {
-        setIsRatingModalOpen(true)
-      })
-      topRatingStars.style.cursor = 'pointer'
-      topRatingStars.classList.add('hover:opacity-80', 'transition-opacity')
-    }
+      if (ingredientsSection && instructionsSection) {
+        const ingredientsRect = ingredientsSection.getBoundingClientRect()
+        const instructionsRect = instructionsSection.getBoundingClientRect()
 
-    if (topComments) {
-      topComments.addEventListener('click', () => {
-        document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })
-      })
-      topComments.style.cursor = 'pointer'
-      topComments.classList.add('hover:text-gray-900', 'transition-colors')
-    }
-
-    // Cleanup event listeners
-    return () => {
-      if (topRatingStars) {
-        topRatingStars.removeEventListener('click', () => setIsRatingModalOpen(true))
-      }
-      if (topComments) {
-        topComments.removeEventListener('click', () => {
-          document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })
-        })
+        if (ingredientsRect.top <= 100 && ingredientsRect.bottom >= 100) {
+          setActiveSection('ingredients')
+        } else if (instructionsRect.top <= 100 && instructionsRect.bottom >= 100) {
+          setActiveSection('instructions')
+        }
       }
     }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   const scrollToSection = (section: 'ingredients' | 'instructions') => {
-    setActiveSection(section)
     const element = document.getElementById(section)
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
@@ -70,12 +61,16 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
 
   return (
     <>
-
-
-      {/* Recipe Actions - Rendered in client component */}
+      {/* Recipe Actions */}
       <section className="bg-white border-b border-gray-200">
         <div className="container py-6">
-          <RecipeActions recipeId={recipe.id} recipeTitle={recipe.title} />
+          <RecipeActions 
+            recipeId={recipe.id} 
+            recipeTitle={recipe.title}
+            recipeSlug={recipe.slug}
+            recipeImage={recipe.imageUrl}
+            recipeDescription={recipe.shortDescription}
+          />
         </div>
       </section>
 
@@ -95,7 +90,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
       {/* Comment System - Moved up */}
       <section id="comments-section" className="bg-gray-50 py-12">
         <div className="container">
-          <CommentSystem recipeSlug={recipe.slug} />
+          <CommentSystem recipeSlug={recipe.slug} onCommentUpdate={handleCommentUpdate} />
         </div>
       </section>
 
@@ -149,7 +144,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
           className="flex items-center space-x-2 bg-white bg-opacity-90 backdrop-blur-sm rounded-lg p-2 shadow-lg text-gray-600 hover:text-gray-900 transition-colors"
         >
           <MessageCircle size={16} />
-          <span className="text-sm">Kommentarer (0)</span>
+          <span className="text-sm">Kommentarer ({commentCount})</span>
         </button>
       </div>
 

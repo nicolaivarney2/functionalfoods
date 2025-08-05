@@ -3,6 +3,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Heart, ShoppingCart, Star } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
 import { Recipe } from '@/types/recipe'
 
 interface RelatedRecipesProps {
@@ -11,9 +13,69 @@ interface RelatedRecipesProps {
 }
 
 export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedRecipesProps) {
+  const { user } = useAuth()
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  
   const relatedRecipes = recipes
     .filter(recipe => recipe.id !== currentRecipeId)
     .slice(0, 6) // Show 6 recipes (2 rows of 3)
+
+  // Load favorites from localStorage
+  useEffect(() => {
+    if (user) {
+      const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+      const favoriteIds = new Set(savedRecipes.map((recipe: any) => recipe.id))
+      setFavorites(favoriteIds)
+    }
+  }, [user])
+
+  const handleFavorite = (e: React.MouseEvent, recipeId: string, recipe: Recipe) => {
+    e.preventDefault() // Prevent navigation
+    e.stopPropagation()
+    
+    if (!user) {
+      alert('Du skal være logget ind for at gemme opskrifter')
+      return
+    }
+
+    const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+    
+    if (favorites.has(recipeId)) {
+      // Remove from favorites
+      const updatedRecipes = savedRecipes.filter((recipe: any) => recipe.id !== recipeId)
+      localStorage.setItem('favorite_recipes', JSON.stringify(updatedRecipes))
+      setFavorites(prev => {
+        const newFavorites = new Set(prev)
+        newFavorites.delete(recipeId)
+        return newFavorites
+      })
+    } else {
+      // Add to favorites
+      const newRecipe = {
+        id: recipeId,
+        title: recipe.title,
+        slug: recipe.slug,
+        image: recipe.imageUrl,
+        description: recipe.shortDescription,
+        savedAt: new Date().toISOString()
+      }
+      const updatedRecipes = [...savedRecipes, newRecipe]
+      localStorage.setItem('favorite_recipes', JSON.stringify(updatedRecipes))
+      setFavorites(prev => new Set([...prev, recipeId]))
+    }
+  }
+
+  const handleShoppingList = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!user) {
+      alert('Du skal være logget ind for at bruge indkøbslisten')
+      return
+    }
+    
+    alert('Indkøbsliste funktionalitet kommer snart!')
+  }
 
   if (relatedRecipes.length === 0) {
     return null
@@ -40,10 +102,23 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
                   
                   {/* Action Icons Overlay */}
                   <div className="absolute top-3 right-3 flex space-x-2">
-                    <button className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors">
-                      <Heart size={16} className="text-gray-600" />
+                    <button 
+                      onClick={(e) => handleFavorite(e, recipe.id, recipe)}
+                      className={`w-8 h-8 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ${
+                        favorites.has(recipe.id)
+                          ? 'bg-red-500/90 hover:bg-red-600/90'
+                          : 'bg-white/80 hover:bg-white'
+                      }`}
+                    >
+                      <Heart 
+                        size={16} 
+                        className={favorites.has(recipe.id) ? 'text-white fill-current' : 'text-gray-600'} 
+                      />
                     </button>
-                    <button className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors">
+                    <button 
+                      onClick={handleShoppingList}
+                      className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                    >
                       <ShoppingCart size={16} className="text-gray-600" />
                     </button>
                   </div>

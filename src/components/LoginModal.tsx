@@ -33,7 +33,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         if (error) {
           setError(error.message)
         } else {
-          setSuccess('Tjek din email for at bekræfte din konto!')
+          setSuccess('Tjek din email for at bekræfte din konto! Du vil blive sendt tilbage til denne side efter bekræftelse.')
         }
       } else {
         const { error } = await signIn(email, password)

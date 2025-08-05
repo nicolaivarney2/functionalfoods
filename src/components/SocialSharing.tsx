@@ -1,6 +1,7 @@
 'use client'
 
 import { Share2, Facebook, Instagram, MessageCircle, Send, Heart } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface SocialSharingProps {
   recipeTitle: string
@@ -15,9 +16,28 @@ export default function SocialSharing({
   recipeImage, 
   recipeDescription 
 }: SocialSharingProps) {
+  const [mounted, setMounted] = useState(false)
   
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Ensure we have a consistent URL format
+  const getFullUrl = (url: string) => {
+    if (url.startsWith('http')) {
+      return url
+    }
+    // For server-side rendering, use relative URL
+    // For client-side, construct full URL
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${url}`
+    }
+    return url
+  }
+
+  const fullUrl = getFullUrl(recipeUrl)
   const shareText = `Tjek denne fantastiske opskrift: ${recipeTitle}`
-  const encodedUrl = encodeURIComponent(recipeUrl)
+  const encodedUrl = encodeURIComponent(fullUrl)
   const encodedText = encodeURIComponent(shareText)
   const encodedImage = recipeImage ? encodeURIComponent(recipeImage) : ''
   const encodedDescription = recipeDescription ? encodeURIComponent(recipeDescription) : ''
@@ -27,7 +47,7 @@ export default function SocialSharing({
     whatsapp: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
     messenger: `https://www.facebook.com/dialog/send?link=${encodedUrl}&app_id=YOUR_APP_ID&redirect_uri=${encodedUrl}`,
     pinterest: `https://pinterest.com/pin/create/button/?url=${encodedUrl}&media=${encodedImage}&description=${encodedDescription}`,
-    copy: recipeUrl
+    copy: fullUrl
   }
 
   const handleShare = (platform: keyof typeof shareUrls) => {
@@ -83,6 +103,30 @@ export default function SocialSharing({
     }
   ]
 
+  // Don't render until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Del denne opskrift</h3>
+          <p className="text-sm text-gray-600">Hjælp andre med at opdage denne fantastiske opskrift</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {shareButtons.map(({ platform, label, icon: Icon, color, textColor }) => (
+            <button
+              key={platform}
+              className={`${color} ${textColor} rounded-lg px-4 py-3 flex flex-col items-center space-y-2 transition-colors duration-200 hover:shadow-md`}
+              disabled
+            >
+              <Icon size={20} />
+              <span className="text-xs font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100">
       <div className="mb-4">
@@ -106,14 +150,14 @@ export default function SocialSharing({
       <div className="mt-4 p-3 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-600">Direkte link:</span>
-          <button
+          <button 
             onClick={() => handleShare('copy')}
             className="text-sm text-green-600 hover:text-green-700 font-medium"
           >
             Kopier
           </button>
         </div>
-        <p className="text-xs text-gray-500 mt-1 break-all">{recipeUrl}</p>
+        <p className="text-xs text-gray-500 mt-1 break-all">{fullUrl}</p>
       </div>
     </div>
   )

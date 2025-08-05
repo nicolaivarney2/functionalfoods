@@ -333,8 +333,24 @@ export default function RecipeOverviewPage() {
       {/* Divider */}
       <div className="border-b border-gray-200"></div>
 
-      {/* Search and Filter Section - Moved above recipes */}
-      <section className="bg-white py-8">
+      {/* Alle vores opskrifter Section - Moved above search */}
+      <section id="alle-opskrifter" className="py-8 bg-white">
+        <div className="container">
+          <div className="text-center mb-4">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Alle vores opskrifter
+            </h1>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Bemærk, at du her søger i alle functionalfoods opskrifter med blandet mad ideologi. 
+              Brug filteret eller vælg mad-ideologi sider ovenover, for at finde lækre opskrifter 
+              inden for en specifik mad ideologi.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Search and Filter Section - Moved below title/description */}
+      <section className="bg-white py-4">
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Search */}
@@ -424,20 +440,9 @@ export default function RecipeOverviewPage() {
         </div>
       </section>
 
-      {/* Alle vores opskrifter Section - Moved below search */}
-      <section id="alle-opskrifter" className="py-12 bg-white">
+      {/* Recipe Grid Section */}
+      <section className="py-8 bg-white">
         <div className="container">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Alle vores opskrifter
-            </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Bemærk, at du her søger i alle functionalfoods opskrifter med blandet mad ideologi. 
-              Brug filteret eller vælg mad-ideologi sider ovenover, for at finde lækre opskrifter 
-              inden for en specifik mad ideologi.
-            </p>
-          </div>
-          
           {displayedRecipes.length > 0 ? (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MessageCircle, Reply, Heart, Flag, Send, User } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import CommentCTA from './CommentCTA'
@@ -18,78 +18,48 @@ interface Comment {
 
 interface CommentSystemProps {
   recipeSlug: string
+  onCommentUpdate?: (count: number) => void
 }
 
-export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
+export default function CommentSystem({ recipeSlug, onCommentUpdate }: CommentSystemProps) {
   const { user } = useAuth()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [comments, setComments] = useState<Comment[]>([
     {
       id: '1',
       author: 'Sarah Jensen',
-      content: 'Fantastisk opskrift! Jeg tilføjede lidt ekstra chili og det blev perfekt. Kan varmt anbefales! 🌶️',
+      content: 'Fantastisk opskrift! Jeg tilføjede lidt ekstra chili og det blev perfekt.',
       timestamp: '2024-01-15T10:30:00Z',
-      likes: 12,
+      likes: 5,
       replies: [
         {
-          id: '1-1',
-          author: 'Mads Hansen',
-          content: 'Hvor meget ekstra chili tilføjede du? Jeg er lidt forsigtig med stærk mad 😅',
-          timestamp: '2024-01-15T11:15:00Z',
-          likes: 3,
+          id: '1.1',
+          author: 'Peter Hansen',
+          content: 'Hvor meget chili tilføjede du?',
+          timestamp: '2024-01-15T11:00:00Z',
+          likes: 2,
           replies: []
         }
       ]
     },
     {
       id: '2',
-      author: 'Emma Nielsen',
-      content: 'Prøvede denne i går og hele familien elskede den! Specielt børnene var vilde med smagen. Tak for opskriften! 👨‍👩‍👧‍👦',
-      timestamp: '2024-01-14T18:45:00Z',
+      author: 'Maria Nielsen',
+      content: 'Prøvede denne i weekenden - min familie elskede det!',
+      timestamp: '2024-01-14T16:45:00Z',
       likes: 8,
       replies: []
-    },
-    {
-      id: '3',
-      author: 'Peter Madsen',
-      content: 'Er der nogen der har prøvet at erstatte bacon med vegetarisk bacon? Jeg er vegetar og vil gerne prøve denne opskrift.',
-      timestamp: '2024-01-14T16:20:00Z',
-      likes: 5,
-      replies: [
-        {
-          id: '3-1',
-          author: 'Lisa Andersen',
-          content: 'Ja! Jeg bruger altid Naturli\'s bacon og det fungerer super godt i denne opskrift. Smagen er næsten identisk!',
-          timestamp: '2024-01-14T17:30:00Z',
-          likes: 7,
-          replies: []
-        },
-        {
-          id: '3-2',
-          author: 'Ole Christensen',
-          content: 'Jeg har prøvet med tempeh bacon og det gav en rigtig god umami smag. Kan anbefales!',
-          timestamp: '2024-01-14T19:10:00Z',
-          likes: 4,
-          replies: []
-        }
-      ]
     }
   ])
-
   const [newComment, setNewComment] = useState('')
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState('')
 
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
-    
-    if (diffInHours < 1) return 'Lige nu'
-    if (diffInHours < 24) return `For ${diffInHours} timer siden`
-    if (diffInHours < 48) return 'I går'
-    return date.toLocaleDateString('da-DK')
-  }
+  // Update comment count when comments change
+  useEffect(() => {
+    const totalComments = comments.length + comments.reduce((total, comment) => total + comment.replies.length, 0)
+    onCommentUpdate?.(totalComments)
+  }, [comments, onCommentUpdate])
 
   const handleLike = (commentId: string) => {
     setComments(prev => 
@@ -106,12 +76,13 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
     )
   }
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = (e: React.FormEvent) => {
+    e.preventDefault()
     if (!newComment.trim()) return
 
     const comment: Comment = {
       id: Date.now().toString(),
-      author: 'Du',
+      author: user?.user_metadata?.name || 'Anonym',
       content: newComment,
       timestamp: new Date().toISOString(),
       likes: 0,
@@ -126,8 +97,8 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
     if (!replyContent.trim()) return
 
     const reply: Comment = {
-      id: `${parentId}-${Date.now()}`,
-      author: 'Du',
+      id: `${parentId}.${Date.now()}`,
+      author: user?.user_metadata?.name || 'Anonym',
       content: replyContent,
       timestamp: new Date().toISOString(),
       likes: 0,
@@ -150,67 +121,113 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
     setReplyingTo(null)
   }
 
-  const renderComment = (comment: Comment, isReply = false) => (
-    <div key={comment.id} className={`${isReply ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}>
-      <div className="bg-white rounded-lg p-4 mb-4 shadow-sm border border-gray-100">
-        <div className="flex items-start space-x-3">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-            <User size={16} className="text-green-600" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center space-x-2 mb-2">
-              <span className="font-medium text-gray-900">{comment.author}</span>
-              <span className="text-sm text-gray-500">{formatTimestamp(comment.timestamp)}</span>
-            </div>
-            <p className="text-gray-700 mb-3">{comment.content}</p>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => handleLike(comment.id)}
-                className={`flex items-center space-x-1 text-sm transition-colors ${
-                  comment.isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
-                }`}
-              >
-                <Heart size={14} className={comment.isLiked ? 'fill-current' : ''} />
-                <span>{comment.likes}</span>
-              </button>
-              <button
-                onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
-                className="flex items-center space-x-1 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <Reply size={14} />
-                <span>Svar</span>
-              </button>
-              <button className="flex items-center space-x-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
-                <Flag size={14} />
-                <span>Rapporter</span>
-              </button>
-            </div>
-          </div>
+  const renderComment = (comment: Comment) => (
+    <div key={comment.id} className="bg-white rounded-lg p-4 border border-gray-200">
+      <div className="flex items-start space-x-3">
+        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+          <User size={16} className="text-green-600" />
         </div>
-      </div>
-
-      {replyingTo === comment.id && (
-        <div className="ml-8 mb-4">
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={replyContent}
-              onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Skriv dit svar..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            />
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-2">
+            <span className="font-medium text-gray-900">{comment.author}</span>
+            <span className="text-sm text-gray-500">
+              {new Date(comment.timestamp).toLocaleDateString('da-DK')}
+            </span>
+          </div>
+          <p className="text-gray-700 mb-3">{comment.content}</p>
+          
+          <div className="flex items-center space-x-4">
             <button
-              onClick={() => handleSubmitReply(comment.id)}
-              disabled={!replyContent.trim()}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={() => handleLike(comment.id)}
+              className={`flex items-center space-x-1 text-sm transition-colors ${
+                comment.isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+              }`}
             >
-              <Send size={16} />
+              <Heart size={16} className={comment.isLiked ? 'fill-current' : ''} />
+              <span>{comment.likes}</span>
+            </button>
+            
+            <button
+              onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+              className="flex items-center space-x-1 text-sm text-gray-500 hover:text-blue-500 transition-colors"
+            >
+              <Reply size={16} />
+              <span>Svar</span>
+            </button>
+            
+            <button className="flex items-center space-x-1 text-sm text-gray-500 hover:text-orange-500 transition-colors">
+              <Flag size={16} />
+              <span>Rapporter</span>
             </button>
           </div>
-        </div>
-      )}
 
-      {comment.replies.map(reply => renderComment(reply, true))}
+          {replyingTo === comment.id && (
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+              <textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Skriv dit svar..."
+                className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                rows={3}
+              />
+              <div className="flex justify-end space-x-2 mt-2">
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={() => handleSubmitReply(comment.id)}
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Svar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {comment.replies.length > 0 && (
+            <div className="mt-3 space-y-3">
+              {comment.replies.map(reply => (
+                <div key={reply.id} className="ml-6 pl-4 border-l-2 border-gray-200">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                      <User size={12} className="text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-medium text-gray-900 text-sm">{reply.author}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(reply.timestamp).toLocaleDateString('da-DK')}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                      
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => handleLike(reply.id)}
+                          className={`flex items-center space-x-1 text-xs transition-colors ${
+                            reply.isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'
+                          }`}
+                        >
+                          <Heart size={12} className={reply.isLiked ? 'fill-current' : ''} />
+                          <span>{reply.likes}</span>
+                        </button>
+                        
+                        <button className="flex items-center space-x-1 text-xs text-gray-500 hover:text-orange-500 transition-colors">
+                          <Flag size={12} />
+                          <span>Rapporter</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 
@@ -231,53 +248,49 @@ export default function CommentSystem({ recipeSlug }: CommentSystemProps) {
       {/* Comment Form - Only show if user is logged in */}
       {user && (
         <div className="bg-white rounded-lg p-6 mb-8 shadow-sm border border-gray-100">
-        <div className="flex space-x-3">
-          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-            <User size={20} className="text-green-600" />
-          </div>
-          <div className="flex-1">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Skriv en kommentar..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-              rows={3}
-            />
-            <div className="flex justify-between items-center mt-3">
-              <p className="text-sm text-gray-500">
-                Din kommentar vil blive synlig for alle
-              </p>
+          <form onSubmit={handleSubmitComment} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Din kommentar
+              </label>
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Del dine erfaringer med denne opskrift..."
+                className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                rows={4}
+                required
+              />
+            </div>
+            <div className="flex justify-end">
               <button
-                onClick={handleSubmitComment}
-                disabled={!newComment.trim()}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                type="submit"
+                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
               >
-                Send kommentar
+                <Send size={16} />
+                <span>Send kommentar</span>
               </button>
             </div>
-          </div>
+          </form>
         </div>
-      </div>
+      )}
 
       {/* Comments List */}
       <div className="space-y-4">
-        {comments.map(comment => renderComment(comment))}
+        {comments.length > 0 ? (
+          comments.map(comment => renderComment(comment))
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+            <p>Ingen kommentarer endnu. Vær den første til at dele dine erfaringer!</p>
+          </div>
+        )}
       </div>
 
-      {comments.length === 0 && (
-        <div className="text-center py-12">
-          <MessageCircle size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen kommentarer endnu</h3>
-          <p className="text-gray-600">Vær den første til at dele dine erfaringer!</p>
-        </div>
-      )}
-        </div>
-      )}
-
       {/* Login Modal */}
-      <LoginModal 
-        isOpen={isLoginModalOpen} 
-        onClose={() => setIsLoginModalOpen(false)} 
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
       />
     </div>
   )
