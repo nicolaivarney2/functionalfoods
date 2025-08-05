@@ -1054,14 +1054,6 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
         />
-        <motion.p 
-          className="text-gray-600 text-lg"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          Skaber din personlige plan...
-        </motion.p>
       </div>
     );
   }
@@ -1222,71 +1214,186 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
 };
 
 const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
-  <div className="max-w-2xl mx-auto">
-    <div className="space-y-6">
+  <motion.div 
+    className="max-w-2xl mx-auto"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div className="text-center mb-8">
+      <h3 className="text-2xl font-bold text-gray-900 mb-4">
+        Ekstra information
+      </h3>
+      <p className="text-gray-600">
+        Hjælp os med at tilpasse din plan endnu bedre til dine behov og livsstil.
+      </p>
+    </div>
+
+    <motion.div 
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2, duration: 0.5 }}
+    >
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Ekstra information</h3>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du springe morgenmad over en gang imellem?
-            </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
-              <option value="">Vælg</option>
-              <option value="yes">Ja</option>
-              <option value="no">Nej</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hvor mange personer er denne plan til?
-            </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
-              <option value="1">1 person</option>
-              <option value="2">2 personer</option>
-              <option value="3">3 personer</option>
-              <option value="4">4 personer</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du spise samme mad 2 dage i træk nogle gange?
-            </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
-              <option value="">Vælg</option>
-              <option value="yes">Ja</option>
-              <option value="no">Nej</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du have adgang til vores gratis online videokurs?
-            </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
-              <option value="">Vælg</option>
-              <option value="yes">Ja</option>
-              <option value="no">Nej</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Vil du have gratis personlig SMS-sparring?
-            </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
-              <option value="">Vælg</option>
-              <option value="yes">Ja</option>
-              <option value="no">Nej</option>
-            </select>
-          </div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
+        </label>
+        <div className="space-y-3">
+          {[
+            { value: 'skip-breakfast', label: 'Ja, jeg vil gerne springe morgenmad over nogle gange' },
+            { value: 'no-skip-breakfast', label: 'Nej, jeg vil have morgenmad hver dag' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <input
+                type="radio"
+                name="skipBreakfast"
+                value={option.value}
+                checked={state.miscellaneous?.skipBreakfast === option.value}
+                onChange={(e) => updateState({
+                  miscellaneous: {
+                    ...state.miscellaneous,
+                    skipBreakfast: e.target.value
+                  }
+                })}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
+              />
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
+          ))}
         </div>
       </div>
-    </div>
-  </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Hvor mange personer er denne plan til? Vi vil tilpasse opskrifter og indkøbsliste.
+        </label>
+        <select
+          value={state.miscellaneous?.peopleCount || ''}
+          onChange={(e) => updateState({
+            miscellaneous: {
+              ...state.miscellaneous,
+              peopleCount: e.target.value
+            }
+          })}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200"
+        >
+          <option value="">Vælg antal personer</option>
+          <option value="1">1 person</option>
+          <option value="2">2 personer</option>
+          <option value="3">3 personer</option>
+          <option value="4">4 personer</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
+        </label>
+        <div className="space-y-3">
+          {[
+            { value: 'repeat-meals', label: 'Ja, jeg vil gerne spise samme mad 2 dage i træk' },
+            { value: 'no-repeat-meals', label: 'Nej, jeg vil have forskellig mad hver dag' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <input
+                type="radio"
+                name="repeatMeals"
+                value={option.value}
+                checked={state.miscellaneous?.repeatMeals === option.value}
+                onChange={(e) => updateState({
+                  miscellaneous: {
+                    ...state.miscellaneous,
+                    repeatMeals: e.target.value
+                  }
+                })}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
+              />
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
+        </label>
+        <div className="space-y-3">
+          {[
+            { value: 'video-course', label: 'Ja, jeg vil gerne have adgang til videokurset' },
+            { value: 'no-video-course', label: 'Nej tak, jeg vil kun have den fysiske bog' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <input
+                type="radio"
+                name="videoCourse"
+                value={option.value}
+                checked={state.miscellaneous?.videoCourse === option.value}
+                onChange={(e) => updateState({
+                  miscellaneous: {
+                    ...state.miscellaneous,
+                    videoCourse: e.target.value
+                  }
+                })}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
+              />
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
+        </label>
+        <div className="space-y-3">
+          {[
+            { value: 'sms-sparring', label: 'Ja, jeg vil gerne have SMS-sparring' },
+            { value: 'no-sms-sparring', label: 'Nej tak, jeg vil kun have den fysiske bog' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <input
+                type="radio"
+                name="smsSparring"
+                value={option.value}
+                checked={state.miscellaneous?.smsSparring === option.value}
+                onChange={(e) => updateState({
+                  miscellaneous: {
+                    ...state.miscellaneous,
+                    smsSparring: e.target.value
+                  }
+                })}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 focus:ring-[#1B365D]"
+              />
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  </motion.div>
 );
 
 export default WizardFlow; 
