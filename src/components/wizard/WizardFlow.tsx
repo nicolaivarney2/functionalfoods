@@ -210,6 +210,7 @@ const WizardFlow: React.FC = () => {
                   state={state} 
                   updateState={updateState} 
                   nextStep={nextStep} 
+                  setShowPreviewModal={currentStep.id === 'generating' ? setShowPreviewModal : undefined}
                 />
               </motion.div>
 
@@ -989,7 +990,7 @@ const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
   </div>
 );
 
-const GeneratingStep: React.FC<any> = ({ state }) => {
+const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
   const [isGenerating, setIsGenerating] = useState(true);
   const [mealPlan, setMealPlan] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
