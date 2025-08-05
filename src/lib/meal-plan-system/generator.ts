@@ -37,143 +37,64 @@ import {
   ingredientService 
 } from '../ingredient-system';
 
+// Import real recipe data
+import { sampleRecipes } from '../sample-data';
+
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
 
   constructor() {
-    this.initializeSampleRecipes();
+    this.initializeRealRecipes();
   }
 
   /**
-   * Initialize with sample recipes for testing
+   * Initialize with real recipes from the existing database
    */
-  private initializeSampleRecipes(): void {
-    this.recipes = [
-      {
-        id: 'keto-breakfast-1',
-        title: 'Keto Avocado & Egg Bowl',
-        description: 'A satisfying keto breakfast with healthy fats',
-        ingredients: [
-          { ingredientId: 'avocado-1', amount: 1, unit: 'piece' },
-          { ingredientId: 'egg-1', amount: 2, unit: 'pieces' },
-          { ingredientId: 'olive-oil-1', amount: 1, unit: 'tbsp' }
-        ],
-        instructions: [
-          'Fry eggs in olive oil',
-          'Slice avocado',
-          'Combine in bowl'
-        ],
-        prepTime: 5,
-        cookTime: 10,
-        servings: 1,
-        categories: [RecipeCategory.Breakfast],
-        dietaryApproaches: ['keto'],
-        nutritionalInfo: {
-          caloriesPer100g: 320,
-          proteinPer100g: 15,
-          carbsPer100g: 8,
-          fatPer100g: 28
-        },
-        images: ['/images/recipes/keto-avocado-egg-bowl.jpg'],
-        slug: 'keto-avocado-egg-bowl',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
+  private initializeRealRecipes(): void {
+    // Convert sample recipes to the format expected by the meal plan system
+    this.recipes = sampleRecipes.map(recipe => ({
+      id: recipe.id,
+      title: recipe.title,
+      description: recipe.description,
+      ingredients: recipe.ingredients.map(ing => ({
+        ingredientId: ing.id,
+        amount: ing.amount,
+        unit: ing.unit
+      })),
+      instructions: recipe.instructions.map(inst => inst.instruction),
+      prepTime: recipe.preparationTime,
+      cookTime: recipe.cookingTime,
+      servings: recipe.servings,
+      categories: [this.mapCategory(recipe.mainCategory)],
+      dietaryApproaches: recipe.dietaryCategories.map(cat => cat.toLowerCase()),
+      nutritionalInfo: {
+        caloriesPer100g: recipe.calories,
+        proteinPer100g: recipe.protein,
+        carbsPer100g: recipe.carbs,
+        fatPer100g: recipe.fat
       },
-      {
-        id: 'keto-lunch-1',
-        title: 'Keto Chicken Salad',
-        description: 'High-protein lunch with mixed greens',
-        ingredients: [
-          { ingredientId: 'chicken-1', amount: 150, unit: 'g' },
-          { ingredientId: 'lettuce-1', amount: 50, unit: 'g' },
-          { ingredientId: 'olive-oil-1', amount: 2, unit: 'tbsp' }
-        ],
-        instructions: [
-          'Grill chicken breast',
-          'Chop lettuce',
-          'Mix with olive oil dressing'
-        ],
-        prepTime: 15,
-        cookTime: 20,
-        servings: 1,
-        categories: [RecipeCategory.Lunch],
-        dietaryApproaches: ['keto'],
-        nutritionalInfo: {
-          caloriesPer100g: 280,
-          proteinPer100g: 25,
-          carbsPer100g: 5,
-          fatPer100g: 18
-        },
-        images: ['/images/recipes/keto-chicken-salad.jpg'],
-        slug: 'keto-chicken-salad',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'keto-dinner-1',
-        title: 'Keto Salmon with Vegetables',
-        description: 'Omega-3 rich dinner with low-carb vegetables',
-        ingredients: [
-          { ingredientId: 'salmon-1', amount: 200, unit: 'g' },
-          { ingredientId: 'broccoli-1', amount: 100, unit: 'g' },
-          { ingredientId: 'butter-1', amount: 1, unit: 'tbsp' }
-        ],
-        instructions: [
-          'Bake salmon in oven',
-          'Steam broccoli',
-          'Serve with butter'
-        ],
-        prepTime: 10,
-        cookTime: 25,
-        servings: 1,
-        categories: [RecipeCategory.Dinner],
-        dietaryApproaches: ['keto'],
-        nutritionalInfo: {
-          caloriesPer100g: 350,
-          proteinPer100g: 30,
-          carbsPer100g: 8,
-          fatPer100g: 22
-        },
-        images: ['/images/recipes/keto-salmon-vegetables.jpg'],
-        slug: 'keto-salmon-vegetables',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      {
-        id: 'keto-snack-1',
-        title: 'Keto Nuts & Seeds Mix',
-        description: 'Healthy fat snack for keto diet',
-        ingredients: [
-          { ingredientId: 'almond-1', amount: 30, unit: 'g' },
-          { ingredientId: 'walnut-1', amount: 20, unit: 'g' },
-          { ingredientId: 'pumpkin-seed-1', amount: 15, unit: 'g' }
-        ],
-        instructions: [
-          'Mix nuts and seeds',
-          'Portion into snack size'
-        ],
-        prepTime: 5,
-        cookTime: 0,
-        servings: 1,
-        categories: [RecipeCategory.Snack],
-        dietaryApproaches: ['keto'],
-        nutritionalInfo: {
-          caloriesPer100g: 580,
-          proteinPer100g: 18,
-          carbsPer100g: 12,
-          fatPer100g: 52
-        },
-        images: ['/images/recipes/keto-nuts-seeds-mix.jpg'],
-        slug: 'keto-nuts-seeds-mix',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    ];
+      images: [recipe.imageUrl],
+      slug: recipe.slug,
+      isActive: true,
+      createdAt: recipe.publishedAt,
+      updatedAt: recipe.updatedAt
+    }));
+  }
+
+  /**
+   * Map Danish category names to RecipeCategory enum
+   */
+  private mapCategory(danishCategory: string): RecipeCategory {
+    const categoryMap: { [key: string]: RecipeCategory } = {
+      'Morgenmad': RecipeCategory.Breakfast,
+      'Frokost': RecipeCategory.Lunch,
+      'Aftensmad': RecipeCategory.Dinner,
+      'Snack': RecipeCategory.Snack,
+      'Dessert': RecipeCategory.Dessert
+    };
+    
+    return categoryMap[danishCategory] || RecipeCategory.Dinner;
   }
 
   /**
