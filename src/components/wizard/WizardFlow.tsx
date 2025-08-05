@@ -47,6 +47,7 @@ const WizardFlow: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [mealPlan, setMealPlan] = useState<any>(null);
 
   // Define wizard steps
   const steps: WizardStep[] = [
@@ -211,6 +212,7 @@ const WizardFlow: React.FC = () => {
                   updateState={updateState} 
                   nextStep={nextStep} 
                   setShowPreviewModal={currentStep.id === 'generating' ? setShowPreviewModal : undefined}
+                  setMealPlan={currentStep.id === 'generating' ? setMealPlan : undefined}
                 />
               </motion.div>
 
@@ -992,9 +994,8 @@ const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
   </div>
 );
 
-const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
+const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal, setMealPlan }) => {
   const [isGenerating, setIsGenerating] = useState(true);
-  const [mealPlan, setMealPlan] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1037,7 +1038,7 @@ const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
     };
 
     generateMealPlan();
-  }, [state]);
+  }, [state, setMealPlan]);
 
   if (isGenerating) {
     return (
@@ -1065,166 +1066,96 @@ const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal }) => {
     );
   }
 
-  if (!mealPlan) return null;
-
-  const dietaryApproachName = {
-    'keto': 'Ketogenisk diæt',
-    'sense': 'Sense diæt',
-    'lchf': 'LCHF/Paleo',
-    'anti-inflammatory': 'Anti-inflammatorisk',
-    'mediterranean': 'Middelhavsdiæt',
-    'flexitarian': 'Fleksitarisk',
-    '5-2': '5:2 diæt'
-  }[mealPlan.dietaryApproach] || 'Din valgte tilgang';
-
+  // Show success message after generation
   return (
     <motion.div 
-      className="max-w-4xl mx-auto"
+      className="max-w-4xl mx-auto text-center"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="text-center mb-8">
-        <motion.h2 
-          className="text-3xl font-bold text-gray-900 mb-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          Din plan er klar! 🎉
-        </motion.h2>
-        <motion.p 
-          className="text-lg text-gray-600 mb-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-        >
-          Vi har skabt din personlige 6-ugers vægttabsplan med {mealPlan.weeks * 7} dages måltider.
-        </motion.p>
-      </div>
-
       <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.5 }}
+        className="mb-8"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
       >
-        <motion.div 
-          className="p-6 bg-gradient-to-br from-[#1B365D]/10 to-[#87A96B]/10 rounded-xl border border-[#1B365D]/20"
-          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(27, 54, 93, 0.15)" }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="text-3xl mb-3">⚖️</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Forventet vægttab</h3>
-          <p className="text-2xl font-bold text-[#1B365D] mb-1">{mealPlan.expectedWeightLoss} kg</p>
-          <p className="text-sm text-gray-600">over 6 uger</p>
-        </motion.div>
-
-        <motion.div 
-          className="p-6 bg-gradient-to-br from-[#87A96B]/10 to-[#D4AF37]/10 rounded-xl border border-[#87A96B]/20"
-          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(135, 169, 107, 0.15)" }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="text-3xl mb-3">🔥</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Daglige kalorier</h3>
-          <p className="text-2xl font-bold text-[#87A96B] mb-1">{mealPlan.dailyCalories}</p>
-          <p className="text-sm text-gray-600">kalorier per dag</p>
-        </motion.div>
-
-        <motion.div 
-          className="p-6 bg-gradient-to-br from-[#D4AF37]/10 to-[#1B365D]/10 rounded-xl border border-[#D4AF37]/20"
-          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(212, 175, 55, 0.15)" }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="text-3xl mb-3">🥗</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Kosttilgang</h3>
-          <p className="text-lg font-medium text-[#D4AF37] mb-1">{dietaryApproachName}</p>
-          <p className="text-sm text-gray-600">tilpasset til dig</p>
-        </motion.div>
+        <div className="w-20 h-20 bg-[#87A96B] rounded-full mx-auto mb-6 flex items-center justify-center">
+          <CheckIcon className="w-10 h-10 text-white" />
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          Din plan er klar! 🎉
+        </h2>
+        <p className="text-lg text-gray-600 mb-6">
+          Vi har skabt din personlige 6-ugers vægttabsplan.
+        </p>
       </motion.div>
 
       <motion.div 
         className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] rounded-xl p-6 mb-8 text-white"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7, duration: 0.5 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
       >
-        <h3 className="text-xl font-semibold mb-4">Din personlige 6-ugers vægttabsbog inkluderer:</h3>
-        <div className="space-y-3">
+        <h3 className="text-xl font-bold mb-4">Hvad du får:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
           <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
             </div>
-            <span>Madplan til 6 uger</span>
+            <span>Personlig 6 ugers vægttabsbog</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
             </div>
-            <span>Budgetvenlig indkøbsliste uge-for-uge</span>
+            <span>+60-100 siders trykt bog i flot indpakning</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <span>60-100 siders trykt bog i flot indpakning (sendes med posten)</span>
-          </div>
-          <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
             </div>
             <span>Funktionel ernæringsrig mad</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
             </div>
-            <span>Ubegrænset og gratis sparing på SMS med os!</span>
+            <span>Ubegrænset og gratis sparing på SMS</span>
           </div>
           <div className="flex items-center space-x-3">
-            <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
-              <svg className="w-3 h-3 text-[#1B365D]" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
             </div>
             <span>Fri adgang til simpelt online vægttabskursus</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm">✓</span>
+            </div>
+            <span>Budgetvenlig indkøbsliste uge-for-uge</span>
           </div>
         </div>
       </motion.div>
 
       <motion.div 
-        className="text-center"
+        className="flex flex-col sm:flex-row gap-4 justify-center"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
       >
-        <p className="text-sm text-gray-500 mb-6">
-          Gennemgå eventuelt planen kort, og gå til betaling.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button 
-            onClick={() => setShowPreviewModal(true)}
-            className="px-8 py-4 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200 hover:scale-105 font-semibold"
-          >
-            Se min plan
-          </button>
-          <button 
-            onClick={() => window.location.href = '/checkout'}
-            className="px-8 py-4 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105 font-semibold"
-          >
-            Få min plan nu
-          </button>
-        </div>
+        <button
+          onClick={() => setShowPreviewModal(true)}
+          className="px-8 py-4 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200 font-semibold"
+        >
+          Se min plan
+        </button>
+        <button
+          onClick={() => {/* Handle payment */}}
+          className="px-8 py-4 bg-[#D4AF37] text-white rounded-lg hover:bg-[#D4AF37]/90 transition-all duration-200 font-semibold"
+        >
+          Få min plan nu - 1195 DKK
+        </button>
       </motion.div>
     </motion.div>
   );
