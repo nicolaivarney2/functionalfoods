@@ -544,13 +544,15 @@ const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [hasCalculated, setHasCalculated] = useState(false);
 
   useEffect(() => {
-    if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel) {
+    if (state.userProfile.age && state.userProfile.weight && state.userProfile.height && state.userProfile.gender && state.userProfile.activityLevel && !hasCalculated) {
       setIsCalculating(true);
       setShowSuccess(false);
+      setHasCalculated(true);
     }
-  }, [state.userProfile]);
+  }, [state.userProfile.age, state.userProfile.weight, state.userProfile.height, state.userProfile.gender, state.userProfile.activityLevel, hasCalculated]);
 
   useEffect(() => {
     if (!isCalculating) return;
@@ -579,7 +581,7 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
     };
 
     calculateEnergy();
-  }, [state.userProfile]);
+  }, [isCalculating]);
 
   if (isCalculating) {
     return (
