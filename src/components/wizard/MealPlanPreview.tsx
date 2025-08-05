@@ -12,6 +12,7 @@ interface MealPlanPreviewProps {
 
 const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) => {
   const [selectedWeek, setSelectedWeek] = useState(0);
+  const [showShoppingList, setShowShoppingList] = useState(false);
 
   if (!mealPlan) {
     return (
@@ -96,10 +97,21 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row h-[70vh]">
-          {/* Meal Plan */}
+        <div className="flex flex-col h-[70vh]">
+          {/* Meal Plan - Full Width */}
           <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
-            <h3 className="text-lg lg:text-xl font-bold text-gray-900 mb-4">Weekly Meal Plan</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg lg:text-xl font-bold text-gray-900">Weekly Meal Plan</h3>
+              
+              {/* Shopping List Toggle */}
+              <button
+                onClick={() => setShowShoppingList(!showShoppingList)}
+                className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs lg:text-sm"
+              >
+                <ShoppingBagIcon className="w-4 h-4" />
+                <span>{showShoppingList ? 'Hide' : 'Show'} Shopping List</span>
+              </button>
+            </div>
             
             <div className="space-y-4">
               {currentWeek.days.map((day: any, dayIndex: number) => {
@@ -161,58 +173,67 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
             </div>
           </div>
 
-          {/* Shopping List */}
-          <div className="w-full lg:w-80 bg-gray-50 p-4 lg:p-6 border-t lg:border-l lg:border-t-0">
+          {/* Collapsible Shopping List */}
+          {showShoppingList && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t bg-gray-50"
+            >
             <div className="flex items-center space-x-2 mb-4">
               <ShoppingBagIcon className="w-5 h-5 text-gray-600" />
               <h3 className="text-lg font-semibold text-gray-900">Shopping List</h3>
             </div>
             
-            <div className="space-y-3">
-              {currentWeek.shoppingList.categories.map((category: any, categoryIndex: number) => (
-                <div key={categoryIndex} className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
-                  <h4 className="font-medium text-gray-900 mb-2 lg:mb-3 text-sm lg:text-base">{category.name}</h4>
-                  <div className="space-y-1 lg:space-y-2">
-                    {category.items.map((item: any, itemIndex: number) => (
-                      <div key={itemIndex} className="flex justify-between items-center text-xs lg:text-sm">
-                        <span className="text-gray-700 truncate pr-2">{item.name}</span>
-                        <span className="text-gray-600 font-medium flex-shrink-0">
-                          {item.amount} {item.unit}
-                        </span>
+              <div className="p-4 lg:p-6">
+                <div className="space-y-3">
+                  {currentWeek.shoppingList.categories.map((category: any, categoryIndex: number) => (
+                    <div key={categoryIndex} className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
+                      <h4 className="font-medium text-gray-900 mb-2 lg:mb-3 text-sm lg:text-base">{category.name}</h4>
+                      <div className="space-y-1 lg:space-y-2">
+                        {category.items.map((item: any, itemIndex: number) => (
+                          <div key={itemIndex} className="flex justify-between items-center text-xs lg:text-sm">
+                            <span className="text-gray-700 truncate pr-2">{item.name}</span>
+                            <span className="text-gray-600 font-medium flex-shrink-0">
+                              {item.amount} {item.unit}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Nutrition Summary */}
+                <div className="mt-4 lg:mt-6 bg-white rounded-lg p-3 lg:p-4 shadow-sm">
+                  <div className="flex items-center space-x-2 mb-2 lg:mb-3">
+                    <ChartBarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                    <h3 className="font-semibold text-gray-900 text-sm lg:text-base">Weekly Nutrition</h3>
+                  </div>
+                  
+                  <div className="space-y-1 lg:space-y-2 text-xs lg:text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg Daily Calories:</span>
+                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCalories)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg Daily Protein:</span>
+                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyProtein)}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg Daily Carbs:</span>
+                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCarbs)}g</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg Daily Fat:</span>
+                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyFat)}g</span>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Nutrition Summary */}
-            <div className="mt-4 lg:mt-6 bg-white rounded-lg p-3 lg:p-4 shadow-sm">
-              <div className="flex items-center space-x-2 mb-2 lg:mb-3">
-                <ChartBarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-                <h3 className="font-semibold text-gray-900 text-sm lg:text-base">Weekly Nutrition</h3>
               </div>
-              
-              <div className="space-y-1 lg:space-y-2 text-xs lg:text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Daily Calories:</span>
-                  <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCalories)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Daily Protein:</span>
-                  <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyProtein)}g</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Daily Carbs:</span>
-                  <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCarbs)}g</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg Daily Fat:</span>
-                  <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyFat)}g</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            </motion.div>
+          )}
         </div>
 
         {/* Footer */}
