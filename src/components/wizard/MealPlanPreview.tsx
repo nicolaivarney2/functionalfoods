@@ -146,7 +146,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
   const currentWeekData = mealPlan.realMealPlan.weeks[currentWeek - 1];
   const mealPlanUserProfile = mealPlan.userProfile;
   const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach)?.name;
-  const shoppingList = currentWeekData.shoppingList;
+  const shoppingList = currentWeekData?.shoppingList || { items: [] };
 
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
@@ -330,7 +330,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-            {currentWeekData.days.map((day: any, dayIndex: number) => (
+            {currentWeekData?.days?.map((day: any, dayIndex: number) => (
               <motion.div
                 key={dayIndex}
                 className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 lg:p-6 border border-gray-200"
