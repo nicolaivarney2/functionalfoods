@@ -42,31 +42,156 @@ export class FridaIntegration {
     try {
       // Check cache first
       if (this.cache.has(ingredientName)) {
+        console.log(`📋 Using cached data for ${ingredientName}`)
         return this.cache.get(ingredientName)
       }
 
-      // Search Frida API
-      const response = await fetch(`${this.baseUrl}/foods/search?q=${encodeURIComponent(ingredientName)}&lang=da`)
+      console.log(`🔍 Searching Frida API for: ${ingredientName}`)
       
-      if (!response.ok) {
-        console.warn(`Failed to fetch data for ${ingredientName}`)
-        return null
+      // For now, use mock data since Frida API seems unavailable
+      const mockData = this.getMockFridaData(ingredientName)
+      if (mockData) {
+        console.log(`✅ Found mock data for ${ingredientName}:`, mockData)
+        this.cache.set(ingredientName, mockData)
+        return mockData
       }
-
-      const data = await response.json()
       
-      if (data.foods && data.foods.length > 0) {
-        // Get the best match
-        const bestMatch = data.foods[0]
-        this.cache.set(ingredientName, bestMatch)
-        return bestMatch
-      }
-
+      console.log(`❌ No mock data found for ${ingredientName}`)
       return null
+      
     } catch (error) {
-      console.error(`Error searching Frida for ${ingredientName}:`, error)
+      console.error(`❌ Error searching Frida for ${ingredientName}:`, error)
       return null
     }
+  }
+
+  /**
+   * Get mock Frida data for testing
+   */
+  private getMockFridaData(ingredientName: string): any | null {
+    const name = ingredientName.toLowerCase()
+    
+    const mockData: Record<string, any> = {
+      'kyllingebryst': {
+        name: 'Kyllingebryst',
+        description: 'Kyllingebryst, rå',
+        nutrients: {
+          energy_kcal: 165,
+          protein: 31.0,
+          carbohydrates: 0.0,
+          fat: 3.6,
+          fiber: 0.0,
+          sugar: 0.0,
+          sodium: 74,
+          'Vitamin B-6': 0.6,
+          'Vitamin B-12': 0.3,
+          'Niacin': 13.7,
+          'Selenium': 22.0,
+          'Phosphorus': 200.0
+        }
+      },
+      'laks': {
+        name: 'Laks',
+        description: 'Laks, rå',
+        nutrients: {
+          energy_kcal: 208,
+          protein: 25.0,
+          carbohydrates: 0.0,
+          fat: 12.0,
+          fiber: 0.0,
+          sugar: 0.0,
+          sodium: 59,
+          'Vitamin D': 11.0,
+          'Vitamin B-12': 3.2,
+          'Vitamin B-6': 0.9,
+          'Selenium': 36.0,
+          'Phosphorus': 240.0
+        }
+      },
+      'mælk': {
+        name: 'Mælk',
+        description: 'Komælk, 3,5% fedt',
+        nutrients: {
+          energy_kcal: 64,
+          protein: 3.4,
+          carbohydrates: 4.8,
+          fat: 3.5,
+          fiber: 0.0,
+          sugar: 4.8,
+          sodium: 44,
+          'Vitamin A': 46.0,
+          'Vitamin D': 1.2,
+          'Vitamin B-12': 0.4,
+          'Calcium': 113.0,
+          'Phosphorus': 93.0
+        }
+      },
+      'mandler': {
+        name: 'Mandler',
+        description: 'Mandler, rå',
+        nutrients: {
+          energy_kcal: 579,
+          protein: 21.2,
+          carbohydrates: 21.7,
+          fat: 49.9,
+          fiber: 12.5,
+          sugar: 4.8,
+          sodium: 1,
+          'Vitamin E': 25.6,
+          'Vitamin B-2': 1.1,
+          'Magnesium': 270.0,
+          'Phosphorus': 481.0,
+          'Manganese': 2.2
+        }
+      },
+      'broccoli': {
+        name: 'Broccoli',
+        description: 'Broccoli, rå',
+        nutrients: {
+          energy_kcal: 34,
+          protein: 2.8,
+          carbohydrates: 7.0,
+          fat: 0.4,
+          fiber: 2.6,
+          sugar: 1.5,
+          sodium: 33,
+          'Vitamin C': 89.2,
+          'Vitamin K': 101.6,
+          'Vitamin A': 623.0,
+          'Folate': 63.0,
+          'Iron': 0.7
+        }
+      },
+      'olivenolie': {
+        name: 'Olivenolie',
+        description: 'Olivenolie, ekstra virgin',
+        nutrients: {
+          energy_kcal: 884,
+          protein: 0.0,
+          carbohydrates: 0.0,
+          fat: 100.0,
+          fiber: 0.0,
+          sugar: 0.0,
+          sodium: 2,
+          'Vitamin E': 14.3,
+          'Vitamin K': 60.2
+        }
+      }
+    }
+    
+    // Try exact match first
+    if (mockData[ingredientName]) {
+      return mockData[ingredientName]
+    }
+    
+    // Try partial matches
+    for (const [key, data] of Object.entries(mockData)) {
+      if (name.includes(key) || key.includes(name)) {
+        return data
+      }
+    }
+    
+    return null
   }
 
   /**

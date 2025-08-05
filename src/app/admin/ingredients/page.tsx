@@ -108,16 +108,28 @@ export default function IngredientsAdminPage() {
       
       // Get ingredients without nutritional data
       const ingredientsWithoutData = ingredients.filter(ing => !ing.nutritionalInfo)
+      console.log(`📊 Found ${ingredientsWithoutData.length} ingredients without nutritional data`)
       
-      for (const ingredient of ingredientsWithoutData.slice(0, 5)) { // Limit to 5 for demo
+      if (ingredientsWithoutData.length === 0) {
+        console.log('✅ All ingredients already have nutritional data!')
+        return
+      }
+      
+      for (const ingredient of ingredientsWithoutData.slice(0, 3)) { // Limit to 3 for demo
         try {
           console.log(`🔍 Searching for: ${ingredient.name}`)
           const fridaData = await fridaIntegration.searchFridaIngredient(ingredient.name)
           
           if (fridaData) {
+            console.log(`✅ Found Frida data for ${ingredient.name}:`, fridaData)
+            
             const nutritionalInfo = fridaIntegration.convertFridaToNutritionalInfo(fridaData)
+            console.log(`📊 Nutritional info for ${ingredient.name}:`, nutritionalInfo)
+            
             const category = fridaIntegration.determineIngredientCategory(ingredient.name, fridaData)
             const { exclusions, allergens } = fridaIntegration.determineExclusionsAndAllergens(ingredient.name, category)
+            
+            console.log(`🏷️ Category: ${category}, Exclusions: ${exclusions}, Allergens: ${allergens}`)
             
             // Update ingredient with Frida data
             const updatedIngredient = ingredientService.updateIngredientTag(ingredient.id, {
@@ -129,12 +141,16 @@ export default function IngredientsAdminPage() {
             })
             
             if (updatedIngredient) {
-              console.log(`✅ Updated ${ingredient.name} with Frida data`)
+              console.log(`✅ Successfully updated ${ingredient.name} with Frida data`)
+            } else {
+              console.error(`❌ Failed to update ${ingredient.name}`)
             }
+          } else {
+            console.log(`❌ No Frida data found for ${ingredient.name}`)
           }
           
           // Add delay to avoid overwhelming the API
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 1000))
           
         } catch (error) {
           console.error(`❌ Error processing ${ingredient.name}:`, error)
@@ -143,9 +159,10 @@ export default function IngredientsAdminPage() {
       
       // Reload ingredients
       loadIngredients()
+      console.log('✅ Frida data fetch completed!')
       
     } catch (error) {
-      console.error('Error fetching Frida data:', error)
+      console.error('❌ Error fetching Frida data:', error)
     } finally {
       setLoading(false)
     }
