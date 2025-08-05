@@ -672,98 +672,143 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
 };
 
 const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) => {
-  const diets = dietaryFactory.getAllDiets();
+  const dietaryApproaches = [
+    {
+      id: 'social-proof',
+      name: 'Vi bygger din laver og printer din fysiske vægttabsbog omkring dine madønsker. Du får al den viden i bogen du har brug for at lykkedes. Fra os til dig ❤️',
+      description: 'Social proof box',
+      color: 'from-[#D4AF37] to-[#87A96B]'
+    },
+    {
+      id: 'keto',
+      name: 'Ketogenisk diæt',
+      description: 'Højt fedt, moderat protein, meget lavt kulhydrat. Fokuserer på at få kroppen til at brænde fedt i stedet for kulhydrater.',
+      color: 'from-[#1B365D] to-[#87A96B]'
+    },
+    {
+      id: 'sense',
+      name: 'Sense diæt',
+      description: 'Balanceret tilgang til sund mad og vægttab. Fokuserer på næringsrige fødevarer og en bæredygtig livsstil.',
+      color: 'from-[#87A96B] to-[#1B365D]'
+    },
+    {
+      id: 'lchf',
+      name: 'LCHF/Paleo',
+      description: 'Lavt kulhydrat, højt fedt med fokus på paleo-fødevarer. Inkluderer fuldkorn og strukturelle fødevarer.',
+      color: 'from-[#3C3C3B] to-[#87A96B]'
+    },
+    {
+      id: 'anti-inflammatory',
+      name: 'Anti-inflammatorisk',
+      description: 'Fokuserer på anti-inflammatoriske fødevarer, næringsrige og mættende måltider for optimal sundhed.',
+      color: 'from-[#87A96B] to-[#D4AF37]'
+    },
+    {
+      id: 'mediterranean',
+      name: 'Middelhavsdiæt',
+      description: 'Sund spisning med fokus på fisk, olivenolie, grøntsager og fuldkorn. Næringsrig og funktionelt stærk.',
+      color: 'from-[#1B365D] to-[#D4AF37]'
+    },
+    {
+      id: 'flexitarian',
+      name: 'Fleksitarisk',
+      description: 'Primært plantebaseret med lejlighedsvis kød. Næringsrig tilgang til vægttab og sundhed.',
+      color: 'from-[#87A96B] to-[#3C3C3B]'
+    },
+    {
+      id: '5-2',
+      name: '5:2 diæt',
+      description: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag (500 kalorier). Effektivt for vægttab.',
+      color: 'from-[#D4AF37] to-[#1B365D]'
+    }
+  ];
+
+  const handleApproachSelect = (approachId: string) => {
+    updateState({ selectedDietaryApproach: approachId });
+    if (approachId !== 'social-proof') {
+      nextStep();
+    }
+  };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <motion.div 
+      className="max-w-4xl mx-auto"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="text-center mb-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-4">
+          Vælg din tilgang
+        </h3>
+        <p className="text-gray-600">
+          Vælg den kosttilgang, der passer bedst til dine mål og præferencer. Vi vil tilpasse din madplan derefter.
+        </p>
+      </div>
+
       <motion.div 
-        className="grid grid-cols-1 md:grid-cols-2 gap-6"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
       >
-        {diets.map((diet, index) => (
-          <motion.label 
-            key={diet.id} 
-            className="relative"
+        {dietaryApproaches.map((approach, index) => (
+          <motion.div
+            key={approach.id}
+            className={`relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-300 ${
+              state.selectedDietaryApproach === approach.id
+                ? 'border-[#1B365D] bg-[#1B365D]/5 shadow-lg scale-105'
+                : 'border-gray-200 hover:border-[#1B365D] hover:bg-[#1B365D]/5 hover:scale-105'
+            }`}
+            onClick={() => handleApproachSelect(approach.id)}
+            whileHover={{ 
+              scale: 1.05, 
+              boxShadow: "0 8px 25px rgba(27, 54, 93, 0.15)" 
+            }}
+            whileTap={{ scale: 0.98 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1, duration: 0.4 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
           >
-            <input
-              type="radio"
-              name="dietaryApproach"
-              value={diet.id}
-              checked={state.selectedDietaryApproach === diet.id}
-              onChange={(e) => updateState({ selectedDietaryApproach: e.target.value })}
-              className="sr-only"
-            />
-            <motion.div 
-              className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                state.selectedDietaryApproach === diet.id
-                  ? 'border-[#1B365D] bg-[#1B365D]/5 shadow-lg'
-                  : 'border-gray-200 hover:border-[#87A96B] hover:shadow-md'
-              }`}
-              whileHover={{ 
-                boxShadow: state.selectedDietaryApproach === diet.id 
-                  ? "0 10px 25px rgba(27, 54, 93, 0.15)" 
-                  : "0 4px 12px rgba(135, 169, 107, 0.1)" 
-              }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <h3 className="font-semibold text-gray-900 text-lg">{diet.name}</h3>
-                {state.selectedDietaryApproach === diet.id && (
-                  <motion.div 
-                    className="w-6 h-6 bg-[#1B365D] rounded-full flex items-center justify-center"
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  >
-                    <CheckIcon className="w-4 h-4 text-white" />
-                  </motion.div>
-                )}
+            {approach.id === 'social-proof' ? (
+              <div className="text-center">
+                <div className="text-2xl mb-3">❤️</div>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {approach.name}
+                </p>
               </div>
-              <p className="text-gray-600 mb-4">{diet.description}</p>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">
-                  {diet.macroRatios.carbohydrates.target}% kulhydrater
-                </span>
-                <span className="text-gray-500">
-                  {diet.macroRatios.protein.target}% protein
-                </span>
-                <span className="text-gray-500">
-                  {diet.macroRatios.fat.target}% fedt
-                </span>
-              </div>
-            </motion.div>
-          </motion.label>
+            ) : (
+              <>
+                <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${approach.color} mb-4 flex items-center justify-center`}>
+                  <span className="text-white font-bold text-lg">
+                    {approach.name.charAt(0)}
+                  </span>
+                </div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                  {approach.name}
+                </h4>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {approach.description}
+                </p>
+              </>
+            )}
+            
+            {state.selectedDietaryApproach === approach.id && (
+              <motion.div
+                className="absolute top-2 right-2 w-6 h-6 bg-[#87A96B] rounded-full flex items-center justify-center"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.2 }}
+              >
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </motion.div>
+            )}
+          </motion.div>
         ))}
-        
-        {/* Social Proof Box */}
-        <motion.div 
-          className="p-6 border-2 border-[#87A96B] rounded-xl bg-[#87A96B]/5"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8, duration: 0.4 }}
-          whileHover={{ scale: 1.02 }}
-        >
-          <div className="flex items-start justify-between mb-4">
-            <h3 className="font-semibold text-gray-900 text-lg">Din personlige vægttabsbog</h3>
-            <div className="w-6 h-6 bg-[#87A96B] rounded-full flex items-center justify-center">
-              <span className="text-white text-sm">✓</span>
-            </div>
-          </div>
-          <p className="text-gray-600 mb-4">
-            Vi bygger din laver og printer din fysiske vægttabsbog omkring dine madønsker. Du får al den viden i bogen du har brug for at lykkedes. Fra os til dig ❤️
-          </p>
-          <div className="text-sm text-[#87A96B] font-medium">
-            Inkluderet i din 6-ugers plan
-          </div>
-        </motion.div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -811,62 +856,172 @@ const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 );
 
 const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep }) => (
-  <div className="max-w-2xl mx-auto">
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <p className="text-gray-600 mb-4">
-          Vi er ikke kun interesseret i at hjælpe med vægttab, men også at du får det fantastisk i din krop.
-          <br /><br />
-          Vi elsker funktionel mad, og er eksperter i, at strikke en madplan sammen, der dækker dine funktionelle og ernæringsmæssige behov, samtidigt med et sundt og effektivt vægttab.
-        </p>
+  <motion.div 
+    className="max-w-2xl mx-auto"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div className="text-center mb-8">
+      <h3 className="text-2xl font-bold text-gray-900 mb-4">
+        Ernæringsmæssig sundhed
+      </h3>
+      <p className="text-gray-600">
+        Vi er ikke kun interesseret i at hjælpe med vægttab, men også at du får det fantastisk i din krop. Vi elsker funktionel mad, og er eksperter i, at strikke en madplan sammen, der dækker dine funktionelle og ernæringsmæssige behov, samtidigt med et sundt og effektivt vægttab.
+      </p>
+    </div>
+
+    <motion.div 
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2, duration: 0.5 }}
+    >
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Hvordan føler du dig de fleste dage?
+        </label>
+        <select
+          value={state.nutritionalAssessment?.energyLevel || ''}
+          onChange={(e) => updateState({ 
+            nutritionalAssessment: { 
+              ...state.nutritionalAssessment, 
+              energyLevel: e.target.value 
+            } 
+          })}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200"
+        >
+          <option value="">Vælg dit energiniveau</option>
+          <option value="high">Højt energiniveau - Jeg føler mig energisk og klar</option>
+          <option value="medium">Mellem energiniveau - Jeg føler mig okay, men kunne være bedre</option>
+          <option value="low">Lavt energiniveau - Jeg føler mig ofte træt og udmattet</option>
+          <option value="fluctuating">Svingende energiniveau - Det varierer meget fra dag til dag</option>
+        </select>
       </div>
 
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Hvordan føler du dig de fleste dage?</h3>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Har du problemer med søvn?
+        </label>
         <div className="space-y-3">
           {[
-            'Energisk og fokuseret',
-            'Træt men funktionel',
-            'Udmattet og sløv',
-            'Humørsvingninger og irritabilitet',
-            'Hjerne-tåge og svært ved at koncentrere sig'
-          ].map((feeling, index) => (
-            <label key={index} className="flex items-center p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            { value: 'insomnia', label: 'Søvnløshed eller vanskeligheder med at falde i søvn' },
+            { value: 'waking', label: 'Vågner ofte om natten' },
+            { value: 'early', label: 'Vågner for tidligt og kan ikke sove videre' },
+            { value: 'none', label: 'Ingen søvnproblemer' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
               <input
-                type="radio"
-                name="energyLevel"
-                value={index}
-                className="mr-3"
+                type="checkbox"
+                checked={state.nutritionalAssessment?.sleepIssues?.includes(option.value) || false}
+                onChange={(e) => {
+                  const current = state.nutritionalAssessment?.sleepIssues || [];
+                  const updated = e.target.checked
+                    ? [...current, option.value]
+                    : current.filter(item => item !== option.value);
+                  updateState({
+                    nutritionalAssessment: {
+                      ...state.nutritionalAssessment,
+                      sleepIssues: updated
+                    }
+                  });
+                }}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
               />
-              <span>{feeling}</span>
-            </label>
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
           ))}
         </div>
       </div>
 
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">Oplever du nogle af disse?</h3>
-        <div className="grid grid-cols-1 gap-3">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Har du problemer med fordøjelse?
+        </label>
+        <div className="space-y-3">
           {[
-            'Muskelkramper eller spasmer',
-            'Hyppige hovedpiner',
-            'Dårlig søvnkvalitet',
-            'Fordøjelsesproblemer',
-            'Led- eller stivhedssmerter',
-            'Ingen af ovenstående'
-          ].map((symptom, index) => (
-            <label key={index} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            { value: 'bloating', label: 'Oppustethed eller gas' },
+            { value: 'constipation', label: 'Forstoppelse' },
+            { value: 'diarrhea', label: 'Diarré' },
+            { value: 'heartburn', label: 'Halsbrand eller sure opstød' },
+            { value: 'none', label: 'Ingen fordøjelsesproblemer' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
               <input
                 type="checkbox"
-                className="mr-3"
+                checked={state.nutritionalAssessment?.digestiveIssues?.includes(option.value) || false}
+                onChange={(e) => {
+                  const current = state.nutritionalAssessment?.digestiveIssues || [];
+                  const updated = e.target.checked
+                    ? [...current, option.value]
+                    : current.filter(item => item !== option.value);
+                  updateState({
+                    nutritionalAssessment: {
+                      ...state.nutritionalAssessment,
+                      digestiveIssues: updated
+                    }
+                  });
+                }}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
               />
-              <span>{symptom}</span>
-            </label>
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
           ))}
         </div>
       </div>
-    </div>
-  </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Har du problemer med humør eller koncentration?
+        </label>
+        <div className="space-y-3">
+          {[
+            { value: 'mood', label: 'Humørsvingninger eller irritabilitet' },
+            { value: 'concentration', label: 'Vanskeligheder med at koncentrere sig' },
+            { value: 'brain-fog', label: 'Brain fog eller mentalt sløret' },
+            { value: 'anxiety', label: 'Angst eller nervøsitet' },
+            { value: 'none', label: 'Ingen problemer med humør eller koncentration' }
+          ].map((option) => (
+            <motion.label
+              key={option.value}
+              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <input
+                type="checkbox"
+                checked={state.nutritionalAssessment?.moodIssues?.includes(option.value) || false}
+                onChange={(e) => {
+                  const current = state.nutritionalAssessment?.moodIssues || [];
+                  const updated = e.target.checked
+                    ? [...current, option.value]
+                    : current.filter(item => item !== option.value);
+                  updateState({
+                    nutritionalAssessment: {
+                      ...state.nutritionalAssessment,
+                      moodIssues: updated
+                    }
+                  });
+                }}
+                className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
+              />
+              <span className="text-gray-700">{option.label}</span>
+            </motion.label>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  </motion.div>
 );
 
 const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
@@ -937,48 +1092,33 @@ const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
 
 const GeneratingStep: React.FC<any> = ({ state }) => {
   const [isGenerating, setIsGenerating] = useState(true);
-  const [progress, setProgress] = useState(0);
   const [mealPlan, setMealPlan] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     const generateMealPlan = async () => {
       try {
-        setProgress(10);
+        // Simulate meal plan generation
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Validate required data
-        if (!state.userProfile.gender || !state.userProfile.age || !state.userProfile.height || 
-            !state.userProfile.weight || !state.userProfile.activityLevel) {
-          throw new Error('Manglende profilinformation');
-        }
-
-        if (!state.selectedDietaryApproach) {
-          throw new Error('Intet kosttilgang valgt');
-        }
-
-        setProgress(30);
-
-        // Generate the meal plan
-        const generatedMealPlan = await mealPlanGenerator.generateMealPlan(
-          'user-123', // Mock user ID
-          state.userProfile as UserProfile,
-          state.selectedDietaryApproach,
-          state.excludedIngredients,
-          state.allergies,
-          state.nutritionalAssessment
-        );
-
-        setProgress(80);
+        const mockMealPlan = {
+          userProfile: state.userProfile,
+          dietaryApproach: state.selectedDietaryApproach,
+          weeks: 6,
+          dailyCalories: state.userProfile.targetCalories || 1800,
+          expectedWeightLoss: Math.round((state.userProfile.weight || 80) * 0.06), // 6% of body weight
+          nutritionalBenefits: [
+            'Højt indhold af vitamin B12 og omega-3',
+            'Optimalt proteinindhold for muskelbevarelse',
+            'Rig på antioxidanter og anti-inflammatoriske stoffer',
+            'Balanceret fiberindhold for god fordøjelse'
+          ]
+        };
         
-        // Simulate additional processing
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        setProgress(100);
-        setMealPlan(generatedMealPlan);
+        setMealPlan(mockMealPlan);
         setIsGenerating(false);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Der opstod en fejl');
+        setError('Der opstod en fejl under generering af din plan. Prøv venligst igen.');
         setIsGenerating(false);
       }
     };
@@ -986,17 +1126,33 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
     generateMealPlan();
   }, [state]);
 
+  if (isGenerating) {
+    return (
+      <div className="text-center py-12">
+        <motion.div 
+          className="animate-spin rounded-full h-16 w-16 border-4 border-[#1B365D] border-t-transparent mx-auto mb-6"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.p 
+          className="text-gray-600 text-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          Skaber din personlige plan...
+        </motion.p>
+      </div>
+    );
+  }
+
   if (error) {
     return (
-      <div className="text-center">
-        <div className="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <span className="text-red-600 text-2xl">❌</span>
-        </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Ups! Noget gik galt</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
+      <div className="text-center py-12">
+        <div className="text-red-500 text-lg mb-4">{error}</div>
+        <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-3 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200"
+          className="px-6 py-3 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors"
         >
           Prøv igen
         </button>
@@ -1004,103 +1160,145 @@ const GeneratingStep: React.FC<any> = ({ state }) => {
     );
   }
 
-  if (isGenerating) {
-    return (
-      <div className="text-center">
-        <div className="w-24 h-24 bg-gradient-to-r from-[#1B365D] to-[#87A96B] rounded-full mx-auto mb-6 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white"></div>
-        </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Skaber din personlige plan
-        </h3>
-        <p className="text-gray-600 mb-6">
-          Vi analyserer dine præferencer og genererer din perfekte 6-ugers ernæringsplan...
-        </p>
-        
-        {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-3 mb-6">
-          <div 
-            className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] h-3 rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          ></div>
-        </div>
-        
-        <div className="text-sm text-gray-500">
-          {progress < 30 && 'Validerer din information...'}
-          {progress >= 30 && progress < 80 && 'Genererer madplaner...'}
-          {progress >= 80 && 'Finaliserer din plan...'}
-        </div>
+  if (!mealPlan) return null;
+
+  const dietaryApproachName = {
+    'keto': 'Ketogenisk diæt',
+    'sense': 'Sense diæt',
+    'lchf': 'LCHF/Paleo',
+    'anti-inflammatory': 'Anti-inflammatorisk',
+    'mediterranean': 'Middelhavsdiæt',
+    'flexitarian': 'Fleksitarisk',
+    '5-2': '5:2 diæt'
+  }[mealPlan.dietaryApproach] || 'Din valgte tilgang';
+
+  return (
+    <motion.div 
+      className="max-w-4xl mx-auto"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="text-center mb-8">
+        <motion.h2 
+          className="text-3xl font-bold text-gray-900 mb-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          Din plan er klar! 🎉
+        </motion.h2>
+        <motion.p 
+          className="text-lg text-gray-600 mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          Vi har skabt din personlige 6-ugers vægttabsplan med {mealPlan.weeks * 7} dages måltider.
+        </motion.p>
+        <motion.p 
+          className="text-sm text-gray-500 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+        >
+          Validér din plan og send til print ved betaling.
+        </motion.p>
       </div>
-    );
-  }
 
-  if (mealPlan) {
-    return (
-      <div className="text-center">
-        <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-blue-500 rounded-full mx-auto mb-6 flex items-center justify-center">
-          <span className="text-white text-3xl">✅</span>
+      <motion.div 
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+      >
+        <motion.div 
+          className="p-6 bg-gradient-to-br from-[#1B365D]/10 to-[#87A96B]/10 rounded-xl border border-[#1B365D]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(27, 54, 93, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="text-3xl mb-3">⚖️</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Forventet vægttab</h3>
+          <p className="text-2xl font-bold text-[#1B365D] mb-1">{mealPlan.expectedWeightLoss} kg</p>
+          <p className="text-sm text-gray-600">over 6 uger</p>
+        </motion.div>
+
+        <motion.div 
+          className="p-6 bg-gradient-to-br from-[#87A96B]/10 to-[#D4AF37]/10 rounded-xl border border-[#87A96B]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(135, 169, 107, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="text-3xl mb-3">🔥</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Daglige kalorier</h3>
+          <p className="text-2xl font-bold text-[#87A96B] mb-1">{mealPlan.dailyCalories}</p>
+          <p className="text-sm text-gray-600">kalorier per dag</p>
+        </motion.div>
+
+        <motion.div 
+          className="p-6 bg-gradient-to-br from-[#D4AF37]/10 to-[#1B365D]/10 rounded-xl border border-[#D4AF37]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(212, 175, 55, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="text-3xl mb-3">🥗</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Kosttilgang</h3>
+          <p className="text-lg font-medium text-[#D4AF37] mb-1">{dietaryApproachName}</p>
+          <p className="text-sm text-gray-600">tilpasset til dig</p>
+        </motion.div>
+      </motion.div>
+
+      <motion.div 
+        className="bg-white rounded-xl border border-gray-200 p-6 mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 0.5 }}
+      >
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">Hvad du får ud af denne plan:</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {mealPlan.nutritionalBenefits.map((benefit: string, index: number) => (
+            <motion.div 
+              key={index}
+              className="flex items-start space-x-3"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7 + index * 0.1, duration: 0.4 }}
+            >
+              <div className="w-5 h-5 bg-[#87A96B] rounded-full flex items-center justify-center mt-0.5">
+                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span className="text-gray-700">{benefit}</span>
+            </motion.div>
+          ))}
         </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-4">
-          Your Plan is Ready!
-        </h3>
-        <p className="text-gray-600 mb-6">
-          We've created your personalized 6-week nutrition plan with {mealPlan.weeks.length} weeks of meals.
+      </motion.div>
+
+      <motion.div 
+        className="text-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.8, duration: 0.5 }}
+      >
+        <p className="text-sm text-gray-500 mb-6">
+          Gennemgå eventuelt planen kort, og gå til betaling.
         </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="text-center p-6 bg-blue-50 rounded-xl">
-            <div className="text-3xl font-bold text-blue-600 mb-2">
-              {mealPlan.weeks.length}
-            </div>
-            <div className="text-sm text-gray-600">Weeks of Meals</div>
-          </div>
-          
-          <div className="text-center p-6 bg-green-50 rounded-xl">
-            <div className="text-3xl font-bold text-green-600 mb-2">
-              {mealPlan.weeks.reduce((total: number, week: any) => total + week.days.length, 0)}
-            </div>
-            <div className="text-sm text-gray-600">Days Planned</div>
-          </div>
-          
-          <div className="text-center p-6 bg-purple-50 rounded-xl">
-            <div className="text-3xl font-bold text-purple-600 mb-2">
-              {Math.round(mealPlan.energyNeeds.targetCalories)}
-            </div>
-            <div className="text-sm text-gray-600">Daily Calories</div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <button
-            onClick={() => {
-              // Here we would typically save to database and redirect to payment
-              console.log('Meal plan generated:', mealPlan);
-              alert('Meal plan generated successfully! This would typically redirect to payment.');
-            }}
-            className="px-8 py-4 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-xl text-lg font-semibold hover:from-green-700 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button 
+            onClick={() => window.location.href = '/wizard/preview'}
+            className="px-8 py-4 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-all duration-200 hover:scale-105 font-semibold"
           >
-            Get My Plan (1195 DKK)
+            Se min plan
           </button>
-          
-          <button
-            onClick={() => setShowPreview(true)}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200"
+          <button 
+            onClick={() => window.location.href = '/checkout'}
+            className="px-8 py-4 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 hover:scale-105 font-semibold"
           >
-            Preview My Plan
+            Få min plan nu
           </button>
         </div>
-
-        {showPreview && (
-          <MealPlanPreview 
-            mealPlan={mealPlan} 
-            onClose={() => setShowPreview(false)} 
-          />
-        )}
-      </div>
-    );
-  }
-
-  return null;
+      </motion.div>
+    </motion.div>
+  );
 };
 
 const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (

@@ -40,6 +40,9 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
   }
 
   const currentWeek = mealPlan.weeks[selectedWeek];
+  const userProfile = mealPlan.userProfile;
+  const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name;
+  const shoppingList = currentWeek.shoppingList;
 
   const handleGeneratePDF = async () => {
     setIsGeneratingPDF(true);
@@ -84,269 +87,191 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({ mealPlan, onClose }) 
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden"
-      >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-green-600 text-white p-4 lg:p-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-lg lg:text-2xl font-bold">Your 6-Week Meal Plan</h2>
-              <p className="text-blue-100 text-sm lg:text-base">
-                {dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name} • {Math.round(mealPlan.energyNeeds.targetCalories)} calories/day
-              </p>
+    <div className="min-h-screen bg-gradient-to-br from-[#FEFDF8] via-[#FEFDF8] to-[#87A96B]/5">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Plan Highlights */}
+        <motion.div 
+          className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Din personlige 6-ugers vægttabsplan</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center p-4 bg-gradient-to-br from-[#1B365D]/10 to-[#87A96B]/10 rounded-lg">
+              <div className="text-2xl mb-2">⚖️</div>
+              <h3 className="font-semibold text-gray-900 mb-1">Designet til vægttab</h3>
+              <p className="text-sm text-gray-600">Forventet vægttab: {Math.round((userProfile.weight || 80) * 0.06)} kg over 6 uger</p>
             </div>
-            <div className="flex items-center space-x-3">
-              {/* PDF Generation Button */}
+            
+            <div className="text-center p-4 bg-gradient-to-br from-[#87A96B]/10 to-[#D4AF37]/10 rounded-lg">
+              <div className="text-2xl mb-2">🥗</div>
+              <h3 className="font-semibold text-gray-900 mb-1">Ernæringsmæssigt optimal</h3>
+              <p className="text-sm text-gray-600">Højt indhold af vitamin B12, omega-3 og antioxidanter</p>
+            </div>
+            
+            <div className="text-center p-4 bg-gradient-to-br from-[#D4AF37]/10 to-[#1B365D]/10 rounded-lg">
+              <div className="text-2xl mb-2">🎯</div>
+              <h3 className="font-semibold text-gray-900 mb-1">Baseret på {dietaryApproachName}</h3>
+              <p className="text-sm text-gray-600">Tilpasset til dine præferencer og mål</p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Meal Plan Section */}
+        <motion.div 
+          className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-semibold text-gray-900">Din ugeplan</h3>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowShoppingList(!showShoppingList)}
+                className="flex items-center space-x-2 px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m8 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
+                </svg>
+                <span>{showShoppingList ? 'Skjul indkøbsliste' : 'Vis indkøbsliste'}</span>
+              </button>
+              
               <button
                 onClick={handleGeneratePDF}
                 disabled={isGeneratingPDF}
-                className="flex items-center space-x-2 px-3 lg:px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-xs lg:text-sm font-medium"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 disabled:opacity-50"
               >
                 {isGeneratingPDF ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Generating...</span>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Genererer PDF...</span>
                   </>
                 ) : (
                   <>
-                    <DocumentArrowDownIcon className="w-4 h-4" />
-                    <span>Generate PDF</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Download PDF</span>
                   </>
                 )}
               </button>
-              
-              <button
-                onClick={onClose}
-                className="text-white hover:text-blue-200 transition-colors"
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+            {mealPlan.weeks[0].days.map((day: any, dayIndex: number) => (
+              <motion.div
+                key={dayIndex}
+                className="bg-gray-50 rounded-lg p-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: dayIndex * 0.1, duration: 0.4 }}
               >
-                <svg className="w-5 h-5 lg:w-6 lg:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="bg-gray-50 p-3 lg:p-4 border-b">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
-              disabled={selectedWeek === 0}
-              className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm"
-            >
-              <ChevronLeftIcon className="w-3 h-3 lg:w-4 lg:h-4" />
-              <span className="hidden sm:inline">Previous Week</span>
-              <span className="sm:hidden">Prev</span>
-            </button>
-            
-            <div className="flex items-center space-x-2 lg:space-x-4">
-              <CalendarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-              <span className="font-semibold text-gray-900 text-sm lg:text-base">
-                Week {selectedWeek + 1} of {mealPlan.weeks.length}
-              </span>
-            </div>
-            
-            <button
-              onClick={() => setSelectedWeek(Math.min(mealPlan.weeks.length - 1, selectedWeek + 1))}
-              disabled={selectedWeek === mealPlan.weeks.length - 1}
-              className="flex items-center space-x-1 lg:space-x-2 px-2 lg:px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-sm"
-            >
-              <span className="hidden sm:inline">Next Week</span>
-              <span className="sm:hidden">Next</span>
-              <ChevronRightIcon className="w-3 h-3 lg:w-4 lg:h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* PDF Generation Error */}
-        {pdfGenerationError && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 mx-4 mt-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">PDF Generation Failed</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{pdfGenerationError}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col h-[70vh]">
-          {/* Meal Plan - Full Width */}
-          <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg lg:text-xl font-bold text-gray-900">Weekly Meal Plan</h3>
-              
-              {/* Shopping List Toggle */}
-              <button
-                onClick={() => setShowShoppingList(!showShoppingList)}
-                className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs lg:text-sm"
-              >
-                <ShoppingBagIcon className="w-4 h-4" />
-                <span>{showShoppingList ? 'Hide' : 'Show'} Shopping List</span>
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              {currentWeek.days.map((day: any, dayIndex: number) => {
-                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                return (
-                  <div key={dayIndex} className="border rounded-lg p-4 bg-white shadow-sm">
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-semibold text-gray-900">
-                        {dayNames[dayIndex]}
-                      </h4>
-                      <div className="text-xs lg:text-sm text-gray-600">
-                        {Math.round(day.totalCalories)} cal • P: {Math.round(day.totalProtein)}g • C: {Math.round(day.totalCarbs)}g • F: {Math.round(day.totalFat)}g
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {day.meals.map((meal: any, mealIndex: number) => (
-                        <div key={mealIndex} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                          {/* Recipe Image */}
-                          <div className="w-16 h-16 flex-shrink-0">
-                            {meal.recipe.images && meal.recipe.images.length > 0 ? (
-                              <img 
-                                src={meal.recipe.images[0]} 
-                                alt={meal.recipe.title}
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-blue-100 to-green-100 rounded-lg flex items-center justify-center">
-                                <span className="text-xs text-gray-600 font-medium">🍽️</span>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="w-12 text-xs font-medium text-gray-600 uppercase tracking-wide mb-1">
-                              {meal.mealType}
-                            </div>
-                            <h5 className="font-medium text-gray-900 text-sm lg:text-base">{meal.recipe.title}</h5>
-                            <p className="text-xs lg:text-sm text-gray-600 mt-1">{meal.recipe.description}</p>
-                            <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-gray-500">
-                              <span>Servings: {meal.servings}</span>
-                              <span>Prep: {meal.recipe.prepTime}min</span>
-                              <span>Cook: {meal.recipe.cookTime}min</span>
-                            </div>
-                          </div>
-                          
-                          <div className="text-right text-xs text-gray-600 flex-shrink-0">
-                            <div>{Math.round(meal.adjustedCalories)} cal</div>
-                            <div>P: {Math.round(meal.adjustedProtein)}g</div>
-                            <div>C: {Math.round(meal.adjustedCarbs)}g</div>
-                            <div>F: {Math.round(meal.adjustedFat)}g</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Collapsible Shopping List */}
-          {showShoppingList && (
-            <motion.div 
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t bg-gray-50"
-            >
-            <div className="flex items-center space-x-2 mb-4">
-              <ShoppingBagIcon className="w-5 h-5 text-gray-600" />
-              <h3 className="text-lg font-semibold text-gray-900">Shopping List</h3>
-            </div>
-            
-              <div className="p-4 lg:p-6">
+                <h4 className="font-semibold text-gray-900 mb-3 text-center">
+                  {['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'][dayIndex]}
+                </h4>
+                
                 <div className="space-y-3">
-                  {currentWeek.shoppingList.categories.map((category: any, categoryIndex: number) => (
-                    <div key={categoryIndex} className="bg-white rounded-lg p-3 lg:p-4 shadow-sm">
-                      <h4 className="font-medium text-gray-900 mb-2 lg:mb-3 text-sm lg:text-base">{category.name}</h4>
-                      <div className="space-y-1 lg:space-y-2">
-                        {category.items.map((item: any, itemIndex: number) => (
-                          <div key={itemIndex} className="flex justify-between items-center text-xs lg:text-sm">
-                            <span className="text-gray-700 truncate pr-2">{item.name}</span>
-                            <span className="text-gray-600 font-medium flex-shrink-0">
-                              {item.amount} {item.unit}
-                            </span>
+                  {day.meals.map((meal: any, mealIndex: number) => (
+                    <div key={mealIndex} className="bg-white rounded-lg p-3 shadow-sm">
+                      <div className="flex items-center space-x-3 mb-2">
+                        {meal.recipe.images && meal.recipe.images.length > 0 ? (
+                          <img 
+                            src={meal.recipe.images[0]} 
+                            alt={meal.recipe.title}
+                            className="w-8 h-8 rounded object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-sm">
+                            🍽️
                           </div>
-                        ))}
+                        )}
+                        <span className="text-xs text-gray-500 font-medium">
+                          {['Morgenmad', 'Frokost', 'Aftensmad'][mealIndex]}
+                        </span>
                       </div>
+                      <h5 className="text-sm font-medium text-gray-900 mb-1">
+                        {meal.recipe.title}
+                      </h5>
+                      <p className="text-xs text-gray-600">
+                        {meal.recipe.calories} kalorier • {meal.recipe.protein}g protein
+                      </p>
                     </div>
                   ))}
                 </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
 
-                {/* Nutrition Summary */}
-                <div className="mt-4 lg:mt-6 bg-white rounded-lg p-3 lg:p-4 shadow-sm">
-                  <div className="flex items-center space-x-2 mb-2 lg:mb-3">
-                    <ChartBarIcon className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
-                    <h3 className="font-semibold text-gray-900 text-sm lg:text-base">Weekly Nutrition</h3>
-                  </div>
-                  
-                  <div className="space-y-1 lg:space-y-2 text-xs lg:text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Avg Daily Calories:</span>
-                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCalories)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Avg Daily Protein:</span>
-                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyProtein)}g</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Avg Daily Carbs:</span>
-                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyCarbs)}g</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Avg Daily Fat:</span>
-                      <span className="font-medium">{Math.round(currentWeek.weeklyNutrition.averageDailyFat)}g</span>
-                    </div>
-                  </div>
-                </div>
+        {/* Shopping List Section - Blurred */}
+        <motion.div 
+          className={`relative ${showShoppingList ? 'block' : 'hidden'}`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.5 }}
+        >
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">Indkøbsliste for uge 1</h3>
+              <div className="text-sm text-gray-500">
+                {shoppingList.items.length} varer
               </div>
-            </motion.div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gray-50 p-3 lg:p-4 border-t">
-          <div className="flex flex-col lg:flex-row justify-between items-center space-y-3 lg:space-y-0">
-            <div className="text-xs lg:text-sm text-gray-600 text-center lg:text-left">
-              Generated for {mealPlan.userProfile.gender}, {mealPlan.userProfile.age} years old, {mealPlan.userProfile.weight}kg
             </div>
-            <div className="flex space-x-2 lg:space-x-3">
-              <button
-                onClick={onClose}
-                className="px-4 lg:px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 text-xs lg:text-sm"
-              >
-                Close Preview
+            
+            {/* Blur overlay */}
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
+              <div className="text-center">
+                <div className="text-4xl mb-4">🔒</div>
+                <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                  Indkøbsliste tilgængelig efter betaling
+                </h4>
+                <p className="text-gray-600 mb-4">
+                  Få adgang til den komplette indkøbsliste med priser og tilbud
+                </p>
+                <button className="px-6 py-3 bg-gradient-to-r from-[#87A96B] to-[#D4AF37] text-white rounded-lg hover:shadow-lg transition-all duration-200 font-semibold">
+                  Få adgang nu
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-30">
+              {shoppingList.items.map((item: any, index: number) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-700">{item.name}</span>
+                  <span className="text-sm text-gray-500">{item.amount}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
+        {/* CTA Section */}
+        <motion.div 
+          className="text-center mt-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          <div className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] rounded-xl p-8 text-white">
+            <h3 className="text-2xl font-bold mb-4">Klar til at starte din vægttabsrejse?</h3>
+            <p className="text-lg mb-6 opacity-90">
+              Få din personlige 6-ugers plan printet og sendt direkte til din dør
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button className="px-8 py-4 bg-white text-[#1B365D] rounded-lg hover:bg-gray-100 transition-all duration-200 font-semibold">
+                Se hele planen
               </button>
-              <button
-                onClick={() => {
-                  console.log('Download meal plan:', mealPlan);
-                  alert('This would download the meal plan as PDF!');
-                }}
-                className="px-4 lg:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs lg:text-sm"
-              >
-                Download PDF
+              <button className="px-8 py-4 bg-[#D4AF37] text-white rounded-lg hover:bg-[#D4AF37]/90 transition-all duration-200 font-semibold">
+                Få min plan nu - 1195 DKK
               </button>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };
