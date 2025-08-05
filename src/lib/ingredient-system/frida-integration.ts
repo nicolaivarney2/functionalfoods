@@ -72,6 +72,24 @@ export class FridaIntegration {
     const name = ingredientName.toLowerCase()
     
     const mockData: Record<string, any> = {
+      'svinemørbrad': {
+        name: 'Svinemørbrad',
+        description: 'Svinemørbrad, rå',
+        nutrients: {
+          energy_kcal: 143,
+          protein: 21.0,
+          carbohydrates: 0.0,
+          fat: 6.0,
+          fiber: 0.0,
+          sugar: 0.0,
+          sodium: 62,
+          'Vitamin B-6': 0.4,
+          'Vitamin B-12': 0.8,
+          'Niacin': 5.2,
+          'Selenium': 18.0,
+          'Phosphorus': 180.0
+        }
+      },
       'kyllingebryst': {
         name: 'Kyllingebryst',
         description: 'Kyllingebryst, rå',
@@ -184,13 +202,36 @@ export class FridaIntegration {
       return mockData[ingredientName]
     }
     
-    // Try partial matches
+    // Try partial matches with better logic
     for (const [key, data] of Object.entries(mockData)) {
+      // Check if ingredient name contains the key or vice versa
       if (name.includes(key) || key.includes(name)) {
+        console.log(`✅ Matched ${ingredientName} with ${key}`)
         return data
+      }
+      
+      // Check for common variations
+      const variations: Record<string, string[]> = {
+        'svinemørbrad': ['svin', 'mørbrad', 'pork'],
+        'kyllingebryst': ['kylling', 'bryst', 'chicken'],
+        'laks': ['laks', 'salmon'],
+        'mælk': ['mælk', 'milk'],
+        'mandler': ['mandler', 'almond', 'almonds'],
+        'broccoli': ['broccoli', 'brokoli'],
+        'olivenolie': ['oliven', 'olie', 'olive']
+      }
+      
+      if (variations[key]) {
+        for (const variation of variations[key]) {
+          if (name.includes(variation) || variation.includes(name)) {
+            console.log(`✅ Matched ${ingredientName} with ${key} via variation ${variation}`)
+            return data
+          }
+        }
       }
     }
     
+    console.log(`❌ No mock data found for ${ingredientName}`)
     return null
   }
 
