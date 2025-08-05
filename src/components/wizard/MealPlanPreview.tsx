@@ -248,45 +248,77 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
-            {mealPlan.weeks[0].days.map((day: any, dayIndex: number) => (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {mealPlan.weeks[selectedWeek].days.map((day: any, dayIndex: number) => (
               <motion.div
                 key={dayIndex}
-                className="bg-gray-50 rounded-lg p-4"
+                className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-6 border border-gray-200"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: dayIndex * 0.1, duration: 0.4 }}
+                transition={{ delay: 0.3 + dayIndex * 0.1, duration: 0.5 }}
               >
-                <h4 className="font-semibold text-gray-900 mb-3 text-center">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <CalendarIcon className="w-5 h-5 mr-2 text-[#1B365D]" />
                   {['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'][dayIndex]}
                 </h4>
                 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {day.meals.map((meal: any, mealIndex: number) => (
-                    <div key={mealIndex} className="bg-white rounded-lg p-3 shadow-sm">
-                      <div className="flex items-center space-x-3 mb-2">
-                        {meal.recipe.images && meal.recipe.images.length > 0 ? (
-                          <img 
-                            src={meal.recipe.images[0]} 
-                            alt={meal.recipe.title}
-                            className="w-8 h-8 rounded object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded bg-gray-200 flex items-center justify-center text-sm">
-                            🍽️
+                    <motion.div 
+                      key={mealIndex} 
+                      className="bg-white rounded-lg p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          {meal.recipe.images && meal.recipe.images.length > 0 ? (
+                            <img 
+                              src={meal.recipe.images[0]} 
+                              alt={meal.recipe.title}
+                              className="w-16 h-16 rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-[#1B365D]/20 to-[#87A96B]/20 flex items-center justify-center">
+                              <span className="text-2xl">🍽️</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-[#1B365D] bg-[#1B365D]/10 px-2 py-1 rounded-full">
+                              {['Morgenmad', 'Frokost', 'Aftensmad'][mealIndex]}
+                            </span>
+                            <span className="text-sm text-gray-500">
+                              {meal.recipe.calories} kalorier
+                            </span>
                           </div>
-                        )}
-                        <span className="text-xs text-gray-500 font-medium">
-                          {['Morgenmad', 'Frokost', 'Aftensmad'][mealIndex]}
-                        </span>
+                          
+                          <h5 className="text-lg font-semibold text-gray-900 mb-2">
+                            {meal.recipe.title}
+                          </h5>
+                          
+                          <div className="grid grid-cols-3 gap-4 mb-3">
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-gray-900">{meal.recipe.protein}g</div>
+                              <div className="text-xs text-gray-500">Protein</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-gray-900">{meal.recipe.carbs}g</div>
+                              <div className="text-xs text-gray-500">Kulhydrater</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-sm font-medium text-gray-900">{meal.recipe.fat}g</div>
+                              <div className="text-xs text-gray-500">Fedt</div>
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm text-gray-600">
+                            <strong>Ingredienser:</strong> {meal.recipe.ingredients.join(', ')}
+                          </div>
+                        </div>
                       </div>
-                      <h5 className="text-sm font-medium text-gray-900 mb-1">
-                        {meal.recipe.title}
-                      </h5>
-                      <p className="text-xs text-gray-600">
-                        {meal.recipe.calories} kalorier • {meal.recipe.protein}g protein
-                      </p>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </motion.div>
