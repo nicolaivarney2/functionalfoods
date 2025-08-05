@@ -901,121 +901,41 @@ const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-3">
-          Har du problemer med søvn?
+          Har du problemer med følgende?
         </label>
         <div className="space-y-3">
           {[
-            { value: 'insomnia', label: 'Søvnløshed eller vanskeligheder med at falde i søvn' },
-            { value: 'waking', label: 'Vågner ofte om natten' },
-            { value: 'early', label: 'Vågner for tidligt og kan ikke sove videre' },
-            { value: 'none', label: 'Ingen søvnproblemer' }
-          ].map((option) => (
+            'Søvnproblemer',
+            'Fordøjelsesproblemer', 
+            'Humørsvingninger',
+            'Koncentrationsproblemer',
+            'Træthed',
+            'Ingen problemer'
+          ].map((problem) => (
             <motion.label
-              key={option.value}
+              key={problem}
               className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               <input
                 type="checkbox"
-                checked={state.nutritionalAssessment?.sleepIssues?.includes(option.value) || false}
+                checked={state.nutritionalAssessment?.issues?.includes(problem) || false}
                 onChange={(e) => {
-                  const current = state.nutritionalAssessment?.sleepIssues || [];
+                  const current = state.nutritionalAssessment?.issues || [];
                   const updated = e.target.checked
-                    ? [...current, option.value]
-                    : current.filter(item => item !== option.value);
+                    ? [...current, problem]
+                    : current.filter((item: string) => item !== problem);
                   updateState({
                     nutritionalAssessment: {
                       ...state.nutritionalAssessment,
-                      sleepIssues: updated
+                      issues: updated
                     }
                   });
                 }}
                 className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
               />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Har du problemer med fordøjelse?
-        </label>
-        <div className="space-y-3">
-          {[
-            { value: 'bloating', label: 'Oppustethed eller gas' },
-            { value: 'constipation', label: 'Forstoppelse' },
-            { value: 'diarrhea', label: 'Diarré' },
-            { value: 'heartburn', label: 'Halsbrand eller sure opstød' },
-            { value: 'none', label: 'Ingen fordøjelsesproblemer' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="checkbox"
-                checked={state.nutritionalAssessment?.digestiveIssues?.includes(option.value) || false}
-                onChange={(e) => {
-                  const current = state.nutritionalAssessment?.digestiveIssues || [];
-                  const updated = e.target.checked
-                    ? [...current, option.value]
-                    : current.filter(item => item !== option.value);
-                  updateState({
-                    nutritionalAssessment: {
-                      ...state.nutritionalAssessment,
-                      digestiveIssues: updated
-                    }
-                  });
-                }}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
-            </motion.label>
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-3">
-          Har du problemer med humør eller koncentration?
-        </label>
-        <div className="space-y-3">
-          {[
-            { value: 'mood', label: 'Humørsvingninger eller irritabilitet' },
-            { value: 'concentration', label: 'Vanskeligheder med at koncentrere sig' },
-            { value: 'brain-fog', label: 'Brain fog eller mentalt sløret' },
-            { value: 'anxiety', label: 'Angst eller nervøsitet' },
-            { value: 'none', label: 'Ingen problemer med humør eller koncentration' }
-          ].map((option) => (
-            <motion.label
-              key={option.value}
-              className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-[#1B365D]/5 transition-all duration-200"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <input
-                type="checkbox"
-                checked={state.nutritionalAssessment?.moodIssues?.includes(option.value) || false}
-                onChange={(e) => {
-                  const current = state.nutritionalAssessment?.moodIssues || [];
-                  const updated = e.target.checked
-                    ? [...current, option.value]
-                    : current.filter(item => item !== option.value);
-                  updateState({
-                    nutritionalAssessment: {
-                      ...state.nutritionalAssessment,
-                      moodIssues: updated
-                    }
-                  });
-                }}
-                className="w-4 h-4 text-[#1B365D] border-gray-300 rounded focus:ring-[#1B365D]"
-              />
-              <span className="text-gray-700">{option.label}</span>
+              <span className="text-gray-700">{problem}</span>
             </motion.label>
           ))}
         </div>
