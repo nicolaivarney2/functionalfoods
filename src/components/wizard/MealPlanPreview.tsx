@@ -106,7 +106,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
   }
 
   const currentWeek = mealPlan.weeks[selectedWeek];
-  const userProfile = mealPlan.userProfile;
+  const mealPlanUserProfile = mealPlan.userProfile;
   const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach.id)?.name;
   const shoppingList = currentWeek.shoppingList;
 
@@ -168,7 +168,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             <div className="text-center p-4 bg-gradient-to-br from-[#1B365D]/10 to-[#87A96B]/10 rounded-lg">
               <div className="text-2xl mb-2">⚖️</div>
               <h3 className="font-semibold text-gray-900 mb-1">Designet til vægttab</h3>
-              <p className="text-sm text-gray-600">Forventet vægttab: {Math.round((userProfile.weight || 80) * 0.06)} kg over 6 uger</p>
+              <p className="text-sm text-gray-600">Forventet vægttab: {Math.round((mealPlanUserProfile.weight || 80) * 0.06)} kg over 6 uger</p>
             </div>
             
             <div className="text-center p-4 bg-gradient-to-br from-[#87A96B]/10 to-[#D4AF37]/10 rounded-lg">
