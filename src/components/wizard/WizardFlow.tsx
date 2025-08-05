@@ -193,70 +193,87 @@ const WizardFlow: React.FC = () => {
         <AnimatePresence mode="wait">
           <motion.div
             key={state.currentStep}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
           >
-            <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
               {/* Step Header */}
-              <div className="text-center mb-8">
+              <motion.div 
+                className="text-center mb-8"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.3 }}
+              >
                 <h2 className="text-3xl font-bold text-gray-900 mb-2">
                   {currentStep.title}
                 </h2>
                 <p className="text-gray-600 text-lg">
                   {currentStep.description}
                 </p>
-              </div>
+              </motion.div>
 
               {/* Step Content */}
-              <div className="min-h-[400px]">
-                <CurrentStepComponent
-                  state={state}
-                  updateState={updateState}
-                  nextStep={nextStep}
-                  prevStep={prevStep}
-                  completeStep={completeStep}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+              >
+                <CurrentStepComponent 
+                  state={state} 
+                  updateState={updateState} 
+                  nextStep={nextStep} 
                 />
-              </div>
+              </motion.div>
 
               {/* Navigation */}
-              <div className="flex items-center justify-between mt-8 pt-6 border-t">
+              <motion.div 
+                className="flex justify-between items-center mt-8 pt-6 border-t border-gray-100"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.4 }}
+              >
                 <button
                   onClick={prevStep}
                   disabled={state.currentStep === 0}
-                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg border transition-all duration-200 ${
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                     state.currentStep === 0
-                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50'
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-[#1B365D] hover:bg-[#1B365D]/5 hover:scale-105'
                   }`}
                 >
                   <ChevronLeftIcon className="w-5 h-5" />
-                  <span>Previous</span>
+                  <span>Tilbage</span>
                 </button>
 
                 <div className="flex items-center space-x-4">
-                  {state.currentStep < steps.length - 1 ? (
-                    <button
-                      onClick={nextStep}
-                      disabled={isLoading}
-                      className="flex items-center space-x-2 px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
-                    >
-                      <span>Next</span>
-                      <ChevronRightIcon className="w-5 h-5" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={nextStep}
-                      disabled={isLoading}
-                      className="flex items-center space-x-2 px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:opacity-50"
-                    >
-                      <span>Create My Plan</span>
-                      <CheckIcon className="w-5 h-5" />
-                    </button>
-                  )}
+                  <span className="text-sm text-gray-500">
+                    Trin {state.currentStep + 1} af {steps.length}
+                  </span>
+                  <div className="w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${((state.currentStep + 1) / steps.length) * 100}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <button
+                  onClick={nextStep}
+                  disabled={state.currentStep === steps.length - 1}
+                  className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
+                    state.currentStep === steps.length - 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white hover:shadow-lg hover:scale-105'
+                  }`}
+                >
+                  <span>Næste</span>
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+              </motion.div>
             </div>
           </motion.div>
         </AnimatePresence>
@@ -318,8 +335,17 @@ const WelcomeStep: React.FC<any> = ({ nextStep }) => (
 
 const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   <div className="max-w-2xl mx-auto">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div>
+    <motion.div 
+      className="grid grid-cols-1 md:grid-cols-2 gap-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.1, duration: 0.4 }}
+      >
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Køn
         </label>
@@ -328,15 +354,19 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, gender: e.target.value as 'male' | 'female' }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]"
         >
           <option value="">Vælg køn</option>
           <option value="male">Mand</option>
           <option value="female">Kvinde</option>
         </select>
-      </div>
+      </motion.div>
 
-      <div>
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2, duration: 0.4 }}
+      >
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Alder
         </label>
@@ -346,12 +376,16 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, age: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]"
           placeholder="Indtast din alder"
         />
-      </div>
+      </motion.div>
 
-      <div>
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Højde (cm)
         </label>
@@ -361,12 +395,16 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, height: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]"
           placeholder="Indtast din højde"
         />
-      </div>
+      </motion.div>
 
-      <div>
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4, duration: 0.4 }}
+      >
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Vægt (kg)
         </label>
@@ -376,13 +414,18 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
           onChange={(e) => updateState({ 
             userProfile: { ...state.userProfile, weight: parseInt(e.target.value) }
           })}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]"
           placeholder="Indtast din vægt"
         />
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
 
-    <div className="mt-6">
+    <motion.div 
+      className="mt-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5, duration: 0.4 }}
+    >
       <label className="block text-sm font-medium text-gray-700 mb-2">
         Aktivitetsniveau
       </label>
@@ -391,7 +434,7 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         onChange={(e) => updateState({ 
           userProfile: { ...state.userProfile, activityLevel: parseFloat(e.target.value) }
         })}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]"
+        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]"
       >
         <option value="">Vælg aktivitetsniveau</option>
         <option value={ActivityLevel.Sedentary}>Stillesiddende - Lidt eller ingen motion</option>
@@ -400,7 +443,7 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
         <option value={ActivityLevel.VeryActive}>Meget aktiv - Hård motion 6-7 dage/uge</option>
         <option value={ActivityLevel.ExtremelyActive}>Ekstremt aktiv - Meget hård motion, fysisk arbejde</option>
       </select>
-    </div>
+    </motion.div>
   </div>
 );
 
@@ -438,6 +481,7 @@ const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
 
 const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
   const [isCalculating, setIsCalculating] = useState(true);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     const calculateEnergy = async () => {
@@ -456,7 +500,11 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
             targetCalories: energyNeeds.targetCalories
           }
         });
+        
+        // Add a small delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 1500));
         setIsCalculating(false);
+        setShowSuccess(true);
       }
     };
 
@@ -465,9 +513,28 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
 
   if (isCalculating) {
     return (
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1B365D] mx-auto mb-4"></div>
-        <p className="text-gray-600">Beregner dine energibehov...</p>
+      <div className="text-center py-12">
+        <motion.div 
+          className="animate-spin rounded-full h-16 w-16 border-4 border-[#1B365D] border-t-transparent mx-auto mb-6"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        <motion.p 
+          className="text-gray-600 text-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          Beregner dine energibehov...
+        </motion.p>
+        <motion.div 
+          className="mt-4 text-sm text-gray-500"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+        >
+          Dette tager kun et øjeblik
+        </motion.div>
       </div>
     );
   }
@@ -479,7 +546,24 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <motion.div 
+      className="max-w-2xl mx-auto"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      {showSuccess && (
+        <motion.div 
+          className="text-center mb-8 p-4 bg-[#87A96B]/10 rounded-xl border border-[#87A96B]/20"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="text-[#87A96B] text-2xl mb-2">✓</div>
+          <p className="text-[#87A96B] font-medium">Beregning gennemført!</p>
+        </motion.div>
+      )}
+
       <div className="text-center mb-8">
         <h3 className="text-2xl font-bold text-gray-900 mb-4">
           Dine personlige energibehov
@@ -489,30 +573,52 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="text-center p-6 bg-[#1B365D]/10 rounded-xl">
+      <motion.div 
+        className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, duration: 0.5 }}
+      >
+        <motion.div 
+          className="text-center p-6 bg-[#1B365D]/10 rounded-xl border border-[#1B365D]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(27, 54, 93, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
           <div className="text-3xl font-bold text-[#1B365D] mb-2">
             {energyNeeds.bmr}
           </div>
           <div className="text-sm text-gray-600">BMR (Grundstofskifte)</div>
-        </div>
+        </motion.div>
         
-        <div className="text-center p-6 bg-[#87A96B]/10 rounded-xl">
+        <motion.div 
+          className="text-center p-6 bg-[#87A96B]/10 rounded-xl border border-[#87A96B]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(135, 169, 107, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
           <div className="text-3xl font-bold text-[#87A96B] mb-2">
             {energyNeeds.tdee}
           </div>
           <div className="text-sm text-gray-600">TDEE (Total daglig energiforbrug)</div>
-        </div>
+        </motion.div>
         
-        <div className="text-center p-6 bg-[#D4AF37]/10 rounded-xl">
+        <motion.div 
+          className="text-center p-6 bg-[#D4AF37]/10 rounded-xl border border-[#D4AF37]/20"
+          whileHover={{ scale: 1.05, boxShadow: "0 8px 25px rgba(212, 175, 55, 0.15)" }}
+          transition={{ duration: 0.2 }}
+        >
           <div className="text-3xl font-bold text-[#D4AF37] mb-2">
             {energyNeeds.targetCalories}
           </div>
           <div className="text-sm text-gray-600">Målkalorier</div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      <div className="bg-gray-50 rounded-xl p-6">
+      <motion.div 
+        className="bg-gray-50 rounded-xl p-6 border border-gray-200"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
+      >
         <h4 className="font-semibold text-gray-900 mb-4">Hvad dette betyder:</h4>
         <ul className="space-y-2 text-gray-600">
           <li className="flex items-start">
@@ -528,8 +634,8 @@ const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
             For dit mål, sigt efter {energyNeeds.targetCalories} kalorier dagligt
           </li>
         </ul>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -538,9 +644,22 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {diets.map((diet) => (
-          <label key={diet.id} className="relative">
+      <motion.div 
+        className="grid grid-cols-1 md:grid-cols-2 gap-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        {diets.map((diet, index) => (
+          <motion.label 
+            key={diet.id} 
+            className="relative"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1, duration: 0.4 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
             <input
               type="radio"
               name="dietaryApproach"
@@ -549,17 +668,29 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
               onChange={(e) => updateState({ selectedDietaryApproach: e.target.value })}
               className="sr-only"
             />
-            <div className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-              state.selectedDietaryApproach === diet.id
-                ? 'border-[#1B365D] bg-[#1B365D]/5'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}>
+            <motion.div 
+              className={`p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
+                state.selectedDietaryApproach === diet.id
+                  ? 'border-[#1B365D] bg-[#1B365D]/5 shadow-lg'
+                  : 'border-gray-200 hover:border-[#87A96B] hover:shadow-md'
+              }`}
+              whileHover={{ 
+                boxShadow: state.selectedDietaryApproach === diet.id 
+                  ? "0 10px 25px rgba(27, 54, 93, 0.15)" 
+                  : "0 4px 12px rgba(135, 169, 107, 0.1)" 
+              }}
+            >
               <div className="flex items-start justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 text-lg">{diet.name}</h3>
                 {state.selectedDietaryApproach === diet.id && (
-                  <div className="w-6 h-6 bg-[#1B365D] rounded-full flex items-center justify-center">
+                  <motion.div 
+                    className="w-6 h-6 bg-[#1B365D] rounded-full flex items-center justify-center"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  >
                     <CheckIcon className="w-4 h-4 text-white" />
-                  </div>
+                  </motion.div>
                 )}
               </div>
               <p className="text-gray-600 mb-4">{diet.description}</p>
@@ -574,12 +705,18 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
                   {diet.macroRatios.fat.target}% fedt
                 </span>
               </div>
-            </div>
-          </label>
+            </motion.div>
+          </motion.label>
         ))}
         
         {/* Social Proof Box */}
-        <div className="p-6 border-2 border-[#87A96B] rounded-xl bg-[#87A96B]/5">
+        <motion.div 
+          className="p-6 border-2 border-[#87A96B] rounded-xl bg-[#87A96B]/5"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.4 }}
+          whileHover={{ scale: 1.02 }}
+        >
           <div className="flex items-start justify-between mb-4">
             <h3 className="font-semibold text-gray-900 text-lg">Din personlige vægttabsbog</h3>
             <div className="w-6 h-6 bg-[#87A96B] rounded-full flex items-center justify-center">
@@ -592,8 +729,8 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
           <div className="text-sm text-[#87A96B] font-medium">
             Inkluderet i din 6-ugers plan
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 };
@@ -943,7 +1080,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Vil du springe morgenmad over en gang imellem? Dette kan booste dit vægttab.
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -954,7 +1091,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Hvor mange personer er denne plan til? Vi vil tilpasse opskrifter og indkøbsliste.
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
               <option value="1">1 person</option>
               <option value="2">2 personer</option>
               <option value="3">3 personer</option>
@@ -966,7 +1103,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Vil du spise samme mad 2 dage i træk nogle gange for at spare tid på madlavning? Vi vil koordinere planen for dette.
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -977,7 +1114,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Vil du have adgang til vores gratis online videokurs sammen med den fysiske bog? Dette er komplementært og koster ikke ekstra.
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
@@ -988,7 +1125,7 @@ const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Vil du have gratis personlig SMS-sparring sammen med din fysiske bog? Dette er også komplementært og koster ikke ekstra. Enten Nicolai eller Jannie vil være tilgængelig for din personlige sparring og hjælp. Kun 6 uger dog.
             </label>
-            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D]">
+            <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-[#1B365D] transition-all duration-200 hover:border-[#87A96B]">
               <option value="">Vælg</option>
               <option value="yes">Ja</option>
               <option value="no">Nej</option>
