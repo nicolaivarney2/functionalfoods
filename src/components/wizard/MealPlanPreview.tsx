@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { dietaryFactory } from '@/lib/dietary-system';
 
 interface MealPlanPreviewProps {
   mealPlan: any;
