@@ -83,6 +83,50 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                 }
               }
             ]
+          },
+          {
+            day: 'Tirsdag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Protein morgenmad',
+                  type: 'breakfast',
+                  calories: 480,
+                  protein: 28,
+                  carbs: 6,
+                  fat: 38,
+                  ingredients: ['æg', 'ost', 'spinat'],
+                  instructions: 'Lav omelet med ost og spinat',
+                  images: ['/images/recipes/protein-breakfast.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Salat frokost',
+                  type: 'lunch',
+                  calories: 520,
+                  protein: 32,
+                  carbs: 8,
+                  fat: 42,
+                  ingredients: ['tun', 'salat', 'oliven'],
+                  instructions: 'Tun salat med oliven og dressing',
+                  images: ['/images/recipes/tuna-salad.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Kylling aftensmad',
+                  type: 'dinner',
+                  calories: 580,
+                  protein: 38,
+                  carbs: 10,
+                  fat: 48,
+                  ingredients: ['kylling', 'grøntsager', 'olivenolie'],
+                  instructions: 'Grill kylling med grøntsager',
+                  images: ['/images/recipes/chicken-dinner.jpg']
+                }
+              }
+            ]
           }
         ],
         shoppingList: {
@@ -96,6 +140,130 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
             { name: 'laks', amount: '400g' },
             { name: 'broccoli', amount: '500g' },
             { name: 'smør', amount: '100g' }
+          ]
+        }
+      },
+      {
+        weekNumber: 2,
+        days: [
+          {
+            day: 'Mandag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Avocado morgenmad',
+                  type: 'breakfast',
+                  calories: 460,
+                  protein: 26,
+                  carbs: 7,
+                  fat: 36,
+                  ingredients: ['avocado', 'æg', 'bacon'],
+                  instructions: 'Avocado toast med æg og bacon',
+                  images: ['/images/recipes/avocado-breakfast.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Kylling salat',
+                  type: 'lunch',
+                  calories: 540,
+                  protein: 34,
+                  carbs: 9,
+                  fat: 44,
+                  ingredients: ['kylling', 'salat', 'tomat'],
+                  instructions: 'Kylling salat med friske grøntsager',
+                  images: ['/images/recipes/chicken-salad.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Laks aftensmad',
+                  type: 'dinner',
+                  calories: 620,
+                  protein: 40,
+                  carbs: 11,
+                  fat: 50,
+                  ingredients: ['laks', 'asparges', 'citron'],
+                  instructions: 'Steg laks med asparges og citron',
+                  images: ['/images/recipes/salmon-dinner.jpg']
+                }
+              }
+            ]
+          }
+        ],
+        shoppingList: {
+          items: [
+            { name: 'avocado', amount: '4 stk' },
+            { name: 'æg', amount: '8 stk' },
+            { name: 'bacon', amount: '150g' },
+            { name: 'kylling', amount: '600g' },
+            { name: 'salat', amount: '2 stk' },
+            { name: 'tomat', amount: '4 stk' },
+            { name: 'laks', amount: '500g' },
+            { name: 'asparges', amount: '300g' },
+            { name: 'citron', amount: '2 stk' }
+          ]
+        }
+      },
+      {
+        weekNumber: 3,
+        days: [
+          {
+            day: 'Mandag',
+            meals: [
+              {
+                recipe: {
+                  title: 'Protein shake morgenmad',
+                  type: 'breakfast',
+                  calories: 440,
+                  protein: 30,
+                  carbs: 5,
+                  fat: 34,
+                  ingredients: ['protein pulver', 'mandel mælk', 'bær'],
+                  instructions: 'Protein shake med bær og mandel mælk',
+                  images: ['/images/recipes/protein-shake.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Tun salat',
+                  type: 'lunch',
+                  calories: 560,
+                  protein: 36,
+                  carbs: 8,
+                  fat: 46,
+                  ingredients: ['tun', 'salat', 'agurk'],
+                  instructions: 'Tun salat med agurk og dressing',
+                  images: ['/images/recipes/tuna-lunch.jpg']
+                }
+              },
+              {
+                recipe: {
+                  title: 'Bøf aftensmad',
+                  type: 'dinner',
+                  calories: 640,
+                  protein: 44,
+                  carbs: 12,
+                  fat: 52,
+                  ingredients: ['bøf', 'broccoli', 'smør'],
+                  instructions: 'Steg bøf med broccoli og smør',
+                  images: ['/images/recipes/steak-dinner.jpg']
+                }
+              }
+            ]
+          }
+        ],
+        shoppingList: {
+          items: [
+            { name: 'protein pulver', amount: '200g' },
+            { name: 'mandel mælk', amount: '1L' },
+            { name: 'bær', amount: '300g' },
+            { name: 'tun', amount: '400g' },
+            { name: 'salat', amount: '1 stk' },
+            { name: 'agurk', amount: '2 stk' },
+            { name: 'bøf', amount: '600g' },
+            { name: 'broccoli', amount: '400g' },
+            { name: 'smør', amount: '150g' }
           ]
         }
       }
@@ -214,15 +382,59 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
           transition={{ delay: 0.2, duration: 0.5 }}
         >
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-gray-900">Din ugeplan</h3>
+            <div className="flex items-center space-x-4">
+              <h3 className="text-xl font-semibold text-gray-900">Din ugeplan</h3>
+              
+              {/* Week Navigation */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setSelectedWeek(Math.max(0, selectedWeek - 1))}
+                  disabled={selectedWeek === 0}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    selectedWeek === 0 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-[#1B365D] hover:bg-[#1B365D]/10'
+                  }`}
+                >
+                  <ChevronLeftIcon className="w-5 h-5" />
+                </button>
+                
+                <div className="flex items-center space-x-1">
+                  {mealPlan.weeks.map((week: any, index: number) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedWeek(index)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        selectedWeek === index
+                          ? 'bg-[#1B365D] text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Uge {week.weekNumber}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => setSelectedWeek(Math.min(mealPlan.weeks.length - 1, selectedWeek + 1))}
+                  disabled={selectedWeek === mealPlan.weeks.length - 1}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    selectedWeek === mealPlan.weeks.length - 1 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-[#1B365D] hover:bg-[#1B365D]/10'
+                  }`}
+                >
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
             <div className="flex space-x-2">
               <button
                 onClick={() => setShowShoppingList(!showShoppingList)}
                 className="flex items-center space-x-2 px-4 py-2 bg-[#1B365D] text-white rounded-lg hover:bg-[#1B365D]/90 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m8 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
-                </svg>
+                <ShoppingBagIcon className="w-4 h-4" />
                 <span>{showShoppingList ? 'Skjul indkøbsliste' : 'Vis indkøbsliste'}</span>
               </button>
               
@@ -238,9 +450,7 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
                   </>
                 ) : (
                   <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                    <DocumentArrowDownIcon className="w-4 h-4" />
                     <span>Download PDF</span>
                   </>
                 )}
