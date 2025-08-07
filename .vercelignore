@@ -4,6 +4,8 @@
 *.zip
 Frida_Dataset_May2025.*
 frida-data.json
+frida-nutritional-data.json
+frida-foods.json
 frida-transformed.json
 
 # Development files

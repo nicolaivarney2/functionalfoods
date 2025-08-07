@@ -52,4 +52,11 @@ node_modules/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+
+# Large Frida dataset files
+frida-nutritional-data.json
+frida-data.json
+Frida_Dataset_May2025.*
+*.xlsx
+*.ods 
