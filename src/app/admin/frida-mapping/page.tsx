@@ -19,7 +19,7 @@ export default function FridaMappingPage() {
     setIsSearching(true)
     
     try {
-      setLoading(true)
+      setIsSearching(true)
       const { FridaIntegration } = await import('@/lib/ingredient-system/frida-integration')
       const fridaIntegration = new FridaIntegration()
       
@@ -27,13 +27,13 @@ export default function FridaMappingPage() {
       
       // For now, just show a message that this feature is not implemented
       console.log('❌ Frida dataset search is not implemented yet')
-      setResults([])
+      setSearchResults([])
       
     } catch (error) {
       console.error('❌ Error searching Frida:', error)
-      setError('Failed to search Frida dataset')
+      setSearchResults([])
     } finally {
-      setLoading(false)
+      setIsSearching(false)
     }
   }
 
