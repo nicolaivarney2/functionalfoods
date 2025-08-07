@@ -156,6 +156,9 @@ export default function RecipeOverviewPage() {
       try {
         console.log('🔄 Loading recipes from API...')
         const response = await fetch('/api/recipes')
+        console.log('📡 Response status:', response.status)
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
+        
         if (response.ok) {
           const recipes = await response.json()
           console.log(`✅ Loaded ${recipes.length} recipes from API`)
@@ -163,9 +166,12 @@ export default function RecipeOverviewPage() {
           setAllRecipes(recipes)
         } else {
           console.error('❌ Failed to load recipes:', response.status, response.statusText)
+          const errorText = await response.text()
+          console.error('❌ Error response:', errorText)
         }
       } catch (error) {
         console.error('❌ Error loading recipes:', error)
+        console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error')
       } finally {
         setIsLoading(false)
       }
@@ -252,6 +258,8 @@ export default function RecipeOverviewPage() {
 
     setSortedRecipes(sorted)
     setDisplayedRecipes(sorted.slice(0, displayCount))
+    console.log(`✅ Final result: ${sorted.length} sorted recipes, ${sorted.slice(0, displayCount).length} displayed`)
+    console.log('📋 Displayed recipes:', sorted.slice(0, displayCount).map(r => r.title))
   }, [allRecipes, searchQuery, selectedDietary, selectedCategory, sortBy, displayCount])
 
   const handleLoadMore = () => {
