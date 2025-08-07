@@ -8,7 +8,10 @@ import {
   IngredientSearchFilters,
   RecipeSearchFilters,
   BulkImportResult,
-  ImportError
+  ImportError,
+  NutritionalInfo,
+  VitaminInfo,
+  MineralInfo
 } from './types';
 
 export class IngredientTaggingService {
@@ -31,7 +34,46 @@ export class IngredientTaggingService {
         exclusions: ['svinekød'],
         allergens: [],
         commonNames: ['pork tenderloin', 'svinemørbrad'],
-        description: 'Svinekød - mørbrad',
+        description: 'Svinekød - mørbrad, afpudset',
+        nutritionalInfo: {
+          caloriesPer100g: 143,
+          proteinPer100g: 21.0,
+          fatPer100g: 6.0,
+          carbsPer100g: 0.0,
+          fiberPer100g: 0.0,
+          sugarPer100g: 0.0,
+          sodiumPer100g: 62,
+          vitamins: [
+            { vitamin: 'A', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'D', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'E', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'K', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'C', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B1', amountPer100g: 0.8, unit: 'mg' },
+            { vitamin: 'B2', amountPer100g: 0.2, unit: 'mg' },
+            { vitamin: 'B3', amountPer100g: 5.2, unit: 'mg' },
+            { vitamin: 'B5', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B6', amountPer100g: 0.4, unit: 'mg' },
+            { vitamin: 'B7', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B9', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B12', amountPer100g: 0.8, unit: 'μg' }
+          ],
+          minerals: [
+            { mineral: 'Calcium', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Iron', amountPer100g: 0.9, unit: 'mg' },
+            { mineral: 'Magnesium', amountPer100g: 22.0, unit: 'mg' },
+            { mineral: 'Phosphorus', amountPer100g: 180.0, unit: 'mg' },
+            { mineral: 'Potassium', amountPer100g: 350.0, unit: 'mg' },
+            { mineral: 'Sodium', amountPer100g: 62.0, unit: 'mg' },
+            { mineral: 'Zinc', amountPer100g: 2.1, unit: 'mg' },
+            { mineral: 'Copper', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Manganese', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Selenium', amountPer100g: 18.0, unit: 'μg' },
+            { mineral: 'Iodine', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Chromium', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Molybdenum', amountPer100g: 0.0, unit: 'μg' }
+          ]
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -43,7 +85,46 @@ export class IngredientTaggingService {
         exclusions: [],
         allergens: [],
         commonNames: ['chicken breast', 'kyllingebryst'],
-        description: 'Kyllingebryst',
+        description: 'Kyllingebryst, kød og skind',
+        nutritionalInfo: {
+          caloriesPer100g: 165,
+          proteinPer100g: 31.0,
+          fatPer100g: 3.6,
+          carbsPer100g: 0.0,
+          fiberPer100g: 0.0,
+          sugarPer100g: 0.0,
+          sodiumPer100g: 74,
+          vitamins: [
+            { vitamin: 'A', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'D', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'E', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'K', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'C', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B1', amountPer100g: 0.6, unit: 'mg' },
+            { vitamin: 'B2', amountPer100g: 0.1, unit: 'mg' },
+            { vitamin: 'B3', amountPer100g: 13.7, unit: 'mg' },
+            { vitamin: 'B5', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B6', amountPer100g: 0.1, unit: 'mg' },
+            { vitamin: 'B7', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B9', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B12', amountPer100g: 0.3, unit: 'μg' }
+          ],
+          minerals: [
+            { mineral: 'Calcium', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Iron', amountPer100g: 0.7, unit: 'mg' },
+            { mineral: 'Magnesium', amountPer100g: 27.0, unit: 'mg' },
+            { mineral: 'Phosphorus', amountPer100g: 200.0, unit: 'mg' },
+            { mineral: 'Potassium', amountPer100g: 256.0, unit: 'mg' },
+            { mineral: 'Sodium', amountPer100g: 74.0, unit: 'mg' },
+            { mineral: 'Zinc', amountPer100g: 1.0, unit: 'mg' },
+            { mineral: 'Copper', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Manganese', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Selenium', amountPer100g: 22.0, unit: 'μg' },
+            { mineral: 'Iodine', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Chromium', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Molybdenum', amountPer100g: 0.0, unit: 'μg' }
+          ]
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -55,7 +136,46 @@ export class IngredientTaggingService {
         exclusions: ['fisk'],
         allergens: ['fisk'],
         commonNames: ['salmon', 'laks'],
-        description: 'Laks',
+        description: 'Laks, atlantisk, vild, rå',
+        nutritionalInfo: {
+          caloriesPer100g: 208,
+          proteinPer100g: 25.0,
+          fatPer100g: 12.0,
+          carbsPer100g: 0.0,
+          fiberPer100g: 0.0,
+          sugarPer100g: 0.0,
+          sodiumPer100g: 59,
+          vitamins: [
+            { vitamin: 'A', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'D', amountPer100g: 11.0, unit: 'μg' },
+            { vitamin: 'E', amountPer100g: 3.6, unit: 'mg' },
+            { vitamin: 'K', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'C', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B1', amountPer100g: 0.2, unit: 'mg' },
+            { vitamin: 'B2', amountPer100g: 0.4, unit: 'mg' },
+            { vitamin: 'B3', amountPer100g: 8.5, unit: 'mg' },
+            { vitamin: 'B5', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B6', amountPer100g: 0.9, unit: 'mg' },
+            { vitamin: 'B7', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B9', amountPer100g: 44.0, unit: 'μg' },
+            { vitamin: 'B12', amountPer100g: 3.2, unit: 'μg' }
+          ],
+          minerals: [
+            { mineral: 'Calcium', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Iron', amountPer100g: 0.3, unit: 'mg' },
+            { mineral: 'Magnesium', amountPer100g: 27.0, unit: 'mg' },
+            { mineral: 'Phosphorus', amountPer100g: 240.0, unit: 'mg' },
+            { mineral: 'Potassium', amountPer100g: 363.0, unit: 'mg' },
+            { mineral: 'Sodium', amountPer100g: 59.0, unit: 'mg' },
+            { mineral: 'Zinc', amountPer100g: 0.4, unit: 'mg' },
+            { mineral: 'Copper', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Manganese', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Selenium', amountPer100g: 36.0, unit: 'μg' },
+            { mineral: 'Iodine', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Chromium', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Molybdenum', amountPer100g: 0.0, unit: 'μg' }
+          ]
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -67,7 +187,46 @@ export class IngredientTaggingService {
         exclusions: ['mejeri'],
         allergens: ['mælk'],
         commonNames: ['milk', 'mælk'],
-        description: 'Komælk',
+        description: 'Sødmælk, konventionel (ikke-økologisk)',
+        nutritionalInfo: {
+          caloriesPer100g: 63,
+          proteinPer100g: 3.4,
+          fatPer100g: 3.5,
+          carbsPer100g: 4.8,
+          fiberPer100g: 0.0,
+          sugarPer100g: 4.8,
+          sodiumPer100g: 44,
+          vitamins: [
+            { vitamin: 'A', amountPer100g: 46.0, unit: 'μg' },
+            { vitamin: 'D', amountPer100g: 1.2, unit: 'μg' },
+            { vitamin: 'E', amountPer100g: 0.1, unit: 'mg' },
+            { vitamin: 'K', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'C', amountPer100g: 1.0, unit: 'mg' },
+            { vitamin: 'B1', amountPer100g: 0.04, unit: 'mg' },
+            { vitamin: 'B2', amountPer100g: 0.2, unit: 'mg' },
+            { vitamin: 'B3', amountPer100g: 0.1, unit: 'mg' },
+            { vitamin: 'B5', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B6', amountPer100g: 0.04, unit: 'mg' },
+            { vitamin: 'B7', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B9', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B12', amountPer100g: 0.4, unit: 'μg' }
+          ],
+          minerals: [
+            { mineral: 'Calcium', amountPer100g: 113.0, unit: 'mg' },
+            { mineral: 'Iron', amountPer100g: 0.03, unit: 'mg' },
+            { mineral: 'Magnesium', amountPer100g: 10.0, unit: 'mg' },
+            { mineral: 'Phosphorus', amountPer100g: 93.0, unit: 'mg' },
+            { mineral: 'Potassium', amountPer100g: 132.0, unit: 'mg' },
+            { mineral: 'Sodium', amountPer100g: 44.0, unit: 'mg' },
+            { mineral: 'Zinc', amountPer100g: 0.4, unit: 'mg' },
+            { mineral: 'Copper', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Manganese', amountPer100g: 0.0, unit: 'mg' },
+            { mineral: 'Selenium', amountPer100g: 3.7, unit: 'μg' },
+            { mineral: 'Iodine', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Chromium', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Molybdenum', amountPer100g: 0.0, unit: 'μg' }
+          ]
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -79,7 +238,46 @@ export class IngredientTaggingService {
         exclusions: ['nødder'],
         allergens: ['nødder'],
         commonNames: ['almonds', 'mandler'],
-        description: 'Mandler',
+        description: 'Mandler, rå',
+        nutritionalInfo: {
+          caloriesPer100g: 606,
+          proteinPer100g: 21.2,
+          fatPer100g: 52.1,
+          carbsPer100g: 7.8,
+          fiberPer100g: 10.6,
+          sugarPer100g: 4.8,
+          sodiumPer100g: 1,
+          vitamins: [
+            { vitamin: 'A', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'D', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'E', amountPer100g: 23.4, unit: 'mg' },
+            { vitamin: 'K', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'C', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B1', amountPer100g: 0.137, unit: 'mg' },
+            { vitamin: 'B2', amountPer100g: 0.939, unit: 'mg' },
+            { vitamin: 'B3', amountPer100g: 5.83, unit: 'mg' },
+            { vitamin: 'B5', amountPer100g: 0.0, unit: 'mg' },
+            { vitamin: 'B6', amountPer100g: 0.1, unit: 'mg' },
+            { vitamin: 'B7', amountPer100g: 0.0, unit: 'μg' },
+            { vitamin: 'B9', amountPer100g: 44.0, unit: 'μg' },
+            { vitamin: 'B12', amountPer100g: 0.0, unit: 'μg' }
+          ],
+          minerals: [
+            { mineral: 'Calcium', amountPer100g: 269.0, unit: 'mg' },
+            { mineral: 'Iron', amountPer100g: 3.7, unit: 'mg' },
+            { mineral: 'Magnesium', amountPer100g: 270.0, unit: 'mg' },
+            { mineral: 'Phosphorus', amountPer100g: 481.0, unit: 'mg' },
+            { mineral: 'Potassium', amountPer100g: 733.0, unit: 'mg' },
+            { mineral: 'Sodium', amountPer100g: 1.0, unit: 'mg' },
+            { mineral: 'Zinc', amountPer100g: 3.1, unit: 'mg' },
+            { mineral: 'Copper', amountPer100g: 1.0, unit: 'mg' },
+            { mineral: 'Manganese', amountPer100g: 2.2, unit: 'mg' },
+            { mineral: 'Selenium', amountPer100g: 4.1, unit: 'μg' },
+            { mineral: 'Iodine', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Chromium', amountPer100g: 0.0, unit: 'μg' },
+            { mineral: 'Molybdenum', amountPer100g: 0.0, unit: 'μg' }
+          ]
+        },
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -89,6 +287,13 @@ export class IngredientTaggingService {
     defaultIngredients.forEach(ingredient => {
       this.ingredients.set(ingredient.id, ingredient);
     });
+  }
+
+  /**
+   * Get all ingredient tags
+   */
+  getAllIngredientTags(): IngredientTag[] {
+    return Array.from(this.ingredients.values())
   }
 
   /**

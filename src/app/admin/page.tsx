@@ -1,20 +1,20 @@
 import Link from 'next/link'
 import { Plus, Search, Filter, Upload, BarChart3, Settings } from 'lucide-react'
-import { getAllRecipesServer, getImportedRecipesCountServer } from '@/lib/recipe-storage-server'
+import { databaseService } from '@/lib/database-service'
 
-export default function AdminDashboard() {
-  const allRecipes = getAllRecipesServer()
+export default async function AdminDashboard() {
+  const allRecipes = await databaseService.getRecipes()
   
   const stats = {
     totalRecipes: allRecipes.length,
-    ketoRecipes: allRecipes.filter(r => r.dietaryCategories.includes('Keto')).length,
-    senseRecipes: allRecipes.filter(r => r.dietaryCategories.includes('SENSE')).length,
+    ketoRecipes: allRecipes.filter(r => r.dietaryCategories?.includes('Keto')).length,
+    senseRecipes: allRecipes.filter(r => r.dietaryCategories?.includes('SENSE')).length,
     publishedToday: allRecipes.filter(r => {
       const today = new Date()
       const recipeDate = r.publishedAt
-      return recipeDate.toDateString() === today.toDateString()
+      return recipeDate ? recipeDate.toDateString() === today.toDateString() : false
     }).length,
-    importedRecipes: getImportedRecipesCountServer()
+    importedRecipes: allRecipes.length // All recipes are now from database
   }
 
   return (
@@ -68,6 +68,12 @@ export default function AdminDashboard() {
               className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
             >
               Recipes
+            </Link>
+            <Link 
+              href="/admin/frida-mapping" 
+              className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+            >
+              Frida Mapping
             </Link>
           </nav>
         </div>
@@ -205,38 +211,42 @@ export default function AdminDashboard() {
                         <div className="flex-shrink-0 h-10 w-10">
                           <img
                             className="h-10 w-10 rounded-lg object-cover"
-                            src={recipe.imageUrl}
+                            src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
                             alt={recipe.title}
                           />
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">{recipe.title}</div>
-                          <div className="text-sm text-gray-500">{recipe.shortDescription}</div>
+                          <div className="text-sm text-gray-500">{recipe.shortDescription || recipe.description?.substring(0, 50) || 'Ingen beskrivelse'}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                        {recipe.mainCategory}
+                        {recipe.mainCategory || 'Hovedret'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
-                        {recipe.dietaryCategories.map((category) => (
-                          <span
-                            key={category}
-                            className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full"
-                          >
-                            {category}
-                          </span>
-                        ))}
+                        {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? (
+                          recipe.dietaryCategories.map((category) => (
+                            <span
+                              key={category}
+                              className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full"
+                            >
+                              {category}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-500">Ingen kategorier</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {recipe.totalTime} min
+                      {recipe.totalTime || 0} min
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {recipe.publishedAt.toLocaleDateString('da-DK')}
+                      {recipe.publishedAt ? new Date(recipe.publishedAt).toLocaleDateString('da-DK') : 'Ikke publiceret'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">

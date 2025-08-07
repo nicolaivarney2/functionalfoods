@@ -11,15 +11,15 @@ export function generateRecipeStructuredData(recipe: Recipe) {
       "@type": "Person",
       "name": recipe.author
     },
-    "datePublished": recipe.publishedAt.toISOString(),
-    "dateModified": recipe.updatedAt.toISOString(),
+    "datePublished": recipe.publishedAt ? recipe.publishedAt.toISOString() : new Date().toISOString(),
+    "dateModified": recipe.updatedAt ? recipe.updatedAt.toISOString() : new Date().toISOString(),
     "prepTime": recipe.prepTimeISO,
     "cookTime": recipe.cookTimeISO,
     "totalTime": recipe.totalTimeISO,
     "recipeYield": `${recipe.servings} servings`,
     "recipeCategory": recipe.mainCategory,
     "recipeCuisine": "Danish",
-    "suitableForDiet": recipe.dietaryCategories.map(category => {
+    "suitableForDiet": recipe.dietaryCategories ? recipe.dietaryCategories.map(category => {
       // Map dietary categories to schema.org diet types
       const dietMap: { [key: string]: string } = {
         'Keto': 'https://schema.org/LowCarbDiet',
@@ -32,16 +32,16 @@ export function generateRecipeStructuredData(recipe: Recipe) {
         'SENSE': 'https://schema.org/GlutenFreeDiet' // Danish balanced diet
       }
       return dietMap[category] || 'https://schema.org/GlutenFreeDiet'
-    }),
-    "keywords": recipe.keywords.join(', '),
-    "recipeIngredient": recipe.ingredients.map(ingredient => 
+    }) : [],
+    "keywords": recipe.keywords ? recipe.keywords.join(', ') : '',
+    "recipeIngredient": recipe.ingredients ? recipe.ingredients.map(ingredient => 
       `${ingredient.amount} ${ingredient.unit} ${ingredient.name}`
-    ),
-    "recipeInstructions": recipe.instructions.map(step => ({
+    ) : [],
+    "recipeInstructions": recipe.instructions ? recipe.instructions.map(step => ({
       "@type": "HowToStep",
       "position": step.stepNumber,
       "text": step.instruction
-    })),
+    })) : [],
     "nutrition": {
       "@type": "NutritionInformation",
       "calories": `${recipe.calories} calories`,
@@ -53,11 +53,11 @@ export function generateRecipeStructuredData(recipe: Recipe) {
     "recipeServings": recipe.servings,
     "recipeDifficulty": recipe.difficulty,
     "cookingMethod": "stovetop", // You can make this dynamic based on recipe type
-    "additionalProperty": recipe.dietaryCategories.map(category => ({
+    "additionalProperty": recipe.dietaryCategories ? recipe.dietaryCategories.map(category => ({
       "@type": "PropertyValue",
       "name": "dietary_category",
       "value": category
-    }))
+    })) : []
   }
 
   // Add rating if available
@@ -94,8 +94,8 @@ export function generateBreadcrumbStructuredData(recipe: Recipe) {
       {
         "@type": "ListItem",
         "position": 3,
-        "name": recipe.mainCategory,
-        "item": `https://functionalfoods.dk/opskriftsoversigt?kategori=${recipe.mainCategory.toLowerCase()}`
+        "name": recipe.mainCategory || "Opskrifter",
+        "item": `https://functionalfoods.dk/opskriftsoversigt?kategori=${(recipe.mainCategory || "opskrifter").toLowerCase()}`
       },
       {
         "@type": "ListItem",

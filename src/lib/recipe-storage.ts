@@ -11,27 +11,8 @@ export function getAllRecipes(): Recipe[] {
 
 // Add imported recipes
 export function addImportedRecipes(recipes: Recipe[]): void {
-  // Generate unique IDs for imported recipes
-  const recipesWithIds = recipes.map((recipe, index) => ({
-    ...recipe,
-    id: `imported-${Date.now()}-${index}`,
-    slug: recipe.slug || generateSlug(recipe.title)
-  }))
-  
-  importedRecipes = [...importedRecipes, ...recipesWithIds]
-  
-  // Save to localStorage for persistence
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('importedRecipes', JSON.stringify(importedRecipes))
-      console.log(`Saved ${recipesWithIds.length} recipes to localStorage`)
-    } catch (error) {
-      console.error('Error saving to localStorage:', error)
-    }
-  }
-  
-  console.log(`Added ${recipesWithIds.length} imported recipes`)
-  console.log('Total recipes:', getAllRecipes().length)
+  // DISABLED: This function is no longer used - recipes are saved directly to database
+  console.log('addImportedRecipes is disabled - recipes are saved directly to database')
 }
 
 // Get recipe by slug

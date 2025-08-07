@@ -109,7 +109,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
       {/* Recipe Tips */}
       <section className="bg-white">
         <div className="container py-8">
-          <RecipeTips tips={[]} dietaryCategory={recipe.dietaryCategories[0]} />
+          <RecipeTips tips={[]} dietaryCategory={recipe.dietaryCategories?.[0] || 'sunde'} />
         </div>
       </section>
 

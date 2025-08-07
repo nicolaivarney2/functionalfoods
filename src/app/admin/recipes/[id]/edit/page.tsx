@@ -78,7 +78,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const addIngredient = () => {
     if (!recipe) return
     const newIngredient: Ingredient = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${Math.random().toString(36).substr(2, 9)}`,
       name: '',
       amount: 0,
       unit: 'g'
@@ -107,7 +107,7 @@ export default function EditRecipe({ params }: { params: { id: string } }) {
   const addInstruction = () => {
     if (!recipe) return
     const newInstruction: RecipeStep = {
-      id: `temp-${Date.now()}`,
+      id: `temp-${Math.random().toString(36).substr(2, 9)}`,
       stepNumber: recipe.instructions.length + 1,
       instruction: ''
     }

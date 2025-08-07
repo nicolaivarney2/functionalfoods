@@ -178,19 +178,19 @@ export default function RecipeOverviewPage() {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(recipe =>
         recipe.title.toLowerCase().includes(query) ||
-        recipe.description.toLowerCase().includes(query) ||
-        recipe.ingredients.some(ingredient =>
+        (recipe.description?.toLowerCase().includes(query) || false) ||
+        recipe.ingredients?.some(ingredient =>
           ingredient.name.toLowerCase().includes(query)
-        )
+        ) || false
       )
     }
 
     // Apply dietary filter
     if (selectedDietary !== 'all') {
       filtered = filtered.filter(recipe =>
-        recipe.dietaryCategories.some(cat => 
+        recipe.dietaryCategories?.some(cat => 
           cat.toLowerCase() === selectedDietary.toLowerCase()
-        )
+        ) || false
       )
     }
 
@@ -207,20 +207,32 @@ export default function RecipeOverviewPage() {
     let sorted = [...filtered]
     switch (sortBy) {
       case 'newest':
-        sorted.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        sorted.sort((a, b) => {
+          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+          return dateB - dateA
+        })
         break
       case 'oldest':
-        sorted.sort((a, b) => new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime())
+        sorted.sort((a, b) => {
+          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+          return dateA - dateB
+        })
         break
       case 'time-asc':
-        sorted.sort((a, b) => a.totalTime - b.totalTime)
+        sorted.sort((a, b) => (a.totalTime || 0) - (b.totalTime || 0))
         break
       case 'time-desc':
-        sorted.sort((a, b) => b.totalTime - a.totalTime)
+        sorted.sort((a, b) => (b.totalTime || 0) - (a.totalTime || 0))
         break
       case 'rating':
         // For now, sort by newest since we don't have ratings
-        sorted.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+        sorted.sort((a, b) => {
+          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+          return dateB - dateA
+        })
         break
     }
 

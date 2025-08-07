@@ -22,18 +22,24 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
       <Link href={`/opskrift/${recipe.slug}`} className="block">
         {/* Recipe Image */}
         <div className="relative aspect-[4/3] overflow-hidden">
-          <Image
-            src={recipe.imageUrl}
-            alt={recipe.imageAlt}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            priority={priority}
-            loading={priority ? 'eager' : 'lazy'}
-            placeholder="blur"
-            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-            quality={75}
-          />
+          {recipe.imageUrl ? (
+            <Image
+              src={recipe.imageUrl}
+              alt={recipe.imageAlt || recipe.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority={priority}
+              loading={priority ? 'eager' : 'lazy'}
+              placeholder="blur"
+              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+              quality={75}
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+              <span className="text-gray-500 text-sm">Intet billede</span>
+            </div>
+          )}
         </div>
 
         {/* Recipe Content */}
@@ -44,49 +50,55 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
           </h3>
 
           {/* Description */}
-          <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-            {recipe.shortDescription}
-          </p>
+          {recipe.shortDescription && (
+            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+              {recipe.shortDescription}
+            </p>
+          )}
 
           {/* Recipe Meta */}
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-1">
                 <Clock size={16} />
-                <span>{formatTime(recipe.totalTime)}</span>
+                <span>{formatTime(recipe.totalTime || 0)}</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Users size={16} />
-                <span>{recipe.servings} pers</span>
+                <span>{recipe.servings || 1} pers</span>
               </div>
             </div>
 
             {/* Difficulty */}
-            <span className={`px-2 py-1 text-xs font-medium ${
-              recipe.difficulty === 'Nem' ? 'bg-green-100 text-green-800' :
-              recipe.difficulty === 'Mellem' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-red-100 text-red-800'
-            }`}>
-              {recipe.difficulty}
-            </span>
-          </div>
-
-          {/* Categories */}
-          <div className="flex flex-wrap gap-1 mt-3">
-            {recipe.dietaryCategories.slice(0, 2).map((category) => (
-              <span
-                key={category}
-                className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700"
-              >
-                {category}
-              </span>
-            ))}
-            {recipe.dietaryCategories.length > 2 && (
-              <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600">
-                +{recipe.dietaryCategories.length - 2}
+            {recipe.difficulty && (
+              <span className={`px-2 py-1 text-xs font-medium ${
+                recipe.difficulty === 'Nem' ? 'bg-green-100 text-green-800' :
+                recipe.difficulty === 'Mellem' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {recipe.difficulty}
               </span>
             )}
           </div>
+
+          {/* Categories */}
+          {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {recipe.dietaryCategories.slice(0, 2).map((category) => (
+                <span
+                  key={category}
+                  className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700"
+                >
+                  {category}
+                </span>
+              ))}
+              {recipe.dietaryCategories.length > 2 && (
+                <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600">
+                  +{recipe.dietaryCategories.length - 2}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </Link>
     </article>

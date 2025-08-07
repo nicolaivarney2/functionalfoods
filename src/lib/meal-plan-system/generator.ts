@@ -37,49 +37,61 @@ import {
   ingredientService 
 } from '../ingredient-system';
 
-// Import real recipe data
-import { sampleRecipes } from '../sample-data';
+// Import database service
+import { databaseService } from '../database-service';
 
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
 
   constructor() {
+    // Initialize recipes asynchronously
     this.initializeRealRecipes();
   }
 
   /**
-   * Initialize with real recipes from the existing database
+   * Initialize with real recipes from the database
    */
-  private initializeRealRecipes(): void {
-    // Convert sample recipes to the format expected by the meal plan system
-    this.recipes = sampleRecipes.map(recipe => ({
-      id: recipe.id,
-      title: recipe.title,
-      description: recipe.description,
-      ingredients: recipe.ingredients.map(ing => ({
-        ingredientId: ing.id,
-        amount: ing.amount,
-        unit: ing.unit
-      })),
-      instructions: recipe.instructions.map(inst => inst.instruction),
-      prepTime: recipe.preparationTime,
-      cookTime: recipe.cookingTime,
-      servings: recipe.servings,
-      categories: [this.mapCategory(recipe.mainCategory)],
-      dietaryApproaches: recipe.dietaryCategories.map(cat => cat.toLowerCase()),
-      nutritionalInfo: {
-        caloriesPer100g: recipe.calories,
-        proteinPer100g: recipe.protein,
-        carbsPer100g: recipe.carbs,
-        fatPer100g: recipe.fat
-      },
-      images: [recipe.imageUrl],
-      slug: recipe.slug,
-      isActive: true,
-      createdAt: recipe.publishedAt,
-      updatedAt: recipe.updatedAt
-    }));
+  private async initializeRealRecipes(): Promise<void> {
+    try {
+      // Get recipes from database
+      const dbRecipes = await databaseService.getRecipes();
+      
+      // Convert database recipes to the format expected by the meal plan system
+      this.recipes = dbRecipes.map(recipe => ({
+        id: recipe.id,
+        title: recipe.title,
+        description: recipe.description,
+        ingredients: recipe.ingredients?.map(ing => ({
+          ingredientId: ing.id || ing.name,
+          amount: ing.amount,
+          unit: ing.unit
+        })) || [],
+        instructions: recipe.instructions?.map(inst => inst.instruction) || [],
+        prepTime: recipe.preparationTime || 0,
+        cookTime: recipe.cookingTime || 0,
+        servings: recipe.servings || 4,
+        categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
+        dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
+        nutritionalInfo: {
+          caloriesPer100g: recipe.calories || 0,
+          proteinPer100g: recipe.protein || 0,
+          carbsPer100g: recipe.carbs || 0,
+          fatPer100g: recipe.fat || 0
+        },
+        images: [recipe.imageUrl || ''],
+        slug: recipe.slug || '',
+        isActive: true,
+        createdAt: recipe.publishedAt || new Date(),
+        updatedAt: recipe.updatedAt || new Date()
+      }));
+      
+      console.log(`Loaded ${this.recipes.length} recipes from database for meal planning`);
+    } catch (error) {
+      console.error('Error loading recipes from database:', error);
+      // Fallback to empty array if database fails
+      this.recipes = [];
+    }
   }
 
   /**
@@ -553,7 +565,7 @@ export class MealPlanGenerator {
 
       if (ingredient?.category === 'protein') {
         proteinItems.push(item);
-      } else if (ingredient?.category === 'vegetable') {
+      } else if (ingredient?.category === 'groent' || ingredient?.category === 'frugt') {
         vegetableItems.push(item);
       } else {
         otherItems.push(item);
@@ -592,9 +604,9 @@ export class MealPlanGenerator {
 
     const nutritionGoals: NutritionGoals = {
       targetCalories: config.targetCalories,
-      targetProtein: config.macroTargets.protein.target,
-      targetCarbs: config.macroTargets.carbohydrates.target,
-      targetFat: config.macroTargets.fat.target
+      targetProtein: config.macroTargets.protein,
+      targetCarbs: config.macroTargets.carbohydrates,
+      targetFat: config.macroTargets.fat
     };
 
     // Calculate deficiencies

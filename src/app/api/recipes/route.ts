@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getAllRecipesServer } from '@/lib/recipe-storage-server'
+import { databaseService } from '@/lib/database-service'
 
 export async function GET() {
   try {
-    const recipes = getAllRecipesServer()
+    const recipes = await databaseService.getRecipes()
     return NextResponse.json(recipes)
   } catch (error) {
     console.error('Error fetching recipes:', error)

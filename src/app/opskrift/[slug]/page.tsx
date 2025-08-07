@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Clock, Star, MessageCircle } from 'lucide-react'
-import { getRecipeBySlugServer, getAllRecipesServer } from '@/lib/recipe-storage-server'
+import { databaseService } from '@/lib/database-service'
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
@@ -15,9 +15,9 @@ interface RecipePageProps {
   }
 }
 
-export default function RecipePage({ params }: RecipePageProps) {
-  const recipe = getRecipeBySlugServer(params.slug)
-  const allRecipes = getAllRecipesServer()
+export default async function RecipePage({ params }: RecipePageProps) {
+  const allRecipes = await databaseService.getRecipes()
+  const recipe = allRecipes.find(r => r.slug === params.slug)
 
   if (!recipe) {
     return (
@@ -106,17 +106,23 @@ export default function RecipePage({ params }: RecipePageProps) {
             <div className="grid md:grid-cols-2 gap-8 items-start">
               {/* Recipe Image */}
               <div className="relative aspect-[4/3] rounded-lg overflow-hidden">
-                <Image
-                  src={recipe.imageUrl}
-                  alt={recipe.imageAlt}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  priority={true}
-                  placeholder="blur"
-                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                  quality={85}
-                />
+                {recipe.imageUrl ? (
+                  <Image
+                    src={recipe.imageUrl}
+                    alt={recipe.imageAlt || recipe.title}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority={true}
+                    placeholder="blur"
+                    blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+                    quality={85}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-500 text-sm">Intet billede</span>
+                  </div>
+                )}
               </div>
               
               {/* Recipe Description and Actions */}
@@ -124,7 +130,7 @@ export default function RecipePage({ params }: RecipePageProps) {
                 <div>
                   <p className="text-gray-700 leading-relaxed text-lg">
                     En skål fuld af smag, farver og skønne råvarer. Nem og hurtig aftensmad - og du kan skifte ud, 
-                    så du både får brugt rester og undgår madspild. Denne {recipe.dietaryCategories[0]} opskrift er 
+                    så du både får brugt rester og undgår madspild. Denne {recipe.dietaryCategories?.[0] || 'sunde'} opskrift er 
                     perfekt til at holde dig mæt og tilfreds, samtidig med at du følger en sund livsstil.
                   </p>
                 </div>
@@ -133,19 +139,21 @@ export default function RecipePage({ params }: RecipePageProps) {
                 <RecipeHeaderActions recipe={recipe} />
                 
                 {/* Recipe Tags */}
-                <div>
-                  <span className="text-sm text-gray-600">Denne opskrift egner sig til: </span>
-                  <div className="inline-flex flex-wrap gap-2 ml-2">
-                    {recipe.dietaryCategories.map((category) => (
-                      <span
-                        key={category}
-                        className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
-                      >
-                        {category}
-                      </span>
-                    ))}
+                {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 && (
+                  <div>
+                    <span className="text-sm text-gray-600">Denne opskrift egner sig til: </span>
+                    <div className="inline-flex flex-wrap gap-2 ml-2">
+                      {recipe.dietaryCategories.map((category) => (
+                        <span
+                          key={category}
+                          className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
+                        >
+                          {category}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Nutrition Facts Box - Moved up from client component */}
                 <div className="mt-6">

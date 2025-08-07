@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Search, Filter } from 'lucide-react'
 import { Metadata } from 'next'
 import { dietaryCategories } from '@/lib/sample-data'
-import { getRecipesByCategoryServer } from '@/lib/recipe-storage-server'
+import { databaseService } from '@/lib/database-service'
 import RecipeCard from '@/components/RecipeCard'
 import Script from 'next/script'
 
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   }
 }
 
-export default function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params }: CategoryPageProps) {
   const category = dietaryCategories.find(c => c.slug === params.category)
   
   if (!category) {
@@ -47,8 +47,13 @@ export default function CategoryPage({ params }: CategoryPageProps) {
     )
   }
 
-  // Filter recipes by this category
-  const categoryRecipes = getRecipesByCategoryServer(category.name)
+  // Get all recipes from database and filter by category
+  const allRecipes = await databaseService.getRecipes()
+  const categoryRecipes = allRecipes.filter(recipe => 
+    recipe.dietaryCategories?.some(cat => 
+      cat.toLowerCase() === category.name.toLowerCase()
+    )
+  )
 
   // Generate structured data for SEO
   const categoryStructuredData = {

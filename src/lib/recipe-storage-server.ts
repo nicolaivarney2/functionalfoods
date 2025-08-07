@@ -49,20 +49,8 @@ export function getAllRecipesServer(): Recipe[] {
 
 // Add imported recipes - SERVER ONLY
 export function addImportedRecipesServer(recipes: Recipe[]): void {
-  // Generate unique IDs for imported recipes
-  const recipesWithIds = recipes.map((recipe, index) => ({
-    ...recipe,
-    id: `imported-${Date.now()}-${index}`,
-    slug: recipe.slug || generateSlug(recipe.title)
-  }))
-  
-  importedRecipes = [...importedRecipes, ...recipesWithIds]
-  
-  // Save to file for persistence
-  saveImportedRecipes(importedRecipes)
-  
-  console.log(`Added ${recipesWithIds.length} imported recipes`)
-  console.log('Total recipes:', getAllRecipesServer().length)
+  // DISABLED: This function is no longer used - recipes are saved directly to database
+  console.log('addImportedRecipesServer is disabled - recipes are saved directly to database')
 }
 
 // Get recipe by slug - SERVER ONLY

@@ -1,5 +1,5 @@
-import { importRecipes, RawRecipeData } from './recipe-import'
-import { FridaIntegration } from './ingredient-system/frida-integration'
+import { importRecipes, importRecipesWithImages, RawRecipeData, convertKetolivToRawRecipeData } from './recipe-import'
+import { FridaDTUMatcher } from './frida-dtu-matcher'
 import { RecipeCalculator } from './recipe-calculator'
 import { ingredientService } from './ingredient-system'
 import { Recipe } from '@/types/recipe'
@@ -14,48 +14,86 @@ export interface ImportResult {
     processedIngredients: number
     recipesWithNutrition: number
     processingTime: number
+    imagesFetched: number
   }
 }
 
 export class ImportProcessor {
-  private fridaIntegration: FridaIntegration
+  private fridaDTUMatcher: FridaDTUMatcher
   private recipeCalculator: RecipeCalculator
 
   constructor() {
-    this.fridaIntegration = new FridaIntegration()
+    this.fridaDTUMatcher = new FridaDTUMatcher()
     this.recipeCalculator = new RecipeCalculator()
   }
 
   /**
-   * Process complete import of recipes with automatic ingredient tagging and nutritional calculation
+   * Process complete import of recipes with automatic ingredient tagging, nutritional calculation, and image fetching
    */
-  async processImport(rawRecipeData: RawRecipeData[]): Promise<ImportResult> {
+  async processImport(rawData: any[]): Promise<ImportResult> {
     const startTime = Date.now()
     
     console.log('🚀 Starting comprehensive recipe import...')
-    console.log(`📊 Processing ${rawRecipeData.length} recipes`)
+    console.log(`📊 Processing ${rawData.length} recipes`)
 
-    // Step 1: Import recipes
-    console.log('📝 Step 1: Importing recipes...')
-    const importedRecipes = importRecipes(rawRecipeData)
+    // Detect if this is Ketoliv format and convert if needed
+    let rawRecipeData: RawRecipeData[]
+    if (rawData.length > 0 && rawData[0].ingredients_flat) {
+      console.log('🔍 Detected Ketoliv format, converting...')
+      rawRecipeData = convertKetolivToRawRecipeData(rawData)
+    } else {
+      console.log('🔍 Using standard format')
+      rawRecipeData = rawData as RawRecipeData[]
+    }
+
+    // Step 1: Import recipes with image fetching
+    console.log('📝 Step 1: Importing recipes with image fetching...')
+    const importedRecipes = await importRecipesWithImages(rawRecipeData)
     
-    // Step 2: Extract and process ingredients
-    console.log('🏷️ Step 2: Extracting and processing ingredients...')
-    const processedIngredients = await this.fridaIntegration.processImportedIngredients(importedRecipes)
+    // Count successfully fetched images
+    const imagesFetched = importedRecipes.filter(recipe => 
+      recipe.imageUrl && !recipe.imageUrl.includes('recipe-placeholder.jpg')
+    ).length
     
-    // Step 3: Add ingredients to ingredient service
-    console.log('💾 Step 3: Adding ingredients to ingredient service...')
-    processedIngredients.forEach(ingredient => {
-      try {
-        ingredientService.createIngredientTag(ingredient)
-      } catch (error) {
-        console.warn(`Ingredient ${ingredient.name} already exists, skipping...`)
+    // Step 2: Calculate nutritional values using Frida DTU for all recipes
+    console.log('🧮 Step 2: Calculating nutritional values using Frida DTU...')
+    const recipesWithNutrition = importedRecipes.map(recipe => {
+      // Calculate nutrition using Frida DTU data
+      const fridaNutrition = this.fridaDTUMatcher.calculateRecipeNutrition(recipe.ingredients || [])
+      
+      return {
+        ...recipe,
+        calories: Math.round(fridaNutrition.calories),
+        protein: Math.round(fridaNutrition.protein * 10) / 10,
+        carbs: Math.round(fridaNutrition.carbs * 10) / 10,
+        fat: Math.round(fridaNutrition.fat * 10) / 10,
+        fiber: Math.round(fridaNutrition.fiber * 10) / 10,
+        nutritionalInfo: fridaNutrition
       }
     })
     
-    // Step 4: Calculate nutritional values for recipes
-    console.log('🧮 Step 4: Calculating nutritional values for recipes...')
-    const recipesWithNutrition = this.recipeCalculator.processImportedRecipes(importedRecipes)
+    // Step 3: Extract and process ingredients (simplified)
+    console.log('🏷️ Step 3: Extracting unique ingredients...')
+    const uniqueIngredients = new Set<string>()
+    recipesWithNutrition.forEach(recipe => {
+      recipe.ingredients?.forEach((ingredient: any) => {
+        uniqueIngredients.add(ingredient.name.toLowerCase())
+      })
+    })
+    
+    const processedIngredients: IngredientTag[] = Array.from(uniqueIngredients).map(name => ({
+      id: `${name}-${Date.now()}`,
+      name: name,
+      category: 'protein' as any, // Simplified for now
+      exclusions: [],
+      allergens: [],
+      commonNames: [name],
+      description: `${name} - importeret fra opskrifter`,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      nutritionalInfo: undefined
+    }))
     
     const processingTime = Date.now() - startTime
     
@@ -63,8 +101,9 @@ export class ImportProcessor {
       totalRecipes: importedRecipes.length,
       totalIngredients: processedIngredients.length,
       processedIngredients: processedIngredients.filter(ing => ing.nutritionalInfo).length,
-      recipesWithNutrition: recipesWithNutrition.filter(recipe => recipe.calories > 0).length,
-      processingTime
+      recipesWithNutrition: recipesWithNutrition.filter(recipe => (recipe.calories || 0) > 0).length,
+      processingTime,
+      imagesFetched
     }
 
     console.log('✅ Import completed successfully!')
@@ -80,8 +119,17 @@ export class ImportProcessor {
   /**
    * Process a single recipe import (for testing)
    */
-  async processSingleRecipe(rawRecipeData: RawRecipeData): Promise<Recipe> {
-    const importedRecipes = importRecipes([rawRecipeData])
+  async processSingleRecipe(rawRecipeData: any): Promise<Recipe> {
+    // Detect if this is Ketoliv format
+    let convertedData: RawRecipeData
+    if (rawRecipeData.ingredients_flat) {
+      const converted = convertKetolivToRawRecipeData([rawRecipeData])
+      convertedData = converted[0]
+    } else {
+      convertedData = rawRecipeData as RawRecipeData
+    }
+
+    const importedRecipes = await importRecipesWithImages([convertedData])
     const processedIngredients = await this.fridaIntegration.processImportedIngredients(importedRecipes)
     
     // Add ingredients to service

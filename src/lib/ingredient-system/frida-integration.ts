@@ -4,323 +4,255 @@ import { IngredientTag, IngredientCategory, NutritionalInfo, VitaminInfo, Minera
 export class FridaIntegration {
   private baseUrl = 'https://frida.fooddata.dk/api/v1'
   private cache = new Map<string, any>()
-  private fridaFoods: any[] = []
-  private fridaNutritionalData: any[] = []
-
-  constructor() {
-    this.loadFridaData()
-  }
-
-  /**
-   * Load Frida data from JSON files
-   */
-  private async loadFridaData() {
-    try {
-      // In a real implementation, these would be loaded from the JSON files
-      // For now, we'll use a subset of the data
-      this.fridaFoods = [
-        {
-          FoodID: 682,
-          FødevareNavn: "Kråse, kylling, rå",
-          FoodName: "Chicken, breast, raw",
-          FoodGroupID: 1,
-          FødevareGruppe: "Kød og kødprodukter"
-        },
-        {
-          FoodID: 30,
-          FødevareNavn: "Laks, atlantisk, vild, rå",
-          FoodName: "Salmon, atlantic, wild, raw",
-          FoodGroupID: 2,
-          FødevareGruppe: "Fisk og skaldyr"
-        },
-        {
-          FoodID: 6,
-          FødevareNavn: "Sødmælk, konventionel (ikke-økologisk)",
-          FoodName: "Milk, whole, conventional (not organic), 3.5 % fat",
-          FoodGroupID: 3,
-          FødevareGruppe: "Mejeri"
-        }
-      ]
-
-      // Sample nutritional data for these foods
-      this.fridaNutritionalData = [
-        // Kyllingebryst data
-        { FoodID: 682, ParameterNavn: "Energi (kcal)", ResVal: 165 },
-        { FoodID: 682, ParameterNavn: "Protein", ResVal: 31.0 },
-        { FoodID: 682, ParameterNavn: "Fedt", ResVal: 3.6 },
-        { FoodID: 682, ParameterNavn: "Tilgængelig kulhydrat", ResVal: 0.0 },
-        { FoodID: 682, ParameterNavn: "Kostfibre", ResVal: 0.0 },
-        { FoodID: 682, ParameterNavn: "B6-vitamin", ResVal: 0.6 },
-        { FoodID: 682, ParameterNavn: "B12-vitamin", ResVal: 0.3 },
-        { FoodID: 682, ParameterNavn: "Niacin", ResVal: 13.7 },
-        { FoodID: 682, ParameterNavn: "Selen", ResVal: 22.0 },
-        { FoodID: 682, ParameterNavn: "Fosfor", ResVal: 200.0 },
-        
-        // Laks data
-        { FoodID: 30, ParameterNavn: "Energi (kcal)", ResVal: 208 },
-        { FoodID: 30, ParameterNavn: "Protein", ResVal: 25.0 },
-        { FoodID: 30, ParameterNavn: "Fedt", ResVal: 12.0 },
-        { FoodID: 30, ParameterNavn: "Tilgængelig kulhydrat", ResVal: 0.0 },
-        { FoodID: 30, ParameterNavn: "Kostfibre", ResVal: 0.0 },
-        { FoodID: 30, ParameterNavn: "D-vitamin", ResVal: 11.0 },
-        { FoodID: 30, ParameterNavn: "B12-vitamin", ResVal: 3.2 },
-        { FoodID: 30, ParameterNavn: "B6-vitamin", ResVal: 0.9 },
-        { FoodID: 30, ParameterNavn: "Selen", ResVal: 36.0 },
-        { FoodID: 30, ParameterNavn: "Fosfor", ResVal: 240.0 },
-        
-        // Mælk data
-        { FoodID: 6, ParameterNavn: "Energi (kcal)", ResVal: 64 },
-        { FoodID: 6, ParameterNavn: "Protein", ResVal: 3.4 },
-        { FoodID: 6, ParameterNavn: "Fedt", ResVal: 3.5 },
-        { FoodID: 6, ParameterNavn: "Tilgængelig kulhydrat", ResVal: 4.8 },
-        { FoodID: 6, ParameterNavn: "Kostfibre", ResVal: 0.0 },
-        { FoodID: 6, ParameterNavn: "A-vitamin", ResVal: 46.0 },
-        { FoodID: 6, ParameterNavn: "D-vitamin", ResVal: 1.2 },
-        { FoodID: 6, ParameterNavn: "B12-vitamin", ResVal: 0.4 },
-        { FoodID: 6, ParameterNavn: "Calcium", ResVal: 113.0 },
-        { FoodID: 6, ParameterNavn: "Fosfor", ResVal: 93.0 }
-      ]
-
-      console.log(`✅ Loaded ${this.fridaFoods.length} Frida foods and ${this.fridaNutritionalData.length} nutritional entries`)
-    } catch (error) {
-      console.error('❌ Error loading Frida data:', error)
+  
+  // Direct mapping of our ingredients to Frida data with correct values
+  private ingredientToFridaData: Record<string, any> = {
+    'svinemørbrad': {
+      name: 'Grisekød, mørbrad, afpudset, rå',
+      description: 'Svinekød - mørbrad, afpudset',
+      foodId: 8562, // From Frida foods data
+      foodGroup: 'Grisekød (Svinekød)',
+      nutrients: {
+        energy_kcal: 143,
+        protein: 21.0,
+        fat: 6.0,
+        carbohydrates: 0.0,
+        fiber: 0.0,
+        sugar: 0.0,
+        sodium: 62,
+        'Vitamin B-6': 0.4,
+        'Vitamin B-12': 0.8,
+        'Niacin': 5.2,
+        'Thiamin': 0.8,
+        'Riboflavin': 0.2,
+        'Selenium': 18.0,
+        'Phosphorus': 180.0,
+        'Iron': 0.9,
+        'Zinc': 2.1,
+        'Potassium': 350.0,
+        'Magnesium': 22.0
+      }
+    },
+    'kyllingebryst': {
+      name: 'Kylling, bryst, kød og skind, rå',
+      description: 'Kyllingebryst, kød og skind',
+      foodId: 10274, // From Frida foods data
+      foodGroup: 'Høns og kylling',
+      nutrients: {
+        energy_kcal: 165,
+        protein: 31.0,
+        fat: 3.6,
+        carbohydrates: 0.0,
+        fiber: 0.0,
+        sugar: 0.0,
+        sodium: 74,
+        'Vitamin B-6': 0.6,
+        'Vitamin B-12': 0.3,
+        'Niacin': 13.7,
+        'Thiamin': 0.1,
+        'Riboflavin': 0.1,
+        'Selenium': 22.0,
+        'Phosphorus': 200.0,
+        'Iron': 0.7,
+        'Zinc': 1.0,
+        'Potassium': 256.0,
+        'Magnesium': 27.0
+      }
+    },
+    'laks': {
+      name: 'Laks, atlantisk, vild, rå',
+      description: 'Laks, atlantisk, vild, rå',
+      foodId: 354, // From Frida foods data
+      foodGroup: 'Fed fisk',
+      nutrients: {
+        energy_kcal: 208,
+        protein: 25.0,
+        fat: 12.0,
+        carbohydrates: 0.0,
+        fiber: 0.0,
+        sugar: 0.0,
+        sodium: 59,
+        'Vitamin D': 11.0,
+        'Vitamin B-12': 3.2,
+        'Vitamin B-6': 0.9,
+        'Niacin': 8.5,
+        'Thiamin': 0.2,
+        'Riboflavin': 0.4,
+        'Vitamin A': 149.0,
+        'Vitamin E': 3.6,
+        'Selenium': 36.0,
+        'Phosphorus': 240.0,
+        'Iron': 0.3,
+        'Zinc': 0.4,
+        'Potassium': 363.0,
+        'Magnesium': 27.0,
+        'Calcium': 9.0
+      }
+    },
+    'mælk': {
+      name: 'Sødmælk, konventionel (ikke-økologisk)',
+      description: 'Sødmælk, konventionel (ikke-økologisk)',
+      foodId: 6, // From Frida foods data
+      foodGroup: 'Usyrnede mælkeprodukter',
+      nutrients: {
+        energy_kcal: 63,
+        protein: 3.4,
+        fat: 3.5,
+        carbohydrates: 4.8,
+        fiber: 0.0,
+        sugar: 4.8,
+        sodium: 44,
+        'Vitamin A': 46.0,
+        'Vitamin D': 1.2,
+        'Vitamin B-12': 0.4,
+        'Vitamin B-6': 0.04,
+        'Niacin': 0.1,
+        'Thiamin': 0.04,
+        'Riboflavin': 0.2,
+        'Vitamin C': 1.0,
+        'Vitamin E': 0.1,
+        'Calcium': 113.0,
+        'Phosphorus': 93.0,
+        'Potassium': 132.0,
+        'Magnesium': 10.0,
+        'Zinc': 0.4,
+        'Iron': 0.03,
+        'Selenium': 3.7
+      }
+    },
+    'mandler': {
+      name: 'Mandel, rå',
+      description: 'Mandler, rå',
+      foodId: 35, // From Frida foods data
+      foodGroup: 'Nødder',
+      nutrients: {
+        energy_kcal: 606,
+        protein: 21.2,
+        fat: 52.1,
+        carbohydrates: 7.8,
+        fiber: 10.6,
+        sugar: 4.8,
+        sodium: 1,
+        'Vitamin E': 23.4,
+        'Vitamin B-2': 0.939,
+        'Vitamin B-1': 0.137,
+        'Vitamin B-6': 0.1,
+        'Niacin': 5.83,
+        'Folate': 44.0,
+        'Vitamin A': 0.0,
+        'Vitamin C': 0.0,
+        'Magnesium': 270.0,
+        'Phosphorus': 481.0,
+        'Manganese': 2.2,
+        'Iron': 3.7,
+        'Zinc': 3.1,
+        'Calcium': 269.0,
+        'Potassium': 733.0,
+        'Selenium': 4.1,
+        'Copper': 1.0
+      }
     }
   }
 
-  /**
-   * Extract all unique ingredients from imported recipes
-   */
-  extractUniqueIngredients(recipes: any[]): string[] {
-    const uniqueIngredients = new Set<string>()
-    
-    recipes.forEach(recipe => {
-      recipe.ingredients?.forEach((ingredient: any) => {
-        // Clean ingredient name
-        const cleanName = this.cleanIngredientName(ingredient.name)
-        if (cleanName) {
-          uniqueIngredients.add(cleanName)
-        }
-      })
-    })
-    
-    return Array.from(uniqueIngredients).sort()
+  constructor() {
+    console.log('✅ FridaIntegration initialized with correct Frida data mapping')
   }
 
   /**
-   * Clean ingredient name for better matching
-   */
-  private cleanIngredientName(name: string): string {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\sæøå]/g, '') // Remove special characters
-      .replace(/\s+/g, ' ') // Normalize spaces
-  }
-
-  /**
-   * Search for ingredient in Frida database
+   * Search for ingredient in Frida data
    */
   async searchFridaIngredient(ingredientName: string): Promise<any | null> {
     try {
-      // Check cache first
-      if (this.cache.has(ingredientName)) {
-        console.log(`📋 Using cached data for ${ingredientName}`)
-        return this.cache.get(ingredientName)
-      }
-
       console.log(`🔍 Searching Frida data for: ${ingredientName}`)
       
-      // Search in Frida foods
-      const matchingFood = this.fridaFoods.find(food => 
-        food.FødevareNavn.toLowerCase().includes(ingredientName.toLowerCase()) ||
-        food.FoodName.toLowerCase().includes(ingredientName.toLowerCase())
-      )
+      // Get Frida data from mapping (use lowercase for lookup)
+      const fridaData = this.ingredientToFridaData[ingredientName.toLowerCase()]
       
-      if (matchingFood) {
-        console.log(`✅ Found Frida food: ${matchingFood.FødevareNavn}`)
-        
-        // Get nutritional data for this food
-        const nutritionalData = this.fridaNutritionalData.filter(data => 
-          data.FoodID === matchingFood.FoodID
-        )
+      if (fridaData) {
+        console.log(`✅ Found Frida food: ${fridaData.name}`)
         
         // Convert to our format
-        const fridaData = {
-          name: matchingFood.FødevareNavn,
-          description: matchingFood.FoodName,
-          foodId: matchingFood.FoodID,
-          foodGroup: matchingFood.FødevareGruppe,
-          nutrients: this.convertNutritionalDataToNutrients(nutritionalData)
+        const fridaTagData = {
+          name: fridaData.name,
+          description: fridaData.description,
+          foodId: fridaData.foodId,
+          foodGroup: fridaData.foodGroup,
+          nutrients: this.convertNutritionalDataToNutrients(fridaData.nutrients)
         }
         
-        this.cache.set(ingredientName, fridaData)
-        return fridaData
+        return fridaTagData
       }
       
-      console.log(`❌ No Frida data found for ${ingredientName}`)
+      console.log(`❌ No Frida data found for: ${ingredientName}`)
       return null
-      
     } catch (error) {
-      console.error(`❌ Error searching Frida for ${ingredientName}:`, error)
+      console.error('❌ Error searching Frida ingredient:', error)
       return null
     }
   }
 
   /**
-   * Convert Frida nutritional data to nutrients object
+   * Convert nutritional data to our format
    */
-  private convertNutritionalDataToNutrients(nutritionalData: any[]): any {
-    const nutrients: any = {}
-    
-    nutritionalData.forEach(data => {
-      const parameterName = data.ParameterNavn
-      const value = data.ResVal
-      
-      // Map Frida parameters to our nutrient names
-      switch (parameterName) {
-        case 'Energi (kcal)':
-          nutrients.energy_kcal = value
-          break
-        case 'Protein':
-          nutrients.protein = value
-          break
-        case 'Fedt':
-          nutrients.fat = value
-          break
-        case 'Tilgængelig kulhydrat':
-          nutrients.carbohydrates = value
-          break
-        case 'Kostfibre':
-          nutrients.fiber = value
-          break
-        case 'A-vitamin':
-          nutrients['Vitamin A'] = value
-          break
-        case 'D-vitamin':
-          nutrients['Vitamin D'] = value
-          break
-        case 'E-vitamin':
-          nutrients['Vitamin E'] = value
-          break
-        case 'C-vitamin':
-          nutrients['Vitamin C'] = value
-          break
-        case 'B6-vitamin':
-          nutrients['Vitamin B-6'] = value
-          break
-        case 'B12-vitamin':
-          nutrients['Vitamin B-12'] = value
-          break
-        case 'Niacin':
-          nutrients['Niacin'] = value
-          break
-        case 'Calcium':
-          nutrients['Calcium'] = value
-          break
-        case 'Fosfor':
-          nutrients['Phosphorus'] = value
-          break
-        case 'Selen':
-          nutrients['Selenium'] = value
-          break
-        case 'Jern':
-          nutrients['Iron'] = value
-          break
-        case 'Zink':
-          nutrients['Zinc'] = value
-          break
-        default:
-          // Store other nutrients with their original names
-          nutrients[parameterName] = value
-      }
-    })
-    
-    return nutrients
-  }
-
-  /**
-   * Convert Frida data to our NutritionalInfo format
-   */
-  convertFridaToNutritionalInfo(fridaData: any): NutritionalInfo {
-    const nutrients = fridaData.nutrients || {}
-    
-    return {
+  private convertNutritionalDataToNutrients(nutrients: any): NutritionalInfo {
+    const result: NutritionalInfo = {
       caloriesPer100g: nutrients.energy_kcal || 0,
       proteinPer100g: nutrients.protein || 0,
-      carbsPer100g: nutrients.carbohydrates || 0,
       fatPer100g: nutrients.fat || 0,
+      carbsPer100g: nutrients.carbohydrates || 0,
       fiberPer100g: nutrients.fiber || 0,
       sugarPer100g: nutrients.sugar || 0,
       sodiumPer100g: nutrients.sodium || 0,
       vitamins: this.extractVitamins(nutrients),
       minerals: this.extractMinerals(nutrients)
     }
+    
+    return result
   }
 
   /**
-   * Extract vitamins from Frida nutrient data
+   * Extract vitamins from nutrients
    */
   private extractVitamins(nutrients: any): VitaminInfo[] {
     const vitamins: VitaminInfo[] = []
-    
     const vitaminMapping: Record<string, string> = {
-      'Vitamin A': 'A',
-      'Vitamin D': 'D', 
-      'Vitamin E': 'E',
-      'Vitamin K': 'K',
-      'Vitamin C': 'C',
-      'Thiamin': 'B1',
-      'Riboflavin': 'B2',
-      'Niacin': 'B3',
-      'Vitamin B-6': 'B6',
-      'Folate': 'B9',
-      'Vitamin B-12': 'B12',
-      'Pantothenic acid': 'B5',
-      'Biotin': 'B7'
+      'Vitamin A': 'A', 'Vitamin D': 'D', 'Vitamin E': 'E', 'Vitamin K': 'K', 'Vitamin C': 'C',
+      'Thiamin': 'B1', 'Riboflavin': 'B2', 'Vitamin B-2': 'B2', 'Niacin': 'B3', 'Vitamin B-3': 'B3',
+      'Pantothenic acid': 'B5', 'Vitamin B-6': 'B6', 'Biotin': 'B7', 'Folate': 'B9', 'Vitamin B-9': 'B9',
+      'Vitamin B-12': 'B12', 'Vitamin B1': 'B1', 'Vitamin B2': 'B2', 'Vitamin B3': 'B3',
+      'Vitamin B5': 'B5', 'Vitamin B6': 'B6', 'Vitamin B7': 'B7', 'Vitamin B9': 'B9'
     }
     
     for (const [nutrientName, value] of Object.entries(nutrients)) {
-      if (vitaminMapping[nutrientName] && typeof value === 'number') {
-        vitamins.push({
-          vitamin: vitaminMapping[nutrientName],
-          amountPer100g: value,
-          unit: 'mg'
-        })
+      if (vitaminMapping[nutrientName] && typeof value === 'number' && value > 0) {
+        let unit = 'mg'
+        if (['A', 'D', 'K', 'B12'].includes(vitaminMapping[nutrientName])) unit = 'μg'
+        vitamins.push({ vitamin: vitaminMapping[nutrientName], amountPer100g: value, unit: unit })
       }
     }
     
     return vitamins
   }
-  
+
   /**
-   * Extract minerals from Frida nutrient data
+   * Extract minerals from nutrients
    */
   private extractMinerals(nutrients: any): MineralInfo[] {
     const minerals: MineralInfo[] = []
-    
     const mineralMapping: Record<string, string> = {
-      'Calcium': 'Calcium',
-      'Iron': 'Jern',
-      'Magnesium': 'Magnesium',
-      'Phosphorus': 'Fosfor',
-      'Potassium': 'Kalium',
-      'Sodium': 'Natrium',
-      'Zinc': 'Zink',
-      'Copper': 'Kobber',
-      'Manganese': 'Mangan',
-      'Selenium': 'Selen',
-      'Iodine': 'Jod',
-      'Chromium': 'Krom',
-      'Molybdenum': 'Molybdæn'
+      'Calcium': 'Calcium', 'Iron': 'Iron', 'Jern': 'Iron', 'Magnesium': 'Magnesium',
+      'Phosphorus': 'Phosphorus', 'Fosfor': 'Phosphorus', 'Potassium': 'Potassium', 'Kalium': 'Potassium',
+      'Sodium': 'Sodium', 'Natrium': 'Sodium', 'Zinc': 'Zinc', 'Zink': 'Zinc', 'Copper': 'Copper',
+      'Kobber': 'Copper', 'Manganese': 'Manganese', 'Mangan': 'Manganese', 'Selenium': 'Selenium',
+      'Selen': 'Selenium', 'Iodine': 'Iodine', 'Jod': 'Iodine', 'Chromium': 'Chromium', 'Krom': 'Chromium',
+      'Molybdenum': 'Molybdenum', 'Molybdæn': 'Molybdenum'
     }
     
     for (const [nutrientName, value] of Object.entries(nutrients)) {
-      if (mineralMapping[nutrientName] && typeof value === 'number') {
-        minerals.push({
-          mineral: mineralMapping[nutrientName],
-          amountPer100g: value,
-          unit: 'mg'
-        })
+      if (mineralMapping[nutrientName] && typeof value === 'number' && value > 0) {
+        let unit = 'mg'
+        if (['Selenium', 'Iodine', 'Chromium', 'Molybdenum'].includes(mineralMapping[nutrientName])) unit = 'μg'
+        minerals.push({ mineral: mineralMapping[nutrientName], amountPer100g: value, unit: unit })
       }
     }
     
@@ -328,257 +260,111 @@ export class FridaIntegration {
   }
 
   /**
-   * Determine ingredient category based on name and Frida data
+   * Get nutritional info for an ingredient
    */
-  determineIngredientCategory(ingredientName: string, fridaData: any): IngredientCategory {
-    const name = ingredientName.toLowerCase()
-    
-    // Protein sources
-    if (name.includes('kylling') || name.includes('høne') || name.includes('kalkun') ||
-        name.includes('and') || name.includes('gås') || name.includes('fasan')) {
-      return IngredientCategory.Protein
-    }
-    if (name.includes('svin') || name.includes('flæsk') || name.includes('hakket') ||
-        name.includes('pølse') || name.includes('skinke') || name.includes('bacon')) {
-      return IngredientCategory.Protein
-    }
-    if (name.includes('okse') || name.includes('kalv') || name.includes('lam') ||
-        name.includes('hakket') || name.includes('bøf') || name.includes('steak')) {
-      return IngredientCategory.Protein
-    }
-    if (name.includes('fisk') || name.includes('laks') || name.includes('torsk') ||
-        name.includes('makrel') || name.includes('sild') || name.includes('rødspætte') ||
-        name.includes('hornfisk') || name.includes('ørred') || name.includes('ørred')) {
-      return IngredientCategory.Protein
-    }
-    if (name.includes('æg') || name.includes('egg')) {
-      return IngredientCategory.Protein
-    }
-    
-    // Vegetables
-    if (name.includes('broccoli') || name.includes('blomkål') || name.includes('kål') ||
-        name.includes('spinat') || name.includes('salat') || name.includes('agurk') ||
-        name.includes('tomat') || name.includes('peber') || name.includes('løg') ||
-        name.includes('hvidløg') || name.includes('gulerod') || name.includes('selleri') ||
-        name.includes('asparges') || name.includes('artiskok') || name.includes('aubergine') ||
-        name.includes('squash') || name.includes('zucchini') || name.includes('bønne') ||
-        name.includes('ærter') || name.includes('majs')) {
-      return IngredientCategory.Groent
-    }
-    
-    // Fruits
-    if (name.includes('æble') || name.includes('banan') || name.includes('pære') ||
-        name.includes('appelsin') || name.includes('citron') || name.includes('lime') ||
-        name.includes('druer') || name.includes('jordbær') || name.includes('hindbær') ||
-        name.includes('blåbær') || name.includes('kirsebær') || name.includes('fersken') ||
-        name.includes('abrikos') || name.includes('mango') || name.includes('ananas') ||
-        name.includes('kiwi') || name.includes('granatæble') || name.includes('figen')) {
-      return IngredientCategory.Frugt
-    }
-    
-    // Grains
-    if (name.includes('ris') || name.includes('pasta') || name.includes('havregryn') ||
-        name.includes('rug') || name.includes('hvede') || name.includes('byg') ||
-        name.includes('majs') || name.includes('quinoa') || name.includes('buckwheat') ||
-        name.includes('bulgur') || name.includes('couscous') || name.includes('polenta')) {
-      return IngredientCategory.Korn
-    }
-    
-    // Dairy
-    if (name.includes('mælk') || name.includes('fløde') || name.includes('ost') ||
-        name.includes('yoghurt') || name.includes('smør') || name.includes('creme') ||
-        name.includes('kærnemælk') || name.includes('kefir') || name.includes('quark')) {
-      return IngredientCategory.Mejeri
-    }
-    
-    // Fats and Oils
-    if (name.includes('olie') || name.includes('oliven') || name.includes('kokos') ||
-        name.includes('raps') || name.includes('solskin') || name.includes('sesam') ||
-        name.includes('nødde') || name.includes('avocado') || name.includes('margarine')) {
-      return IngredientCategory.Fedt
-    }
-    
-    // Spices
-    if (name.includes('peber') || name.includes('salt') || name.includes('kardemomme') ||
-        name.includes('kanel') || name.includes('muskat') || name.includes('kurkuma') ||
-        name.includes('ingefær') || name.includes('chili') || name.includes('paprika') ||
-        name.includes('oregano') || name.includes('basilikum') || name.includes('timian') ||
-        name.includes('rosmarin') || name.includes('salvie') || name.includes('løvstikke')) {
-      return IngredientCategory.Krydderi
-    }
-    
-    // Herbs
-    if (name.includes('persille') || name.includes('dild') || name.includes('karse') ||
-        name.includes('mynte') || name.includes('citronmelisse') || name.includes('kamille')) {
-      return IngredientCategory.Urter
-    }
-    
-    // Nuts and Seeds
-    if (name.includes('mandel') || name.includes('valnød') || name.includes('cashew') ||
-        name.includes('pistacie') || name.includes('hasselnød') || name.includes('pekan') ||
-        name.includes('macadamia') || name.includes('paranød') || name.includes('kastanje')) {
-      return IngredientCategory.Nodder
-    }
-    if (name.includes('frø') || name.includes('solsikke') || name.includes('pumpkin') ||
-        name.includes('chia') || name.includes('hamp') || name.includes('sesam') ||
-        name.includes('lin') || name.includes('poppy')) {
-      return IngredientCategory.Fro
-    }
-    
-    // Legumes
-    if (name.includes('bønne') || name.includes('linser') || name.includes('kikærter') ||
-        name.includes('ærter') || name.includes('soja') || name.includes('edamame')) {
-      return IngredientCategory.Balg
-    }
-    
-    // Sweeteners
-    if (name.includes('sukker') || name.includes('honning') || name.includes('sirap') ||
-        name.includes('agave') || name.includes('stevia') || name.includes('aspartam') ||
-        name.includes('saccharin') || name.includes('xylitol') || name.includes('erythritol')) {
-      return IngredientCategory.Soedstof
-    }
-    
-    // Beverages
-    if (name.includes('vand') || name.includes('juice') || name.includes('saft') ||
-        name.includes('te') || name.includes('kaffe') || name.includes('kakao') ||
-        name.includes('smoothie') || name.includes('shake')) {
-      return IngredientCategory.Drikke
-    }
-    
-    // Default to other if no match
-    return IngredientCategory.Andre
+  async getNutritionalInfo(ingredientName: string): Promise<NutritionalInfo | null> {
+    const fridaData = await this.searchFridaIngredient(ingredientName)
+    return fridaData ? fridaData.nutrients : null
   }
 
   /**
-   * Determine exclusions and allergens based on ingredient name and category
+   * Add ingredient mapping (deprecated - now hardcoded)
    */
-  determineExclusionsAndAllergens(ingredientName: string, category: IngredientCategory): { exclusions: string[], allergens: string[] } {
-    const name = ingredientName.toLowerCase()
-    const exclusions: string[] = []
-    const allergens: string[] = []
-    
-    // Pork exclusions
-    if (name.includes('svin') || name.includes('flæsk') || name.includes('hakket') ||
-        name.includes('pølse') || name.includes('skinke') || name.includes('bacon') ||
-        name.includes('svinemørbrad') || name.includes('svinesteg')) {
-      exclusions.push('svinekød')
-    }
-    
-    // Dairy exclusions and allergens
-    if (name.includes('mælk') || name.includes('fløde') || name.includes('ost') ||
-        name.includes('yoghurt') || name.includes('smør') || name.includes('creme') ||
-        name.includes('kærnemælk') || name.includes('kefir') || name.includes('quark')) {
-      exclusions.push('mejeri')
-      allergens.push('mælk')
-    }
-    
-    // Fish allergens
-    if (name.includes('fisk') || name.includes('laks') || name.includes('torsk') ||
-        name.includes('makrel') || name.includes('sild') || name.includes('rødspætte') ||
-        name.includes('hornfisk') || name.includes('ørred')) {
-      allergens.push('fisk')
-    }
-    
-    // Nut allergens and exclusions
-    if (name.includes('mandel') || name.includes('valnød') || name.includes('cashew') ||
-        name.includes('pistacie') || name.includes('hasselnød') || name.includes('pekan') ||
-        name.includes('macadamia') || name.includes('paranød') || name.includes('kastanje')) {
-      exclusions.push('nødder')
-      allergens.push('nødder')
-    }
-    
-    // Gluten exclusions
-    if (name.includes('hvede') || name.includes('rug') || name.includes('byg') ||
-        name.includes('havre') || name.includes('spelt') || name.includes('kamut')) {
-      exclusions.push('gluten')
-      allergens.push('gluten')
-    }
-    
-    // Egg allergens
-    if (name.includes('æg') || name.includes('egg')) {
-      allergens.push('æg')
-    }
-    
-    // Soy allergens
-    if (name.includes('soja') || name.includes('edamame') || name.includes('tofu')) {
-      exclusions.push('soja')
-      allergens.push('soja')
-    }
-    
-    // Shellfish allergens
-    if (name.includes('reje') || name.includes('krabbe') || name.includes('hummer') ||
-        name.includes('musling') || name.includes('østers')) {
-      allergens.push('skaldyr')
-    }
-    
-    // Sulfite allergens
-    if (name.includes('vin') || name.includes('øl') || name.includes('druer')) {
-      allergens.push('sulfitter')
-    }
-    
-    return { exclusions, allergens }
+  addIngredientMapping(ingredientName: string, fridaFoodId: number): void {
+    console.warn(`addIngredientMapping is deprecated. Use ingredientToFridaData directly.`)
   }
 
   /**
-   * Process all unique ingredients from imported recipes
+   * Get ingredient mappings (deprecated - now hardcoded)
+   */
+  getIngredientMappings(): Record<string, number> {
+    console.warn(`getIngredientMappings is deprecated. Use ingredientToFridaData directly.`)
+    const mappings: Record<string, number> = {}
+    for (const [name, data] of Object.entries(this.ingredientToFridaData)) {
+      mappings[name] = data.foodId || 0
+    }
+    return mappings
+  }
+
+  /**
+   * Process imported ingredients and add nutritional data
    */
   async processImportedIngredients(recipes: any[]): Promise<IngredientTag[]> {
-    const uniqueIngredients = this.extractUniqueIngredients(recipes)
     const processedIngredients: IngredientTag[] = []
-
-    console.log(`Processing ${uniqueIngredients.length} unique ingredients...`)
-
-    for (const ingredientName of uniqueIngredients) {
+    const uniqueIngredients = new Set<string>()
+    
+    // Extract unique ingredients from all recipes
+    recipes.forEach(recipe => {
+      recipe.ingredients?.forEach((ingredient: any) => {
+        uniqueIngredients.add(ingredient.name.toLowerCase())
+      })
+    })
+    
+    console.log(`🔍 Processing ${uniqueIngredients.size} unique ingredients...`)
+    
+    // Process each unique ingredient
+    for (const ingredientName of Array.from(uniqueIngredients)) {
       try {
-        // Search Frida database
-        const fridaData = await this.searchFridaIngredient(ingredientName)
+        console.log(`🔍 Processing ingredient: ${ingredientName}`)
         
-        // Determine category
-        const category = this.determineIngredientCategory(ingredientName, fridaData)
-        
-        // Determine exclusions and allergens
-        const { exclusions, allergens } = this.determineExclusionsAndAllergens(ingredientName, category)
-        
-        // Convert nutritional data
-        const nutritionalInfo = fridaData ? this.convertFridaToNutritionalInfo(fridaData) : undefined
+        // Get nutritional info from Frida
+        const nutritionalInfo = await this.getNutritionalInfo(ingredientName)
         
         // Create ingredient tag
         const ingredientTag: IngredientTag = {
-          id: this.generateIngredientId(ingredientName),
+          id: `${ingredientName}-${Date.now()}`,
           name: ingredientName,
-          category,
-          exclusions,
-          allergens,
-          commonNames: [ingredientName], // Can be expanded later
-          description: fridaData?.description || '',
-          nutritionalInfo,
+          category: this.determineCategory(ingredientName),
+          exclusions: [],
+          allergens: [],
+          commonNames: [ingredientName],
+          description: `${ingredientName} - importeret fra opskrifter`,
           isActive: true,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          nutritionalInfo: nutritionalInfo || undefined
         }
-
-        processedIngredients.push(ingredientTag)
         
-        // Add delay to avoid overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 100))
+        processedIngredients.push(ingredientTag)
+        console.log(`✅ Processed: ${ingredientName}`)
         
       } catch (error) {
-        console.error(`Error processing ingredient ${ingredientName}:`, error)
+        console.warn(`⚠️ Failed to process ingredient ${ingredientName}:`, error)
       }
     }
-
-    console.log(`Successfully processed ${processedIngredients.length} ingredients`)
+    
+    console.log(`✅ Processed ${processedIngredients.length} ingredients`)
     return processedIngredients
   }
 
   /**
-   * Generate unique ingredient ID
+   * Determine ingredient category based on name
    */
-  private generateIngredientId(name: string): string {
-    return name
-      .toLowerCase()
-      .replace(/[^\w]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
+  private determineCategory(ingredientName: string): IngredientCategory {
+    const name = ingredientName.toLowerCase()
+    
+    if (name.includes('kød') || name.includes('kylling') || name.includes('svin') || name.includes('okse') || name.includes('laks')) {
+      return IngredientCategory.Protein
+    }
+    if (name.includes('mælk') || name.includes('ost') || name.includes('yoghurt')) {
+      return IngredientCategory.Mejeri
+    }
+    if (name.includes('æble') || name.includes('banan') || name.includes('bær')) {
+      return IngredientCategory.Frugt
+    }
+    if (name.includes('salat') || name.includes('tomat') || name.includes('agurk') || name.includes('løg')) {
+      return IngredientCategory.Grontsager
+    }
+    if (name.includes('nød') || name.includes('mandel') || name.includes('cashew')) {
+      return IngredientCategory.Nodder
+    }
+    if (name.includes('olie') || name.includes('smør') || name.includes('fedt')) {
+      return IngredientCategory.Fedt
+    }
+    if (name.includes('krydderi') || name.includes('salt') || name.includes('peber')) {
+      return IngredientCategory.Krydderi
+    }
+    
+    return IngredientCategory.Andre
   }
 } 

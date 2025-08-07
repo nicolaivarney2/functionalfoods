@@ -92,13 +92,19 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
               <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 {/* Recipe Image */}
                 <div className="relative aspect-[4/3]">
-                  <Image
-                    src={recipe.imageUrl}
-                    alt={recipe.imageAlt}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
+                  {recipe.imageUrl ? (
+                    <Image
+                      src={recipe.imageUrl}
+                      alt={recipe.imageAlt || recipe.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                      <span className="text-gray-500 text-sm">Intet billede</span>
+                    </div>
+                  )}
                   
                   {/* Action Icons Overlay */}
                   <div className="absolute top-3 right-3 flex space-x-2">
@@ -128,7 +134,7 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-500">
-                      {recipe.preparationTime + recipe.cookingTime} MIN
+                      {((recipe.preparationTime || 0) + (recipe.cookingTime || 0))} MIN
                     </span>
                     <div className="flex items-center space-x-1">
                       {[...Array(5)].map((_, i) => (
@@ -146,9 +152,11 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
                     {recipe.title}
                   </h3>
                   
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {recipe.shortDescription}
-                  </p>
+                  {recipe.shortDescription && (
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {recipe.shortDescription}
+                    </p>
+                  )}
                 </div>
               </div>
             </Link>

@@ -1,15 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, BarChart3 } from 'lucide-react'
+import { Upload, FileText, CheckCircle, AlertCircle, Loader2, BarChart3, Database } from 'lucide-react'
 import { ImportProcessor } from '@/lib/import-processor'
 import { RawRecipeData } from '@/lib/recipe-import'
+import { databaseService } from '@/lib/database-service'
+import { ingredientMatcher } from '@/lib/ingredient-matcher'
 
 export default function ImportPage() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<any>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<string | null>(null)
+  const [dbStats, setDbStats] = useState<any>(null)
 
   const importProcessor = new ImportProcessor()
 
@@ -20,12 +25,15 @@ export default function ImportPage() {
     setIsProcessing(true)
     setError(null)
     setImportResult(null)
+    setSaveStatus(null)
 
     try {
       const text = await file.text()
-      const rawData: RawRecipeData[] = JSON.parse(text)
+      const rawData = JSON.parse(text)
 
       console.log('📁 Processing uploaded file...')
+      console.log('🔍 Detected format:', rawData.length > 0 && rawData[0].ingredients_flat ? 'Ketoliv' : 'Standard')
+      
       const result = await importProcessor.processImport(rawData)
 
       setImportResult(result)
@@ -37,6 +45,56 @@ export default function ImportPage() {
       setError(err instanceof Error ? err.message : 'Import failed')
     } finally {
       setIsProcessing(false)
+    }
+  }
+
+  const handleSaveRecipes = async () => {
+    if (!importResult) return
+
+    setIsSaving(true)
+    setSaveStatus('Initialiserer ingredient matcher...')
+
+    try {
+      // Initialize ingredient matcher
+      await ingredientMatcher.initialize()
+      
+      setSaveStatus('Behandler ingredienser for duplikater...')
+      
+      // Process ingredients to remove duplicates
+      const { newIngredients, matchedIngredients, skippedCount } = await ingredientMatcher.processIngredients(importResult.ingredients)
+      
+      console.log('🔍 Ingredient matching results:')
+      console.log(`  - Total ingredients: ${importResult.ingredients.length}`)
+      console.log(`  - New ingredients: ${newIngredients.length}`)
+      console.log(`  - Skipped duplicates: ${skippedCount}`)
+      
+      setSaveStatus(`Gemmer ${importResult.recipes.length} opskrifter og ${newIngredients.length} nye ingredienser...`)
+
+      // Save recipes and only new ingredients to database
+      const recipesSaved = await databaseService.saveRecipes(importResult.recipes)
+      const ingredientsSaved = newIngredients.length > 0 ? await databaseService.saveIngredients(newIngredients) : true
+      
+      if (recipesSaved && ingredientsSaved) {
+        setSaveStatus(`✅ Opskrifter gemt succesfuldt! ${skippedCount} duplikater undgået.`)
+        
+        // Get updated database stats
+        const newDbStats = await databaseService.getDatabaseStats()
+        setDbStats(newDbStats)
+        
+        // Clear the import result after successful save
+        setTimeout(() => {
+          setImportResult(null)
+          setSaveStatus(null)
+        }, 3000)
+      } else {
+        setSaveStatus('❌ Fejl ved gemning til database')
+      }
+      
+    } catch (err) {
+      console.error('❌ Save failed:', err)
+      setSaveStatus('❌ Fejl ved gemning af opskrifter')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -140,6 +198,27 @@ export default function ImportPage() {
     }
   }
 
+  const handleCheckDatabase = async () => {
+    try {
+      // First test connection
+      const connectionOk = await databaseService.testConnection()
+      if (!connectionOk) {
+        console.error('❌ Database connection failed')
+        return
+      }
+      
+      const structure = await databaseService.checkDatabaseStructure()
+      const stats = await databaseService.getDatabaseStats()
+      setDbStats(stats)
+      
+      console.log('📊 Database structure:', structure)
+      console.log('📈 Database stats:', stats)
+      
+    } catch (error) {
+      console.error('❌ Error checking database:', error)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -150,13 +229,20 @@ export default function ImportPage() {
               <h1 className="text-2xl font-bold text-gray-900">Recipe Import</h1>
               <p className="text-gray-600">Import recipes with automatic ingredient tagging and nutritional calculation</p>
             </div>
+            <button
+              onClick={handleCheckDatabase}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+            >
+              <Database size={16} />
+              <span>Check Database</span>
+            </button>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container">
+      <div className="container">
           <nav className="flex space-x-8">
             <a href="/admin" className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300">
               Dashboard
@@ -230,6 +316,34 @@ export default function ImportPage() {
           </div>
         )}
 
+        {/* Database Stats */}
+        {dbStats && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Database Status</h2>
+              <button
+                onClick={handleCheckDatabase}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+              >
+                <Database size={16} />
+                <span>Check Database</span>
+              </button>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-blue-600">Recipes in Database</p>
+                <p className="text-2xl font-bold text-blue-900">{dbStats.recipeCount}</p>
+              </div>
+              
+              <div className="bg-green-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-green-600">Ingredients in Database</p>
+                <p className="text-2xl font-bold text-green-900">{dbStats.ingredientCount}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Import Section */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Recipes</h2>
@@ -282,12 +396,92 @@ export default function ImportPage() {
           </div>
         </div>
 
+        {/* Save buttons */}
+        <div className="flex space-x-4 mt-6">
+          <button
+            onClick={handleSaveRecipes}
+            disabled={!importResult || isSaving}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-save">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17,21 17,13 7,13 7,21"/>
+              <polyline points="7,3 7,8 15,8"/>
+            </svg>
+            <span>Gem Opskrifter</span>
+          </button>
+          
+          <button
+            onClick={async () => {
+              if (!importResult) return
+              setIsSaving(true)
+              setSaveStatus('Gemmer kun opskrifter...')
+              try {
+                const recipesSaved = await databaseService.saveRecipes(importResult.recipes)
+                if (recipesSaved) {
+                  setSaveStatus('✅ Kun opskrifter gemt succesfuldt!')
+                  const newDbStats = await databaseService.getDatabaseStats()
+                  setDbStats(newDbStats)
+                  setTimeout(() => { setSaveStatus(null); }, 3000)
+                } else {
+                  setSaveStatus('❌ Fejl ved gemning af opskrifter')
+                }
+              } catch (err) {
+                console.error('❌ Save failed:', err)
+                setSaveStatus('❌ Fejl ved gemning af opskrifter')
+              } finally {
+                setIsSaving(false)
+              }
+            }}
+            disabled={!importResult || isSaving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" x2="8" y1="13" y2="13"/>
+              <line x1="16" x2="8" y1="17" y2="17"/>
+              <line x1="10" x2="8" y1="9" y2="9"/>
+            </svg>
+            <span>Gem Kun Opskrifter</span>
+          </button>
+        </div>
+
         {/* Import Results */}
         {importResult && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Import Results</h2>
-            
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Import Results</h2>
+              <button
+                onClick={handleSaveRecipes}
+                disabled={isSaving}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center space-x-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>Gemmer...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={16} />
+                    <span>Gem Opskrifter</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {saveStatus && (
+              <div className={`mb-4 p-3 rounded-lg ${
+                saveStatus.includes('✅') ? 'bg-green-50 text-green-800' : 
+                saveStatus.includes('❌') ? 'bg-red-50 text-red-800' : 
+                'bg-blue-50 text-blue-800'
+              }`}>
+                {saveStatus}
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-blue-600">Total Recipes</p>
                 <p className="text-2xl font-bold text-blue-900">{importResult.stats.totalRecipes}</p>
@@ -296,12 +490,17 @@ export default function ImportPage() {
               <div className="bg-green-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-green-600">Total Ingredients</p>
                 <p className="text-2xl font-bold text-green-900">{importResult.stats.totalIngredients}</p>
-              </div>
+                </div>
               
               <div className="bg-purple-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-purple-600">With Nutritional Data</p>
                 <p className="text-2xl font-bold text-purple-900">{importResult.stats.processedIngredients}</p>
-              </div>
+                </div>
+              
+              <div className="bg-yellow-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-yellow-600">Images Fetched</p>
+                <p className="text-2xl font-bold text-yellow-900">{importResult.stats.imagesFetched || 0}</p>
+                </div>
               
               <div className="bg-orange-50 p-4 rounded-lg">
                 <p className="text-sm font-medium text-orange-600">Processing Time</p>

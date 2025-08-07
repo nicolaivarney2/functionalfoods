@@ -1,0 +1,27 @@
+# Task ID: 4
+# Title: Complete 6-Week Meal Plan Wizard Flow
+# Status: pending
+# Dependencies: None
+# Priority: medium
+# Description: Finalize the user profile collection wizard for the 6-week meal plan system, including dietary approach selection and preferences.
+# Details:
+1. Design a multi-step form wizard using a state machine approach
+2. Implement form validation for each step
+3. Create UI components for dietary approach selection (7 approaches)
+4. Develop preference collection for allergies, dislikes, and cooking time
+5. Implement a progress indicator for the wizard
+6. Add persistence to allow users to continue later
+7. Create a summary review step before final submission
+8. Implement responsive design for all device sizes
+9. Add animations for transitions between steps
+10. Ensure accessibility compliance throughout the wizard
+
+Technologies: XState v4.x for state management, React Hook Form v7.x for validation, Framer Motion v10.x for animations, Zod v3.x for schema validation
+
+# Test Strategy:
+1. Test form validation with various inputs
+2. Verify state transitions in the wizard flow
+3. Test persistence across page refreshes
+4. Conduct usability testing with real users
+5. Verify accessibility with automated tools and manual testing
+6. Test responsive design across device sizes
