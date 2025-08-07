@@ -1,3 +1,6 @@
+node_modules
+node_modules
+
 # Dependencies
 node_modules
 /.pnp
@@ -36,13 +39,10 @@ next-env.d.ts
 logs
 *.log
 dev-debug.log
-
 # Dependency directories
 node_modules/
-
 # Environment variables
 .env
-
 # Editor directories and files
 .idea
 .vscode
@@ -51,7 +51,6 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
-
 # OS specific
 
 # Task files
@@ -63,4 +62,4 @@ frida-nutritional-data.json
 frida-data.json
 Frida_Dataset_May2025.*
 *.xlsx
-*.ods
+*.ods 
