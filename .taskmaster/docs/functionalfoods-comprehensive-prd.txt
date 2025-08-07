@@ -1,0 +1,189 @@
+# FunctionalFoods - Comprehensive Product Requirements Document
+
+## Project Overview
+FunctionalFoods is a Danish recipe platform focused on functional foods and dietary approaches. The platform provides personalized meal planning, nutritional guidance, and recipe management with a focus on keto, LCHF, and other functional dietary approaches.
+
+## Current State Analysis
+
+### ✅ COMPLETED FEATURES
+
+#### 1. Core Recipe Platform
+- Next.js 14 with TypeScript and Tailwind CSS
+- App Router architecture with responsive design
+- Recipe card and detail components with Arla-inspired design
+- Dynamic ingredients calculation with serving size adjustment
+- Floating navigation for ingredients and instructions
+- Comment system for recipe feedback
+- Recipe actions (save, share, shopping list)
+- Recipe tips and related suggestions sections
+- "Om functionalfoods" educational content
+- Star rating system and personal recipe descriptions
+
+#### 2. Recipe Management System
+- Recipe database with comprehensive schema
+- Category-based recipe organization
+- Ingredient string system with amounts, volumes, and units
+- Recipe import/export functionality
+- Admin interface for recipe management
+- Recipe search and filtering capabilities
+
+#### 3. User Interface Components
+- Header with navigation
+- Recipe cards with images and metadata
+- Recipe detail pages with full information
+- Ingredients list with dynamic calculations
+- Instructions list with step-by-step guidance
+- Nutrition facts box with serving size adjustment
+- Social sharing functionality
+- Mobile-responsive design
+
+#### 4. Database Infrastructure
+- Supabase integration with PostgreSQL
+- Recipes table with comprehensive schema
+- Ingredients table with nutritional information
+- Row Level Security (RLS) policies
+- Public read access, authenticated write access
+
+#### 5. Admin System
+- Admin dashboard with recipe management
+- Ingredient management interface
+- Import functionality for bulk recipe uploads
+- Database statistics and monitoring
+- Test import capabilities for different formats
+
+#### 6. Meal Planning Foundation
+- 6-week meal plan wizard architecture
+- User profile collection system
+- Dietary approach selection (7 approaches: Keto, Sense, LCHF/Paleo, Anti-inflammatory, Mediterranean, Flexitarian, 5:2)
+- Macro calculation service
+- Recipe filtering service
+- PDF generation system architecture
+
+### 🔧 CURRENT ISSUES TO RESOLVE
+
+#### 1. Recipe Import System Problem
+- Import function processes recipes successfully
+- Ingredients are extracted and displayed correctly
+- SAVE functionality fails when attempting to store to database
+- Issue appears to be database-related but may be code logic
+- Need to debug and fix the save operation
+
+#### 2. Nutrition Data Integration
+- Frida DTU nutritional data available (frida-nutritional-data.json, 53MB)
+- Need to integrate macro and micro nutrition profiles
+- All ingredient strings should have complete nutrition profiles
+- Import system should automatically match ingredients with Frida data
+- Current import shows ingredients without nutrition profiles
+
+### 🚧 IN PROGRESS FEATURES
+
+#### 1. 6-Week Meal Plan System
+- Wizard flow for user profile collection
+- Dietary approach selection and preferences
+- Meal plan generation algorithm
+- PDF generation for meal plans
+- Shopping list generation
+- Progress tracking and customization
+
+#### 2. Nutritional Assessment System
+- Deficiency assessment based on symptoms
+- Personalized recommendations
+- Integration with meal planning
+- Progress tracking over time
+
+## PLANNED FEATURES
+
+### 1. AI SMS Function for Signups
+- SMS-based user registration
+- Minimal design requirements
+- Integration with existing user system
+- Automated welcome messages
+
+### 2. Budget Function
+- Weekly digital meal planner
+- Shopping list generation
+- Price comparison across Danish supermarkets
+- API integration with shopping centers
+- Cost optimization recommendations
+
+### 3. Recipe Database Expansion
+- Target: 5000+ recipes
+- AI-generated recipes using automation
+- Midjourney image generation
+- Make.com automation workflow
+- JSON-based import system
+- Quality control and validation
+
+### 4. Website Design Enhancement
+- Complete frontend redesign
+- Modern, amazing user experience
+- Improved navigation and user flow
+- Enhanced visual design
+- Performance optimization
+
+### 5. Deployment and Infrastructure
+- Vercel deployment
+- Production environment setup
+- Performance monitoring
+- SEO optimization
+- Analytics integration
+
+## Technical Requirements
+
+### Database Schema
+- Recipes table with comprehensive metadata
+- Ingredients table with nutritional information
+- User profiles and preferences
+- Meal plans and shopping lists
+- Analytics and tracking data
+
+### API Integrations
+- Supabase for database and authentication
+- Danish supermarket APIs for price comparison
+- SMS service for user registration
+- Image generation APIs (Midjourney)
+- Payment processing for premium features
+
+### Performance Requirements
+- Fast recipe search and filtering
+- Efficient image loading and optimization
+- Responsive design across all devices
+- SEO-friendly structure
+- Scalable architecture for 5000+ recipes
+
+### Security Requirements
+- User data protection
+- Secure payment processing
+- Content protection for premium features
+- Anti-theft measures
+- GDPR compliance for Danish market
+
+## Success Metrics
+- User engagement with recipe platform
+- Meal plan completion rates
+- Recipe import success rate
+- User retention and satisfaction
+- Revenue from premium features
+- Recipe database growth and quality
+
+## Timeline and Priorities
+1. Fix current import issues (URGENT)
+2. Complete nutrition data integration
+3. Finish 6-week meal plan system
+4. Implement AI SMS signup
+5. Develop budget function
+6. Expand recipe database
+7. Enhance website design
+8. Deploy to production
+
+## Technical Stack
+- Frontend: Next.js 14, TypeScript, Tailwind CSS
+- Backend: Supabase, PostgreSQL
+- Authentication: Supabase Auth
+- File Storage: Supabase Storage
+- Deployment: Vercel
+- Image Processing: Next.js Image Optimization
+- PDF Generation: jsPDF or similar
+- SMS: Danish SMS service provider
+- Automation: Make.com for recipe generation
+- AI: Various APIs for content generation 

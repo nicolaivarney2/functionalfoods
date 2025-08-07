@@ -1,0 +1,27 @@
+# Task ID: 19
+# Title: Implement GDPR Compliance for Danish Market
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Ensure the platform is fully compliant with GDPR regulations specific to the Danish market.
+# Details:
+1. Create comprehensive privacy policy
+2. Implement cookie consent management
+3. Create data export functionality
+4. Implement right to be forgotten
+5. Add data processing records
+6. Create data breach notification system
+7. Implement data minimization practices
+8. Add user consent tracking
+9. Create admin tools for GDPR requests
+10. Implement data retention policies
+
+Technologies: Cookie Consent Manager (like Cookiebot or OneTrust), Next.js middleware for consent checking, Supabase RLS for data access control
+
+# Test Strategy:
+1. Verify cookie blocking before consent
+2. Test data export completeness
+3. Validate account deletion functionality
+4. Test consent recording and tracking
+5. Verify privacy policy accessibility
+6. Conduct compliance audit with checklist

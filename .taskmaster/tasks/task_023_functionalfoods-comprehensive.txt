@@ -1,0 +1,27 @@
+# Task ID: 23
+# Title: Implement Automated Recipe Generation with AI
+# Status: pending
+# Dependencies: 14
+# Priority: medium
+# Description: Develop a system to automatically generate high-quality recipes using AI, targeting an expansion to 5000+ recipes.
+# Details:
+1. Research and select appropriate AI models (GPT-4, Claude, etc.)
+2. Create prompt engineering for recipe generation
+3. Implement structured output formatting
+4. Develop quality control filters
+5. Create batch generation system
+6. Implement nutritional analysis integration
+7. Add image generation with Midjourney
+8. Create category and tag assignment
+9. Implement duplicate detection
+10. Add human review workflow
+
+Technologies: OpenAI API, Anthropic Claude API, Midjourney API, Node.js for orchestration, PostgreSQL for tracking
+
+# Test Strategy:
+1. Test recipe quality and variety
+2. Verify nutritional accuracy
+3. Test image appropriateness
+4. Validate structured output format
+5. Test duplicate detection
+6. Verify category assignment accuracy
