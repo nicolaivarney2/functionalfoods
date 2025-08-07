@@ -49,8 +49,8 @@ export class DatabaseService {
       subCategories: recipe.subcategories || [],
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],
-      publishedAt: recipe.publishedat,
-      updatedAt: recipe.updatedat,
+      publishedAt: recipe.publishedat ? new Date(recipe.publishedat) : new Date(),
+      updatedAt: recipe.updatedat ? new Date(recipe.updatedat) : new Date(),
       metaTitle: recipe.metatitle,
       metaDescription: recipe.metadescription,
       keywords: recipe.keywords || [],
@@ -88,7 +88,11 @@ export class DatabaseService {
       category: ingredient.category,
       description: ingredient.description,
       exclusions: ingredient.exclusions || [],
-      allergens: ingredient.allergens || []
+      allergens: ingredient.allergens || [],
+      commonNames: ingredient.common_names || [],
+      isActive: ingredient.is_active ?? true,
+      createdAt: new Date(ingredient.created_at),
+      updatedAt: new Date(ingredient.updated_at || ingredient.created_at)
     }))
     
     return transformedIngredients
@@ -174,8 +178,8 @@ export class DatabaseService {
         filteredRecipe.dietarycategories = recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? recipe.dietaryCategories : null
         filteredRecipe.imageurl = recipe.imageUrl || '/images/recipe-placeholder.jpg'
         filteredRecipe.imagealt = recipe.imageAlt || null
-        filteredRecipe.publishedat = recipe.publishedAt || new Date().toISOString()
-        filteredRecipe.updatedat = recipe.updatedAt || new Date().toISOString()
+        filteredRecipe.publishedat = recipe.publishedAt ? (typeof recipe.publishedAt === 'string' ? recipe.publishedAt : recipe.publishedAt.toISOString()) : new Date().toISOString()
+        filteredRecipe.updatedat = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
         filteredRecipe.rating = recipe.rating || null
         filteredRecipe.reviewcount = recipe.reviewCount || null
         filteredRecipe.preptimeiso = recipe.prepTimeISO || null

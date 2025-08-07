@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { dietaryFactory } from '@/lib/dietary-system';
-import { pdfGenerator } from '@/lib/pdf-system';
+import { pdfGenerator, PDFQuality, PDFFormat, SectionType } from '@/lib/pdf-system';
 import { UserProfile } from '@/types/user';
 
 interface MealPlanPreviewProps {
@@ -175,9 +175,9 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
         mealPlan,
         userProfile,
         {
-          quality: 'premium',
-          format: 'a4',
-          includeSections: ['cover', 'user-profile', 'meal-plan', 'shopping-list', 'nutrition-guide', 'progress-tracking', 'educational-content']
+          quality: PDFQuality.Premium,
+          format: PDFFormat.A4,
+          includeSections: [SectionType.Cover, SectionType.UserProfile, SectionType.MealPlan, SectionType.ShoppingList, SectionType.NutritionGuide, SectionType.ProgressTracking, SectionType.EducationalContent]
         }
       );
 

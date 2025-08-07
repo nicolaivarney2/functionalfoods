@@ -3,7 +3,7 @@ import { FridaDTUMatcher } from './frida-dtu-matcher'
 import { RecipeCalculator } from './recipe-calculator'
 import { ingredientService } from './ingredient-system'
 import { Recipe } from '@/types/recipe'
-import { IngredientTag } from '@/lib/ingredient-system/types'
+import { IngredientTag, IngredientCategory, NutritionalInfo as IngredientNutritionalInfo } from '@/lib/ingredient-system/types'
 
 export interface ImportResult {
   recipes: Recipe[]
@@ -57,9 +57,9 @@ export class ImportProcessor {
     
     // Step 2: Calculate nutritional values using Frida DTU for all recipes
     console.log('🧮 Step 2: Calculating nutritional values using Frida DTU...')
-    const recipesWithNutrition = importedRecipes.map(recipe => {
+    const recipesWithNutrition = await Promise.all(importedRecipes.map(async recipe => {
       // Calculate nutrition using Frida DTU data
-      const fridaNutrition = this.fridaDTUMatcher.calculateRecipeNutrition(recipe.ingredients || [])
+      const fridaNutrition = await this.fridaDTUMatcher.calculateRecipeNutrition(recipe.ingredients || [])
       
       return {
         ...recipe,
@@ -70,7 +70,7 @@ export class ImportProcessor {
         fiber: Math.round(fridaNutrition.fiber * 10) / 10,
         nutritionalInfo: fridaNutrition
       }
-    })
+    }))
     
     // Step 3: Extract and process ingredients (simplified)
     console.log('🏷️ Step 3: Extracting unique ingredients...')
@@ -130,7 +130,35 @@ export class ImportProcessor {
     }
 
     const importedRecipes = await importRecipesWithImages([convertedData])
-    const processedIngredients = await this.fridaIntegration.processImportedIngredients(importedRecipes)
+    // Process ingredients using the new Frida DTU matcher system
+    const allIngredients = importedRecipes.flatMap(recipe => recipe.ingredients || [])
+    const processedIngredients: IngredientTag[] = []
+    
+    for (const ingredient of allIngredients) {
+      const result = await this.fridaDTUMatcher.matchIngredient(ingredient.name)
+      if (result.nutrition) {
+        // Convert to IngredientTag format
+        const ingredientTag: IngredientTag = {
+          id: ingredient.id || ingredient.name.toLowerCase().replace(/\s+/g, '-'),
+          name: ingredient.name,
+          category: IngredientCategory.Andre, // Default category
+          exclusions: [],
+          allergens: [],
+          commonNames: [ingredient.name],
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          nutritionalInfo: {
+            caloriesPer100g: result.nutrition.calories,
+            proteinPer100g: result.nutrition.protein,
+            carbsPer100g: result.nutrition.carbs,
+            fatPer100g: result.nutrition.fat,
+            fiberPer100g: result.nutrition.fiber
+          } as IngredientNutritionalInfo
+        }
+        processedIngredients.push(ingredientTag)
+      }
+    }
     
     // Add ingredients to service
     processedIngredients.forEach(ingredient => {

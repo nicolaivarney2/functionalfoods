@@ -1,4 +1,5 @@
 // PDF Generation System Types
+import { UserProfile } from '@/types/user';
 
 export interface PDFDocument {
   id: string;

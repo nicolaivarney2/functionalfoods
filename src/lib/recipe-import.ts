@@ -148,17 +148,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       preparationTime: prepTime,
       cookingTime: cookTime,
       totalTime: totalTime,
-      // Calculate nutrition using Frida DTU data
-      ...(() => {
-        const fridaNutrition = fridaMatcher.calculateRecipeNutrition(ingredients)
-        return {
-          calories: Math.round(fridaNutrition.calories),
-          protein: Math.round(fridaNutrition.protein * 10) / 10,
-          carbs: Math.round(fridaNutrition.carbs * 10) / 10,
-          fat: Math.round(fridaNutrition.fat * 10) / 10,
-          fiber: Math.round(fridaNutrition.fiber * 10) / 10,
-        }
-      })(),
+      // Nutrition will be calculated by import-processor.ts instead
       mainCategory,
       subCategories: recipe.tags.course || [],
       dietaryCategories,

@@ -11,7 +11,7 @@ export default async function AdminDashboard() {
     senseRecipes: allRecipes.filter(r => r.dietaryCategories?.includes('SENSE')).length,
     publishedToday: allRecipes.filter(r => {
       const today = new Date()
-      const recipeDate = r.publishedAt
+      const recipeDate = r.publishedAt ? new Date(r.publishedAt) : null
       return recipeDate ? recipeDate.toDateString() === today.toDateString() : false
     }).length,
     importedRecipes: allRecipes.length // All recipes are now from database

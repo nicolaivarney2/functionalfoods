@@ -1,14 +1,24 @@
-import fridaData from '../../frida-nutritional-data.json'
+import { createClient } from '@supabase/supabase-js'
+
+// Get Supabase client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Types for Frida DTU data
-interface FridaDataEntry {
-  FoodID: number
-  FødevareNavn: string
-  FoodName: string
-  ParameterID: number
-  ParameterNavn: string
-  ParameterName: string
-  ResVal: number
+interface FridaFood {
+  food_id: number
+  food_name_da: string
+  food_name_en: string
+}
+
+interface FridaNutritionValue {
+  food_id: number
+  parameter_id: number
+  parameter_name_da: string
+  parameter_name_en: string
+  value: number
+  sort_key: number
 }
 
 interface NutritionalInfo {
@@ -22,12 +32,36 @@ interface NutritionalInfo {
 }
 
 export class FridaDTUMatcher {
-  private fridaData: FridaDataEntry[]
   private ingredientCache: Map<string, NutritionalInfo> = new Map()
   
   constructor() {
-    this.fridaData = fridaData as FridaDataEntry[]
-    console.log('✅ FridaDTUMatcher initialized with', this.fridaData.length, 'entries')
+    // Supabase connection is ready to use
+  }
+
+  /**
+   * Search for foods in Supabase database
+   */
+  private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
+    try {
+      const normalizedTerm = this.normalizeIngredientName(searchTerm)
+      
+      // Use full-text search for better Danish language support
+      const { data, error } = await supabase
+        .from('frida_foods')
+        .select('food_id, food_name_da, food_name_en')
+        .or(`food_name_da.ilike.%${normalizedTerm}%,food_name_en.ilike.%${normalizedTerm}%`)
+        .limit(10)
+      
+      if (error) {
+        console.error('❌ Error searching foods:', error)
+        return []
+      }
+      
+      return data || []
+    } catch (error) {
+      console.error('❌ Failed to search foods:', error)
+      return []
+    }
   }
 
   /**
@@ -70,18 +104,25 @@ export class FridaDTUMatcher {
   }
 
   /**
-   * Find best match for ingredient in Frida data
+   * Find best match for ingredient in Frida database
    */
-  private findBestMatch(ingredientName: string): { foodId: number, name: string, score: number } | null {
-    const uniqueFoods = this.getUniqueFoods()
+  private async findBestMatch(ingredientName: string): Promise<{ foodId: number, name: string, score: number } | null> {
+    const foods = await this.searchFoods(ingredientName)
     let bestMatch = null
     let bestScore = 0
 
-    for (const food of uniqueFoods) {
-      const score = this.calculateSimilarity(ingredientName, food.name)
+    for (const food of foods) {
+      const scoreDa = this.calculateSimilarity(ingredientName, food.food_name_da)
+      const scoreEn = this.calculateSimilarity(ingredientName, food.food_name_en || '')
+      const score = Math.max(scoreDa, scoreEn)
+      
       if (score > bestScore && score > 0.3) { // Minimum threshold
         bestScore = score
-        bestMatch = { foodId: food.foodId, name: food.name, score }
+        bestMatch = { 
+          foodId: food.food_id, 
+          name: food.food_name_da, 
+          score 
+        }
       }
     }
 
@@ -89,30 +130,35 @@ export class FridaDTUMatcher {
   }
 
   /**
-   * Get unique foods from Frida data
+   * Get nutritional values for a specific food ID from Supabase
    */
-  private getUniqueFoods(): Array<{ foodId: number, name: string }> {
-    const uniqueFoods = new Map<number, string>()
-    
-    for (const entry of this.fridaData) {
-      if (!uniqueFoods.has(entry.FoodID)) {
-        uniqueFoods.set(entry.FoodID, entry.FødevareNavn)
+  private async getNutritionalValues(foodId: number): Promise<FridaNutritionValue[]> {
+    try {
+      const { data, error } = await supabase
+        .from('frida_nutrition_values')
+        .select('food_id, parameter_id, parameter_name_da, parameter_name_en, value, sort_key')
+        .eq('food_id', foodId)
+        .order('sort_key')
+      
+      if (error) {
+        console.error('❌ Error getting nutrition values:', error)
+        return []
       }
+      
+      return data || []
+    } catch (error) {
+      console.error('❌ Failed to get nutrition values:', error)
+      return []
     }
-    
-    return Array.from(uniqueFoods.entries()).map(([foodId, name]) => ({
-      foodId,
-      name
-    }))
   }
 
   /**
-   * Get nutritional info for a specific food ID
+   * Get nutritional info for a specific food ID from Supabase
    */
-  private getNutritionalInfo(foodId: number): NutritionalInfo | null {
-    const foodEntries = this.fridaData.filter(entry => entry.FoodID === foodId)
+  private async getNutritionalInfo(foodId: number): Promise<NutritionalInfo | null> {
+    const nutritionValues = await this.getNutritionalValues(foodId)
     
-    if (foodEntries.length === 0) return null
+    if (nutritionValues.length === 0) return null
 
     const nutrition: NutritionalInfo = {
       calories: 0,
@@ -124,10 +170,11 @@ export class FridaDTUMatcher {
       minerals: {}
     }
 
-    for (const entry of foodEntries) {
-      const value = entry.ResVal
+    for (const entry of nutritionValues) {
+      const value = entry.value
       
-      switch (entry.ParameterNavn) {
+      // Use Danish parameter names since that's what we have in our data
+      switch (entry.parameter_name_da) {
         case 'Energi (kcal)':
           nutrition.calories = value
           break
@@ -145,12 +192,12 @@ export class FridaDTUMatcher {
           break
         default:
           // Handle vitamins and minerals
-          if (entry.ParameterNavn.includes('vitamin') || entry.ParameterNavn.includes('Vitamin')) {
-            nutrition.vitamins[entry.ParameterNavn] = value
-          } else if (entry.ParameterNavn.includes('jern') || entry.ParameterNavn.includes('calcium') || 
-                     entry.ParameterNavn.includes('magnesium') || entry.ParameterNavn.includes('zink') ||
-                     entry.ParameterNavn.includes('selen') || entry.ParameterNavn.includes('kalium')) {
-            nutrition.minerals[entry.ParameterNavn] = value
+          if (entry.parameter_name_da.includes('vitamin') || entry.parameter_name_da.includes('Vitamin')) {
+            nutrition.vitamins[entry.parameter_name_da] = value
+          } else if (entry.parameter_name_da.includes('jern') || entry.parameter_name_da.includes('calcium') || 
+                     entry.parameter_name_da.includes('magnesium') || entry.parameter_name_da.includes('zink') ||
+                     entry.parameter_name_da.includes('selen') || entry.parameter_name_da.includes('kalium')) {
+            nutrition.minerals[entry.parameter_name_da] = value
           }
           break
       }
@@ -162,7 +209,7 @@ export class FridaDTUMatcher {
   /**
    * Match ingredient and get nutritional info
    */
-  public matchIngredient(ingredientName: string): { nutrition: NutritionalInfo | null, match: string | null, score: number } {
+  public async matchIngredient(ingredientName: string): Promise<{ nutrition: NutritionalInfo | null, match: string | null, score: number }> {
     // Check cache first
     if (this.ingredientCache.has(ingredientName)) {
       return {
@@ -172,14 +219,14 @@ export class FridaDTUMatcher {
       }
     }
 
-    const bestMatch = this.findBestMatch(ingredientName)
+    const bestMatch = await this.findBestMatch(ingredientName)
     
     if (!bestMatch) {
       console.log(`❌ No match found for: ${ingredientName}`)
       return { nutrition: null, match: null, score: 0 }
     }
 
-    const nutrition = this.getNutritionalInfo(bestMatch.foodId)
+    const nutrition = await this.getNutritionalInfo(bestMatch.foodId)
     
     if (nutrition) {
       this.ingredientCache.set(ingredientName, nutrition)
@@ -196,7 +243,7 @@ export class FridaDTUMatcher {
   /**
    * Process all ingredients in a recipe and calculate total nutrition
    */
-  public calculateRecipeNutrition(ingredients: Array<{ name: string, amount: number, unit: string }>): NutritionalInfo {
+  public async calculateRecipeNutrition(ingredients: Array<{ name: string, amount: number, unit: string }>): Promise<NutritionalInfo> {
     const totalNutrition: NutritionalInfo = {
       calories: 0,
       protein: 0,
@@ -208,7 +255,7 @@ export class FridaDTUMatcher {
     }
 
     for (const ingredient of ingredients) {
-      const result = this.matchIngredient(ingredient.name)
+      const result = await this.matchIngredient(ingredient.name)
       
       if (result.nutrition) {
         // Convert to per 100g basis and scale by amount

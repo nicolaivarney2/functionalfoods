@@ -1,12 +1,14 @@
 import { Recipe } from '@/types/recipe'
-import { sampleRecipes } from './sample-data'
+import { databaseService } from './database-service'
 
-// Simple in-memory storage for development
-let importedRecipes: Recipe[] = []
-
-// Get all recipes (sample + imported)
-export function getAllRecipes(): Recipe[] {
-  return [...sampleRecipes, ...importedRecipes]
+// Get all recipes from database
+export async function getAllRecipes(): Promise<Recipe[]> {
+  try {
+    return await databaseService.getRecipes()
+  } catch (error) {
+    console.error('Error fetching recipes from database:', error)
+    return []
+  }
 }
 
 // Add imported recipes
@@ -16,13 +18,15 @@ export function addImportedRecipes(recipes: Recipe[]): void {
 }
 
 // Get recipe by slug
-export function getRecipeBySlug(slug: string): Recipe | undefined {
-  return getAllRecipes().find(recipe => recipe.slug === slug)
+export async function getRecipeBySlug(slug: string): Promise<Recipe | undefined> {
+  const recipes = await getAllRecipes()
+  return recipes.find(recipe => recipe.slug === slug)
 }
 
 // Get recipes by category
-export function getRecipesByCategory(category: string): Recipe[] {
-  return getAllRecipes().filter(recipe =>
+export async function getRecipesByCategory(category: string): Promise<Recipe[]> {
+  const recipes = await getAllRecipes()
+  return recipes.filter(recipe =>
     recipe.dietaryCategories.some(dietaryCategory =>
       dietaryCategory.toLowerCase() === category.toLowerCase()
     )
@@ -30,9 +34,10 @@ export function getRecipesByCategory(category: string): Recipe[] {
 }
 
 // Search recipes
-export function searchRecipes(query: string): Recipe[] {
+export async function searchRecipes(query: string): Promise<Recipe[]> {
+  const recipes = await getAllRecipes()
   const searchTerm = query.toLowerCase()
-  return getAllRecipes().filter(recipe =>
+  return recipes.filter(recipe =>
     recipe.title.toLowerCase().includes(searchTerm) ||
     recipe.description.toLowerCase().includes(searchTerm) ||
     recipe.ingredients.some(ingredient =>
@@ -41,42 +46,7 @@ export function searchRecipes(query: string): Recipe[] {
   )
 }
 
-// Get imported recipes count
-export function getImportedRecipesCount(): number {
-  return importedRecipes.length
-}
-
-// Clear imported recipes (for testing)
-export function clearImportedRecipes(): void {
-  importedRecipes = []
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('importedRecipes')
-  }
-}
-
-// Load recipes from localStorage on client side
-export function loadRecipesFromStorage(): void {
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('importedRecipes')
-      if (stored) {
-        importedRecipes = JSON.parse(stored).map((recipe: any) => ({
-          ...recipe,
-          publishedAt: new Date(recipe.publishedAt),
-          updatedAt: new Date(recipe.updatedAt)
-        }))
-        console.log(`Loaded ${importedRecipes.length} recipes from localStorage`)
-      }
-    } catch (error) {
-      console.error('Error loading recipes from localStorage:', error)
-    }
-  }
-}
-
-// Initialize recipes on client side
-if (typeof window !== 'undefined') {
-  loadRecipesFromStorage()
-}
+// Database-based functions - no longer need localStorage or importedRecipes
 
 function generateSlug(title: string): string {
   return title

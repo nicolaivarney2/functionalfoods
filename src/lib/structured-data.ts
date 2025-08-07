@@ -11,8 +11,8 @@ export function generateRecipeStructuredData(recipe: Recipe) {
       "@type": "Person",
       "name": recipe.author
     },
-    "datePublished": recipe.publishedAt ? recipe.publishedAt.toISOString() : new Date().toISOString(),
-    "dateModified": recipe.updatedAt ? recipe.updatedAt.toISOString() : new Date().toISOString(),
+    "datePublished": recipe.publishedAt ? new Date(recipe.publishedAt).toISOString() : new Date().toISOString(),
+    "dateModified": recipe.updatedAt ? new Date(recipe.updatedAt).toISOString() : new Date().toISOString(),
     "prepTime": recipe.prepTimeISO,
     "cookTime": recipe.cookTimeISO,
     "totalTime": recipe.totalTimeISO,

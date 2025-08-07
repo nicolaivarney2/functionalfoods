@@ -34,8 +34,8 @@ export async function POST(request: NextRequest) {
     // Calculate nutrition using Frida DTU
     console.log('🧮 Calculating nutrition with Frida DTU...')
     const fridaMatcher = new FridaDTUMatcher()
-    const recipesWithNutrition = importedRecipes.map(recipe => {
-      const fridaNutrition = fridaMatcher.calculateRecipeNutrition(recipe.ingredients || [])
+    const recipesWithNutrition = await Promise.all(importedRecipes.map(async recipe => {
+      const fridaNutrition = await fridaMatcher.calculateRecipeNutrition(recipe.ingredients || [])
       
       return {
         ...recipe,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         fiber: Math.round(fridaNutrition.fiber * 10) / 10,
         nutritionalInfo: fridaNutrition
       }
-    })
+    }))
     
     // Download and store images locally
     console.log('Downloading images for imported recipes...')

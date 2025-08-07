@@ -24,7 +24,7 @@ function IngredientModal({ isOpen, onClose, onSave, ingredient }: IngredientModa
     if (ingredient) {
       setFormData({
         name: ingredient.name,
-        description: ingredient.description,
+        description: ingredient.description || '',
         category: ingredient.category,
         exclusions: ingredient.exclusions?.join(', ') || '',
         allergens: ingredient.allergens?.join(', ') || ''
@@ -395,7 +395,7 @@ export default function IngredientsPage() {
             setEditingIngredient(null)
           }}
           onSave={handleSaveIngredient}
-          ingredient={editingIngredient}
+          ingredient={editingIngredient || undefined}
         />
       </div>
     </div>

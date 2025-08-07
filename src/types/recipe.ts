@@ -45,6 +45,15 @@ export interface Recipe {
   carbs?: number;
   fat?: number;
   fiber?: number;
+  nutritionalInfo?: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    vitamins?: Record<string, number>;
+    minerals?: Record<string, number>;
+  };
   
   // SEO
   metaTitle: string;

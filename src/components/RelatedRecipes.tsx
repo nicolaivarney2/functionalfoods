@@ -24,7 +24,7 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
   useEffect(() => {
     if (user) {
       const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
-      const favoriteIds = new Set(savedRecipes.map((recipe: any) => recipe.id))
+      const favoriteIds = new Set<string>(savedRecipes.map((recipe: any) => recipe.id as string))
       setFavorites(favoriteIds)
     }
   }, [user])
@@ -61,7 +61,7 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
       }
       const updatedRecipes = [...savedRecipes, newRecipe]
       localStorage.setItem('favorite_recipes', JSON.stringify(updatedRecipes))
-      setFavorites(prev => new Set([...prev, recipeId]))
+      setFavorites(prev => new Set(Array.from(prev).concat([recipeId])))
     }
   }
 

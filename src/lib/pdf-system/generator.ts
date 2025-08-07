@@ -10,6 +10,7 @@ import {
   PDFQuality,
   PDFFormat,
   SectionType,
+  EncryptionLevel,
   CoverPageContent,
   MealPlanContent,
   ShoppingListContent,
@@ -38,7 +39,7 @@ export class PDFGenerator {
 
     try {
       // Create a temporary div element to render the HTML
-      const tempDiv = document.createElement('div');
+      const tempDiv = (typeof window !== 'undefined' ? window.document : global.document).createElement('div');
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.top = '-9999px';
@@ -55,7 +56,7 @@ export class PDFGenerator {
       tempDiv.innerHTML = htmlContent;
       
       // Add to DOM temporarily
-      document.body.appendChild(tempDiv);
+      (typeof window !== 'undefined' ? window.document : global.document).body.appendChild(tempDiv);
       
       // Convert to canvas
       const canvas = await html2canvas(tempDiv, {
@@ -66,7 +67,7 @@ export class PDFGenerator {
       });
       
       // Remove from DOM
-      document.body.removeChild(tempDiv);
+      (typeof window !== 'undefined' ? window.document : global.document).body.removeChild(tempDiv);
       
       // Create PDF
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -98,7 +99,7 @@ export class PDFGenerator {
         title: `6-Week ${userProfile.dietaryApproach} Meal Plan`,
         description: `Personalized meal plan for ${userProfile.name}`,
         version: '1.0.0',
-        pageCount: Math.ceil(pdfBuffer.length / 1000), // Rough estimate
+        pageCount: Math.ceil(pdfBuffer.byteLength / 1000), // Rough estimate
         generationTime: Date.now() - startTime,
         userProfile,
         dietaryApproach: userProfile.dietaryApproach,
@@ -120,7 +121,7 @@ export class PDFGenerator {
         downloadCount: 0,
         maxDownloads: 3,
         isProtected: true,
-        encryptionLevel: options.security?.encryptionLevel || 'standard'
+        encryptionLevel: options.security?.encryptionLevel || EncryptionLevel.Standard
       };
 
       const document: PDFDocument = {
@@ -138,7 +139,7 @@ export class PDFGenerator {
         success: true,
         document,
         generationTime: Date.now() - startTime,
-        fileSize: pdfBuffer.length
+        fileSize: pdfBuffer.byteLength
       };
 
     } catch (error) {
@@ -203,7 +204,7 @@ export class PDFGenerator {
   }
 
   private generateCoverPageHTML(userProfile: any, mealPlan: any): string {
-    const dietaryApproach = dietaryFactory.getDietaryApproach(userProfile.dietaryApproach);
+    const dietaryApproach = dietaryFactory.getDiet(userProfile.dietaryApproach);
     
     return `
       <div class="cover-page" style="page-break-after: always;">
@@ -500,7 +501,7 @@ export class PDFGenerator {
   }
 
   private generateEducationalContentHTML(userProfile: any): string {
-    const dietaryApproach = dietaryFactory.getDietaryApproach(userProfile.dietaryApproach);
+    const dietaryApproach = dietaryFactory.getDiet(userProfile.dietaryApproach);
     
     return `
       <div class="educational-content-section">
@@ -515,9 +516,9 @@ export class PDFGenerator {
           <div class="macro-info" style="margin-bottom: 20px;">
             <h4 style="color: #666; font-size: 16px; margin-bottom: 10px;">Macronutrient Distribution</h4>
             <div style="font-size: 14px; color: #666;">
-              <div>Protein: ${dietaryApproach?.macroRatio?.protein?.target || 25}%</div>
-              <div>Carbohydrates: ${dietaryApproach?.macroRatio?.carbohydrates?.target || 45}%</div>
-              <div>Fat: ${dietaryApproach?.macroRatio?.fat?.target || 30}%</div>
+              <div>Protein: ${dietaryApproach?.macroRatios?.protein?.target || 25}%</div>
+              <div>Carbohydrates: ${dietaryApproach?.macroRatios?.carbohydrates?.target || 45}%</div>
+              <div>Fat: ${dietaryApproach?.macroRatios?.fat?.target || 30}%</div>
             </div>
           </div>
         </div>

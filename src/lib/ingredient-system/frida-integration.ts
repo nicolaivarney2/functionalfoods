@@ -353,7 +353,7 @@ export class FridaIntegration {
       return IngredientCategory.Frugt
     }
     if (name.includes('salat') || name.includes('tomat') || name.includes('agurk') || name.includes('løg')) {
-      return IngredientCategory.Grontsager
+      return IngredientCategory.Groent
     }
     if (name.includes('nød') || name.includes('mandel') || name.includes('cashew')) {
       return IngredientCategory.Nodder

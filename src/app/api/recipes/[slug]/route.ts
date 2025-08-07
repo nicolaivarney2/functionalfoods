@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRecipeBySlugServer } from '@/lib/recipe-storage-server'
+import { databaseService } from '@/lib/database-service'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } }
 ) {
   try {
-    const recipe = getRecipeBySlugServer(params.slug) // Uses server-side storage
+    const recipes = await databaseService.getRecipes()
+    const recipe = recipes.find(r => r.slug === params.slug)
 
     if (!recipe) {
       return NextResponse.json({
