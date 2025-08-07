@@ -1,0 +1,63 @@
+[
+  {
+    "title": "Test Keto Suppe",
+    "description": "En lækker test suppe til keto diæt",
+    "shortDescription": "Lækker keto suppe til test",
+    "preparationTime": 10,
+    "cookingTime": 20,
+    "calories": 250,
+    "protein": 15,
+    "carbs": 8,
+    "fat": 18,
+    "fiber": 5,
+    "mainCategory": "Aftensmad",
+    "subCategories": ["Suppe", "Test"],
+    "dietaryCategories": ["Keto", "LCHF"],
+    "ingredients": [
+      {
+        "name": "kødbouillon",
+        "amount": 1,
+        "unit": "liter",
+        "notes": "sansalt"
+      },
+      {
+        "name": "blomkål",
+        "amount": 300,
+        "unit": "g",
+        "notes": "fint hakket"
+      },
+      {
+        "name": "fløde",
+        "amount": 200,
+        "unit": "ml",
+        "notes": "38%"
+      }
+    ],
+    "instructions": [
+      {
+        "stepNumber": 1,
+        "instruction": "Varm bouillon op i en gryde",
+        "time": 5,
+        "tips": "Brug medium varme"
+      },
+      {
+        "stepNumber": 2,
+        "instruction": "Tilføj blomkål og kog i 10 minutter",
+        "time": 10,
+        "tips": "Blomkålen skal være mør"
+      },
+      {
+        "stepNumber": 3,
+        "instruction": "Tilføj fløde og kog i 5 minutter mere",
+        "time": 5,
+        "tips": "Rør jævnligt"
+      }
+    ],
+    "imageUrl": "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=800&h=600&fit=crop",
+    "imageAlt": "Keto suppe",
+    "servings": 4,
+    "difficulty": "Nem",
+    "author": "Test Chef",
+    "publishedAt": "2024-01-15"
+  }
+] 

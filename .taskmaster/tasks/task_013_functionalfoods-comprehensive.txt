@@ -1,0 +1,27 @@
+# Task ID: 13
+# Title: Set Up Make.com Automation for Recipe Generation
+# Status: pending
+# Dependencies: 3
+# Priority: medium
+# Description: Establish an automated workflow using Make.com to generate recipes using AI and prepare them for import into the system.
+# Details:
+1. Create a Make.com account and set up the project
+2. Design workflow for recipe generation using AI APIs (OpenAI, Claude, etc.)
+3. Implement structured output formatting for generated recipes
+4. Set up Midjourney integration for image generation
+5. Create validation steps for recipe quality
+6. Implement batch processing for efficiency
+7. Set up error handling and notifications
+8. Create scheduling for automated generation
+9. Implement output to JSON format compatible with import system
+10. Add customization options for recipe types and dietary approaches
+
+Technologies: Make.com (formerly Integromat), OpenAI API, Midjourney API, JSON Schema for validation
+
+# Test Strategy:
+1. Test recipe generation quality and variety
+2. Verify image generation appropriateness
+3. Validate JSON output against import requirements
+4. Test error handling scenarios
+5. Verify scheduling reliability
+6. Conduct manual review of generated content

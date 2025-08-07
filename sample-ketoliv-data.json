@@ -1,0 +1,282 @@
+[
+  {
+    "id": 187815,
+    "slug": "wprm-hoense-og-gulerodssuppe-med-mozzarellaboeffer-til",
+    "post_status": "publish",
+    "type": "food",
+    "image_url": "https://ketoliv.dk/wp-content/uploads/2021/08/ketoliv-hoense-og-gulerodssuppe-med-mozzarellaboeffer-overview.jpg",
+    "pin_image_url": "https://ketoliv.dk/wp-content/uploads/2021/08/ketoliv-hoense-og-gulerodssuppe-med-mozzarellaboeffer-overview.jpg",
+    "name": "Hønse- og gulerodssuppe med mozzarellabøffer til",
+    "summary": "I den her opskrift rister vi gulerødder og blomkål i lime, og blender det til en suppe, som vi rører sammen med smør, timian, løg, og hønsebouillon. Til suppen laver vi nogle super sjove og lækre mozzarellabøffer, af forskellige typer af ost samt loppefrøskaller. De mases flade og steges på panden, så de får en lækker og sprød skorpe. Retten er lidt anderledes og lækker, og passer perfekt til Keto",
+    "author_display": "default",
+    "author_name": "Functional Foods",
+    "author_link": "",
+    "cost": "",
+    "servings": "2",
+    "servings_unit": "personer",
+    "prep_time": "15",
+    "prep_time_zero": "",
+    "cook_time": "60",
+    "cook_time_zero": "",
+    "total_time": "75",
+    "custom_time": "0",
+    "custom_time_zero": "",
+    "custom_time_label": "",
+    "tags": {
+      "course": ["Aftensmad"],
+      "cuisine": ["[Keto]"],
+      "keyword": []
+    },
+    "equipment": [],
+    "ingredients_flat": [
+      {
+        "name": "Hønse og gulerodssuppe",
+        "type": "group"
+      },
+      {
+        "amount": "2",
+        "unit": "stk",
+        "name": "gulerødder",
+        "notes": "ca. 150 gram",
+        "type": "ingredient"
+      },
+      {
+        "amount": "0,5",
+        "unit": "stk",
+        "name": "blomkål",
+        "notes": "ca. 200 gram",
+        "type": "ingredient"
+      },
+      {
+        "amount": "2",
+        "unit": "spsk",
+        "name": "olivenolie",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "1",
+        "unit": "st",
+        "name": "lime",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "1",
+        "unit": "stk",
+        "name": "løg",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "3",
+        "unit": "stk",
+        "name": "hvidløgsfed",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "10",
+        "unit": "gram",
+        "name": "ingefær",
+        "notes": "kan undlades",
+        "type": "ingredient"
+      },
+      {
+        "amount": "2",
+        "unit": "spsk",
+        "name": "smør",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "1",
+        "unit": "stk",
+        "name": "bouillon",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "500",
+        "unit": "ml",
+        "name": "vand",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "100",
+        "unit": "ml",
+        "name": "piskefløde",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "0,5",
+        "unit": "tsk",
+        "name": "tørret timian",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "name": "Mozzarellabøffer",
+        "type": "group"
+      },
+      {
+        "amount": "150",
+        "unit": "gram",
+        "name": "hytteost",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "100",
+        "unit": "gram",
+        "name": "revet ost",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "30",
+        "unit": "gram",
+        "name": "parmesan",
+        "notes": "kan undlades",
+        "type": "ingredient"
+      },
+      {
+        "amount": "0,25",
+        "unit": "bundt",
+        "name": "frisk purløg",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "1",
+        "unit": "stk",
+        "name": "æg",
+        "notes": "",
+        "type": "ingredient"
+      },
+      {
+        "amount": "10",
+        "unit": "gram",
+        "name": "loppefrøskaller",
+        "notes": "ca. 2 spsk bare",
+        "type": "ingredient"
+      }
+    ],
+    "instructions_flat": [
+      {
+        "name": "Suppe",
+        "type": "group"
+      },
+      {
+        "name": "",
+        "text": "Forvarm ovnen til 200°",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Skær blomkål i buketter og fordel dem på en bageplade med bagepapir. Skræl gulerødder og skær dem på langs og læg dem også på bagepladen. Stryg grønsagerne med saften fra en hel lime og godt med olivenolie. Bag dem i 45 minutter ved 200°",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Tilsæt grønsagerne i en foodprocessor og blend det til en pure.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Hak løg, hvidløgsfed og ingefær imens. Når der er gået ca. 30 minutter tilsætter du smør i en gryde og steger løg, hvidløg og ingefær i ca. 2-3 minutter. Tilsæt grøntsagspureen og bland rundt.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Tilsæt enten hønsefong (bone broth) eller vand + hønsebouillon. Tilsæt også krydderierne, samt salt og peber.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Kog det i ca. 15 minutter og rør i det jævnligt. Sæt det til lav varme og tilsæt piskefløden. Lad det simre indtil dine mozzarellabøffer er klar, og kog det hurtigt op inden servering.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "Mozzarellabøffer",
+        "type": "group"
+      },
+      {
+        "name": "",
+        "text": "Tag en skål og tilsæt hytteost (hæld væsken fra, hvis der er noget) og mozzarella. Bland det sammen og sæt det i mikrobølgeovnen i 20-30 sekunder.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Hak purløg og tilsæt det i osteblandingen, sammen med parmesan æg og loppefrøskaller. Bland det super godt rundt i et minuts tid, og lad det trække. Loppefrøskaller suger i ca. 10 minutter, så mozzarellabøfferne skal lige masseres lidt en gang imellem fra nu og 10 minutter frem. Tilsæt et par dryp vand hvis de er for hårde, eller en smule mere loppefrøskaller, hvis de er alt for smattet efter 5-7 minutter.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Tilsæt olie på en pande og tag en stor klump mozzarellabøf. Mas den lidt flad i din hånd og steg den på panden i 5-7 minutter, eller indtil det har en gylden og brændt overflade. Gør det samme med resten af ostemassen.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "Servering",
+        "type": "group"
+      },
+      {
+        "name": "",
+        "text": "Server dine mozzarellabøffer til suppen. Riv eventuelt stykker af bøffen og tilsæt suppen.",
+        "type": "instruction",
+        "image_url": ""
+      },
+      {
+        "name": "",
+        "text": "Vi håber opskriften smager, selvom den er lidt specielt :). Giv gerne opskriften stjerner.",
+        "type": "instruction",
+        "image_url": ""
+      }
+    ],
+    "video_embed": "",
+    "notes": "",
+    "nutrition": {
+      "calories": 704,
+      "carbohydrates": 12,
+      "protein": 36,
+      "fat": 55,
+      "saturated_fat": 18,
+      "cholesterol": 146,
+      "sodium": 1,
+      "potassium": 1,
+      "fiber": 11,
+      "sugar": 1,
+      "vitamin_a": 6,
+      "vitamin_c": 1,
+      "vitamin_k": 1,
+      "calcium": 1,
+      "folate": 1,
+      "iron": 1,
+      "magnesium": 1,
+      "phosphorus": 1,
+      "choline": 1
+    },
+    "custom_fields": [],
+    "ingredient_links_type": "global",
+    "ingredient_links": [],
+    "unit_system": "metric",
+    "post_excerpt": "Ekstremt simpelt og meget, meget kraftig og smagfuldt er vores tabouleh serveret med en svinemørbradsbøf. Tabouleh er en mellemøstlig salat der er bygget på krydderurter, særligt mynte, som jo er kraftig i smagen. Det reflekteres i retten, men kombineres super godt med en god svinemørbradsbøf. En sund og lækker Keto ret, som altid.",
+    "post_status": "publish",
+    "post_type": "post",
+    "image_url": "https://ketoliv.dk/wp-content/uploads/2021/08/ketoliv-Tabouleh-med-svinemoerbrad-overview.jpeg",
+    "tags": {
+      "category": ["Verden rundt"]
+    }
+  }
+] 

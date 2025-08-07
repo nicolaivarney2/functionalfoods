@@ -1,0 +1,13 @@
+# Add to .htaccess file on ketoliv.dk
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "https://functionalfoods.dk"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule>
+
+# Or for development (localhost)
+<IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "http://localhost:3001"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header set Access-Control-Allow-Headers "Content-Type"
+</IfModule> 
