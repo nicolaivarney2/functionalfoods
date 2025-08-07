@@ -1,0 +1,32 @@
+# Large files to exclude from Vercel deployment
+*.xlsx
+*.ods
+*.zip
+Frida_Dataset_May2025.*
+frida-data.json
+frida-transformed.json
+
+# Development files
+test-*.js
+analyze-*.js
+clean-*.js
+debug-*.js
+delete-*.js
+extract-*.js
+fix-*.js
+read-*.js
+reset-*.js
+transform-*.js
+update-*.js
+
+# Cache files
+.next/cache
+node_modules/.cache
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
