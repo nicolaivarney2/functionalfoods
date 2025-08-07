@@ -154,13 +154,18 @@ export default function RecipeOverviewPage() {
   useEffect(() => {
     const loadRecipes = async () => {
       try {
+        console.log('🔄 Loading recipes from API...')
         const response = await fetch('/api/recipes')
         if (response.ok) {
           const recipes = await response.json()
+          console.log(`✅ Loaded ${recipes.length} recipes from API`)
+          console.log('📋 First recipe:', recipes[0])
           setAllRecipes(recipes)
+        } else {
+          console.error('❌ Failed to load recipes:', response.status, response.statusText)
         }
       } catch (error) {
-        console.error('Error loading recipes:', error)
+        console.error('❌ Error loading recipes:', error)
       } finally {
         setIsLoading(false)
       }
@@ -171,6 +176,12 @@ export default function RecipeOverviewPage() {
 
   // Apply filters and sorting when dependencies change
   useEffect(() => {
+    console.log('🔄 Applying filters and sorting...')
+    console.log(`📊 Total recipes: ${allRecipes.length}`)
+    console.log(`🔍 Search query: "${searchQuery}"`)
+    console.log(`🥗 Selected dietary: "${selectedDietary}"`)
+    console.log(`📂 Selected category: "${selectedCategory}"`)
+    
     let filtered = allRecipes
 
     // Apply search filter
@@ -183,6 +194,7 @@ export default function RecipeOverviewPage() {
           ingredient.name.toLowerCase().includes(query)
         ) || false
       )
+      console.log(`🔍 After search filter: ${filtered.length} recipes`)
     }
 
     // Apply dietary filter
@@ -192,6 +204,7 @@ export default function RecipeOverviewPage() {
           cat.toLowerCase() === selectedDietary.toLowerCase()
         ) || false
       )
+      console.log(`🥗 After dietary filter: ${filtered.length} recipes`)
     }
 
     // Apply category filter
@@ -199,6 +212,7 @@ export default function RecipeOverviewPage() {
       filtered = filtered.filter(recipe =>
         recipe.mainCategory === selectedCategory
       )
+      console.log(`📂 After category filter: ${filtered.length} recipes`)
     }
 
     setFilteredRecipes(filtered)
