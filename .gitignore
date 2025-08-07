@@ -64,3 +64,5 @@ Frida_Dataset_May2025.*
 *.xlsx
 *.ods 
 frida-data.zip
+public/images/recipes/
+public/images/categories/
