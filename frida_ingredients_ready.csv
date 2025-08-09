@@ -1,0 +1,10 @@
+id,name,category,description,calories,protein,carbs,fat,fiber,vitamins,minerals,source,frida_id,is_active
+frida-1," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,1,true
+frida-2," uspec.",andre," uspec. fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,2,true
+frida-3," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,3,true
+frida-4," uspec.",andre," uspec. fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,4,true
+frida-6," konventionel (ikke-økologisk)",andre," konventionel (ikke-økologisk) fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,6,true
+frida-8," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,8,true
+frida-9," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,9,true
+frida-10," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,10,true
+frida-11," rå",andre," rå fra Frida DTU database",NULL,NULL,NULL,NULL,NULL,'{}','{}',frida_dtu,11,true

@@ -8,6 +8,7 @@ import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
 import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
+import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 
 interface RecipePageProps {
   params: {
@@ -155,15 +156,17 @@ export default async function RecipePage({ params }: RecipePageProps) {
                   </div>
                 )}
 
-                {/* Nutrition Facts Box - Moved up from client component */}
+                {/* Nutrition Facts Box - Using nutritionalInfo from Frida DTU */}
                 <div className="mt-6">
                   <NutritionFactsBox
-                    calories={recipe.calories || 0}
-                    protein={recipe.protein || 0}
-                    carbs={recipe.carbs || 0}
-                    fat={recipe.fat || 0}
-                    fiber={recipe.fiber || 0}
+                    calories={recipe.nutritionalInfo?.calories || recipe.calories || 0}
+                    protein={recipe.nutritionalInfo?.protein || recipe.protein || 0}
+                    carbs={recipe.nutritionalInfo?.carbs || recipe.carbs || 0}
+                    fat={recipe.nutritionalInfo?.fat || recipe.fat || 0}
+                    fiber={recipe.nutritionalInfo?.fiber || recipe.fiber || 0}
                     servings={recipe.servings || 4}
+                    vitamins={recipe.nutritionalInfo?.vitamins || {}}
+                    minerals={recipe.nutritionalInfo?.minerals || {}}
                   />
                 </div>
 

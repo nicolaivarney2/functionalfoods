@@ -61,7 +61,7 @@ export class DatabaseService {
       prepTimeISO: recipe.preptimeiso,
       cookTimeISO: recipe.cooktimeiso,
       totalTimeISO: recipe.totaltimeiso,
-      // nutritionalInfo: recipe.nutritionalinfo // Column doesn't exist yet
+      nutritionalInfo: recipe.nutritionalinfo // Complete nutritional data from Frida DTU
     }))
     
     console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend`)
@@ -185,9 +185,10 @@ export class DatabaseService {
         filteredRecipe.preptimeiso = recipe.prepTimeISO || null
         filteredRecipe.cooktimeiso = recipe.cookTimeISO || null
         filteredRecipe.totaltimeiso = recipe.totalTimeISO || null
-        // Note: nutritionalinfo column doesn't exist yet - store in description for now
+        
+        // Store complete nutritional information as JSONB
         if (recipe.nutritionalInfo) {
-          filteredRecipe.description = recipe.description + ` [Frida DTU: ${Math.round(recipe.nutritionalInfo.calories)} cal, ${Math.round(recipe.nutritionalInfo.protein)}g protein]`
+          filteredRecipe.nutritionalinfo = recipe.nutritionalInfo
         }
         
         return filteredRecipe

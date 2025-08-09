@@ -76,7 +76,7 @@ export class RecipeCalculator {
     unit: string
   ): CalculatedNutrition {
     // Convert amount to grams
-    const grams = this.convertToGrams(amount, unit)
+    const grams = this.convertAmountToGrams(amount, unit, 'unknown')
     const multiplier = grams / 100 // Nutritional info is per 100g
 
     return {
@@ -95,26 +95,155 @@ export class RecipeCalculator {
   /**
    * Convert various units to grams
    */
-  private convertToGrams(amount: number, unit: string): number {
-    const unitMap: { [key: string]: number } = {
+  public convertAmountToGrams(amount: number, unit: string, ingredientName?: string): number {
+    const unitLower = unit.toLowerCase()
+    
+    // Basic unit conversions
+    const basicUnits: { [key: string]: number } = {
       'g': 1,
       'gram': 1,
       'kg': 1000,
       'kilo': 1000,
-      'ml': 1, // Approximate for liquids
+      
+      // Liquid measurements (approx. 1ml = 1g for water-based liquids)
+      'ml': 1,
       'l': 1000,
       'liter': 1000,
-      'stk': 100, // Average piece weight
-      'stykke': 100,
-      'spsk': 15, // Tablespoon
-      'teskefuld': 5, // Teaspoon
+      'dl': 100,
+      
+      // Standard tablespoon/teaspoon (varies by ingredient type)
+      'spsk': this.getTablespoonWeight(ingredientName),
+      'spiseskefuld': this.getTablespoonWeight(ingredientName),
+      'tsk': this.getTeaspoonWeight(ingredientName),
+      'teskefuld': this.getTeaspoonWeight(ingredientName),
+      'teske': this.getTeaspoonWeight(ingredientName),
+      
+      // Piece-based measurements
+      'stk': this.getPieceWeight(ingredientName),
+      'stykke': this.getPieceWeight(ingredientName),
+      'fed': this.getCloveWeight(ingredientName),
+      
+      // Volume/handful measurements
+      'bundt': this.getBunchWeight(ingredientName),
+      'bunke': this.getBunchWeight(ingredientName),
+      'håndfuld': 30,
       'knsp': 1, // Pinch
-      'bunke': 50, // Bunch
-      'fed': 5, // Clove (garlic)
-      'håndfuld': 30, // Handful
+      'knivspids': 1,
+      
+      // Danish cooking units
+      'kop': 240, // Cup
+      'glas': 200, // Glass
     }
 
-    return amount * (unitMap[unit.toLowerCase()] || 100) // Default to 100g if unknown unit
+    return amount * (basicUnits[unitLower] || 100) // Default to 100g if unknown unit
+  }
+
+  /**
+   * Get tablespoon weight based on ingredient type (15ml volume but different weights)
+   */
+  private getTablespoonWeight(ingredientName?: string): number {
+    if (!ingredientName) return 15
+    
+    const ingredient = ingredientName.toLowerCase()
+    
+    // Oils and liquids
+    if (ingredient.includes('olie') || ingredient.includes('oil')) return 14
+    if (ingredient.includes('eddike') || ingredient.includes('vinegar')) return 15
+    if (ingredient.includes('saft') || ingredient.includes('juice')) return 15
+    if (ingredient.includes('fløde') || ingredient.includes('cream')) return 15
+    if (ingredient.includes('mælk') || ingredient.includes('milk')) return 15
+    
+    // Powders and spices
+    if (ingredient.includes('mel') || ingredient.includes('flour')) return 8
+    if (ingredient.includes('sukker') || ingredient.includes('sugar')) return 12
+    if (ingredient.includes('salt')) return 18
+    if (ingredient.includes('paprika') || ingredient.includes('krydderi')) return 7
+    if (ingredient.includes('oregano') || ingredient.includes('basilikum')) return 3
+    
+    // Thick pastes
+    if (ingredient.includes('butter') || ingredient.includes('smør')) return 14
+    if (ingredient.includes('peanut') || ingredient.includes('nød')) return 16
+    
+    return 15 // Default tablespoon weight
+  }
+
+  /**
+   * Get teaspoon weight based on ingredient type (5ml volume but different weights)
+   */
+  private getTeaspoonWeight(ingredientName?: string): number {
+    if (!ingredientName) return 5
+    
+    const ingredient = ingredientName.toLowerCase()
+    
+    // Oils and liquids
+    if (ingredient.includes('olie') || ingredient.includes('oil')) return 4.5
+    if (ingredient.includes('eddike') || ingredient.includes('vinegar')) return 5
+    
+    // Powders and spices
+    if (ingredient.includes('salt')) return 6
+    if (ingredient.includes('sukker') || ingredient.includes('sugar')) return 4
+    if (ingredient.includes('paprika') || ingredient.includes('krydderi')) return 2
+    if (ingredient.includes('oregano') || ingredient.includes('basilikum')) return 1
+    if (ingredient.includes('spidskommen') || ingredient.includes('cumin')) return 2
+    if (ingredient.includes('kardemomme') || ingredient.includes('cardamom')) return 2
+    if (ingredient.includes('gurkemeje') || ingredient.includes('turmeric')) return 3
+    
+    return 5 // Default teaspoon weight
+  }
+
+  /**
+   * Get piece weight based on ingredient type
+   */
+  private getPieceWeight(ingredientName?: string): number {
+    if (!ingredientName) return 100
+    
+    const ingredient = ingredientName.toLowerCase()
+    
+    // Eggs
+    if (ingredient.includes('æg') || ingredient.includes('egg')) return 60
+    
+    // Vegetables
+    if (ingredient.includes('løg') || ingredient.includes('onion')) return 150
+    if (ingredient.includes('tomat') || ingredient.includes('tomato')) return 100
+    if (ingredient.includes('agurk') || ingredient.includes('cucumber')) return 300
+    if (ingredient.includes('citron') || ingredient.includes('lemon')) return 60
+    if (ingredient.includes('lime')) return 30
+    if (ingredient.includes('peberfrugt') || ingredient.includes('pepper')) return 150
+    
+    // Meat pieces
+    if (ingredient.includes('kylling') || ingredient.includes('chicken')) return 150
+    if (ingredient.includes('bøf') || ingredient.includes('steak')) return 200
+    
+    return 100 // Default piece weight
+  }
+
+  /**
+   * Get clove weight (garlic, etc.)
+   */
+  private getCloveWeight(ingredientName?: string): number {
+    if (!ingredientName) return 5
+    
+    const ingredient = ingredientName.toLowerCase()
+    
+    if (ingredient.includes('hvidløg') || ingredient.includes('garlic')) return 3
+    
+    return 5 // Default clove weight
+  }
+
+  /**
+   * Get bunch weight 
+   */
+  private getBunchWeight(ingredientName?: string): number {
+    if (!ingredientName) return 50
+    
+    const ingredient = ingredientName.toLowerCase()
+    
+    if (ingredient.includes('persille') || ingredient.includes('parsley')) return 30
+    if (ingredient.includes('mynte') || ingredient.includes('mint')) return 20
+    if (ingredient.includes('forårsløg') || ingredient.includes('spring onion')) return 40
+    if (ingredient.includes('basilikum') || ingredient.includes('basil')) return 25
+    
+    return 50 // Default bunch weight
   }
 
   /**

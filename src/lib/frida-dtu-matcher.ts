@@ -39,6 +39,77 @@ export class FridaDTUMatcher {
   }
 
   /**
+   * Get manually confirmed match from ingredient_matches table
+   */
+  private async getManualMatch(ingredientName: string): Promise<{ fridaId: string, fridaName: string } | null> {
+    try {
+      // Look for saved matches by ingredient name - handle both exact and prefixed patterns
+      const { data: matches, error } = await supabase
+        .from('ingredient_matches')
+        .select('frida_ingredient_id')
+        .or(`recipe_ingredient_id.eq.${ingredientName},recipe_ingredient_id.like.${ingredientName}-%`)
+        .limit(1)
+      
+      if (error || !matches || matches.length === 0) {
+        return null
+      }
+      
+      const fridaId = matches[0].frida_ingredient_id
+      
+      // Get the Frida ingredient details
+      const { data: fridaIngredient, error: fridaError } = await supabase
+        .from('frida_ingredients')
+        .select('name')
+        .eq('id', fridaId)
+        .limit(1)
+      
+      if (fridaError || !fridaIngredient || fridaIngredient.length === 0) {
+        return null
+      }
+      
+      return {
+        fridaId,
+        fridaName: fridaIngredient[0].name
+      }
+    } catch (error) {
+      console.log(`⚠️ Error checking manual matches: ${error}`)
+      return null
+    }
+  }
+
+  /**
+   * Get nutrition data from frida_ingredients table
+   */
+  private async getFridaIngredientNutrition(fridaId: string): Promise<NutritionalInfo | null> {
+    try {
+      const { data: ingredient, error } = await supabase
+        .from('frida_ingredients')
+        .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
+        .eq('id', fridaId)
+        .limit(1)
+      
+      if (error || !ingredient || ingredient.length === 0) {
+        console.log(`❌ Failed to get nutrition for Frida ID: ${fridaId}`)
+        return null
+      }
+      
+      const ing = ingredient[0]
+      return {
+        calories: ing.calories || 0,
+        protein: ing.protein || 0,
+        carbs: ing.carbs || 0,
+        fat: ing.fat || 0,
+        fiber: ing.fiber || 0,
+        vitamins: ing.vitamins || {},
+        minerals: ing.minerals || {}
+      }
+    } catch (error) {
+      console.log(`❌ Error getting Frida nutrition: ${error}`)
+      return null
+    }
+  }
+
+  /**
    * Search for foods in Supabase database
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
@@ -219,6 +290,22 @@ export class FridaDTUMatcher {
       }
     }
 
+    // First, check if this ingredient has a manually confirmed match in the database
+    const manualMatch = await this.getManualMatch(ingredientName)
+    if (manualMatch) {
+      console.log(`🎯 Using manual match for "${ingredientName}" → "${manualMatch.fridaName}"`)
+      const nutrition = await this.getFridaIngredientNutrition(manualMatch.fridaId)
+      if (nutrition) {
+        this.ingredientCache.set(ingredientName, nutrition)
+        return {
+          nutrition,
+          match: manualMatch.fridaName,
+          score: 1.0 // Manual matches get perfect score
+        }
+      }
+    }
+
+    // If no manual match, fall back to automatic matching
     const bestMatch = await this.findBestMatch(ingredientName)
     
     if (!bestMatch) {

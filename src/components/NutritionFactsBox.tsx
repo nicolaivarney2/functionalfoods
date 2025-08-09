@@ -10,6 +10,8 @@ interface NutritionFactsBoxProps {
   fat: number
   fiber: number
   servings: number
+  vitamins?: { [key: string]: number }
+  minerals?: { [key: string]: number }
 }
 
 export default function NutritionFactsBox({
@@ -18,40 +20,124 @@ export default function NutritionFactsBox({
   carbs,
   fat,
   fiber,
-  servings
+  servings,
+  vitamins = {},
+  minerals = {}
 }: NutritionFactsBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
-  // Dummy data for vitaminer og mineraler (senere fra Frida database)
-  const vitamins = {
-    'Vitamin A': { amount: 850, unit: 'µg', dailyValue: 800, percentage: 106 },
-    'Vitamin B1 (Thiamin)': { amount: 0.8, unit: 'mg', dailyValue: 1.1, percentage: 73 },
-    'Vitamin B2 (Riboflavin)': { amount: 1.2, unit: 'mg', dailyValue: 1.4, percentage: 86 },
-    'Vitamin B6': { amount: 1.8, unit: 'mg', dailyValue: 1.4, percentage: 129 },
-    'Vitamin B12': { amount: 3.2, unit: 'µg', dailyValue: 2.4, percentage: 133 },
-    'Vitamin C': { amount: 45, unit: 'mg', dailyValue: 80, percentage: 56 },
-    'Vitamin D': { amount: 2.8, unit: 'µg', dailyValue: 5, percentage: 56 },
-    'Vitamin E': { amount: 8.5, unit: 'mg', dailyValue: 12, percentage: 71 },
-    'Vitamin K': { amount: 65, unit: 'µg', dailyValue: 75, percentage: 87 }
+  // Daglige anbefalinger (voksne)
+  const dailyValues = {
+    // Vitaminer
+    'A': { amount: 800, unit: 'µg' },
+    'C': { amount: 80, unit: 'mg' },
+    'D': { amount: 5, unit: 'µg' },
+    'E': { amount: 12, unit: 'mg' },
+    'B1': { amount: 1.1, unit: 'mg' },
+    'B2': { amount: 1.4, unit: 'mg' },
+    'B3': { amount: 16, unit: 'mg' },
+    'B6': { amount: 1.4, unit: 'mg' },
+    'B12': { amount: 2.4, unit: 'µg' },
+    'Folate': { amount: 400, unit: 'µg' },
+    'K': { amount: 75, unit: 'µg' },
+    // Mineraler
+    'calcium': { amount: 800, unit: 'mg' },
+    'iron': { amount: 14, unit: 'mg' },
+    'magnesium': { amount: 375, unit: 'mg' },
+    'phosphor': { amount: 700, unit: 'mg' },
+    'potassium': { amount: 2000, unit: 'mg' },
+    'zinc': { amount: 10, unit: 'mg' },
+    'selenium': { amount: 55, unit: 'µg' },
+    'sodium': { amount: 2300, unit: 'mg' } // Max anbefaling
   }
 
-  const minerals = {
-    'Calcium': { amount: 280, unit: 'mg', dailyValue: 800, percentage: 35 },
-    'Jern': { amount: 4.2, unit: 'mg', dailyValue: 14, percentage: 30 },
-    'Magnesium': { amount: 85, unit: 'mg', dailyValue: 375, percentage: 23 },
-    'Fosfor': { amount: 320, unit: 'mg', dailyValue: 700, percentage: 46 },
-    'Kalium': { amount: 680, unit: 'mg', dailyValue: 2000, percentage: 34 },
-    'Zink': { amount: 3.8, unit: 'mg', dailyValue: 10, percentage: 38 },
-    'Selen': { amount: 25, unit: 'µg', dailyValue: 55, percentage: 45 }
+  // Generer dynamiske nutrition data baseret på props
+  const generateNutritionData = () => {
+    const vitaminData: { [key: string]: { amount: number, unit: string, dailyValue: number, percentage: number } } = {}
+    const mineralData: { [key: string]: { amount: number, unit: string, dailyValue: number, percentage: number } } = {}
+
+    // Process vitamins
+    Object.entries(vitamins).forEach(([vitaminKey, amount]) => {
+      const dailyVal = dailyValues[vitaminKey as keyof typeof dailyValues]
+      if (dailyVal && amount > 0) {
+        const percentage = Math.round((amount / dailyVal.amount) * 100)
+        const displayName = vitaminKey === 'B12' ? 'Vitamin B12' : 
+                           vitaminKey === 'B6' ? 'Vitamin B6' :
+                           vitaminKey === 'B1' ? 'Vitamin B1 (Thiamin)' :
+                           vitaminKey === 'B2' ? 'Vitamin B2 (Riboflavin)' :
+                           vitaminKey === 'B3' ? 'Vitamin B3 (Niacin)' :
+                           vitaminKey === 'Folate' ? 'Folsyre' :
+                           `Vitamin ${vitaminKey}`
+        
+        vitaminData[displayName] = {
+          amount: Math.round(amount * 100) / 100,
+          unit: dailyVal.unit,
+          dailyValue: dailyVal.amount,
+          percentage
+        }
+      }
+    })
+
+    // Process minerals
+    Object.entries(minerals).forEach(([mineralKey, amount]) => {
+      const dailyVal = dailyValues[mineralKey as keyof typeof dailyValues]
+      if (dailyVal && amount > 0) {
+        const percentage = Math.round((amount / dailyVal.amount) * 100)
+        const displayName = mineralKey === 'calcium' ? 'Calcium' :
+                           mineralKey === 'iron' ? 'Jern' :
+                           mineralKey === 'magnesium' ? 'Magnesium' :
+                           mineralKey === 'phosphor' ? 'Fosfor' :
+                           mineralKey === 'potassium' ? 'Kalium' :
+                           mineralKey === 'zinc' ? 'Zink' :
+                           mineralKey === 'selenium' ? 'Selen' :
+                           mineralKey === 'sodium' ? 'Natrium' : mineralKey
+        
+        mineralData[displayName] = {
+          amount: Math.round(amount * 100) / 100,
+          unit: dailyVal.unit,
+          dailyValue: dailyVal.amount,
+          percentage
+        }
+      }
+    })
+
+    return { vitaminData, mineralData }
   }
 
-  // Højdepunkter baseret på indhold
-  const highlights = [
-    'Høj mængde B12 vitamin (133% af daglig anbefaling)',
-    'God kilde til B6 vitamin (129% af daglig anbefaling)',
-    'Indeholder betydelige mængder af Vitamin A (106% af daglig anbefaling)',
-    'Rig på Selen - vigtig for immunforsvaret'
-  ]
+  const { vitaminData, mineralData } = generateNutritionData()
+
+  // Generer dynamiske highlights baseret på faktisk nutrition data
+  const generateHighlights = () => {
+    const highlights: string[] = []
+    const allNutrients = { ...vitaminData, ...mineralData }
+
+    // Find høje værdier (>= 100% af daglig anbefaling)
+    Object.entries(allNutrients).forEach(([name, data]) => {
+      if (data.percentage >= 133) {
+        highlights.push(`Høj mængde ${name} (${data.percentage}% af daglig anbefaling)`)
+      } else if (data.percentage >= 100) {
+        highlights.push(`Indeholder betydelige mængder af ${name} (${data.percentage}% af daglig anbefaling)`)
+      } else if (data.percentage >= 50) {
+        highlights.push(`God kilde til ${name} (${data.percentage}% af daglig anbefaling)`)
+      }
+    })
+
+    // Tilføj makro-nutrition highlights
+    if (protein >= 20) {
+      highlights.push(`Højt proteinindhold (${Math.round(protein)}g per portion)`)
+    }
+    if (carbs <= 5) {
+      highlights.push(`Meget lavt kulhydratindhold (${Math.round(carbs)}g) - perfekt til keto`)
+    }
+    if (fiber >= 5) {
+      highlights.push(`God kilde til kostfibre (${Math.round(fiber)}g)`)
+    }
+
+    // Begræns til top 4 highlights
+    return highlights.slice(0, 4)
+  }
+
+  const highlights = generateHighlights()
 
   return (
     <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-200">
@@ -61,27 +147,29 @@ export default function NutritionFactsBox({
           <h3 className="text-sm font-medium text-gray-900">NÆRINGSINDHOLD PR. PORTION</h3>
         </div>
 
+
+
       {/* Basic Nutrition Grid */}
       <div className="grid grid-cols-3 gap-2 text-xs">
         <div className="flex justify-between">
           <span className="text-gray-600">Kalorier:</span>
-          <span className="font-medium">{calories} kcal</span>
+          <span className="font-medium">{Math.round(calories)} kcal</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Protein:</span>
-          <span className="font-medium">{protein}g</span>
+          <span className="font-medium">{Math.round(protein * 10) / 10}g</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Kulhydrater:</span>
-          <span className="font-medium">{carbs}g</span>
+          <span className="font-medium">{Math.round(carbs * 10) / 10}g</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Fedt:</span>
-          <span className="font-medium">{fat}g</span>
+          <span className="font-medium">{Math.round(fat * 10) / 10}g</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Fiber:</span>
-          <span className="font-medium">{fiber}g</span>
+          <span className="font-medium">{Math.round(fiber * 10) / 10}g</span>
         </div>
         <div className="flex justify-between">
           <span className="text-gray-600">Portioner:</span>
@@ -119,36 +207,40 @@ export default function NutritionFactsBox({
             </div>
 
             {/* Vitamins */}
-            <div>
-              <h4 className="text-xs font-medium text-gray-900 mb-2">Vitaminer</h4>
-              <div className="space-y-1">
-                {Object.entries(vitamins).map(([vitamin, data]) => (
-                  <div key={vitamin} className="flex justify-between items-center">
-                    <span className="text-gray-600 text-xs">{vitamin}:</span>
-                    <div className="flex items-center space-x-1">
-                      <span className="font-medium text-xs">{data.amount} {data.unit}</span>
-                      <span className="text-xs text-gray-500">({data.percentage}%)</span>
+            {Object.keys(vitaminData).length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-gray-900 mb-2">Vitaminer</h4>
+                <div className="space-y-1">
+                  {Object.entries(vitaminData).map(([vitamin, data]) => (
+                    <div key={vitamin} className="flex justify-between items-center">
+                      <span className="text-gray-600 text-xs">{vitamin}:</span>
+                      <div className="flex items-center space-x-1">
+                        <span className="font-medium text-xs">{data.amount} {data.unit}</span>
+                        <span className="text-xs text-gray-500">({data.percentage}%)</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Minerals */}
-            <div>
-              <h4 className="text-xs font-medium text-gray-900 mb-2">Mineraler</h4>
-              <div className="space-y-1">
-                {Object.entries(minerals).map(([mineral, data]) => (
-                  <div key={mineral} className="flex justify-between items-center">
-                    <span className="text-gray-600 text-xs">{mineral}:</span>
-                    <div className="flex items-center space-x-1">
-                      <span className="font-medium text-xs">{data.amount} {data.unit}</span>
-                      <span className="text-xs text-gray-500">({data.percentage}%)</span>
+            {Object.keys(mineralData).length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-gray-900 mb-2">Mineraler</h4>
+                <div className="space-y-1">
+                  {Object.entries(mineralData).map(([mineral, data]) => (
+                    <div key={mineral} className="flex justify-between items-center">
+                      <span className="text-gray-600 text-xs">{mineral}:</span>
+                      <div className="flex items-center space-x-1">
+                        <span className="font-medium text-xs">{data.amount} {data.unit}</span>
+                        <span className="text-xs text-gray-500">({data.percentage}%)</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

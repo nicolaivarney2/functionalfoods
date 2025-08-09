@@ -1,0 +1,4 @@
+id,name,category,description,calories,protein,carbs,fat,fiber,source,frida_id,is_active
+frida-1,"Strawberry raw",frugt,"Strawberry raw fra Frida DTU database",38.46,0.66,6.07,0.6,1.49,frida_dtu,1,true
+frida-2,"Apple raw all varieties",frugt,"Apple raw all varieties fra Frida DTU database",55.06,0.27,11.32,0.23,2.21,frida_dtu,2,true
+frida-3,"Banana raw",frugt,"Banana raw fra Frida DTU database",93.48,1.14,19.71,0.21,1.63,frida_dtu,3,true

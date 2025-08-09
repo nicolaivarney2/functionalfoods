@@ -63,12 +63,18 @@ export default async function AdminDashboard() {
             >
               Import
             </Link>
-            <Link 
-              href="/admin/recipes" 
-              className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
-            >
-              Recipes
-            </Link>
+                    <Link
+          href="/admin/ingredient-matching"
+          className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+        >
+          Ingredient Matching
+        </Link>
+        <Link
+          href="/admin/recipes"
+          className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
+        >
+          Recipe Management
+        </Link>
             <Link 
               href="/admin/frida-mapping" 
               className="px-3 py-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300"
