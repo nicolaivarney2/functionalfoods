@@ -158,16 +158,36 @@ export default async function RecipePage({ params }: RecipePageProps) {
 
                 {/* Nutrition Facts Box - Using nutritionalInfo from Frida DTU */}
                 <div className="mt-6">
-                  <NutritionFactsBox
-                    calories={recipe.nutritionalInfo?.calories || recipe.calories || 0}
-                    protein={recipe.nutritionalInfo?.protein || recipe.protein || 0}
-                    carbs={recipe.nutritionalInfo?.carbs || recipe.carbs || 0}
-                    fat={recipe.nutritionalInfo?.fat || recipe.fat || 0}
-                    fiber={recipe.nutritionalInfo?.fiber || recipe.fiber || 0}
-                    servings={recipe.servings || 4}
-                    vitamins={recipe.nutritionalInfo?.vitamins || {}}
-                    minerals={recipe.nutritionalInfo?.minerals || {}}
-                  />
+                  {(() => {
+                    const servings = recipe.servings && recipe.servings > 0 ? recipe.servings : 1
+                    const perServing = (value?: number) => (value || 0) / servings
+                    const divideRecord = (rec?: Record<string, number>) => {
+                      const source = rec || {}
+                      const entries = Object.entries(source).map(([k, v]) => [k, (v || 0) / servings])
+                      return Object.fromEntries(entries)
+                    }
+
+                    const calories = perServing(recipe.nutritionalInfo?.calories ?? recipe.calories)
+                    const protein = perServing(recipe.nutritionalInfo?.protein ?? recipe.protein)
+                    const carbs = perServing(recipe.nutritionalInfo?.carbs ?? recipe.carbs)
+                    const fat = perServing(recipe.nutritionalInfo?.fat ?? recipe.fat)
+                    const fiber = perServing(recipe.nutritionalInfo?.fiber ?? recipe.fiber)
+                    const vitamins = divideRecord(recipe.nutritionalInfo?.vitamins as Record<string, number> | undefined)
+                    const minerals = divideRecord(recipe.nutritionalInfo?.minerals as Record<string, number> | undefined)
+
+                    return (
+                      <NutritionFactsBox
+                        calories={calories}
+                        protein={protein}
+                        carbs={carbs}
+                        fat={fat}
+                        fiber={fiber}
+                        servings={servings}
+                        vitamins={vitamins}
+                        minerals={minerals}
+                      />
+                    )
+                  })()}
                 </div>
 
               </div>

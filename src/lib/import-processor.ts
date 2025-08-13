@@ -1,4 +1,4 @@
-import { importRecipes, importRecipesWithImages, RawRecipeData, convertKetolivToRawRecipeData } from './recipe-import'
+import { importRecipes, RawRecipeData, convertKetolivToRawRecipeData } from './recipe-import'
 import { FridaDTUMatcher } from './frida-dtu-matcher'
 import { RecipeCalculator } from './recipe-calculator'
 import { ingredientService } from './ingredient-system'
@@ -46,9 +46,17 @@ export class ImportProcessor {
       rawRecipeData = rawData as RawRecipeData[]
     }
 
-    // Step 1: Import recipes with image fetching
-    console.log('📝 Step 1: Importing recipes with image fetching...')
-    const importedRecipes = await importRecipesWithImages(rawRecipeData)
+    // Step 1: Normalize & import recipes (do NOT fetch images on client)
+    console.log('📝 Step 1: Importing recipes (no client fetch)...')
+    const normalizedRaw: RawRecipeData[] = rawRecipeData.map((r: any) => {
+      // normalize imageUrl from various possible fields
+      const imageUrl = r.imageUrl || r.image_url || r.image?.url || r.image?.src || r.image
+      return {
+        ...r,
+        imageUrl: imageUrl || '/images/recipe-placeholder.jpg'
+      }
+    })
+    const importedRecipes = importRecipes(normalizedRaw)
     
     // Count successfully fetched images
     const imagesFetched = importedRecipes.filter(recipe => 
@@ -81,10 +89,19 @@ export class ImportProcessor {
       })
     })
     
+    const toSlug = (input: string) =>
+      input
+        .toLowerCase()
+        .replace(/[æøå]/g, (m) => ({ 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }[m] as string))
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim()
+
     const processedIngredients: IngredientTag[] = Array.from(uniqueIngredients).map(name => ({
-      id: `${name}-${Date.now()}`,
+      id: toSlug(name),
       name: name,
-      category: 'protein' as any, // Simplified for now
+      category: 'Andre' as any,
       exclusions: [],
       allergens: [],
       commonNames: [name],

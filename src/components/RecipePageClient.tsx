@@ -24,7 +24,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
   const [currentRating, setCurrentRating] = useState(4)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
-  const [commentCount, setCommentCount] = useState(2) // Start with dummy data count
+  const [commentCount, setCommentCount] = useState(0)
 
   // Update comment count when comments change
   const handleCommentUpdate = (newCount: number) => {

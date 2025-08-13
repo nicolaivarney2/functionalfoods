@@ -38,7 +38,12 @@ interface KetolivRecipe {
 }
 
 export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeData[] {
+  console.log(`🔄 Converting ${ketolivData.length} Ketoliv recipes...`)
+  
   return ketolivData.map(recipe => {
+    console.log(`   📝 Converting recipe: ${recipe.name}`)
+    console.log(`   Original image_url: ${recipe.image_url}`)
+    
     // Extract dietary categories from tags
     const dietaryCategories = extractDietaryCategories(recipe.tags?.cuisine || [])
     
@@ -93,6 +98,10 @@ export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeDa
       rating: undefined,
       reviewCount: undefined
     }
+  }).map(convertedRecipe => {
+    console.log(`   ✅ Converted recipe: ${convertedRecipe.title}`)
+    console.log(`   Final imageUrl: ${convertedRecipe.imageUrl}`)
+    return convertedRecipe
   })
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseServer } from '@/lib/supabaseServer'
 import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
 import { RecipeCalculator } from '@/lib/recipe-calculator'
 
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     console.log(`🔄 Recalculating nutrition for recipe ID: ${recipeId}`)
     
     // Get recipe first
-    const { data: recipe, error: recipeError } = await supabase
+    const { data: recipe, error: recipeError } = await supabaseServer
       .from('recipes')
       .select('*')
       .eq('id', recipeId)
@@ -115,10 +115,10 @@ export async function POST(request: NextRequest) {
       fat: totalNutrition.fat / servings,
       fiber: totalNutrition.fiber / servings,
       vitamins: Object.fromEntries(
-        Object.entries(totalNutrition.vitamins).map(([k, v]) => [k, v / servings])
+        Object.entries(totalNutrition.vitamins).map(([k, v]) => [k, (v as number) / servings])
       ),
       minerals: Object.fromEntries(
-        Object.entries(totalNutrition.minerals).map(([k, v]) => [k, v / servings])
+        Object.entries(totalNutrition.minerals).map(([k, v]) => [k, (v as number) / servings])
       )
     }
     
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     })
     
     // Update recipe with new nutritional info (per portion)
-    const { data: updatedRecipe, error: updateError } = await supabase
+    const { data: updatedRecipe, error: updateError } = await supabaseServer
       .from('recipes')
       .update({
         nutritionalinfo: perPortionNutrition,

@@ -227,6 +227,69 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
           </div>
         </motion.div>
 
+        {/* Weekly micro-nutrition (optional, shown when real data exists) */}
+        {mealPlan?.realMealPlan?.weeks?.[0]?.weeklyNutrition && (
+          <motion.div
+            className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Ugens mikro- og makro-oversigt</h3>
+            </div>
+            {(() => {
+              const wn = mealPlan.realMealPlan.weeks[0].weeklyNutrition;
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">Gns. pr. dag</div>
+                    <div className="mt-2 text-sm text-gray-800">
+                      <div>Kalorier: <span className="font-medium">{Math.round(wn.averageDailyCalories)}</span> kcal</div>
+                      <div>Protein: <span className="font-medium">{Math.round(wn.averageDailyProtein)}</span> g</div>
+                      <div>Kulhydrat: <span className="font-medium">{Math.round(wn.averageDailyCarbs)}</span> g</div>
+                      <div>Fedt: <span className="font-medium">{Math.round(wn.averageDailyFat)}</span> g</div>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">Mikro (gns. pr. dag)</div>
+                    <div className="mt-2 text-sm text-gray-800">
+                      {typeof wn.averageDailyFiber === 'number' && (
+                        <div>Fiber: <span className="font-medium">{Math.round(wn.averageDailyFiber)}</span> g</div>
+                      )}
+                      {typeof wn.averageDailySodium === 'number' && (
+                        <div>Natrium: <span className="font-medium">{Math.round(wn.averageDailySodium)}</span> mg</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">Styrker (top 3)</div>
+                    <ul className="mt-2 text-sm text-gray-800 list-disc list-inside space-y-1">
+                      {(wn.strengths || []).slice(0, 3).map((s: any, idx: number) => (
+                        <li key={idx}>{s.nutrient}: <span className="text-gray-600">{Math.round(s.coverage * 100)}% af dagligt mål</span></li>
+                      ))}
+                      {(!wn.strengths || wn.strengths.length === 0) && (
+                        <li>Ingen særlige styrker registreret</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <div className="text-sm text-gray-600">Fokus (1 ting)</div>
+                    <ul className="mt-2 text-sm text-gray-800 list-disc list-inside space-y-1">
+                      {(wn.deficiencies || []).slice(0, 1).map((d: any, idx: number) => (
+                        <li key={idx}>{d.nutrient}: <span className="text-gray-600">mangler ca. {Math.max(0, Math.round((d.targetAmount - d.currentAmount)))} {d.unit}</span></li>
+                      ))}
+                      {(!wn.deficiencies || wn.deficiencies.length === 0) && (
+                        <li>Alt ser fint ud denne uge</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+
         {/* Meal Plan Section */}
         <motion.div 
           className="bg-white rounded-xl border border-gray-200 p-6 mb-8 shadow-sm"

@@ -59,8 +59,19 @@ export interface NutritionalInfo {
   fiberPer100g?: number;
   sugarPer100g?: number;
   sodiumPer100g?: number;
+  // Optional per-portion fields for recipes where nutrition is stored per serving
+  caloriesPerPortion?: number;
+  proteinPerPortion?: number;
+  carbsPerPortion?: number;
+  fatPerPortion?: number;
+  fiberPerPortion?: number;
+  sugarPerPortion?: number;
+  sodiumPerPortion?: number;
+  // Vitamins and minerals can be provided either as arrays (per 100g) or maps (per portion)
   vitamins?: VitaminInfo[];
   minerals?: MineralInfo[];
+  vitaminMap?: { [key: string]: number };
+  mineralMap?: { [key: string]: number };
 }
 
 export interface VitaminInfo {

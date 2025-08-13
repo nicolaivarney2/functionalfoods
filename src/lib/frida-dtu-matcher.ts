@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
-
-// Get Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { supabase } from '@/lib/supabase'
 
 // Types for Frida DTU data
 interface FridaFood {
@@ -43,11 +38,29 @@ export class FridaDTUMatcher {
    */
   private async getManualMatch(ingredientName: string): Promise<{ fridaId: string, fridaName: string } | null> {
     try {
-      // Look for saved matches by ingredient name - handle both exact and prefixed patterns
+      // Support both legacy name-based IDs and new slug-based IDs
+      const toSlug = (input: string) => input
+        .toLowerCase()
+        .replace(/[æøå]/g, (m) => ({ 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }[m] as string))
+        .replace(/[^a-z0-9\s-]/g, ' ')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim()
+
+      const slugId = toSlug(ingredientName)
+
+      // Look for saved matches by either slug id or exact name
+      const orFilter = [
+        `recipe_ingredient_id.eq.${slugId}`,
+        `recipe_ingredient_id.eq.${ingredientName}`,
+        `recipe_ingredient_id.like.${slugId}-%`
+      ].join(',')
+
       const { data: matches, error } = await supabase
         .from('ingredient_matches')
         .select('frida_ingredient_id')
-        .or(`recipe_ingredient_id.eq.${ingredientName},recipe_ingredient_id.like.${ingredientName}-%`)
+        .or(orFilter)
+        .order('created_at', { ascending: false })
         .limit(1)
       
       if (error || !matches || matches.length === 0) {
@@ -380,16 +393,19 @@ export class FridaDTUMatcher {
       'gram': 1,
       'kg': 1000,
       'kilo': 1000,
-      'stk': 100, // Assume 100g per piece
-      'stykke': 100,
+      // Piece-based defaults (conservative)
+      'stk': 80,
+      'st': 80, // alias often seen in imported data
+      'stykke': 80,
       'spsk': 15, // Tablespoon
-      'tesk': 5,  // Teaspoon
+      'tesk': 5,  // Teaspoon (common misspelling)
+      'tsk': 5,   // Teaspoon
       'dl': 100,  // Deciliter
       'l': 1000,  // Liter
       'ml': 1     // Milliliter
     }
     
-    const gramsPerUnit = conversions[unitLower] || 100 // Default to 100g
+    const gramsPerUnit = conversions[unitLower] || 80 // Default to 80g per piece/unknown to avoid overcounting
     const totalGrams = amount * gramsPerUnit
     
     return totalGrams / 100 // Convert to per 100g basis

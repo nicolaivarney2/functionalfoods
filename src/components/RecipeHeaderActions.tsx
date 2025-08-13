@@ -45,7 +45,8 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
           />
         ))}
       </button>
-      <span className="text-gray-600">(15)</span>
+      {/* Rating count hidden until we have real data */}
+      {/* <span className="text-gray-600">(15)</span> */}
       
       <button 
         onClick={handleCommentsClick}
@@ -53,7 +54,7 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
         id="top-comments"
       >
         <MessageCircle size={14} />
-        <span>Kommentarer (3)</span>
+        <span>Kommentarer</span>
       </button>
     </div>
   )

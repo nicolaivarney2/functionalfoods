@@ -96,7 +96,12 @@ export class RecipeCalculator {
    * Convert various units to grams
    */
   public convertAmountToGrams(amount: number, unit: string, ingredientName?: string): number {
-    const unitLower = unit.toLowerCase()
+    const unitLower = (unit || '').toLowerCase()
+    const normalizeAmount = (val: number): number => {
+      if (typeof val === 'number' && isFinite(val)) return val
+      return 0
+    }
+    const amt = normalizeAmount(amount)
     
     // Basic unit conversions
     const basicUnits: { [key: string]: number } = {
@@ -120,6 +125,7 @@ export class RecipeCalculator {
       
       // Piece-based measurements
       'stk': this.getPieceWeight(ingredientName),
+      'st': this.getPieceWeight(ingredientName),
       'stykke': this.getPieceWeight(ingredientName),
       'fed': this.getCloveWeight(ingredientName),
       
@@ -135,7 +141,7 @@ export class RecipeCalculator {
       'glas': 200, // Glass
     }
 
-    return amount * (basicUnits[unitLower] || 100) // Default to 100g if unknown unit
+    return amt * (basicUnits[unitLower] || 100) // Default to 100g if unknown unit
   }
 
   /**
@@ -195,7 +201,7 @@ export class RecipeCalculator {
    * Get piece weight based on ingredient type
    */
   private getPieceWeight(ingredientName?: string): number {
-    if (!ingredientName) return 100
+    if (!ingredientName) return 80
     
     const ingredient = ingredientName.toLowerCase()
     
@@ -207,14 +213,14 @@ export class RecipeCalculator {
     if (ingredient.includes('tomat') || ingredient.includes('tomato')) return 100
     if (ingredient.includes('agurk') || ingredient.includes('cucumber')) return 300
     if (ingredient.includes('citron') || ingredient.includes('lemon')) return 60
-    if (ingredient.includes('lime')) return 30
+    if (ingredient.includes('lime')) return 60
     if (ingredient.includes('peberfrugt') || ingredient.includes('pepper')) return 150
     
     // Meat pieces
     if (ingredient.includes('kylling') || ingredient.includes('chicken')) return 150
     if (ingredient.includes('bøf') || ingredient.includes('steak')) return 200
     
-    return 100 // Default piece weight
+    return 80 // Default piece weight slightly conservative
   }
 
   /**

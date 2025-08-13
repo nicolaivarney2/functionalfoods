@@ -68,13 +68,17 @@ export default function ImportPage() {
       console.log(`  - New ingredients: ${newIngredients.length}`)
       console.log(`  - Skipped duplicates: ${skippedCount}`)
       
-      setSaveStatus(`Gemmer ${importResult.recipes.length} opskrifter og ${newIngredients.length} nye ingredienser...`)
+      setSaveStatus(`Gemmer ${importResult.recipes.length} opskrifter og ${newIngredients.length} nye ingredienser (server-side)...`)
 
-      // Save recipes and only new ingredients to database
-      const recipesSaved = await databaseService.saveRecipes(importResult.recipes)
-      const ingredientsSaved = newIngredients.length > 0 ? await databaseService.saveIngredients(newIngredients) : true
-      
-      if (recipesSaved && ingredientsSaved) {
+      // Save via server-side API (downloads images + bypasses RLS)
+      const saveRes = await fetch('/api/import/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipes: importResult.recipes, ingredients: newIngredients })
+      })
+      const saveJson = await saveRes.json().catch(() => ({}))
+
+      if (saveRes.ok && saveJson.success) {
         setSaveStatus(`✅ Opskrifter gemt succesfuldt! ${skippedCount} duplikater undgået.`)
         
         // Get updated database stats
@@ -87,7 +91,7 @@ export default function ImportPage() {
           setSaveStatus(null)
         }, 3000)
       } else {
-        setSaveStatus('❌ Fejl ved gemning til database')
+        setSaveStatus(`❌ Fejl ved gemning til database${saveJson?.message ? `: ${saveJson.message}` : ''}`)
       }
       
     } catch (err) {

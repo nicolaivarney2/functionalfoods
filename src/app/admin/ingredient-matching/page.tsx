@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { ChevronDownIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 interface RecipeIngredient {
@@ -83,9 +84,10 @@ export default function IngredientMatchingPage() {
       console.log(`📋 Found ${existingMatches.length} existing matches in database`)
       
       // Filter out ingredients that already have matches
-      const unmatchedIngredients = recipeIngredients.filter(
-        (ingredient: RecipeIngredient) => !existingMatchMap.has(ingredient.id)
-      )
+      // Ensure we compare normalized IDs (our import now uses stable slugs)
+      const unmatchedIngredients = recipeIngredients.filter((ingredient: RecipeIngredient) => {
+        return !existingMatchMap.has(ingredient.id)
+      })
       
       console.log(`🔍 Processing ${unmatchedIngredients.length} unmatched ingredients (${recipeIngredients.length - unmatchedIngredients.length} already matched)`)
       
@@ -149,20 +151,22 @@ export default function IngredientMatchingPage() {
     return null
   }
 
-  const confirmMatch = async (index: number) => {
+  const confirmMatch = async (recipeIngredientId: string) => {
+    const idx = ingredientMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
     const updated = [...ingredientMatches]
-    updated[index].isConfirmed = true
-    updated[index].isRejected = false
-    updated[index].selectedMatch = updated[index].suggestedMatch?.fridaIngredient || null
+    updated[idx].isConfirmed = true
+    updated[idx].isRejected = false
+    updated[idx].selectedMatch = updated[idx].suggestedMatch?.fridaIngredient || null
     setIngredientMatches(updated)
     
     // Auto-save this match immediately
-    if (updated[index].selectedMatch) {
+    if (updated[idx].selectedMatch) {
       try {
         const matchToSave = {
-          recipeIngredientId: updated[index].recipeIngredient.id,
-          fridaIngredientId: updated[index].selectedMatch!.id,
-          confidence: updated[index].suggestedMatch?.confidence || 100
+          recipeIngredientId: updated[idx].recipeIngredient.id,
+          fridaIngredientId: updated[idx].selectedMatch!.id,
+          confidence: updated[idx].suggestedMatch?.confidence || 100
         }
         
         const response = await fetch('/api/ingredient-matches', {
@@ -202,11 +206,13 @@ export default function IngredientMatchingPage() {
     }, 0)
   }
 
-  const rejectMatch = (index: number) => {
+  const rejectMatch = (recipeIngredientId: string) => {
+    const idx = ingredientMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
     const updated = [...ingredientMatches]
-    updated[index].isRejected = true
-    updated[index].isConfirmed = false
-    updated[index].selectedMatch = null
+    updated[idx].isRejected = true
+    updated[idx].isConfirmed = false
+    updated[idx].selectedMatch = null
     setIngredientMatches(updated)
     
     // Update stats immediately
@@ -219,20 +225,22 @@ export default function IngredientMatchingPage() {
     }, 0)
   }
 
-  const selectManualMatch = async (index: number, fridaIngredient: FridaIngredient) => {
+  const selectManualMatch = async (recipeIngredientId: string, fridaIngredient: FridaIngredient) => {
+    const idx = ingredientMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
     const updated = [...ingredientMatches]
-    updated[index].selectedMatch = fridaIngredient
-    updated[index].isConfirmed = true
-    updated[index].isRejected = false
+    updated[idx].selectedMatch = fridaIngredient
+    updated[idx].isConfirmed = true
+    updated[idx].isRejected = false
     setIngredientMatches(updated)
     
     // Auto-save this manual match immediately
     try {
-      const matchToSave = {
-        recipeIngredientId: updated[index].recipeIngredient.id,
-        fridaIngredientId: fridaIngredient.id,
-        confidence: 100 // Manual selection = 100% confidence
-      }
+        const matchToSave = {
+          recipeIngredientId: updated[idx].recipeIngredient.id,
+          fridaIngredientId: fridaIngredient.id,
+          confidence: 100 // Manual selection = 100% confidence
+        }
       
       const response = await fetch('/api/ingredient-matches', {
         method: 'POST',
@@ -242,7 +250,7 @@ export default function IngredientMatchingPage() {
       
       if (response.ok) {
         // Remove saved match from UI
-        const filteredMatches = updated.filter(m => m.recipeIngredient.id !== matchToSave.recipeIngredientId)
+          const filteredMatches = updated.filter(m => m.recipeIngredient.id !== matchToSave.recipeIngredientId)
         setIngredientMatches(filteredMatches)
         
         // Update stats with filtered list
@@ -366,10 +374,20 @@ export default function IngredientMatchingPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Ingredient Matching</h1>
-          <p className="mt-2 text-gray-600">
-            Match recipe ingredients with Frida DTU nutritional data
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Ingredient Matching</h1>
+              <p className="mt-2 text-gray-600">
+                Match recipe ingredients with Frida DTU nutritional data
+              </p>
+            </div>
+            <Link
+              href="/admin/ingredient-matching/recent"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Seneste matches
+            </Link>
+          </div>
         </div>
 
         {/* Stats */}
@@ -502,7 +520,7 @@ export default function IngredientMatchingPage() {
                         {/* Action Buttons */}
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => confirmMatch(index)}
+                            onClick={() => confirmMatch(match.recipeIngredient.id)}
                             disabled={match.isConfirmed}
                             className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-300 text-sm"
                           >
@@ -511,7 +529,7 @@ export default function IngredientMatchingPage() {
                           </button>
                           
                           <button
-                            onClick={() => rejectMatch(index)}
+                            onClick={() => rejectMatch(match.recipeIngredient.id)}
                             disabled={match.isRejected}
                             className="flex items-center px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-red-300 text-sm"
                           >
@@ -538,7 +556,7 @@ export default function IngredientMatchingPage() {
                   <FridaIngredientSelector
                     fridaIngredients={fridaIngredients}
                     selectedIngredient={match.selectedMatch}
-                    onSelect={(fridaIngredient) => selectManualMatch(index, fridaIngredient)}
+                    onSelect={(fridaIngredient) => selectManualMatch(match.recipeIngredient.id, fridaIngredient)}
                     placeholder="Search and select a Frida ingredient..."
                   />
                 </div>

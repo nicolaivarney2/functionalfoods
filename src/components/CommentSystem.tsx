@@ -24,33 +24,7 @@ interface CommentSystemProps {
 export default function CommentSystem({ recipeSlug, onCommentUpdate }: CommentSystemProps) {
   const { user } = useAuth()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const [comments, setComments] = useState<Comment[]>([
-    {
-      id: '1',
-      author: 'Sarah Jensen',
-      content: 'Fantastisk opskrift! Jeg tilføjede lidt ekstra chili og det blev perfekt.',
-      timestamp: '2024-01-15T10:30:00Z',
-      likes: 5,
-      replies: [
-        {
-          id: '1.1',
-          author: 'Peter Hansen',
-          content: 'Hvor meget chili tilføjede du?',
-          timestamp: '2024-01-15T11:00:00Z',
-          likes: 2,
-          replies: []
-        }
-      ]
-    },
-    {
-      id: '2',
-      author: 'Maria Nielsen',
-      content: 'Prøvede denne i weekenden - min familie elskede det!',
-      timestamp: '2024-01-14T16:45:00Z',
-      likes: 8,
-      replies: []
-    }
-  ])
+  const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState('')
