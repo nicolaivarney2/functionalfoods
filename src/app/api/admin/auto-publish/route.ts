@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Create Supabase client dynamically to avoid build-time issues
+function createSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing required Supabase environment variables')
+  }
+  
+  return createClient(supabaseUrl, supabaseKey)
+}
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -12,6 +19,9 @@ export const revalidate = 0
 export async function POST() {
   try {
     console.log('🤖 Auto-publish check started')
+    
+    // Create Supabase client
+    const supabase = createSupabaseClient()
     
     const now = new Date()
     const currentTime = now.toTimeString().slice(0, 5) // HH:MM format
@@ -67,6 +77,14 @@ export async function POST() {
     
   } catch (error) {
     console.error('❌ Error in auto-publish:', error)
+    
+    // Handle specific environment variable errors
+    if (error instanceof Error && error.message.includes('Missing required Supabase environment variables')) {
+      return NextResponse.json({ 
+        error: 'Server configuration error: Missing Supabase credentials' 
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -74,6 +92,9 @@ export async function POST() {
 // GET endpoint til at tjekke status
 export async function GET() {
   try {
+    // Create Supabase client
+    const supabase = createSupabaseClient()
+    
     const now = new Date()
     const currentTime = now.toTimeString().slice(0, 5)
     const currentDate = now.toISOString().split('T')[0]
@@ -103,7 +124,15 @@ export async function GET() {
     })
     
   } catch (error) {
-    console.error('❌ Error in auto-publish status check:', error)
+    console.error('❌ Error in auto-publish GET:', error)
+    
+    // Handle specific environment variable errors
+    if (error instanceof Error && error.message.includes('Missing required Supabase environment variables')) {
+      return NextResponse.json({ 
+        error: 'Server configuration error: Missing Supabase credentials' 
+      }, { status: 500 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
