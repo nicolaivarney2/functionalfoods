@@ -73,11 +73,22 @@ export class MealPlanGenerator {
         servings: recipe.servings || 4,
         categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
         dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
-        nutritionalInfo: {
+         nutritionalInfo: {
           caloriesPer100g: recipe.calories || 0,
           proteinPer100g: recipe.protein || 0,
           carbsPer100g: recipe.carbs || 0,
-          fatPer100g: recipe.fat || 0
+          fatPer100g: recipe.fat || 0,
+          fiberPer100g: recipe.fiber || 0,
+          // If full Frida per-portion JSON exists, map it as per-portion fields
+          ...(recipe.nutritionalInfo ? {
+            caloriesPerPortion: recipe.nutritionalInfo.calories,
+            proteinPerPortion: recipe.nutritionalInfo.protein,
+            carbsPerPortion: recipe.nutritionalInfo.carbs,
+            fatPerPortion: recipe.nutritionalInfo.fat,
+            fiberPerPortion: recipe.nutritionalInfo.fiber,
+            vitaminMap: recipe.nutritionalInfo.vitamins || {},
+            mineralMap: recipe.nutritionalInfo.minerals || {}
+          } : {})
         },
         images: [recipe.imageUrl || ''],
         slug: recipe.slug || '',
@@ -232,6 +243,9 @@ export class MealPlanGenerator {
     let totalProtein = 0;
     let totalCarbs = 0;
     let totalFat = 0;
+    let totalFiber = 0;
+    let totalSugar = 0;
+    let totalSodium = 0;
 
     // Generate meals for each meal type
     for (const mealDistribution of config.mealStructure.mealDistribution) {
@@ -242,6 +256,9 @@ export class MealPlanGenerator {
       totalProtein += meal.adjustedProtein;
       totalCarbs += meal.adjustedCarbs;
       totalFat += meal.adjustedFat;
+      totalFiber += meal.adjustedFiber || 0;
+      totalSugar += meal.adjustedSugar || 0;
+      totalSodium += meal.adjustedSodium || 0;
     }
 
     return {
@@ -250,7 +267,10 @@ export class MealPlanGenerator {
       totalCalories,
       totalProtein,
       totalCarbs,
-      totalFat
+      totalFat,
+      totalFiber,
+      totalSugar,
+      totalSodium
     };
   }
 
@@ -284,7 +304,12 @@ export class MealPlanGenerator {
       adjustedCalories: adjustedValues.calories,
       adjustedProtein: adjustedValues.protein,
       adjustedCarbs: adjustedValues.carbs,
-      adjustedFat: adjustedValues.fat
+      adjustedFat: adjustedValues.fat,
+      adjustedFiber: adjustedValues.fiber,
+      adjustedSugar: adjustedValues.sugar,
+      adjustedSodium: adjustedValues.sodium,
+      adjustedVitamins: adjustedValues.vitamins,
+      adjustedMinerals: adjustedValues.minerals
     };
   }
 
@@ -477,32 +502,115 @@ export class MealPlanGenerator {
    */
   private calculateServings(recipe: Recipe, mealDistribution: any): number {
     const targetCalories = mealDistribution.targetCalories;
-    const recipeCalories = recipe.nutritionalInfo.caloriesPer100g;
-    
-    // Calculate servings based on calories
-    const servings = targetCalories / recipeCalories;
-    
-    // Round to reasonable serving sizes
+    // Prefer per-portion calories if available (from Frida per-portion JSON)
+    const perPortionCalories = recipe.nutritionalInfo.caloriesPerPortion;
+    if (perPortionCalories && perPortionCalories > 0) {
+      const servings = targetCalories / perPortionCalories;
+      return Math.max(0.5, Math.min(3, Math.round(servings * 10) / 10));
+    }
+
+    // Fallback to per-100g
+    const recipeCaloriesPer100g = recipe.nutritionalInfo.caloriesPer100g || 100;
+    const servings = targetCalories / recipeCaloriesPer100g;
     return Math.max(0.5, Math.min(3, Math.round(servings * 10) / 10));
   }
 
   /**
-   * Calculate adjusted nutritional values
+   * Calculate adjusted nutrition per serving
+   * FIXED: Now properly calculates per-serving nutrition instead of per-100g
    */
   private calculateAdjustedNutrition(recipe: Recipe, servings: number): {
     calories: number;
     protein: number;
     carbs: number;
     fat: number;
+    fiber?: number;
+    sugar?: number;
+    sodium?: number;
+    vitamins?: { [key: string]: number };
+    minerals?: { [key: string]: number };
   } {
-    const multiplier = servings / recipe.servings;
-    
-    return {
-      calories: recipe.nutritionalInfo.caloriesPer100g * multiplier,
-      protein: recipe.nutritionalInfo.proteinPer100g * multiplier,
-      carbs: recipe.nutritionalInfo.carbsPer100g * multiplier,
-      fat: recipe.nutritionalInfo.fatPer100g * multiplier
+    // Prefer per-portion nutrition if present (Frida per-portion JSON stored on recipe)
+    const hasPerPortion = typeof recipe.nutritionalInfo.caloriesPerPortion === 'number' && recipe.nutritionalInfo.caloriesPerPortion > 0;
+    const multiplier = servings; // multiplier scales per-portion values directly
+
+    const result: {
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+      fiber?: number;
+      sugar?: number;
+      sodium?: number;
+      vitamins?: { [key: string]: number };
+      minerals?: { [key: string]: number };
+    } = {
+      calories: hasPerPortion
+        ? (recipe.nutritionalInfo.caloriesPerPortion || 0) * multiplier
+        : (recipe.nutritionalInfo.caloriesPer100g * recipe.servings / 100) * (servings / recipe.servings),
+      protein: hasPerPortion
+        ? (recipe.nutritionalInfo.proteinPerPortion || 0) * multiplier
+        : (recipe.nutritionalInfo.proteinPer100g * recipe.servings / 100) * (servings / recipe.servings),
+      carbs: hasPerPortion
+        ? (recipe.nutritionalInfo.carbsPerPortion || 0) * multiplier
+        : (recipe.nutritionalInfo.carbsPer100g * recipe.servings / 100) * (servings / recipe.servings),
+      fat: hasPerPortion
+        ? (recipe.nutritionalInfo.fatPerPortion || 0) * multiplier
+        : (recipe.nutritionalInfo.fatPer100g * recipe.servings / 100) * (servings / recipe.servings)
     };
+
+    // Add micro-nutrition if available (prefer per-portion, fallback to per-100g)
+    if (hasPerPortion) {
+      if (typeof recipe.nutritionalInfo.fiberPerPortion === 'number') {
+        result.fiber = recipe.nutritionalInfo.fiberPerPortion * multiplier;
+      }
+      if (typeof recipe.nutritionalInfo.sugarPerPortion === 'number') {
+        result.sugar = recipe.nutritionalInfo.sugarPerPortion * multiplier;
+      }
+      if (typeof recipe.nutritionalInfo.sodiumPerPortion === 'number') {
+        result.sodium = recipe.nutritionalInfo.sodiumPerPortion * multiplier;
+      }
+    } else {
+      if (recipe.nutritionalInfo.fiberPer100g) {
+        result.fiber = (recipe.nutritionalInfo.fiberPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      }
+      if (recipe.nutritionalInfo.sugarPer100g) {
+        result.sugar = (recipe.nutritionalInfo.sugarPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      }
+      if (recipe.nutritionalInfo.sodiumPer100g) {
+        result.sodium = (recipe.nutritionalInfo.sodiumPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      }
+    }
+
+    // Add vitamins and minerals if available
+    // Vitamins & minerals
+    if (hasPerPortion && recipe.nutritionalInfo.vitaminMap) {
+      result.vitamins = {};
+      Object.entries(recipe.nutritionalInfo.vitaminMap).forEach(([k, v]) => {
+        result.vitamins![k] = (v || 0) * multiplier;
+      });
+    } else if (recipe.nutritionalInfo.vitamins) {
+      result.vitamins = {};
+      recipe.nutritionalInfo.vitamins.forEach(vitamin => {
+        const baseAmount = (vitamin.amountPer100g * recipe.servings) / 100;
+        result.vitamins![vitamin.vitamin] = baseAmount * (servings / recipe.servings);
+      });
+    }
+
+    if (hasPerPortion && recipe.nutritionalInfo.mineralMap) {
+      result.minerals = {};
+      Object.entries(recipe.nutritionalInfo.mineralMap).forEach(([k, v]) => {
+        result.minerals![k] = (v || 0) * multiplier;
+      });
+    } else if (recipe.nutritionalInfo.minerals) {
+      result.minerals = {};
+      recipe.nutritionalInfo.minerals.forEach(mineral => {
+        const baseAmount = (mineral.amountPer100g * recipe.servings) / 100;
+        result.minerals![mineral.mineral] = baseAmount * (servings / recipe.servings);
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -589,7 +697,8 @@ export class MealPlanGenerator {
   }
 
   /**
-   * Calculate weekly nutrition
+   * Calculate weekly nutrition with enhanced micro-nutrition tracking
+   * FIXED: Now includes fiber, sugar, sodium, vitamins, and minerals
    */
   private calculateWeeklyNutrition(days: DayPlan[], config: MealPlanConfig): WeeklyNutrition {
     const totalCalories = days.reduce((sum, day) => sum + day.totalCalories, 0);
@@ -597,21 +706,52 @@ export class MealPlanGenerator {
     const totalCarbs = days.reduce((sum, day) => sum + day.totalCarbs, 0);
     const totalFat = days.reduce((sum, day) => sum + day.totalFat, 0);
 
+    // Calculate micro-nutrition totals
+    const totalFiber = days.reduce((sum, day) => sum + (day.totalFiber || 0), 0);
+    const totalSugar = days.reduce((sum, day) => sum + (day.totalSugar || 0), 0);
+    const totalSodium = days.reduce((sum, day) => sum + (day.totalSodium || 0), 0);
+
+    // Aggregate vitamins and minerals across all days
+    const vitaminTotals: { [key: string]: number } = {};
+    const mineralTotals: { [key: string]: number } = {};
+    
+    days.forEach(day => {
+      day.meals.forEach(meal => {
+        if (meal.adjustedVitamins) {
+          Object.entries(meal.adjustedVitamins).forEach(([vitamin, amount]) => {
+            vitaminTotals[vitamin] = (vitaminTotals[vitamin] || 0) + amount;
+          });
+        }
+        if (meal.adjustedMinerals) {
+          Object.entries(meal.adjustedMinerals).forEach(([mineral, amount]) => {
+            mineralTotals[mineral] = (mineralTotals[mineral] || 0) + amount;
+          });
+        }
+      });
+    });
+
     const averageDailyCalories = totalCalories / 7;
     const averageDailyProtein = totalProtein / 7;
     const averageDailyCarbs = totalCarbs / 7;
     const averageDailyFat = totalFat / 7;
+    const averageDailyFiber = totalFiber / 7;
+    const averageDailySugar = totalSugar / 7;
+    const averageDailySodium = totalSodium / 7;
 
     const nutritionGoals: NutritionGoals = {
       targetCalories: config.targetCalories,
       targetProtein: config.macroTargets.protein,
       targetCarbs: config.macroTargets.carbohydrates,
-      targetFat: config.macroTargets.fat
+      targetFat: config.macroTargets.fat,
+      // Defaults for micro targets (grams for fiber, mg for sodium)
+      targetFiber: 25,
+      targetSodium: 2300
     };
 
-    // Calculate deficiencies
+    // Calculate deficiencies with enhanced detection
     const deficiencies: NutritionalDeficiency[] = [];
     
+    // Macro deficiencies
     if (averageDailyProtein < nutritionGoals.targetProtein * 0.9) {
       deficiencies.push({
         nutrient: 'Protein',
@@ -619,19 +759,128 @@ export class MealPlanGenerator {
         targetAmount: nutritionGoals.targetProtein,
         unit: 'g',
         severity: 'medium',
-        recommendations: ['Add more protein-rich foods', 'Consider protein supplements']
+        recommendations: ['Add more protein-rich foods', 'Consider protein supplements', 'Include lean meats, fish, eggs, or legumes']
       });
     }
+
+    if (averageDailyCarbs < nutritionGoals.targetCarbs * 0.8) {
+      deficiencies.push({
+        nutrient: 'Carbohydrates',
+        currentAmount: averageDailyCarbs,
+        targetAmount: nutritionGoals.targetCarbs,
+        unit: 'g',
+        severity: 'low',
+        recommendations: ['Include more whole grains', 'Add fruits and vegetables', 'Consider complex carbs for sustained energy']
+      });
+    }
+
+    if (averageDailyFat < nutritionGoals.targetFat * 0.8) {
+      deficiencies.push({
+        nutrient: 'Healthy Fats',
+        currentAmount: averageDailyFat,
+        targetAmount: nutritionGoals.targetFat,
+        unit: 'g',
+        severity: 'low',
+        recommendations: ['Add healthy fats like nuts, seeds, avocados', 'Include fatty fish', 'Use olive oil for cooking']
+      });
+    }
+
+    // Micro-nutrition deficiencies
+    const fiberTarget = nutritionGoals.targetFiber ?? 25;
+    if (averageDailyFiber < fiberTarget * 0.8) {
+      deficiencies.push({
+        nutrient: 'Fiber',
+        currentAmount: averageDailyFiber,
+        targetAmount: fiberTarget,
+        unit: 'g',
+        severity: 'medium',
+        recommendations: ['Increase vegetable intake', 'Add more whole grains', 'Include legumes and nuts', 'Eat fruits with skin']
+      });
+    }
+
+    const sodiumTarget = nutritionGoals.targetSodium ?? 2300;
+    if (averageDailySodium > sodiumTarget * 1.2) {
+      deficiencies.push({
+        nutrient: 'Sodium',
+        currentAmount: averageDailySodium,
+        targetAmount: sodiumTarget,
+        unit: 'mg',
+        severity: 'high',
+        recommendations: ['Reduce processed foods', 'Use herbs and spices instead of salt', 'Read nutrition labels', 'Cook more meals from scratch']
+      });
+    }
+
+    // Vitamin and mineral deficiencies
+    Object.entries(vitaminTotals).forEach(([vitamin, totalAmount]) => {
+      const dailyAverage = totalAmount / 7;
+      const targetAmount = this.getVitaminTarget(vitamin);
+      if (dailyAverage < targetAmount * 0.8) {
+        deficiencies.push({
+          nutrient: `Vitamin ${vitamin}`,
+          currentAmount: dailyAverage,
+          targetAmount: targetAmount,
+          unit: this.getVitaminUnit(vitamin),
+          severity: 'medium',
+          recommendations: this.getVitaminRecommendations(vitamin)
+        });
+      }
+    });
+
+    Object.entries(mineralTotals).forEach(([mineral, totalAmount]) => {
+      const dailyAverage = totalAmount / 7;
+      const targetAmount = this.getMineralTarget(mineral);
+      if (dailyAverage < targetAmount * 0.8) {
+        deficiencies.push({
+          nutrient: mineral,
+          currentAmount: dailyAverage,
+          targetAmount: targetAmount,
+          unit: this.getMineralUnit(mineral),
+          severity: 'medium',
+          recommendations: this.getMineralRecommendations(mineral)
+        });
+      }
+    });
+
+    // Identify strengths: top 3 nutrients where coverage >= 1.0 (meeting or exceeding targets)
+    const strengths: { nutrient: string; coverage: number; unit: string; dailyAverage: number; targetAmount: number }[] = [];
+    Object.entries(vitaminTotals).forEach(([vitamin, totalAmount]) => {
+      const dailyAverage = totalAmount / 7;
+      const target = this.getVitaminTarget(vitamin);
+      if (target > 0) {
+        const coverage = dailyAverage / target;
+        if (coverage >= 1.0) {
+          strengths.push({ nutrient: `Vitamin ${vitamin}`, coverage, unit: this.getVitaminUnit(vitamin), dailyAverage, targetAmount: target });
+        }
+      }
+    });
+    Object.entries(mineralTotals).forEach(([mineral, totalAmount]) => {
+      const dailyAverage = totalAmount / 7;
+      const target = this.getMineralTarget(mineral);
+      if (target > 0) {
+        const coverage = dailyAverage / target;
+        if (coverage >= 1.0) {
+          strengths.push({ nutrient: mineral, coverage, unit: this.getMineralUnit(mineral), dailyAverage, targetAmount: target });
+        }
+      }
+    });
+    strengths.sort((a, b) => b.coverage - a.coverage);
+    const topStrengths = strengths.slice(0, 3);
 
     return {
       averageDailyCalories,
       averageDailyProtein,
       averageDailyCarbs,
       averageDailyFat,
+      averageDailyFiber,
+      averageDailySugar,
+      averageDailySodium,
       totalWeeklyCalories: totalCalories,
       nutritionGoals,
       deficiencies,
-      recommendations: this.generateRecommendations(deficiencies)
+      recommendations: this.generateRecommendations(deficiencies),
+      vitaminTotals,
+      mineralTotals,
+      strengths: topStrengths
     };
   }
 
@@ -701,5 +950,87 @@ export class MealPlanGenerator {
    */
   private generateMealPlanId(): string {
     return `meal-plan-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Helper methods for enhanced micro-nutrition tracking
+  private getVitaminTarget(vitamin: string): number {
+    switch (vitamin) {
+      case 'Vitamin A': return 900; // IU
+      case 'Vitamin C': return 90; // mg
+      case 'Vitamin D': return 20; // IU
+      case 'Vitamin E': return 15; // IU
+      case 'Vitamin K': return 120; // mcg
+      default: return 0;
+    }
+  }
+
+  private getVitaminUnit(vitamin: string): string {
+    switch (vitamin) {
+      case 'Vitamin A': return 'IU';
+      case 'Vitamin C': return 'mg';
+      case 'Vitamin D': return 'IU';
+      case 'Vitamin E': return 'IU';
+      case 'Vitamin K': return 'mcg';
+      default: return 'mcg';
+    }
+  }
+
+  private getVitaminRecommendations(vitamin: string): string[] {
+    switch (vitamin) {
+      case 'Vitamin A': return ['Eat liver, fish liver oil, eggs, and dark green leafy vegetables'];
+      case 'Vitamin C': return ['Eat citrus fruits, berries, tomatoes, and green vegetables'];
+      case 'Vitamin D': return ['Sun exposure, fatty fish, eggs, and fortified foods'];
+      case 'Vitamin E': return ['Eat nuts, seeds, vegetable oils, and green leafy vegetables'];
+      case 'Vitamin K': return ['Eat leafy green vegetables, broccoli, and fortified foods'];
+      default: return [];
+    }
+  }
+
+  private getMineralTarget(mineral: string): number {
+    switch (mineral) {
+      case 'Calcium': return 1000; // mg
+      case 'Iron': return 18; // mg
+      case 'Magnesium': return 400; // mg
+      case 'Phosphorus': return 1200; // mg
+      case 'Potassium': return 4700; // mg
+      case 'Sodium': return 2300; // mg
+      case 'Zinc': return 11; // mg
+      case 'Copper': return 0.9; // mg
+      case 'Manganese': return 2.3; // mg
+      case 'Selenium': return 55; // mcg
+      default: return 0;
+    }
+  }
+
+  private getMineralUnit(mineral: string): string {
+    switch (mineral) {
+      case 'Calcium': return 'mg';
+      case 'Iron': return 'mg';
+      case 'Magnesium': return 'mg';
+      case 'Phosphorus': return 'mg';
+      case 'Potassium': return 'mg';
+      case 'Sodium': return 'mg';
+      case 'Zinc': return 'mg';
+      case 'Copper': return 'mg';
+      case 'Manganese': return 'mg';
+      case 'Selenium': return 'mcg';
+      default: return 'mcg';
+    }
+  }
+
+  private getMineralRecommendations(mineral: string): string[] {
+    switch (mineral) {
+      case 'Calcium': return ['Eat dairy products, leafy green vegetables, and fortified foods'];
+      case 'Iron': return ['Eat red meat, poultry, fish, beans, and iron-fortified cereals'];
+      case 'Magnesium': return ['Eat whole grains, nuts, seeds, and green leafy vegetables'];
+      case 'Phosphorus': return ['Eat meat, fish, poultry, and dairy products'];
+      case 'Potassium': return ['Eat bananas, oranges, potatoes, and leafy green vegetables'];
+      case 'Sodium': return ['Read nutrition labels and reduce processed foods'];
+      case 'Zinc': return ['Eat oysters, beef, pork, and fortified cereals'];
+      case 'Copper': return ['Eat shellfish, nuts, and whole grains'];
+      case 'Manganese': return ['Eat whole grains, nuts, and green leafy vegetables'];
+      case 'Selenium': return ['Eat Brazil nuts, seafood, and fortified foods'];
+      default: return [];
+    }
   }
 } 

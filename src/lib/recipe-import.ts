@@ -92,12 +92,31 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
   const fridaMatcher = new FridaDTUMatcher()
   
   return ketolivRecipes.map(recipe => {
+    console.log(`🔄 Converting Ketoliv recipe: ${recipe.name}`)
+    console.log(`   Original image_url: ${recipe.image_url}`)
+    console.log(`   Original pin_image_url: ${recipe.pin_image_url}`)
+    
+    const parseAmount = (val: any): number => {
+      if (typeof val === 'number') return isFinite(val) ? val : 0
+      if (typeof val !== 'string') return 0
+      const mapFractions: Record<string, string> = { '½': '0.5', '¼': '0.25', '¾': '0.75' }
+      let s = val.trim()
+      s = s.replace(/[½¼¾]/g, (m) => mapFractions[m] || m)
+      s = s.replace(',', '.')
+      // handle strings like "1/2"
+      if (/^\s*\d+\s*\/\s*\d+\s*$/.test(s)) {
+        const [n, d] = s.split('/').map(Number)
+        return d ? n / d : 0
+      }
+      const num = parseFloat(s)
+      return isFinite(num) ? num : 0
+    }
     // Convert ingredients
     const ingredients = recipe.ingredients_flat
       .filter(ing => ing.type === 'ingredient')
       .map(ing => ({
         name: ing.name,
-        amount: parseFloat(ing.amount) || 0,
+        amount: parseAmount(ing.amount),
         unit: ing.unit,
         notes: ing.notes || undefined
       }))
@@ -116,8 +135,8 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
     const mainCategory = recipe.tags.course?.[0] || 'Hovedret'
 
     // Calculate total time
-    const prepTime = parseInt(recipe.prep_time) || 0
-    const cookTime = parseInt(recipe.cook_time) || 0
+    const prepTime = parseInt(String(recipe.prep_time).replace(',', '.')) || 0
+    const cookTime = parseInt(String(recipe.cook_time).replace(',', '.')) || 0
     const totalTime = prepTime + cookTime
 
     // Determine difficulty based on total time
@@ -163,6 +182,10 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       rating: undefined,
       reviewCount: undefined
     }
+  }).map(convertedRecipe => {
+    console.log(`   ✅ Converted recipe: ${convertedRecipe.title}`)
+    console.log(`   Final imageUrl: ${convertedRecipe.imageUrl}`)
+    return convertedRecipe
   })
 }
 

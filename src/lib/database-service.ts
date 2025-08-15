@@ -4,12 +4,14 @@ import { IngredientTag } from '@/lib/ingredient-system/types'
 
 export class DatabaseService {
   /**
-   * Get all recipes from database
+   * Get all published recipes from database
    */
   async getRecipes(): Promise<Recipe[]> {
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
+      .eq('status', 'published') // Kun udgivne opskrifter
+      .order('updated_at', { ascending: false })
     
     if (error) {
       console.error('Error fetching recipes:', error)
@@ -30,41 +32,116 @@ export class DatabaseService {
     const transformedRecipes = (data || []).map(recipe => ({
       id: recipe.id,
       title: recipe.title,
+      slug: recipe.slug,
       description: recipe.description,
       shortDescription: recipe.shortdescription,
-      imageUrl: recipe.imageurl,
-      imageAlt: recipe.imagealt,
       preparationTime: recipe.preparationtime,
       cookingTime: recipe.cookingtime,
       totalTime: recipe.totaltime,
-      servings: recipe.servings,
-      difficulty: recipe.difficulty,
       calories: recipe.calories,
       protein: recipe.protein,
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      dietaryCategories: recipe.dietarycategories || [],
+      nutritionalInfo: recipe.nutritionalinfo,
+      personalTips: recipe.personaltips, // Personal tips and experiences
       mainCategory: recipe.maincategory,
-      subCategories: recipe.subcategories || [],
-      ingredients: recipe.ingredients || [],
-      instructions: recipe.instructions || [],
-      publishedAt: recipe.publishedat ? new Date(recipe.publishedat) : new Date(),
-      updatedAt: recipe.updatedat ? new Date(recipe.updatedat) : new Date(),
+      subCategories: recipe.subcategories,
+      dietaryCategories: recipe.dietarycategories,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      imageUrl: recipe.imageurl,
+      imageAlt: recipe.imagealt,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      author: recipe.author,
+      publishedAt: recipe.publishedat,
+      updatedAt: recipe.updated_at,
       metaTitle: recipe.metatitle,
       metaDescription: recipe.metadescription,
-      keywords: recipe.keywords || [],
-      author: recipe.author,
-      slug: recipe.slug,
+      keywords: recipe.keywords,
       rating: recipe.rating,
       reviewCount: recipe.reviewcount,
-      prepTimeISO: recipe.preptimeiso,
-      cookTimeISO: recipe.cooktimeiso,
-      totalTimeISO: recipe.totaltimeiso,
-      // nutritionalInfo: recipe.nutritionalinfo // Column doesn't exist yet
+      // Page counter fields
+      pageViews: recipe.pageviews || 0,
+      popularityScore: recipe.popularityscore || 0,
+      ketolivViews: recipe.ketolivviews || 0,
+      // Publishing status
+      status: recipe.status || 'draft'
     }))
     
     console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend`)
+    return transformedRecipes
+  }
+
+  /**
+   * Get all recipes from database (including drafts) - for admin use only
+   */
+  async getAllRecipes(): Promise<Recipe[]> {
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .order('updated_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching all recipes:', error)
+      return []
+    }
+    
+    console.log(`🔍 Raw database data: ${data?.length || 0} recipes found (all statuses)`)
+    if (data && data.length > 0) {
+      console.log('📋 First raw recipe from DB:', {
+        id: data[0].id,
+        title: data[0].title,
+        imageurl: data[0].imageurl,
+        totaltime: data[0].totaltime,
+        status: data[0].status
+      })
+    }
+    
+    // Transform snake_case database fields to camelCase for frontend
+    const transformedRecipes = (data || []).map(recipe => ({
+      id: recipe.id,
+      title: recipe.title,
+      slug: recipe.slug,
+      description: recipe.description,
+      shortDescription: recipe.shortdescription,
+      preparationTime: recipe.preparationtime,
+      cookingTime: recipe.cookingtime,
+      totalTime: recipe.totaltime,
+      calories: recipe.calories,
+      protein: recipe.protein,
+      carbs: recipe.carbs,
+      fat: recipe.fat,
+      fiber: recipe.fiber,
+      nutritionalInfo: recipe.nutritionalinfo,
+      personalTips: recipe.personaltips, // Personal tips and experiences
+      mainCategory: recipe.maincategory,
+      subCategories: recipe.subcategories,
+      dietaryCategories: recipe.dietarycategories,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      imageUrl: recipe.imageurl,
+      imageAlt: recipe.imagealt,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      author: recipe.author,
+      publishedAt: recipe.publishedat,
+      updatedAt: recipe.updated_at,
+      metaTitle: recipe.metatitle,
+      metaDescription: recipe.metadescription,
+      keywords: recipe.keywords,
+      rating: recipe.rating,
+      reviewCount: recipe.reviewcount,
+      // Page counter fields
+      pageViews: recipe.pageviews || 0,
+      popularityScore: recipe.popularityscore || 0,
+      ketolivViews: recipe.ketolivviews || 0,
+      // Publishing status
+      status: recipe.status || 'draft'
+    }))
+    
+    console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend (all statuses)`)
     return transformedRecipes
   }
 
@@ -149,18 +226,41 @@ export class DatabaseService {
         const filteredRecipe: any = {
           id: recipe.id,
           title: recipe.title,
+          slug: recipe.slug,
           description: recipe.description,
-          calories: recipe.calories || 0,
-          protein: recipe.protein || 0,
-          carbs: recipe.carbs || 0,
-          fat: recipe.fat || 0,
-          fiber: recipe.fiber || 0,
-          keywords: recipe.keywords,
+          shortdescription: recipe.shortDescription,
+          preparationtime: recipe.preparationTime,
+          cookingtime: recipe.cookingTime,
+          totaltime: recipe.totalTime,
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat,
+          fiber: recipe.fiber,
+          nutritionalinfo: recipe.nutritionalInfo,
+          maincategory: recipe.mainCategory,
+          subcategories: recipe.subCategories,
+          dietarycategories: recipe.dietaryCategories,
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
-          servings: recipe.servings || 2,
-          difficulty: recipe.difficulty || 'Nem',
-          author: recipe.author || 'Functional Foods'
+          imageurl: recipe.imageUrl,
+          imagealt: recipe.imageAlt,
+          servings: recipe.servings,
+          difficulty: recipe.difficulty,
+          author: recipe.author,
+          publishedat: recipe.publishedAt,
+          updated_at: recipe.updatedAt,
+          metatitle: recipe.metaTitle,
+          metadescription: recipe.metaDescription,
+          keywords: recipe.keywords,
+          rating: recipe.rating,
+          reviewcount: recipe.reviewCount,
+          // Page counter fields
+          pageviews: recipe.pageViews || 0,
+          popularityscore: recipe.popularityScore || 0,
+          ketolivviews: recipe.ketolivViews || 0,
+          // Publishing status
+          status: recipe.status || 'draft'
         }
         
         // Add optional fields if they exist (only include columns we know exist)
@@ -185,9 +285,19 @@ export class DatabaseService {
         filteredRecipe.preptimeiso = recipe.prepTimeISO || null
         filteredRecipe.cooktimeiso = recipe.cookTimeISO || null
         filteredRecipe.totaltimeiso = recipe.totalTimeISO || null
-        // Note: nutritionalinfo column doesn't exist yet - store in description for now
+        filteredRecipe.personaltips = recipe.personalTips || null
+        
+        // Publishing status
+        filteredRecipe.status = recipe.status || 'draft'
+        
+        // Store complete nutritional information as JSONB
         if (recipe.nutritionalInfo) {
-          filteredRecipe.description = recipe.description + ` [Frida DTU: ${Math.round(recipe.nutritionalInfo.calories)} cal, ${Math.round(recipe.nutritionalInfo.protein)}g protein]`
+          filteredRecipe.nutritionalinfo = recipe.nutritionalInfo
+        }
+        
+        // Store personal tips
+        if (recipe.personalTips) {
+          filteredRecipe.personaltips = recipe.personalTips
         }
         
         return filteredRecipe

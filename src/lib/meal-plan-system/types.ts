@@ -35,6 +35,10 @@ export interface DayPlan {
   totalProtein: number;
   totalCarbs: number;
   totalFat: number;
+  // Micro-nutrition totals (optional)
+  totalFiber?: number;
+  totalSugar?: number;
+  totalSodium?: number;
   notes?: string;
 }
 
@@ -46,6 +50,12 @@ export interface MealAssignment {
   adjustedProtein: number;
   adjustedCarbs: number;
   adjustedFat: number;
+  // Micro-nutrition (optional)
+  adjustedFiber?: number;
+  adjustedSugar?: number;
+  adjustedSodium?: number;
+  adjustedVitamins?: { [key: string]: number };
+  adjustedMinerals?: { [key: string]: number };
   preparationNotes?: string;
   substitutionNotes?: string;
 }
@@ -83,10 +93,26 @@ export interface WeeklyNutrition {
   averageDailyProtein: number;
   averageDailyCarbs: number;
   averageDailyFat: number;
+  // Micro-nutrition daily averages (optional)
+  averageDailyFiber?: number;
+  averageDailySugar?: number;
+  averageDailySodium?: number;
   totalWeeklyCalories: number;
   nutritionGoals: NutritionGoals;
   deficiencies: NutritionalDeficiency[];
   recommendations: string[];
+  // Weekly totals for vitamins/minerals (optional)
+  vitaminTotals?: { [key: string]: number };
+  mineralTotals?: { [key: string]: number };
+  strengths?: MicroStrength[];
+}
+
+export interface MicroStrength {
+  nutrient: string;
+  coverage: number; // ratio of dailyAverage/targetAmount (e.g., 1.3 = 130%)
+  unit: string;
+  dailyAverage: number;
+  targetAmount: number;
 }
 
 export interface NutritionGoals {

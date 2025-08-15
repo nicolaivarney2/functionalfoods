@@ -35,10 +35,20 @@ interface KetolivRecipe {
     fat: number
     fiber: number
   }
+  // Page counter fields (if available in Ketoliv JSON)
+  page_views?: number
+  post_views?: number
+  view_count?: number
+  popularity?: number
 }
 
 export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeData[] {
+  console.log(`🔄 Converting ${ketolivData.length} Ketoliv recipes...`)
+  
   return ketolivData.map(recipe => {
+    console.log(`   📝 Converting recipe: ${recipe.name}`)
+    console.log(`   Original image_url: ${recipe.image_url}`)
+    
     // Extract dietary categories from tags
     const dietaryCategories = extractDietaryCategories(recipe.tags?.cuisine || [])
     
@@ -91,8 +101,14 @@ export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeDa
       author: recipe.author_name || 'Functional Foods',
       publishedAt: new Date().toISOString(),
       rating: undefined,
-      reviewCount: undefined
+      reviewCount: undefined,
+      // Page counter mapping
+      ketolivViews: recipe.page_views || recipe.post_views || recipe.view_count || recipe.popularity || 0
     }
+  }).map(convertedRecipe => {
+    console.log(`   ✅ Converted recipe: ${convertedRecipe.title}`)
+    console.log(`   Final imageUrl: ${convertedRecipe.imageUrl}`)
+    return convertedRecipe
   })
 }
 
