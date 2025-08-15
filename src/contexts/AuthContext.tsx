@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase'
 
@@ -19,10 +19,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const supabaseRef = useRef<any>(null)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
-    // Get initial session
+    // Only initialize once
+    if (initializedRef.current) {
+      return
+    }
+    
+    initializedRef.current = true
+    
+    // Create a single Supabase client instance
     const supabase = createSupabaseClient()
+    supabaseRef.current = supabase
+
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
@@ -38,7 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      initializedRef.current = false
+    }
   }, [])
 
   // Handle redirect after email verification
@@ -60,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const signIn = async (email: string, password: string) => {
-    const supabase = createSupabaseClient()
+    const supabase = supabaseRef.current || createSupabaseClient()
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -74,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('auth_redirect_url', window.location.href)
     }
 
-    const supabase = createSupabaseClient()
+    const supabase = supabaseRef.current || createSupabaseClient()
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -89,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    const supabase = createSupabaseClient()
+    const supabase = supabaseRef.current || createSupabaseClient()
     await supabase.auth.signOut()
   }
 
