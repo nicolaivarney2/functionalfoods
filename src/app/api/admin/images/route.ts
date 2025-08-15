@@ -2,27 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+// Create Supabase client dynamically to avoid build-time issues
+function createSupabaseServerClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing required Supabase environment variables')
+  }
+  
+  const cookieStore = cookies()
+  
+  return createServerClient(
+    supabaseUrl,
+    supabaseKey,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value
+        },
+        set(name: string, value: string, options: any) {
+          cookieStore.set({ name, value, ...options })
+        },
+        remove(name: string, options: any) {
+          cookieStore.set({ name, value: '', ...options })
+        },
+      },
+    }
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
-      }
-    )
+    // Create Supabase client
+    const supabase = createSupabaseServerClient()
 
     // Get all recipes with image information
     const { data: recipes, error } = await supabase
@@ -54,6 +67,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ images })
   } catch (error) {
     console.error('Error in images API:', error)
+    
+    // Handle specific environment variable errors
+    if (error instanceof Error && error.message.includes('Missing required Supabase environment variables')) {
+      return NextResponse.json({ 
+        error: 'Server configuration error: Missing Supabase credentials' 
+      }, { status: 500 })
+    }
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
