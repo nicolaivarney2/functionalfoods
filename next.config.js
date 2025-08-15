@@ -5,9 +5,6 @@ const nextConfig = {
     optimizeCss: false, // Disable the CSS optimization that might be causing issues
   },
   
-  // Optimize build process
-  swcMinify: true,
-  
   // Disable image optimization if not needed
   images: {
     unoptimized: true,

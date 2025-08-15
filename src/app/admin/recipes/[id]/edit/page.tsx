@@ -7,6 +7,10 @@ import { ArrowLeft, Save, Trash2, Plus, X } from 'lucide-react'
 import { sampleRecipes } from '@/lib/sample-data'
 import { Recipe, Ingredient, RecipeStep } from '@/types/recipe'
 
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
 interface RecipeFormData {
   title: string
   description: string
@@ -30,40 +34,34 @@ interface RecipeFormData {
   author: string
 }
 
-export default function EditRecipe({ params }: { params: { id: string } }) {
+export default function EditRecipe({ params }: PageProps) {
   const router = useRouter()
-  const [recipe, setRecipe] = useState<RecipeFormData | null>(null)
+  const [recipe, setRecipe] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const foundRecipe = sampleRecipes.find(r => r.id === params.id)
-    if (foundRecipe) {
-      setRecipe({
-        title: foundRecipe.title,
-        description: foundRecipe.description,
-        shortDescription: foundRecipe.shortDescription,
-        preparationTime: foundRecipe.preparationTime,
-        cookingTime: foundRecipe.cookingTime,
-        calories: foundRecipe.calories,
-        protein: foundRecipe.protein,
-        carbs: foundRecipe.carbs,
-        fat: foundRecipe.fat,
-        fiber: foundRecipe.fiber,
-        mainCategory: foundRecipe.mainCategory,
-        subCategories: foundRecipe.subCategories,
-        dietaryCategories: foundRecipe.dietaryCategories,
-        ingredients: foundRecipe.ingredients,
-        instructions: foundRecipe.instructions,
-        imageUrl: foundRecipe.imageUrl,
-        imageAlt: foundRecipe.imageAlt,
-        servings: foundRecipe.servings,
-        difficulty: foundRecipe.difficulty,
-        author: foundRecipe.author,
-      })
+    const loadRecipe = async () => {
+      try {
+        const resolvedParams = await params
+        const foundRecipe = sampleRecipes.find(r => r.id === resolvedParams.id)
+        
+        if (foundRecipe) {
+          setRecipe(foundRecipe)
+        } else {
+          console.error('Recipe not found')
+          router.push('/admin/recipes')
+        }
+      } catch (error) {
+        console.error('Error loading recipe:', error)
+        router.push('/admin/recipes')
+      } finally {
+        setLoading(false)
+      }
     }
-    setLoading(false)
-  }, [params.id])
+
+    loadRecipe()
+  }, [params, router])
 
   const handleSave = async () => {
     setSaving(true)
