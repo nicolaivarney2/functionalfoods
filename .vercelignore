@@ -2,11 +2,6 @@
 *.xlsx
 *.ods
 *.zip
-Frida_Dataset_May2025.*
-frida-data.json
-frida-transformed.json
-
-# Note: frida-nutritional-data.json and frida-foods.json are needed in public/ for runtime
 
 # Development files
 test-*.js
