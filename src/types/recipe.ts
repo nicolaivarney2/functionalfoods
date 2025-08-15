@@ -88,6 +88,17 @@ export interface Recipe {
   prepTimeISO?: string; // ISO 8601 format
   cookTimeISO?: string;
   totalTimeISO?: string;
+  
+  // Publishing
+  status?: 'draft' | 'scheduled' | 'published';
+  scheduledDate?: Date;
+  scheduledTime?: string;
+  personalTips?: string;
+  
+  // Analytics
+  pageViews?: number;
+  popularityScore?: number;
+  ketolivViews?: number;
 }
 
 export interface RecipeCategory {
