@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://najaxycfjgultwdwffhv.supabase.co'
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build'
     
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     
     const supabase = createServerClient(
       supabaseUrl,
