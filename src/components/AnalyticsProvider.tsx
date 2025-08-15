@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { trackUserBehavior, getUserProfile, UserBehavior } from '@/lib/analytics'
 
@@ -23,7 +23,7 @@ export function useAnalytics() {
   return context
 }
 
-export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+function AnalyticsProviderContent({ children }: { children: React.ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserBehavior>({
     source: 'direct',
     interests: [],
@@ -127,5 +127,15 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     <AnalyticsContext.Provider value={value}>
       {children}
     </AnalyticsContext.Provider>
+  )
+}
+
+export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div>Loading analytics...</div>}>
+      <AnalyticsProviderContent>
+        {children}
+      </AnalyticsProviderContent>
+    </Suspense>
   )
 } 
