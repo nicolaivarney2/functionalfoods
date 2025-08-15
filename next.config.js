@@ -1,43 +1,37 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'functionalfoods.dk',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'ketoliv.dk',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-    // Performance optimizations
-    formats: ['image/webp', 'image/avif'],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60,
-    dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-  },
-  // Performance optimizations
+  // Disable static optimization for problematic pages
   experimental: {
-    optimizeCss: true,
-    optimizePackageImports: ['lucide-react'],
+    optimizeCss: false, // Disable the CSS optimization that might be causing issues
   },
-  // Enable compression
-  compress: true,
-  // Enable gzip compression
-  poweredByHeader: false,
+  
+  // Optimize build process
+  swcMinify: true,
+  
+  // Disable image optimization if not needed
+  images: {
+    unoptimized: true,
+  },
+  
+  // Reduce build complexity
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
+  // Optimize webpack
+  webpack: (config, { isServer }) => {
+    // Reduce bundle size
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    return config;
+  },
 }
 
 module.exports = nextConfig 
