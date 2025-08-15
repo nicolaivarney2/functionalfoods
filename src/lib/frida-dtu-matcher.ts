@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 
 // Types for Frida DTU data
 interface FridaFood {
@@ -38,6 +38,7 @@ export class FridaDTUMatcher {
    */
   private async getManualMatch(ingredientName: string): Promise<{ fridaId: string, fridaName: string } | null> {
     try {
+      const supabase = createSupabaseClient()
       // Support both legacy name-based IDs and new slug-based IDs
       const toSlug = (input: string) => input
         .toLowerCase()
@@ -95,6 +96,7 @@ export class FridaDTUMatcher {
    */
   private async getFridaIngredientNutrition(fridaId: string): Promise<NutritionalInfo | null> {
     try {
+      const supabase = createSupabaseClient()
       const { data: ingredient, error } = await supabase
         .from('frida_ingredients')
         .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
@@ -127,6 +129,7 @@ export class FridaDTUMatcher {
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
     try {
+      const supabase = createSupabaseClient()
       const normalizedTerm = this.normalizeIngredientName(searchTerm)
       
       // Use full-text search for better Danish language support
@@ -191,6 +194,7 @@ export class FridaDTUMatcher {
    * Find best match for ingredient in Frida database
    */
   private async findBestMatch(ingredientName: string): Promise<{ foodId: number, name: string, score: number } | null> {
+    const supabase = createSupabaseClient()
     const foods = await this.searchFoods(ingredientName)
     let bestMatch = null
     let bestScore = 0
@@ -218,6 +222,7 @@ export class FridaDTUMatcher {
    */
   private async getNutritionalValues(foodId: number): Promise<FridaNutritionValue[]> {
     try {
+      const supabase = createSupabaseClient()
       const { data, error } = await supabase
         .from('frida_nutrition_values')
         .select('food_id, parameter_id, parameter_name_da, parameter_name_en, value, sort_key')
@@ -240,6 +245,7 @@ export class FridaDTUMatcher {
    * Get nutritional info for a specific food ID from Supabase
    */
   private async getNutritionalInfo(foodId: number): Promise<NutritionalInfo | null> {
+    const supabase = createSupabaseClient()
     const nutritionValues = await this.getNutritionalValues(foodId)
     
     if (nutritionValues.length === 0) return null
@@ -344,6 +350,7 @@ export class FridaDTUMatcher {
    * Process all ingredients in a recipe and calculate total nutrition
    */
   public async calculateRecipeNutrition(ingredients: Array<{ name: string, amount: number, unit: string }>): Promise<NutritionalInfo> {
+    const supabase = createSupabaseClient()
     const totalNutrition: NutritionalInfo = {
       calories: 0,
       protein: 0,
@@ -385,6 +392,7 @@ export class FridaDTUMatcher {
    * Convert ingredient amount to 100g basis
    */
   private getScaleFactor(unit: string, amount: number): number {
+    const supabase = createSupabaseClient()
     const unitLower = unit.toLowerCase()
     
     // Common conversions to grams

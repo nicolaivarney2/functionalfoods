@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Get initial session
+    const supabase = createSupabaseClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const signIn = async (email: string, password: string) => {
+    const supabase = createSupabaseClient()
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -72,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('auth_redirect_url', window.location.href)
     }
 
+    const supabase = createSupabaseClient()
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -86,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    const supabase = createSupabaseClient()
     await supabase.auth.signOut()
   }
 

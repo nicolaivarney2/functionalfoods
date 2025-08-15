@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { createSupabaseClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 
@@ -7,6 +7,7 @@ export class DatabaseService {
    * Get all published recipes from database
    */
   async getRecipes(): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
@@ -78,6 +79,7 @@ export class DatabaseService {
    * Get all recipes from database (including drafts) - for admin use only
    */
   async getAllRecipes(): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
@@ -149,6 +151,7 @@ export class DatabaseService {
    * Get all ingredients from database
    */
   async getIngredients(): Promise<IngredientTag[]> {
+    const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('ingredients')
       .select('*')
@@ -179,6 +182,7 @@ export class DatabaseService {
    * Generate unique IDs for recipes that don't have one
    */
   async assignUniqueIds(recipes: Recipe[]): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
     // SIMPLE: Generate IDs only for recipes without IDs, starting from 1000
     let nextId = 1000
     
@@ -215,6 +219,7 @@ export class DatabaseService {
    * Save recipes to database (using only existing columns)
    */
   async saveRecipes(recipes: Recipe[]): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log(`💾 Attempting to save ${recipes.length} recipes...`)
       
@@ -335,6 +340,7 @@ export class DatabaseService {
    * Save ingredients to database (using only existing columns)
    */
   async saveIngredients(ingredients: IngredientTag[]): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log(`💾 Attempting to save ${ingredients.length} ingredients...`)
       
@@ -388,6 +394,7 @@ export class DatabaseService {
    * Check database tables exist
    */
   async checkDatabaseStructure(): Promise<any> {
+    const supabase = createSupabaseClient()
     try {
       console.log('🔍 Checking database structure...')
       
@@ -423,6 +430,7 @@ export class DatabaseService {
    * Get database statistics
    */
   async getDatabaseStats(): Promise<{ recipeCount: number; ingredientCount: number }> {
+    const supabase = createSupabaseClient()
     try {
       const { count: recipeCount, error: recipeError } = await supabase
         .from('recipes')
@@ -448,6 +456,7 @@ export class DatabaseService {
    * Test database connection
    */
   async testConnection(): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log('🔍 Testing Supabase connection...')
       const { data, error } = await supabase.from('recipes').select('count', { count: 'exact', head: true })

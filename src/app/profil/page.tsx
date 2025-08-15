@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { User, Mail, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -31,6 +31,7 @@ export default function ProfilePage() {
     setMessage('')
 
     try {
+      const supabase = createSupabaseClient()
       const { error } = await supabase.auth.updateUser({
         data: { name }
       })
@@ -70,6 +71,7 @@ export default function ProfilePage() {
     }
 
     try {
+      const supabase = createSupabaseClient()
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       })

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { createSupabaseClient } from '@/lib/supabase'
 
 export function useAdminAuth() {
   const { user, session, loading } = useAuth()
@@ -35,6 +35,7 @@ export function useAdminAuth() {
         console.log('🔒 useAdminAuth: Checking admin role for user:', user.id)
         
         // Check if user has admin role
+        const supabase = createSupabaseClient()
         const { data: profile, error } = await supabase
           .from('user_profiles')
           .select('role')
