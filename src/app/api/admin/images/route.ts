@@ -8,9 +8,14 @@ function createSupabaseServerClient() {
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build'
   
   // Only throw error if we're actually trying to use the client (not during build)
-  if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  // During build, we'll use fallback values. During runtime, we'll check if real values exist.
+  if (typeof window === 'undefined') {
+    // We're on the server side
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('Missing required Supabase environment variables')
+      // Only throw if we're actually in a request context, not during build
+      if (process.env.VERCEL_ENV || process.env.NODE_ENV === 'production') {
+        throw new Error('Missing required Supabase environment variables')
+      }
     }
   }
   
