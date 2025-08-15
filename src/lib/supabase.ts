@@ -8,5 +8,5 @@ export function createSupabaseClient() {
   return createClient(supabaseUrl, supabaseAnonKey)
 }
 
-// Export a default client for backward compatibility
-export const supabase = createSupabaseClient() 
+// Don't create client at build time - only when function is called
+// export const supabase = createSupabaseClient() 
