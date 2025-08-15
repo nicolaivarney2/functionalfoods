@@ -91,7 +91,7 @@ export default function EditRecipe({ params }: PageProps) {
     if (!recipe) return
     setRecipe({
       ...recipe,
-      ingredients: recipe.ingredients.filter((_, i) => i !== index)
+      ingredients: recipe.ingredients.filter((_: any, i: number) => i !== index)
     })
   }
 
@@ -119,7 +119,7 @@ export default function EditRecipe({ params }: PageProps) {
     if (!recipe) return
     setRecipe({
       ...recipe,
-      instructions: recipe.instructions.filter((_, i) => i !== index)
+      instructions: recipe.instructions.filter((_: any, i: number) => i !== index)
     })
   }
 
@@ -264,7 +264,7 @@ export default function EditRecipe({ params }: PageProps) {
                 </button>
               </div>
               <div className="space-y-3">
-                {recipe.ingredients.map((ingredient, index) => (
+                {recipe.ingredients.map((ingredient: any, index: number) => (
                   <div key={index} className="flex items-center space-x-3">
                     <input
                       type="text"
@@ -311,7 +311,7 @@ export default function EditRecipe({ params }: PageProps) {
                 </button>
               </div>
               <div className="space-y-3">
-                {recipe.instructions.map((instruction, index) => (
+                {recipe.instructions.map((instruction: any, index: number) => (
                   <div key={index} className="flex items-start space-x-3">
                     <div className="flex-shrink-0 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-bold">
                       {instruction.stepNumber}
