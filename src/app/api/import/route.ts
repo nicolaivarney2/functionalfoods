@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { importRecipes, RawRecipeData } from '@/lib/recipe-import'
 import { convertKetolivRecipes } from '@/lib/ketoliv-converter'

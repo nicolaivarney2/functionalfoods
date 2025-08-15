@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { downloadBulkImages } from '@/lib/image-downloader'
 import fs from 'fs'

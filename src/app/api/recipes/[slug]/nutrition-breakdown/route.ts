@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
