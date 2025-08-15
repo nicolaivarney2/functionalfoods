@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 
 export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const resolvedParams = await params
+    const { slug } = resolvedParams
+    
     const recipes = await databaseService.getRecipes()
-    const recipe = recipes.find(r => r.slug === params.slug)
+    const recipe = recipes.find(r => r.slug === slug)
 
     if (!recipe) {
       return NextResponse.json({
