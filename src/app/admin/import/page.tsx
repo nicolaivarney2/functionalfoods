@@ -1,13 +1,23 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2, BarChart3, Database } from 'lucide-react'
+import { useState, useRef } from 'react'
+import AdminLayout from '@/components/AdminLayout'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { Upload, Database, CheckCircle, AlertCircle, Loader2, BarChart3, FileText } from 'lucide-react'
 import { ImportProcessor } from '@/lib/import-processor'
 import { RawRecipeData } from '@/lib/recipe-import'
 import { databaseService } from '@/lib/database-service'
 import { ingredientMatcher } from '@/lib/ingredient-matcher'
 
-export default function ImportPage() {
+export default function AdminImportPage() {
+  const { isAdmin, checking: authChecking } = useAdminAuth()
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [checking, setChecking] = useState(false)
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -15,6 +25,21 @@ export default function ImportPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<string | null>(null)
   const [dbStats, setDbStats] = useState<any>(null)
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Tjekker admin rettigheder...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAdmin) {
+    return null // Will redirect via useAdminAuth
+  }
 
   const importProcessor = new ImportProcessor()
 
@@ -68,13 +93,17 @@ export default function ImportPage() {
       console.log(`  - New ingredients: ${newIngredients.length}`)
       console.log(`  - Skipped duplicates: ${skippedCount}`)
       
-      setSaveStatus(`Gemmer ${importResult.recipes.length} opskrifter og ${newIngredients.length} nye ingredienser...`)
+      setSaveStatus(`Gemmer ${importResult.recipes.length} opskrifter og ${newIngredients.length} nye ingredienser (server-side)...`)
 
-      // Save recipes and only new ingredients to database
-      const recipesSaved = await databaseService.saveRecipes(importResult.recipes)
-      const ingredientsSaved = newIngredients.length > 0 ? await databaseService.saveIngredients(newIngredients) : true
-      
-      if (recipesSaved && ingredientsSaved) {
+      // Save via server-side API (downloads images + bypasses RLS)
+      const saveRes = await fetch('/api/import/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipes: importResult.recipes, ingredients: newIngredients })
+      })
+      const saveJson = await saveRes.json().catch(() => ({}))
+
+      if (saveRes.ok && saveJson.success) {
         setSaveStatus(`✅ Opskrifter gemt succesfuldt! ${skippedCount} duplikater undgået.`)
         
         // Get updated database stats
@@ -87,7 +116,7 @@ export default function ImportPage() {
           setSaveStatus(null)
         }, 3000)
       } else {
-        setSaveStatus('❌ Fejl ved gemning til database')
+        setSaveStatus(`❌ Fejl ved gemning til database${saveJson?.message ? `: ${saveJson.message}` : ''}`)
       }
       
     } catch (err) {
