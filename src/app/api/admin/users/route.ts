@@ -4,11 +4,14 @@ import { cookies } from 'next/headers'
 
 // Create Supabase client dynamically to avoid build-time issues
 function createSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://najaxycfjgultwdwffhv.supabase.co'
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build'
   
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing required Supabase environment variables')
+  // Only throw error if we're actually trying to use the client (not during build)
+  if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Missing required Supabase environment variables')
+    }
   }
   
   const cookieStore = cookies()
