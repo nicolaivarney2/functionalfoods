@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { 
   BookOpen, 
   Calendar, 
@@ -14,7 +15,8 @@ import {
   Settings, 
   Users,
   X,
-  Menu
+  Menu,
+  Loader2
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -81,6 +83,35 @@ const adminNavItems = [
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
+  const { isAdmin, checking } = useAdminAuth()
+  const router = useRouter()
+
+  // Centralized auth check for all admin pages
+  useEffect(() => {
+    if (!checking && !isAdmin) {
+      console.log('🔒 AdminLayout: Not admin, redirecting to home')
+      router.push('/')
+    }
+  }, [isAdmin, checking, router])
+
+  // Show loading while checking auth
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto">
+            <Loader2 className="h-12 w-12 text-blue-600" />
+          </div>
+          <p className="mt-4 text-gray-600">Tjekker admin rettigheder...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render anything if not admin (will redirect)
+  if (!isAdmin) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -2,26 +2,22 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { User, Mail, Lock, Save, AlertCircle, CheckCircle } from 'lucide-react'
+import { User, Lock, Save, CheckCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export default function ProfilePage() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState<'success' | 'error'>('success')
-  
-  // Form states
+  const { user, signOut } = useAuth()
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 
   useEffect(() => {
     if (user) {
       setName(user.user_metadata?.name || '')
-      setEmail(user.email || '')
     }
   }, [user])
 
@@ -31,6 +27,7 @@ export default function ProfilePage() {
     setMessage('')
 
     try {
+      // Use the existing Supabase client from AuthContext instead of creating a new one
       const supabase = createSupabaseClient()
       const { error } = await supabase.auth.updateUser({
         data: { name }
@@ -71,6 +68,7 @@ export default function ProfilePage() {
     }
 
     try {
+      // Use the existing Supabase client from AuthContext instead of creating a new one
       const supabase = createSupabaseClient()
       const { error } = await supabase.auth.updateUser({
         password: newPassword
@@ -155,11 +153,10 @@ export default function ProfilePage() {
                   <div className="flex items-center space-x-2">
                     <input
                       type="email"
-                      value={email}
+                      value={user.email || ''}
                       disabled
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
                     />
-                    <Mail size={16} className="text-gray-400" />
                   </div>
                   <p className="text-xs text-gray-500 mt-1">Email kan ikke ændres</p>
                 </div>
