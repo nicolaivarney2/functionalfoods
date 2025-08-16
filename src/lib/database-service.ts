@@ -4,7 +4,7 @@ import { IngredientTag } from '@/lib/ingredient-system/types'
 
 export class DatabaseService {
   /**
-   * Get all published recipes from database
+   * Get all recipes from database (published only) - for frontend use
    */
   async getRecipes(): Promise<Recipe[]> {
     const supabase = createSupabaseClient()
@@ -23,47 +23,16 @@ export class DatabaseService {
       console.log('📋 First raw recipe from DB:', {
         id: data[0].id,
         title: data[0].title,
-        imageurl: data[0].imageurl,
-        totaltime: data[0].totaltime
+        imageUrl: data[0].imageUrl,
+        totalTime: data[0].totalTime,
+        preparationTime: data[0].preparationTime,
+        cookingTime: data[0].cookingTime
       })
     }
     
-    // Transform snake_case database fields to camelCase for frontend
-    const transformedRecipes = (data || []).map(recipe => ({
-      id: recipe.id,
-      title: recipe.title,
-      slug: recipe.slug,
-      description: recipe.description,
-      shortDescription: recipe.shortdescription,
-      preparationTime: recipe.preparationtime,
-      cookingTime: recipe.cookingtime,
-      totalTime: recipe.totaltime,
-      calories: recipe.calories,
-      protein: recipe.protein,
-      carbs: recipe.carbs,
-      fat: recipe.fat,
-      fiber: recipe.fiber,
-      mainCategory: recipe.maincategory,
-      subCategories: recipe.subcategories,
-      dietaryCategories: recipe.dietarycategories,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      imageUrl: recipe.imageurl,
-      imageAlt: recipe.imagealt,
-      servings: recipe.servings,
-      difficulty: recipe.difficulty,
-      author: recipe.author,
-      publishedAt: recipe.publishedat,
-      updatedAt: recipe.updatedAt,
-      metaTitle: recipe.metatitle,
-      metaDescription: recipe.metadescription,
-      keywords: recipe.keywords,
-      rating: recipe.rating,
-      reviewCount: recipe.reviewcount
-    }))
-    
-    console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend`)
-    return transformedRecipes
+    // Database already uses camelCase, no transformation needed
+    console.log(`✅ Returning ${data?.length || 0} recipes directly from database`)
+    return data || []
   }
 
   /**
@@ -86,56 +55,16 @@ export class DatabaseService {
       console.log('📋 First raw recipe from DB:', {
         id: data[0].id,
         title: data[0].title,
-        imageurl: data[0].imageurl,
-        totaltime: data[0].totaltime,
-        status: data[0].status
+        imageUrl: data[0].imageUrl,
+        totalTime: data[0].totalTime,
+        preparationTime: data[0].preparationTime,
+        cookingTime: data[0].cookingTime
       })
     }
     
-    // Transform snake_case database fields to camelCase for frontend
-    const transformedRecipes = (data || []).map(recipe => ({
-      id: recipe.id,
-      title: recipe.title,
-      slug: recipe.slug,
-      description: recipe.description,
-      shortDescription: recipe.shortdescription,
-      preparationTime: recipe.preparationtime,
-      cookingTime: recipe.cookingtime,
-      totalTime: recipe.totaltime,
-      calories: recipe.calories,
-      protein: recipe.protein,
-      carbs: recipe.carbs,
-      fat: recipe.fat,
-      fiber: recipe.fiber,
-      nutritionalInfo: recipe.nutritionalinfo,
-      personalTips: recipe.personaltips, // Personal tips and experiences
-      mainCategory: recipe.maincategory,
-      subCategories: recipe.subcategories,
-      dietaryCategories: recipe.dietarycategories,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      imageUrl: recipe.imageurl,
-      imageAlt: recipe.imagealt,
-      servings: recipe.servings,
-      difficulty: recipe.difficulty,
-      author: recipe.author,
-      publishedAt: recipe.publishedat,
-      updatedAt: recipe.updatedAt,
-      metaTitle: recipe.metatitle,
-      metaDescription: recipe.metadescription,
-      keywords: recipe.keywords,
-      rating: recipe.rating,
-      reviewCount: recipe.reviewcount,
-      // Page counter fields
-      pageViews: recipe.pageviews || 0,
-      popularityScore: recipe.popularityscore || 0,
-      ketolivViews: recipe.ketolivviews || 0,
-      // Publishing status
-      status: recipe.status || 'draft'
-    }))
-    
-    console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend (all statuses)`)
-    return transformedRecipes
+    // Database already uses camelCase, no transformation needed
+    console.log(`✅ Returning ${data?.length || 0} recipes directly from database`)
+    return data || []
   }
 
   /**

@@ -5,28 +5,9 @@ const nextConfig = {
     optimizeCss: false, // Disable the CSS optimization that might be causing issues
   },
   
-  // Configure image optimization for Supabase Storage
+  // Disable Next.js image optimization to fix 400 errors
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'najaxycfjgultwdwffhv.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3000',
-        pathname: '/**',
-      }
-    ],
-    formats: ['image/webp', 'image/avif'], // Next.js 15 only supports these formats
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    unoptimized: true, // Use regular img tags instead of Next.js Image component
   },
   
   // Reduce build complexity
