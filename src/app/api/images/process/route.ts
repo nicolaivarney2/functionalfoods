@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
     // Create safe filename (no special characters, spaces, or non-ASCII)
     const safeSlug = recipeSlug
       .toLowerCase()
-      .replace(/[æøå]/g, (match) => {
+      .replace(/[æøå]/g, (match: string) => {
         const replacements: { [key: string]: string } = { 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }
         return replacements[match] || match
       })
