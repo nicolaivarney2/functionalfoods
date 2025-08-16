@@ -22,6 +22,10 @@ CREATE POLICY "Authenticated users can upload images" ON storage.objects
     AND auth.role() = 'authenticated'
   );
 
+-- Create storage policy for public uploads (since bucket is public)
+CREATE POLICY "Public uploads allowed" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'recipe-images');
+
 -- Create storage policy for authenticated users to update
 CREATE POLICY "Authenticated users can update images" ON storage.objects
   FOR UPDATE USING (
