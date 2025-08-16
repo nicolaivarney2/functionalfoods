@@ -325,6 +325,7 @@ export class DatabaseService {
           hint: error.hint, 
           code: error.code 
         })
+        console.error('🔍 First recipe that failed:', JSON.stringify(filteredRecipes[0], null, 2))
         return false
       }
       
