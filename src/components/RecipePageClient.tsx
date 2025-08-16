@@ -159,10 +159,45 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
       <RatingModal
         isOpen={isRatingModalOpen}
         onClose={() => setIsRatingModalOpen(false)}
-        onRate={(rating) => {
-          setCurrentRating(rating)
-          // Here you could save the rating to your database
-          console.log(`Rating saved: ${rating} stars for ${recipe.title}`)
+        onRate={async (rating) => {
+          try {
+            console.log(`⭐ Saving rating: ${rating} stars for ${recipe.title}`)
+            
+            // Get current user ID (you'll need to implement this based on your auth system)
+            const userId = 'temp-user-id' // Replace with actual user ID from auth context
+            
+            const response = await fetch(`/api/recipes/${recipe.slug}/rating`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                rating,
+                userId
+              })
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json()
+              throw new Error(errorData.error || 'Failed to save rating')
+            }
+
+            const result = await response.json()
+            
+            if (result.success) {
+              console.log(`✅ Rating saved successfully: ${result.newRating} stars, ${result.newReviewCount} reviews`)
+              // Update local state with new rating from database
+              setCurrentRating(result.newRating)
+              // You might also want to update the recipe object here
+            } else {
+              throw new Error('Rating save failed')
+            }
+            
+          } catch (error) {
+            console.error('❌ Error saving rating:', error)
+            // You might want to show a toast or error message to the user
+            alert('Kunne ikke gemme bedømmelse. Prøv igen senere.')
+          }
         }}
         recipeTitle={recipe.title}
       />
