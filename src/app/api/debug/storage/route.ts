@@ -50,8 +50,8 @@ export async function GET() {
       debug: {
         hasStorageFiles: !!(storageFiles && storageFiles.length > 0),
         hasRecipes: !!(recipes && recipes.length > 0),
-        storageError: storageError?.message || null,
-        recipesError: recipesError?.message || null
+        storageError: storageError ? (storageError as any).message || null : null,
+        recipesError: recipesError ? (recipesError as any).message || null : null
       }
     })
     
