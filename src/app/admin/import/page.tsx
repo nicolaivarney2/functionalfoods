@@ -86,6 +86,12 @@ export default function AdminImportPage() {
       })
       const saveJson = await saveRes.json().catch(() => ({}))
 
+      console.log('🔍 Save API response:', {
+        status: saveRes.status,
+        ok: saveRes.ok,
+        response: saveJson
+      })
+
       if (saveRes.ok && saveJson.success) {
         setSaveStatus(`✅ Opskrifter gemt succesfuldt! ${skippedCount} duplikater undgået.`)
         
@@ -99,7 +105,17 @@ export default function AdminImportPage() {
           setSaveStatus(null)
         }, 3000)
       } else {
+        console.error('❌ Save API error:', {
+          status: saveRes.status,
+          response: saveJson,
+          debug: saveJson.debug
+        })
         setSaveStatus(`❌ Fejl ved gemning til database${saveJson?.message ? `: ${saveJson.message}` : ''}`)
+        
+        // Show detailed error info
+        if (saveJson.debug) {
+          console.error('🔍 Debug info:', saveJson.debug)
+        }
       }
       
     } catch (err) {

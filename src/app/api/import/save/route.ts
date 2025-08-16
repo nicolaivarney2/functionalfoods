@@ -19,7 +19,8 @@ export async function POST(request: NextRequest) {
       console.error('❌ Invalid recipes data:', recipes)
       return NextResponse.json({
         success: false,
-        message: 'No recipes provided or invalid format'
+        message: 'No recipes provided or invalid format',
+        debug: { recipes, ingredients }
       }, { status: 400 })
     }
 
@@ -27,7 +28,8 @@ export async function POST(request: NextRequest) {
       console.error('❌ Invalid ingredients data:', ingredients)
       return NextResponse.json({
         success: false,
-        message: 'No ingredients provided or invalid format'
+        message: 'No ingredients provided or invalid format',
+        debug: { recipes, ingredients }
       }, { status: 400 })
     }
 
@@ -67,7 +69,8 @@ export async function POST(request: NextRequest) {
         console.error('❌ Failed to save recipes')
         return NextResponse.json({
           success: false,
-          message: 'Failed to save recipes to database'
+          message: 'Failed to save recipes to database',
+          debug: { recipesCount: recipes.length, firstRecipe: recipes[0] }
         }, { status: 500 })
       }
       console.log('✅ Recipes saved successfully')
@@ -78,7 +81,8 @@ export async function POST(request: NextRequest) {
         success: false,
         message: 'Exception during recipe save',
         error: saveError instanceof Error ? saveError.message : 'Unknown error',
-        stack: saveError instanceof Error ? saveError.stack : undefined
+        stack: saveError instanceof Error ? saveError.stack : undefined,
+        debug: { recipesCount: recipes.length, firstRecipe: recipes[0] }
       }, { status: 500 })
     }
 
@@ -96,7 +100,8 @@ export async function POST(request: NextRequest) {
           console.error('❌ Failed to save ingredients')
           return NextResponse.json({
             success: false,
-            message: 'Failed to save ingredients to database'
+            message: 'Failed to save ingredients to database',
+            debug: { newIngredientsCount: newIngredients.length, firstIngredient: newIngredients[0] }
           }, { status: 500 })
         }
         console.log('✅ Ingredients saved successfully')
@@ -107,7 +112,8 @@ export async function POST(request: NextRequest) {
           success: false,
           message: 'Exception during ingredient save',
           error: saveError instanceof Error ? saveError.message : 'Unknown error',
-          stack: saveError instanceof Error ? saveError.stack : undefined
+          stack: saveError instanceof Error ? saveError.stack : undefined,
+          debug: { newIngredientsCount: newIngredients.length, firstIngredient: newIngredients[0] }
         }, { status: 500 })
       }
     }
@@ -137,7 +143,11 @@ export async function POST(request: NextRequest) {
       success: false,
       message: 'Failed to save imported data',
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
+      debug: { 
+        errorType: error?.constructor?.name, 
+        errorMessage: error instanceof Error ? error.message : 'Unknown error' 
+      }
     }, { status: 500 })
   }
 }
