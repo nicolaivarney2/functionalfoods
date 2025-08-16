@@ -242,7 +242,6 @@ export class DatabaseService {
           carbs: recipe.carbs,
           fat: recipe.fat,
           fiber: recipe.fiber,
-          nutritionalInfo: recipe.nutritionalInfo,
           mainCategory: recipe.mainCategory,
           subCategories: recipe.subCategories,
           dietaryCategories: recipe.dietaryCategories,
@@ -290,20 +289,12 @@ export class DatabaseService {
         filteredRecipe.prepTimeISO = recipe.prepTimeISO || null
         filteredRecipe.cookTimeISO = recipe.cookTimeISO || null
         filteredRecipe.totalTimeISO = recipe.totalTimeISO || null
-        filteredRecipe.personalTips = recipe.personalTips || null
         
         // Publishing status
         filteredRecipe.status = recipe.status || 'draft'
         
-        // Store complete nutritional information as JSONB
-        if (recipe.nutritionalInfo) {
-          filteredRecipe.nutritionalInfo = recipe.nutritionalInfo
-        }
-        
-        // Store personal tips
-        if (recipe.personalTips) {
-          filteredRecipe.personalTips = recipe.personalTips
-        }
+        // Note: nutritionalInfo and personalTips are not stored in recipes table
+        // They are stored in ingredients table or handled separately
         
         return filteredRecipe
       })
@@ -357,8 +348,11 @@ export class DatabaseService {
         // Add optional fields if they exist (only include columns we know exist)
         if (ingredient.exclusions) filteredIngredient.exclusions = ingredient.exclusions
         if (ingredient.allergens) filteredIngredient.allergens = ingredient.allergens
-        // Note: commonNames, isActive, createdAt, updatedAt, nutritionalInfo columns don't exist in the database
-        // so we exclude them to prevent errors
+        if (ingredient.nutritionalInfo) filteredIngredient.nutritionalInfo = ingredient.nutritionalInfo
+        if (ingredient.commonNames) filteredIngredient.commonNames = ingredient.commonNames
+        if (ingredient.isActive !== undefined) filteredIngredient.isActive = ingredient.isActive
+        
+        // Note: createdAt and updatedAt are handled by database defaults
         
         return filteredIngredient
       })
