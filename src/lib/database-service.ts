@@ -75,7 +75,7 @@ export class DatabaseService {
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
-      .order('updated_at', { ascending: false })
+      .order('updatedAt', { ascending: false })
     
     if (error) {
       console.error('Error fetching all recipes:', error)
@@ -121,7 +121,7 @@ export class DatabaseService {
       difficulty: recipe.difficulty,
       author: recipe.author,
       publishedAt: recipe.publishedat,
-      updatedAt: recipe.updated_at,
+      updatedAt: recipe.updatedAt,
       metaTitle: recipe.metatitle,
       metaDescription: recipe.metadescription,
       keywords: recipe.keywords,
