@@ -1,15 +1,18 @@
-import { supabase } from './supabase'
+import { createSupabaseClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 
 export class DatabaseService {
   /**
-   * Get all recipes from database
+   * Get all published recipes from database
    */
   async getRecipes(): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
+      .eq('status', 'published') // Kun udgivne opskrifter
+      .order('updated_at', { ascending: false })
     
     if (error) {
       console.error('Error fetching recipes:', error)
@@ -30,38 +33,42 @@ export class DatabaseService {
     const transformedRecipes = (data || []).map(recipe => ({
       id: recipe.id,
       title: recipe.title,
+      slug: recipe.slug,
       description: recipe.description,
       shortDescription: recipe.shortdescription,
-      imageUrl: recipe.imageurl,
-      imageAlt: recipe.imagealt,
       preparationTime: recipe.preparationtime,
       cookingTime: recipe.cookingtime,
       totalTime: recipe.totaltime,
-      servings: recipe.servings,
-      difficulty: recipe.difficulty,
       calories: recipe.calories,
       protein: recipe.protein,
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      dietaryCategories: recipe.dietarycategories || [],
+      nutritionalInfo: recipe.nutritionalinfo,
+      personalTips: recipe.personaltips, // Personal tips and experiences
       mainCategory: recipe.maincategory,
-      subCategories: recipe.subcategories || [],
-      ingredients: recipe.ingredients || [],
-      instructions: recipe.instructions || [],
-      publishedAt: recipe.publishedat ? new Date(recipe.publishedat) : new Date(),
-      updatedAt: recipe.updatedat ? new Date(recipe.updatedat) : new Date(),
+      subCategories: recipe.subcategories,
+      dietaryCategories: recipe.dietarycategories,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      imageUrl: recipe.imageurl,
+      imageAlt: recipe.imagealt,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      author: recipe.author,
+      publishedAt: recipe.publishedat,
+      updatedAt: recipe.updated_at,
       metaTitle: recipe.metatitle,
       metaDescription: recipe.metadescription,
-      keywords: recipe.keywords || [],
-      author: recipe.author,
-      slug: recipe.slug,
+      keywords: recipe.keywords,
       rating: recipe.rating,
       reviewCount: recipe.reviewcount,
-      prepTimeISO: recipe.preptimeiso,
-      cookTimeISO: recipe.cooktimeiso,
-      totalTimeISO: recipe.totaltimeiso,
-      nutritionalInfo: recipe.nutritionalinfo // Complete nutritional data from Frida DTU
+      // Page counter fields
+      pageViews: recipe.pageviews || 0,
+      popularityScore: recipe.popularityscore || 0,
+      ketolivViews: recipe.ketolivviews || 0,
+      // Publishing status
+      status: recipe.status || 'draft'
     }))
     
     console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend`)
@@ -69,9 +76,82 @@ export class DatabaseService {
   }
 
   /**
+   * Get all recipes from database (including drafts) - for admin use only
+   */
+  async getAllRecipes(): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .order('updated_at', { ascending: false })
+    
+    if (error) {
+      console.error('Error fetching all recipes:', error)
+      return []
+    }
+    
+    console.log(`🔍 Raw database data: ${data?.length || 0} recipes found (all statuses)`)
+    if (data && data.length > 0) {
+      console.log('📋 First raw recipe from DB:', {
+        id: data[0].id,
+        title: data[0].title,
+        imageurl: data[0].imageurl,
+        totaltime: data[0].totaltime,
+        status: data[0].status
+      })
+    }
+    
+    // Transform snake_case database fields to camelCase for frontend
+    const transformedRecipes = (data || []).map(recipe => ({
+      id: recipe.id,
+      title: recipe.title,
+      slug: recipe.slug,
+      description: recipe.description,
+      shortDescription: recipe.shortdescription,
+      preparationTime: recipe.preparationtime,
+      cookingTime: recipe.cookingtime,
+      totalTime: recipe.totaltime,
+      calories: recipe.calories,
+      protein: recipe.protein,
+      carbs: recipe.carbs,
+      fat: recipe.fat,
+      fiber: recipe.fiber,
+      nutritionalInfo: recipe.nutritionalinfo,
+      personalTips: recipe.personaltips, // Personal tips and experiences
+      mainCategory: recipe.maincategory,
+      subCategories: recipe.subcategories,
+      dietaryCategories: recipe.dietarycategories,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      imageUrl: recipe.imageurl,
+      imageAlt: recipe.imagealt,
+      servings: recipe.servings,
+      difficulty: recipe.difficulty,
+      author: recipe.author,
+      publishedAt: recipe.publishedat,
+      updatedAt: recipe.updated_at,
+      metaTitle: recipe.metatitle,
+      metaDescription: recipe.metadescription,
+      keywords: recipe.keywords,
+      rating: recipe.rating,
+      reviewCount: recipe.reviewcount,
+      // Page counter fields
+      pageViews: recipe.pageviews || 0,
+      popularityScore: recipe.popularityscore || 0,
+      ketolivViews: recipe.ketolivviews || 0,
+      // Publishing status
+      status: recipe.status || 'draft'
+    }))
+    
+    console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend (all statuses)`)
+    return transformedRecipes
+  }
+
+  /**
    * Get all ingredients from database
    */
   async getIngredients(): Promise<IngredientTag[]> {
+    const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('ingredients')
       .select('*')
@@ -102,6 +182,7 @@ export class DatabaseService {
    * Generate unique IDs for recipes that don't have one
    */
   async assignUniqueIds(recipes: Recipe[]): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
     // SIMPLE: Generate IDs only for recipes without IDs, starting from 1000
     let nextId = 1000
     
@@ -138,6 +219,7 @@ export class DatabaseService {
    * Save recipes to database (using only existing columns)
    */
   async saveRecipes(recipes: Recipe[]): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log(`💾 Attempting to save ${recipes.length} recipes...`)
       
@@ -149,46 +231,78 @@ export class DatabaseService {
         const filteredRecipe: any = {
           id: recipe.id,
           title: recipe.title,
+          slug: recipe.slug,
           description: recipe.description,
-          calories: recipe.calories || 0,
-          protein: recipe.protein || 0,
-          carbs: recipe.carbs || 0,
-          fat: recipe.fat || 0,
-          fiber: recipe.fiber || 0,
-          keywords: recipe.keywords,
+          shortDescription: recipe.shortDescription,
+          preparationTime: recipe.preparationTime,
+          cookingTime: recipe.cookingTime,
+          totalTime: recipe.totalTime,
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat,
+          fiber: recipe.fiber,
+          nutritionalInfo: recipe.nutritionalInfo,
+          mainCategory: recipe.mainCategory,
+          subCategories: recipe.subCategories,
+          dietaryCategories: recipe.dietaryCategories,
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
-          servings: recipe.servings || 2,
-          difficulty: recipe.difficulty || 'Nem',
-          author: recipe.author || 'Functional Foods'
+          imageUrl: recipe.imageUrl,
+          imageAlt: recipe.imageAlt,
+          servings: recipe.servings,
+          difficulty: recipe.difficulty,
+          author: recipe.author,
+          publishedAt: recipe.publishedAt,
+          updatedAt: recipe.updatedAt,
+          metaTitle: recipe.metaTitle,
+          metaDescription: recipe.metaDescription,
+          keywords: recipe.keywords,
+          rating: recipe.rating,
+          reviewCount: recipe.reviewCount,
+          // Page counter fields
+          pageViews: recipe.pageViews || 0,
+          popularityScore: recipe.popularityScore || 0,
+          ketolivViews: recipe.ketolivViews || 0,
+          // Publishing status
+          status: recipe.status || 'draft'
         }
         
         // Add optional fields if they exist (only include columns we know exist)
         if (recipe.slug) filteredRecipe.slug = recipe.slug
         
         // Add default values for fields that frontend expects but don't exist in database
-        filteredRecipe.shortdescription = recipe.shortDescription || null
-        filteredRecipe.preparationtime = recipe.preparationTime || 0
-        filteredRecipe.cookingtime = recipe.cookingTime || 0
-        filteredRecipe.totaltime = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
-        filteredRecipe.metatitle = recipe.metaTitle || null
-        filteredRecipe.metadescription = recipe.metaDescription || null
-        filteredRecipe.maincategory = recipe.mainCategory || null
-        filteredRecipe.subcategories = recipe.subCategories || null
-        filteredRecipe.dietarycategories = recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? recipe.dietaryCategories : null
-        filteredRecipe.imageurl = recipe.imageUrl || '/images/recipe-placeholder.jpg'
-        filteredRecipe.imagealt = recipe.imageAlt || null
-        filteredRecipe.publishedat = recipe.publishedAt ? (typeof recipe.publishedAt === 'string' ? recipe.publishedAt : recipe.publishedAt.toISOString()) : new Date().toISOString()
-        filteredRecipe.updatedat = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
+        filteredRecipe.shortDescription = recipe.shortDescription || null
+        filteredRecipe.preparationTime = recipe.preparationTime || 0
+        filteredRecipe.cookingTime = recipe.cookingTime || 0
+        filteredRecipe.totalTime = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
+        filteredRecipe.metaTitle = recipe.metaTitle || null
+        filteredRecipe.metaDescription = recipe.metaDescription || null
+        filteredRecipe.mainCategory = recipe.mainCategory || null
+        filteredRecipe.subCategories = recipe.subCategories || null
+        filteredRecipe.dietaryCategories = recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? recipe.dietaryCategories : null
+        filteredRecipe.imageUrl = recipe.imageUrl || '/images/recipe-placeholder.jpg'
+        filteredRecipe.imageAlt = recipe.imageAlt || null
+        filteredRecipe.publishedAt = recipe.publishedAt ? (typeof recipe.publishedAt === 'string' ? recipe.publishedAt : recipe.publishedAt.toISOString()) : new Date().toISOString()
+        filteredRecipe.updatedAt = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
         filteredRecipe.rating = recipe.rating || null
-        filteredRecipe.reviewcount = recipe.reviewCount || null
-        filteredRecipe.preptimeiso = recipe.prepTimeISO || null
-        filteredRecipe.cooktimeiso = recipe.cookTimeISO || null
-        filteredRecipe.totaltimeiso = recipe.totalTimeISO || null
+        filteredRecipe.reviewCount = recipe.reviewCount || null
+        filteredRecipe.prepTimeISO = recipe.prepTimeISO || null
+        filteredRecipe.cookTimeISO = recipe.cookTimeISO || null
+        filteredRecipe.totalTimeISO = recipe.totalTimeISO || null
+        filteredRecipe.personalTips = recipe.personalTips || null
+        
+        // Publishing status
+        filteredRecipe.status = recipe.status || 'draft'
         
         // Store complete nutritional information as JSONB
         if (recipe.nutritionalInfo) {
-          filteredRecipe.nutritionalinfo = recipe.nutritionalInfo
+          filteredRecipe.nutritionalInfo = recipe.nutritionalInfo
+        }
+        
+        // Store personal tips
+        if (recipe.personalTips) {
+          filteredRecipe.personalTips = recipe.personalTips
         }
         
         return filteredRecipe
@@ -211,6 +325,7 @@ export class DatabaseService {
           hint: error.hint, 
           code: error.code 
         })
+        console.error('🔍 First recipe that failed:', JSON.stringify(filteredRecipes[0], null, 2))
         return false
       }
       
@@ -226,6 +341,7 @@ export class DatabaseService {
    * Save ingredients to database (using only existing columns)
    */
   async saveIngredients(ingredients: IngredientTag[]): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log(`💾 Attempting to save ${ingredients.length} ingredients...`)
       
@@ -279,6 +395,7 @@ export class DatabaseService {
    * Check database tables exist
    */
   async checkDatabaseStructure(): Promise<any> {
+    const supabase = createSupabaseClient()
     try {
       console.log('🔍 Checking database structure...')
       
@@ -314,6 +431,7 @@ export class DatabaseService {
    * Get database statistics
    */
   async getDatabaseStats(): Promise<{ recipeCount: number; ingredientCount: number }> {
+    const supabase = createSupabaseClient()
     try {
       const { count: recipeCount, error: recipeError } = await supabase
         .from('recipes')
@@ -339,6 +457,7 @@ export class DatabaseService {
    * Test database connection
    */
   async testConnection(): Promise<boolean> {
+    const supabase = createSupabaseClient()
     try {
       console.log('🔍 Testing Supabase connection...')
       const { data, error } = await supabase.from('recipes').select('count', { count: 'exact', head: true })

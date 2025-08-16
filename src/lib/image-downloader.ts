@@ -1,56 +1,23 @@
-import fs from 'fs'
-import path from 'path'
 import { createHash } from 'crypto'
+import { createSupabaseClient } from './supabase'
 
-const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'recipes')
-
-// Ensure images directory exists
-if (!fs.existsSync(IMAGES_DIR)) {
-  fs.mkdirSync(IMAGES_DIR, { recursive: true })
-}
+// Check if we're in a serverless environment (Vercel)
+const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
 export interface ImageDownloadResult {
   success: boolean
   localPath?: string
+  storageUrl?: string
   error?: string
-}
-
-async function optimizeImage(input: Buffer): Promise<{ buffer: Buffer; ext: string; resized: boolean }> {
-  // Allow turning off optimization instantly if environment is unstable
-  if (process.env.IMAGE_OPTIMIZE !== 'true') {
-    return { buffer: input, ext: '', resized: false }
-  }
-  try {
-    // Use dynamic import so project doesn't break if sharp isn't installed
-    const sharp = (await import('sharp')).default as unknown as (input?: any) => any
-    const img = sharp(input)
-    const meta = await img.metadata()
-    const maxWidth = parseInt(process.env.IMAGE_MAX_WIDTH || '1200', 10)
-    const scale = parseFloat(process.env.IMAGE_SCALE || '0.5')
-    const quality = parseInt(process.env.IMAGE_WEBP_QUALITY || '75', 10)
-    let pipeline = img
-    if (meta.width && meta.width > 0) {
-      const targetWidth = Math.min(
-        maxWidth,
-        Math.max(600, Math.round(meta.width * scale))
-      )
-      pipeline = pipeline.resize({ width: targetWidth })
-    }
-    const out = await pipeline.webp({ quality }).toBuffer()
-    return { buffer: out, ext: '.webp', resized: true }
-  } catch {
-    // sharp not available or failed – return original
-    return { buffer: input, ext: '', resized: false }
-  }
 }
 
 export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string): Promise<ImageDownloadResult> {
   try {
     console.log(`🖼️ Attempting to download image for ${recipeSlug}: ${imageUrl}`)
     
-    // Skip if already a local path
-    if (imageUrl.startsWith('/images/')) {
-      console.log(`   ⏭️  Skipping local path: ${imageUrl}`)
+    // Skip if already a local path or storage URL
+    if (imageUrl.startsWith('/images/') || imageUrl.includes('supabase.co')) {
+      console.log(`   ⏭️  Skipping existing path: ${imageUrl}`)
       return { success: true, localPath: imageUrl }
     }
 
@@ -60,72 +27,68 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
       return { success: true, localPath: imageUrl }
     }
 
-    // Generate a unique filename based on URL path and recipe slug
-    let urlObj: URL
-    try {
-      urlObj = new URL(imageUrl)
-    } catch {
-      // Handle root-relative or path-only URLs from Ketoliv
-      console.log(`   🔧 Converting relative URL: ${imageUrl}`)
-      urlObj = new URL(imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`, 'https://ketoliv.dk')
-    }
-    
-    console.log(`   🌐 Final URL: ${urlObj.href}`)
-    
-    const urlHash = createHash('md5').update(urlObj.href).digest('hex').substring(0, 8)
-    const extFromPath = path.posix.extname(urlObj.pathname)
-    let fileExtension = extFromPath && extFromPath.length <= 5 ? extFromPath : '.jpg'
-
-    // We'll compute filename after potential optimization (extension may change)
-
-    // Download the image (add headers for stricter hosts like Ketoliv)
+    // Download image with proper headers
     const headers: Record<string, string> = {
       'User-Agent': 'Mozilla/5.0 (compatible; FunctionalFoodsBot/1.0)'
     }
-    if (/ketoliv/i.test(urlObj.hostname)) {
+    
+    // Add referer for Ketoliv images
+    if (imageUrl.includes('ketoliv.dk')) {
       headers['Referer'] = 'https://ketoliv.dk'
     }
     
-    console.log(`   📥 Downloading with headers:`, headers)
-    const response = await fetch(urlObj.href, { headers })
+    const response = await fetch(imageUrl, { headers })
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
     }
 
-    const arrBuf = await response.arrayBuffer()
-    const originalBuffer = Buffer.from(arrBuf)
-    console.log(`   💾 Downloaded ${originalBuffer.byteLength} bytes`)
+    const imageBuffer = await response.arrayBuffer()
+    const imageBlob = new Blob([imageBuffer])
     
-    // Optimize (resize ~50% width and convert to webp if possible)
-    const optimized = await optimizeImage(originalBuffer)
-    const finalBuffer = optimized.resized ? optimized.buffer : originalBuffer
-    if (optimized.resized && optimized.ext) {
-      fileExtension = optimized.ext
-      console.log(`   ✂️ Optimized to ${finalBuffer.length} bytes as ${fileExtension}`)
+    // Create filename with hash to avoid conflicts
+    const hash = createHash('md5').update(imageUrl).digest('hex').substring(0, 8)
+    const filename = `${recipeSlug}-${hash}.jpg`
+    
+    console.log(`   📤 Uploading to Supabase Storage: ${filename}`)
+    
+    // Upload to Supabase Storage
+    const supabase = createSupabaseClient()
+    const { data, error } = await supabase.storage
+      .from('recipe-images')
+      .upload(filename, imageBlob, {
+        contentType: 'image/jpeg',
+        upsert: true
+      })
+    
+    if (error) {
+      console.error('❌ Failed to upload to Supabase Storage:', error)
+      
+      // If bucket doesn't exist, provide helpful error
+      if (error.message.includes('bucket') || error.message.includes('not found')) {
+        throw new Error('Storage bucket "recipe-images" not found. Please run the SQL migration to create it.')
+      }
+      
+      throw error
     }
     
-    const filename = `${recipeSlug}-${urlHash}${fileExtension}`
-    const localRelPath = path.posix.join('images', 'recipes', filename) // no leading slash for fs paths
-    const fullPath = path.join(process.cwd(), 'public', localRelPath)
-    console.log(`   💾 Local path: /${localRelPath}`)
-
-    // Check if file already exists (after deciding final name)
-    if (fs.existsSync(fullPath)) {
-      console.log(`   ✅ File already exists: ${fullPath}`)
-      return { success: true, localPath: `/${localRelPath}` }
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('recipe-images')
+      .getPublicUrl(filename)
+    
+    console.log(`✅ Image uploaded to Supabase Storage: ${publicUrl}`)
+    
+    return {
+      success: true,
+      storageUrl: publicUrl,
+      localPath: publicUrl // Use storage URL as local path for consistency
     }
     
-    // Write to local file
-    fs.writeFileSync(fullPath, finalBuffer)
-    
-    console.log(`✅ Successfully downloaded image: ${imageUrl} -> /${localRelPath}`)
-    
-    return { success: true, localPath: `/${localRelPath}` }
   } catch (error) {
-    console.error(`❌ Error downloading image ${imageUrl}:`, error)
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    console.error(`❌ Failed to download/store image for ${recipeSlug}:`, error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -154,23 +117,39 @@ export async function downloadRecipeImages(recipe: any): Promise<any> {
 
 export async function downloadBulkImages(recipes: any[]): Promise<any[]> {
   console.log(`🖼️ Starting bulk image download for ${recipes.length} recipes...`)
+  
   const updatedRecipes = []
   
   for (const recipe of recipes) {
-    console.log(`📸 Processing image for recipe: ${recipe.title} (${recipe.slug})`)
-    console.log(`   Original imageUrl: ${recipe.imageUrl}`)
-    
-    const updatedRecipe = await downloadRecipeImages(recipe)
-    
-    if (updatedRecipe.imageUrl !== recipe.imageUrl) {
-      console.log(`   ✅ Image updated: ${recipe.imageUrl} -> ${updatedRecipe.imageUrl}`)
-    } else {
-      console.log(`   ⚠️  Image unchanged: ${updatedRecipe.imageUrl}`)
+    try {
+      const result = await downloadAndStoreImage(recipe.imageUrl, recipe.slug)
+      
+      if (result.success && result.localPath) {
+        updatedRecipes.push({
+          ...recipe,
+          imageUrl: result.localPath
+        })
+      } else {
+        // Keep original image URL if download failed
+        updatedRecipes.push({
+          ...recipe,
+          imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg'
+        })
+      }
+      
+      // Add small delay to avoid overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+    } catch (error) {
+      console.error(`❌ Error processing recipe ${recipe.slug}:`, error)
+      // Keep original image URL if processing failed
+      updatedRecipes.push({
+        ...recipe,
+        imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg'
+      })
     }
-    
-    updatedRecipes.push(updatedRecipe)
   }
   
-  console.log(`🖼️ Bulk image download completed. Processed ${updatedRecipes.length} recipes.`)
+  console.log(`✅ Bulk image download completed. Processed ${updatedRecipes.length} recipes.`)
   return updatedRecipes
 } 

@@ -1,44 +1,40 @@
+export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { downloadBulkImages } from '@/lib/image-downloader'
-import fs from 'fs'
-import path from 'path'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Loading existing recipes...')
+    console.log('🚀 Starting image download process...')
     
-    // Load imported recipes
-    const importedRecipesPath = path.join(process.cwd(), 'data', 'imported-recipes.json')
-    if (!fs.existsSync(importedRecipesPath)) {
+    const body = await request.json()
+    const { recipes } = body
+    
+    if (!recipes || !Array.isArray(recipes)) {
       return NextResponse.json({
         success: false,
-        message: 'No imported recipes found'
-      })
+        message: 'Invalid request body. Expected recipes array.'
+      }, { status: 400 })
     }
     
-    const importedRecipes = JSON.parse(fs.readFileSync(importedRecipesPath, 'utf8'))
-    console.log(`Found ${importedRecipes.length} imported recipes`)
+    console.log(`📋 Processing ${recipes.length} recipes for image download...`)
     
-    // Download images for imported recipes
-    console.log('Downloading images for imported recipes...')
-    const updatedRecipes = await downloadBulkImages(importedRecipes)
+    // Download and store images using Supabase Storage
+    const updatedRecipes = await downloadBulkImages(recipes)
     
-    // Save updated recipes back to file
-    fs.writeFileSync(importedRecipesPath, JSON.stringify(updatedRecipes, null, 2))
-    
-    console.log('✅ Successfully downloaded images for all recipes')
+    console.log('✅ Image download process completed successfully')
     
     return NextResponse.json({
       success: true,
-      message: `Successfully downloaded images for ${updatedRecipes.length} recipes`,
-      recipeCount: updatedRecipes.length
+      message: `Successfully processed ${updatedRecipes.length} recipes`,
+      recipes: updatedRecipes
     })
     
   } catch (error) {
-    console.error('❌ Error downloading images:', error)
+    console.error('❌ Error in image download API:', error)
+    
     return NextResponse.json({
       success: false,
-      message: 'Failed to download images',
+      message: 'Failed to process image downloads',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
