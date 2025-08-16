@@ -38,24 +38,49 @@ export async function POST(request: NextRequest) {
     // Check environment variables
     console.log('🔍 Environment check:', {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSupabaseKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       nodeEnv: process.env.NODE_ENV,
       vercelEnv: process.env.VERCEL_ENV
     })
 
     // Initialize ingredient matcher
     console.log('🔧 Initializing ingredient matcher...')
-    await ingredientMatcher.initialize()
-    console.log('✅ Ingredient matcher initialized')
+    try {
+      await ingredientMatcher.initialize()
+      console.log('✅ Ingredient matcher initialized')
+    } catch (initError) {
+      console.error('💥 Error initializing ingredient matcher:', initError)
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to initialize ingredient matcher',
+        error: initError instanceof Error ? initError.message : 'Unknown error'
+      }, { status: 500 })
+    }
     
     // Process ingredients to remove duplicates
     console.log('🔍 Processing ingredients...')
-    const { newIngredients, matchedIngredients, skippedCount } = await ingredientMatcher.processIngredients(ingredients)
+    let newIngredients: any[] = []
+    let matchedIngredients: any[] = []
+    let skippedCount = 0
     
-    console.log('🔍 Ingredient matching results:')
-    console.log(`  - Total ingredients: ${ingredients.length}`)
-    console.log(`  - New ingredients: ${newIngredients.length}`)
-    console.log(`  - Skipped duplicates: ${skippedCount}`)
+    try {
+      const result = await ingredientMatcher.processIngredients(ingredients)
+      newIngredients = result.newIngredients
+      matchedIngredients = result.matchedIngredients
+      skippedCount = result.skippedCount
+      
+      console.log('🔍 Ingredient matching results:')
+      console.log(`  - Total ingredients: ${ingredients.length}`)
+      console.log(`  - New ingredients: ${newIngredients.length}`)
+      console.log(`  - Skipped duplicates: ${skippedCount}`)
+    } catch (processError) {
+      console.error('💥 Error processing ingredients:', processError)
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to process ingredients',
+        error: processError instanceof Error ? processError.message : 'Unknown error'
+      }, { status: 500 })
+    }
     
     // Save recipes to database
     console.log('💾 Saving recipes to database...')
