@@ -233,37 +233,37 @@ export class DatabaseService {
           title: recipe.title,
           slug: recipe.slug,
           description: recipe.description,
-          shortdescription: recipe.shortDescription,
-          preparationtime: recipe.preparationTime,
-          cookingtime: recipe.cookingTime,
-          totaltime: recipe.totalTime,
+          shortDescription: recipe.shortDescription,
+          preparationTime: recipe.preparationTime,
+          cookingTime: recipe.cookingTime,
+          totalTime: recipe.totalTime,
           calories: recipe.calories,
           protein: recipe.protein,
           carbs: recipe.carbs,
           fat: recipe.fat,
           fiber: recipe.fiber,
-          nutritionalinfo: recipe.nutritionalInfo,
-          maincategory: recipe.mainCategory,
-          subcategories: recipe.subCategories,
-          dietarycategories: recipe.dietaryCategories,
+          nutritionalInfo: recipe.nutritionalInfo,
+          mainCategory: recipe.mainCategory,
+          subCategories: recipe.subCategories,
+          dietaryCategories: recipe.dietaryCategories,
           ingredients: recipe.ingredients,
           instructions: recipe.instructions,
-          imageurl: recipe.imageUrl,
-          imagealt: recipe.imageAlt,
+          imageUrl: recipe.imageUrl,
+          imageAlt: recipe.imageAlt,
           servings: recipe.servings,
           difficulty: recipe.difficulty,
           author: recipe.author,
-          publishedat: recipe.publishedAt,
-          updated_at: recipe.updatedAt,
-          metatitle: recipe.metaTitle,
-          metadescription: recipe.metaDescription,
+          publishedAt: recipe.publishedAt,
+          updatedAt: recipe.updatedAt,
+          metaTitle: recipe.metaTitle,
+          metaDescription: recipe.metaDescription,
           keywords: recipe.keywords,
           rating: recipe.rating,
-          reviewcount: recipe.reviewCount,
+          reviewCount: recipe.reviewCount,
           // Page counter fields
-          pageviews: recipe.pageViews || 0,
-          popularityscore: recipe.popularityScore || 0,
-          ketolivviews: recipe.ketolivViews || 0,
+          pageViews: recipe.pageViews || 0,
+          popularityScore: recipe.popularityScore || 0,
+          ketolivViews: recipe.ketolivViews || 0,
           // Publishing status
           status: recipe.status || 'draft'
         }
@@ -272,37 +272,37 @@ export class DatabaseService {
         if (recipe.slug) filteredRecipe.slug = recipe.slug
         
         // Add default values for fields that frontend expects but don't exist in database
-        filteredRecipe.shortdescription = recipe.shortDescription || null
-        filteredRecipe.preparationtime = recipe.preparationTime || 0
-        filteredRecipe.cookingtime = recipe.cookingTime || 0
-        filteredRecipe.totaltime = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
-        filteredRecipe.metatitle = recipe.metaTitle || null
-        filteredRecipe.metadescription = recipe.metaDescription || null
-        filteredRecipe.maincategory = recipe.mainCategory || null
-        filteredRecipe.subcategories = recipe.subCategories || null
-        filteredRecipe.dietarycategories = recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? recipe.dietaryCategories : null
-        filteredRecipe.imageurl = recipe.imageUrl || '/images/recipe-placeholder.jpg'
-        filteredRecipe.imagealt = recipe.imageAlt || null
-        filteredRecipe.publishedat = recipe.publishedAt ? (typeof recipe.publishedAt === 'string' ? recipe.publishedAt : recipe.publishedAt.toISOString()) : new Date().toISOString()
-        filteredRecipe.updatedat = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
+        filteredRecipe.shortDescription = recipe.shortDescription || null
+        filteredRecipe.preparationTime = recipe.preparationTime || 0
+        filteredRecipe.cookingTime = recipe.cookingTime || 0
+        filteredRecipe.totalTime = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
+        filteredRecipe.metaTitle = recipe.metaTitle || null
+        filteredRecipe.metaDescription = recipe.metaDescription || null
+        filteredRecipe.mainCategory = recipe.mainCategory || null
+        filteredRecipe.subCategories = recipe.subCategories || null
+        filteredRecipe.dietaryCategories = recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? recipe.dietaryCategories : null
+        filteredRecipe.imageUrl = recipe.imageUrl || '/images/recipe-placeholder.jpg'
+        filteredRecipe.imageAlt = recipe.imageAlt || null
+        filteredRecipe.publishedAt = recipe.publishedAt ? (typeof recipe.publishedAt === 'string' ? recipe.publishedAt : recipe.publishedAt.toISOString()) : new Date().toISOString()
+        filteredRecipe.updatedAt = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
         filteredRecipe.rating = recipe.rating || null
-        filteredRecipe.reviewcount = recipe.reviewCount || null
-        filteredRecipe.preptimeiso = recipe.prepTimeISO || null
-        filteredRecipe.cooktimeiso = recipe.cookTimeISO || null
-        filteredRecipe.totaltimeiso = recipe.totalTimeISO || null
-        filteredRecipe.personaltips = recipe.personalTips || null
+        filteredRecipe.reviewCount = recipe.reviewCount || null
+        filteredRecipe.prepTimeISO = recipe.prepTimeISO || null
+        filteredRecipe.cookTimeISO = recipe.cookTimeISO || null
+        filteredRecipe.totalTimeISO = recipe.totalTimeISO || null
+        filteredRecipe.personalTips = recipe.personalTips || null
         
         // Publishing status
         filteredRecipe.status = recipe.status || 'draft'
         
         // Store complete nutritional information as JSONB
         if (recipe.nutritionalInfo) {
-          filteredRecipe.nutritionalinfo = recipe.nutritionalInfo
+          filteredRecipe.nutritionalInfo = recipe.nutritionalInfo
         }
         
         // Store personal tips
         if (recipe.personalTips) {
-          filteredRecipe.personaltips = recipe.personalTips
+          filteredRecipe.personalTips = recipe.personalTips
         }
         
         return filteredRecipe
