@@ -5,9 +5,15 @@ const nextConfig = {
     optimizeCss: false, // Disable the CSS optimization that might be causing issues
   },
   
-  // Disable image optimization if not needed
+  // Configure image optimization for Supabase Storage
   images: {
-    unoptimized: true,
+    domains: [
+      'najaxycfjgultwdwffhv.supabase.co', // Supabase Storage domain
+      'localhost'
+    ],
+    formats: ['image/webp', 'image/jpeg', 'image/png'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
   
   // Reduce build complexity
