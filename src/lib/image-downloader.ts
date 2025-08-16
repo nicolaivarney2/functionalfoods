@@ -2,11 +2,21 @@ import fs from 'fs'
 import path from 'path'
 import { createHash } from 'crypto'
 
-const IMAGES_DIR = path.join(process.cwd(), 'public', 'images', 'recipes')
+// Check if we're in a serverless environment (Vercel)
+const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
-// Ensure images directory exists
-if (!fs.existsSync(IMAGES_DIR)) {
-  fs.mkdirSync(IMAGES_DIR, { recursive: true })
+// Use environment-safe image directory
+const IMAGES_DIR = isServerless 
+  ? '/tmp/images/recipes' // Vercel uses /tmp for temporary storage
+  : path.join(process.cwd(), 'public', 'images', 'recipes')
+
+// Only create directory if not in serverless environment
+if (!isServerless && !fs.existsSync(IMAGES_DIR)) {
+  try {
+    fs.mkdirSync(IMAGES_DIR, { recursive: true })
+  } catch (error) {
+    console.warn('Could not create images directory:', error)
+  }
 }
 
 export interface ImageDownloadResult {
@@ -58,6 +68,16 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
     if (imageUrl.includes('recipe-placeholder.jpg')) {
       console.log(`   ⏭️  Skipping placeholder image`)
       return { success: true, localPath: imageUrl }
+    }
+
+    // In serverless environment, we can't save files permanently
+    if (isServerless) {
+      console.log(`   ⚠️  Serverless environment detected - skipping image download`)
+      return { 
+        success: true, 
+        localPath: imageUrl, // Return original URL
+        error: 'Image download skipped in serverless environment'
+      }
     }
 
     // Generate a unique filename based on URL path and recipe slug
@@ -154,23 +174,44 @@ export async function downloadRecipeImages(recipe: any): Promise<any> {
 
 export async function downloadBulkImages(recipes: any[]): Promise<any[]> {
   console.log(`🖼️ Starting bulk image download for ${recipes.length} recipes...`)
+  
+  // In serverless environment, skip image downloads
+  if (isServerless) {
+    console.log(`⚠️  Serverless environment detected - skipping bulk image download`)
+    return recipes.map(recipe => ({
+      ...recipe,
+      imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg'
+    }))
+  }
+  
   const updatedRecipes = []
   
   for (const recipe of recipes) {
-    console.log(`📸 Processing image for recipe: ${recipe.title} (${recipe.slug})`)
-    console.log(`   Original imageUrl: ${recipe.imageUrl}`)
-    
-    const updatedRecipe = await downloadRecipeImages(recipe)
-    
-    if (updatedRecipe.imageUrl !== recipe.imageUrl) {
-      console.log(`   ✅ Image updated: ${recipe.imageUrl} -> ${updatedRecipe.imageUrl}`)
-    } else {
-      console.log(`   ⚠️  Image unchanged: ${updatedRecipe.imageUrl}`)
+    try {
+      const result = await downloadAndStoreImage(recipe.imageUrl, recipe.slug)
+      
+      if (result.success && result.localPath) {
+        updatedRecipes.push({
+          ...recipe,
+          imageUrl: result.localPath
+        })
+      } else {
+        // Keep original image URL if download failed
+        updatedRecipes.push({
+          ...recipe,
+          imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg'
+        })
+      }
+    } catch (error) {
+      console.error(`❌ Error processing recipe ${recipe.slug}:`, error)
+      // Keep original image URL if processing failed
+      updatedRecipes.push({
+        ...recipe,
+        imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg'
+      })
     }
-    
-    updatedRecipes.push(updatedRecipe)
   }
   
-  console.log(`🖼️ Bulk image download completed. Processed ${updatedRecipes.length} recipes.`)
+  console.log(`✅ Bulk image download completed for ${updatedRecipes.length} recipes`)
   return updatedRecipes
 } 

@@ -6,10 +6,29 @@ interface OpenAIConfig {
   assistantId: string
 }
 
-const CONFIG_FILE = path.join(process.cwd(), '.openai-config.json')
+// Check if we're in a serverless environment (Vercel)
+const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+
+const CONFIG_FILE = isServerless 
+  ? '/tmp/openai-config.json' // Vercel uses /tmp for temporary storage
+  : path.join(process.cwd(), '.openai-config.json')
 
 export function getOpenAIConfig(): OpenAIConfig | null {
   try {
+    // In serverless environment, try to get config from environment variables
+    if (isServerless) {
+      const apiKey = process.env.OPENAI_API_KEY
+      const assistantId = process.env.OPENAI_ASSISTANT_ID
+      
+      if (apiKey && assistantId) {
+        return { apiKey, assistantId }
+      }
+      
+      console.warn('OpenAI config not available in serverless environment')
+      return null
+    }
+    
+    // Local environment - read from file
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf-8')
       const config = JSON.parse(configData)
@@ -27,6 +46,13 @@ export function getOpenAIConfig(): OpenAIConfig | null {
 
 export function saveOpenAIConfig(config: OpenAIConfig): boolean {
   try {
+    // In serverless environment, we can't save files permanently
+    if (isServerless) {
+      console.warn('Cannot save OpenAI config in serverless environment')
+      return false
+    }
+    
+    // Local environment - save to file
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
     return true
   } catch (error) {

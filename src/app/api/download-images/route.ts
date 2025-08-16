@@ -1,45 +1,53 @@
 export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { downloadBulkImages } from '@/lib/image-downloader'
-import fs from 'fs'
-import path from 'path'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Loading existing recipes...')
+    console.log('🚀 Starting image download process...')
     
-    // Load imported recipes
-    const importedRecipesPath = path.join(process.cwd(), 'data', 'imported-recipes.json')
-    if (!fs.existsSync(importedRecipesPath)) {
+    // Check if we're in a serverless environment
+    const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    
+    if (isServerless) {
+      console.log('⚠️  Serverless environment detected - image download not supported')
       return NextResponse.json({
         success: false,
-        message: 'No imported recipes found'
-      })
+        message: 'Image download not supported in serverless environment',
+        error: 'This feature requires a local environment with file system access'
+      }, { status: 400 })
     }
     
-    const importedRecipes = JSON.parse(fs.readFileSync(importedRecipesPath, 'utf8'))
-    console.log(`Found ${importedRecipes.length} imported recipes`)
+    // Get recipes from request body instead of file system
+    const body = await request.json()
+    const { recipes } = body
     
-    // Download images for imported recipes
-    console.log('Downloading images for imported recipes...')
-    const updatedRecipes = await downloadBulkImages(importedRecipes)
+    if (!recipes || !Array.isArray(recipes)) {
+      return NextResponse.json({
+        success: false,
+        message: 'No recipes provided in request body'
+      }, { status: 400 })
+    }
     
-    // Save updated recipes back to file
-    fs.writeFileSync(importedRecipesPath, JSON.stringify(updatedRecipes, null, 2))
+    console.log(`📸 Processing ${recipes.length} recipes for image download...`)
     
-    console.log('✅ Successfully downloaded images for all recipes')
+    // Download images for recipes
+    const updatedRecipes = await downloadBulkImages(recipes)
+    
+    console.log('✅ Successfully processed recipes for image download')
     
     return NextResponse.json({
       success: true,
-      message: `Successfully downloaded images for ${updatedRecipes.length} recipes`,
-      recipeCount: updatedRecipes.length
+      message: `Successfully processed ${updatedRecipes.length} recipes for image download`,
+      recipeCount: updatedRecipes.length,
+      recipes: updatedRecipes
     })
     
   } catch (error) {
-    console.error('❌ Error downloading images:', error)
+    console.error('❌ Error processing image download:', error)
     return NextResponse.json({
       success: false,
-      message: 'Failed to download images',
+      message: 'Failed to process image download',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }

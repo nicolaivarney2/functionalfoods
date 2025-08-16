@@ -8,8 +8,12 @@ export const dynamic = 'force-dynamic'
 // Create Supabase client dynamically to avoid build-time issues
 function createSupabaseServerClient() {
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://najaxycfjgultwdwffhv.supabase.co'
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build'
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing required Supabase environment variables')
+    }
     
     // Don't call cookies() here - it causes build issues
     // We'll call it inside the actual function when needed
@@ -42,8 +46,12 @@ function createSupabaseServerClient() {
 export async function GET(request: NextRequest) {
   try {
     // Create Supabase client with proper cookies context
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://najaxycfjgultwdwffhv.supabase.co'
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build'
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing required Supabase environment variables')
+    }
     
     const cookieStore = await cookies()
     
