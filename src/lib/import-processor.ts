@@ -100,6 +100,12 @@ export class ImportProcessor {
         .replace(/-+/g, '-')
         .trim()
 
+    // Add slugs to recipes
+    const recipesWithSlugs = recipesWithNutrition.map(recipe => ({
+      ...recipe,
+      slug: recipe.slug || toSlug(recipe.title)
+    }))
+
     const processedIngredients: IngredientTag[] = Array.from(uniqueIngredients).map(name => ({
       id: toSlug(name),
       name: name,
@@ -129,7 +135,7 @@ export class ImportProcessor {
     console.log(`📈 Stats:`, stats)
 
     return {
-      recipes: recipesWithNutrition,
+      recipes: recipesWithSlugs,
       ingredients: processedIngredients,
       stats
     }
@@ -191,7 +197,20 @@ export class ImportProcessor {
     // Calculate nutrition
     const recipeWithNutrition = this.recipeCalculator.processImportedRecipes(importedRecipes)[0]
     
-    return recipeWithNutrition
+    // Add slug if missing
+    const toSlug = (input: string) =>
+      input
+        .toLowerCase()
+        .replace(/[æøå]/g, (m) => ({ 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }[m] as string))
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .trim()
+    
+    return {
+      ...recipeWithNutrition,
+      slug: recipeWithNutrition.slug || toSlug(recipeWithNutrition.title)
+    }
   }
 
   /**
