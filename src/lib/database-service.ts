@@ -63,10 +63,6 @@ export class DatabaseService {
       keywords: recipe.keywords,
       rating: recipe.rating,
       reviewCount: recipe.reviewcount,
-      // Page counter fields
-      pageViews: recipe.pageviews || 0,
-      popularityScore: recipe.popularityscore || 0,
-      ketolivViews: recipe.ketolivviews || 0,
       // Publishing status
       status: recipe.status || 'draft'
     }))
@@ -259,10 +255,6 @@ export class DatabaseService {
           keywords: recipe.keywords,
           rating: recipe.rating,
           reviewCount: recipe.reviewCount,
-          // Page counter fields
-          pageViews: recipe.pageViews || 0,
-          popularityScore: recipe.popularityScore || 0,
-          ketolivViews: recipe.ketolivViews || 0,
           // Publishing status
           status: recipe.status || 'draft'
         }
