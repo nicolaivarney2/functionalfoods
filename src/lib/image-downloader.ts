@@ -42,12 +42,22 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
       throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
     }
 
+    // Get the correct MIME type from the response
+    const contentType = response.headers.get('content-type') || 'image/jpeg'
+    console.log(`   📋 Detected MIME type: ${contentType}`)
+    
+    // Determine file extension from MIME type
+    let fileExtension = 'jpg'
+    if (contentType.includes('png')) fileExtension = 'png'
+    else if (contentType.includes('webp')) fileExtension = 'webp'
+    else if (contentType.includes('gif')) fileExtension = 'gif'
+    
     const imageBuffer = await response.arrayBuffer()
-    const imageBlob = new Blob([imageBuffer])
+    const imageBlob = new Blob([imageBuffer], { type: contentType })
     
     // Create filename with hash to avoid conflicts
     const hash = createHash('md5').update(imageUrl).digest('hex').substring(0, 8)
-    const filename = `${recipeSlug}-${hash}.jpg`
+    const filename = `${recipeSlug}-${hash}.${fileExtension}`
     
     console.log(`   📤 Uploading to Supabase Storage: ${filename}`)
     
@@ -56,7 +66,7 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
     const { data, error } = await supabase.storage
       .from('recipe-images')
       .upload(filename, imageBlob, {
-        contentType: 'image/jpeg',
+        contentType: contentType,
         upsert: true
       })
     
