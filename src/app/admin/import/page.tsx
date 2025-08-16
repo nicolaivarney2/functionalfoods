@@ -110,12 +110,14 @@ export default function AdminImportPage() {
           response: saveJson,
           debug: saveJson.debug
         })
-        setSaveStatus(`❌ Fejl ved gemning til database${saveJson?.message ? `: ${saveJson.message}` : ''}`)
         
         // Show detailed error info
         if (saveJson.debug) {
           console.error('🔍 Debug info:', saveJson.debug)
+          console.error('📋 First recipe details:', JSON.stringify(saveJson.debug.firstRecipe, null, 2))
         }
+        
+        setSaveStatus(`❌ Fejl ved gemning til database${saveJson?.message ? `: ${saveJson.message}` : ''}`)
       }
       
     } catch (err) {
