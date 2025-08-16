@@ -206,18 +206,24 @@ export default function RecipeOverviewPage() {
     // Apply dietary filter
     if (selectedDietary !== 'all') {
       filtered = filtered.filter(recipe =>
-        recipe.dietaryCategories?.some(cat => 
-          cat.toLowerCase() === selectedDietary.toLowerCase()
-        ) || false
+        recipe.dietaryCategories?.some(cat => {
+          // Normalize category names by removing brackets for comparison
+          const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
+          const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
+          return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
+        }) || false
       )
       console.log(`🥗 After dietary filter: ${filtered.length} recipes`)
     }
 
     // Apply category filter
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(recipe =>
-        recipe.mainCategory === selectedCategory
-      )
+      filtered = filtered.filter(recipe => {
+        // Normalize category names by removing brackets for comparison
+        const normalizedRecipeCat = recipe.mainCategory?.replace(/[\[\]]/g, '').trim() || ''
+        const normalizedSelected = selectedCategory.replace(/[\[\]]/g, '').trim()
+        return normalizedRecipeCat.toLowerCase() === normalizedSelected.toLowerCase()
+      })
       console.log(`📂 After category filter: ${filtered.length} recipes`)
     }
 
