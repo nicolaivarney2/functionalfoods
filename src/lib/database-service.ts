@@ -44,8 +44,6 @@ export class DatabaseService {
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      nutritionalInfo: recipe.nutritionalinfo,
-      personalTips: recipe.personaltips, // Personal tips and experiences
       mainCategory: recipe.maincategory,
       subCategories: recipe.subcategories,
       dietaryCategories: recipe.dietarycategories,
@@ -62,9 +60,7 @@ export class DatabaseService {
       metaDescription: recipe.metadescription,
       keywords: recipe.keywords,
       rating: recipe.rating,
-      reviewCount: recipe.reviewcount,
-      // Publishing status
-      status: recipe.status || 'draft'
+      reviewCount: recipe.reviewcount
     }))
     
     console.log(`✅ Transformed ${transformedRecipes.length} recipes for frontend`)
@@ -254,9 +250,7 @@ export class DatabaseService {
           metaDescription: recipe.metaDescription,
           keywords: recipe.keywords,
           rating: recipe.rating,
-          reviewCount: recipe.reviewCount,
-          // Publishing status
-          status: recipe.status || 'draft'
+          reviewCount: recipe.reviewCount
         }
         
         // Add optional fields if they exist (only include columns we know exist)
@@ -278,15 +272,9 @@ export class DatabaseService {
         filteredRecipe.updatedAt = recipe.updatedAt ? (typeof recipe.updatedAt === 'string' ? recipe.updatedAt : recipe.updatedAt.toISOString()) : new Date().toISOString()
         filteredRecipe.rating = recipe.rating || null
         filteredRecipe.reviewCount = recipe.reviewCount || null
-        filteredRecipe.prepTimeISO = recipe.prepTimeISO || null
-        filteredRecipe.cookTimeISO = recipe.cookTimeISO || null
-        filteredRecipe.totalTimeISO = recipe.totalTimeISO || null
         
-        // Publishing status
-        filteredRecipe.status = recipe.status || 'draft'
-        
-        // Note: nutritionalInfo and personalTips are not stored in recipes table
-        // They are stored in ingredients table or handled separately
+        // Note: nutritionalInfo, personalTips, status, prepTimeISO, cookTimeISO, totalTimeISO 
+        // are not stored in recipes table - they are handled separately or stored in ingredients table
         
         return filteredRecipe
       })
