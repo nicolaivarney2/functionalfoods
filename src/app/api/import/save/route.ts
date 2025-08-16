@@ -57,29 +57,59 @@ export async function POST(request: NextRequest) {
     
     // Save recipes to database
     console.log('💾 Saving recipes to database...')
-    const recipesSaved = await databaseService.saveRecipes(recipes)
-    if (!recipesSaved) {
-      console.error('❌ Failed to save recipes')
+    console.log('📋 First recipe structure:', JSON.stringify(recipes[0], null, 2))
+    
+    try {
+      const recipesSaved = await databaseService.saveRecipes(recipes)
+      console.log('🔍 saveRecipes result:', recipesSaved)
+      
+      if (!recipesSaved) {
+        console.error('❌ Failed to save recipes')
+        return NextResponse.json({
+          success: false,
+          message: 'Failed to save recipes to database'
+        }, { status: 500 })
+      }
+      console.log('✅ Recipes saved successfully')
+    } catch (saveError) {
+      console.error('💥 Exception during recipe save:', saveError)
+      console.error('Save error stack:', saveError instanceof Error ? saveError.stack : 'No stack trace')
       return NextResponse.json({
         success: false,
-        message: 'Failed to save recipes to database'
+        message: 'Exception during recipe save',
+        error: saveError instanceof Error ? saveError.message : 'Unknown error',
+        stack: saveError instanceof Error ? saveError.stack : undefined
       }, { status: 500 })
     }
-    console.log('✅ Recipes saved successfully')
 
     // Save new ingredients to database
     let ingredientsSaved = true
     if (newIngredients.length > 0) {
       console.log('💾 Saving new ingredients to database...')
-      ingredientsSaved = await databaseService.saveIngredients(newIngredients)
-      if (!ingredientsSaved) {
-        console.error('❌ Failed to save ingredients')
+      console.log('📋 First ingredient structure:', JSON.stringify(newIngredients[0], null, 2))
+      
+      try {
+        ingredientsSaved = await databaseService.saveIngredients(newIngredients)
+        console.log('🔍 saveIngredients result:', ingredientsSaved)
+        
+        if (!ingredientsSaved) {
+          console.error('❌ Failed to save ingredients')
+          return NextResponse.json({
+            success: false,
+            message: 'Failed to save ingredients to database'
+          }, { status: 500 })
+        }
+        console.log('✅ Ingredients saved successfully')
+      } catch (saveError) {
+        console.error('💥 Exception during ingredient save:', saveError)
+        console.error('Save error stack:', saveError instanceof Error ? saveError.stack : 'No stack trace')
         return NextResponse.json({
           success: false,
-          message: 'Failed to save ingredients to database'
+          message: 'Exception during ingredient save',
+          error: saveError instanceof Error ? saveError.message : 'Unknown error',
+          stack: saveError instanceof Error ? saveError.stack : undefined
         }, { status: 500 })
       }
-      console.log('✅ Ingredients saved successfully')
     }
 
     // Get updated database stats
