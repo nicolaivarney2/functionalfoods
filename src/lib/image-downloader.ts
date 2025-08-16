@@ -1,7 +1,4 @@
-import { createHash } from 'crypto'
-import { createSupabaseClient } from './supabase'
-import sharp from 'sharp'
-
+// Frontend-only image downloader - server-side processing handled by API route
 // Check if we're in a serverless environment (Vercel)
 const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 
@@ -28,90 +25,36 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
       return { success: true, localPath: imageUrl }
     }
 
-    // Download image with proper headers
-    const headers: Record<string, string> = {
-      'User-Agent': 'Mozilla/5.0 (compatible; FunctionalFoodsBot/1.0)'
-    }
+    console.log(`   📤 Sending to API for processing and upload...`)
     
-    // Add referer for Ketoliv images
-    if (imageUrl.includes('ketoliv.dk')) {
-      headers['Referer'] = 'https://ketoliv.dk'
-    }
-    
-    const response = await fetch(imageUrl, { headers })
+    // Call API route for server-side image processing
+    const response = await fetch('/api/images/process', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageUrl,
+        recipeSlug
+      })
+    })
+
     if (!response.ok) {
-      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
+      const errorData = await response.json()
+      throw new Error(errorData.error || `API request failed: ${response.status}`)
     }
 
-    // Get the correct MIME type from the response
-    const contentType = response.headers.get('content-type') || 'image/jpeg'
-    console.log(`   📋 Detected MIME type: ${contentType}`)
+    const result = await response.json()
     
-    const imageBuffer = await response.arrayBuffer()
-    
-    // Convert to WebP with optimization (target: 150-300KB)
-    console.log(`   🔧 Optimizing image to WebP format...`)
-    const optimizedBuffer = await sharp(Buffer.from(imageBuffer))
-      .webp({ 
-        quality: 80,
-        effort: 6,
-        nearLossless: false
-      })
-      .resize(800, 600, { 
-        fit: 'inside',
-        withoutEnlargement: true 
-      })
-      .toBuffer()
-    
-    console.log(`   📊 Original size: ${(imageBuffer.byteLength / 1024).toFixed(1)}KB, Optimized: ${(optimizedBuffer.length / 1024).toFixed(1)}KB`)
-    
-    // Create safe filename (no special characters, spaces, or non-ASCII)
-    const safeSlug = recipeSlug
-      .toLowerCase()
-      .replace(/[æøå]/g, (match) => {
-        const replacements: { [key: string]: string } = { 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }
-        return replacements[match] || match
-      })
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-    
-    const hash = createHash('md5').update(imageUrl).digest('hex').substring(0, 8)
-    const filename = `${safeSlug}-${hash}.webp`
-    
-    console.log(`   📤 Uploading to Supabase Storage: ${filename}`)
-    
-    // Upload to Supabase Storage
-    const supabase = createSupabaseClient()
-    const { data, error } = await supabase.storage
-      .from('recipe-images')
-      .upload(filename, optimizedBuffer, {
-        contentType: 'image/webp',
-        upsert: true
-      })
-    
-    if (error) {
-      console.error('❌ Failed to upload to Supabase Storage:', error)
-      
-      // If bucket doesn't exist, provide helpful error
-      if (error.message.includes('bucket') || error.message.includes('not found')) {
-        throw new Error('Storage bucket "recipe-images" not found. Please run the SQL migration to create it.')
+    if (result.success && result.storageUrl) {
+      console.log(`✅ Image processed and uploaded via API: ${result.storageUrl}`)
+      return {
+        success: true,
+        storageUrl: result.storageUrl,
+        localPath: result.storageUrl // Use storage URL as local path for consistency
       }
-      
-      throw error
-    }
-    
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('recipe-images')
-      .getPublicUrl(filename)
-    
-    console.log(`✅ Image uploaded to Supabase Storage: ${publicUrl}`)
-    
-    return {
-      success: true,
-      storageUrl: publicUrl,
-      localPath: publicUrl // Use storage URL as local path for consistency
+    } else {
+      throw new Error(result.error || 'API returned unsuccessful result')
     }
     
   } catch (error) {
