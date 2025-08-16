@@ -11,7 +11,6 @@ export class DatabaseService {
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
-      .eq('status', 'published') // Kun udgivne opskrifter
       .order('updatedAt', { ascending: false })
     
     if (error) {
