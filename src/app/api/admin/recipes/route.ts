@@ -7,9 +7,17 @@ export const revalidate = 0
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('🔍 Admin recipes route: Starting...')
+    
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    console.log('🔍 Environment check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceRoleKey: !!serviceRoleKey,
+      serviceRoleKeyLength: serviceRoleKey?.length || 0
+    })
     
     if (!supabaseUrl || !serviceRoleKey) {
       console.error('❌ Missing Supabase environment variables')
@@ -30,8 +38,12 @@ export async function GET(request: NextRequest) {
       },
     })
     
+    console.log('🔍 Service role client created successfully')
+    
     // Check authentication (still required for admin access)
     const cookieStore = await cookies()
+    console.log('🔍 Cookie store obtained')
+    
     const authSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -50,11 +62,22 @@ export async function GET(request: NextRequest) {
       }
     )
     
+    console.log('🔍 Auth client created, checking session...')
+    
     const { data: { session }, error: authError } = await authSupabase.auth.getSession()
     
+    console.log('🔍 Session check result:', {
+      hasSession: !!session,
+      userId: session?.user?.id,
+      authError: authError?.message
+    })
+    
     if (authError || !session) {
+      console.error('❌ Authentication failed:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    
+    console.log('🔍 User authenticated, checking admin role...')
     
     // Check if user has admin role
     const { data: profile, error: profileError } = await authSupabase
@@ -63,7 +86,14 @@ export async function GET(request: NextRequest) {
       .eq('id', session.user.id)
       .single()
     
+    console.log('🔍 Profile check result:', {
+      hasProfile: !!profile,
+      role: profile?.role,
+      profileError: profileError?.message
+    })
+    
     if (profileError || !profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
+      console.error('❌ Admin role check failed:', { profileError, profile, role: profile?.role })
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
