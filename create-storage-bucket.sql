@@ -8,7 +8,7 @@ VALUES (
   'recipe-images',
   true,
   5242880, -- 5MB limit per file
-  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  ARRAY['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/webp']
 );
 
 -- Create storage policy for public read access

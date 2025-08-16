@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { createSupabaseClient } from './supabase'
+import sharp from 'sharp'
 
 // Check if we're in a serverless environment (Vercel)
 const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
@@ -46,18 +47,37 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
     const contentType = response.headers.get('content-type') || 'image/jpeg'
     console.log(`   📋 Detected MIME type: ${contentType}`)
     
-    // Determine file extension from MIME type
-    let fileExtension = 'jpg'
-    if (contentType.includes('png')) fileExtension = 'png'
-    else if (contentType.includes('webp')) fileExtension = 'webp'
-    else if (contentType.includes('gif')) fileExtension = 'gif'
-    
     const imageBuffer = await response.arrayBuffer()
-    const imageBlob = new Blob([imageBuffer], { type: contentType })
     
-    // Create filename with hash to avoid conflicts
+    // Convert to WebP with optimization (target: 150-300KB)
+    console.log(`   🔧 Optimizing image to WebP format...`)
+    const optimizedBuffer = await sharp(Buffer.from(imageBuffer))
+      .webp({ 
+        quality: 80,
+        effort: 6,
+        nearLossless: false
+      })
+      .resize(800, 600, { 
+        fit: 'inside',
+        withoutEnlargement: true 
+      })
+      .toBuffer()
+    
+    console.log(`   📊 Original size: ${(imageBuffer.byteLength / 1024).toFixed(1)}KB, Optimized: ${(optimizedBuffer.length / 1024).toFixed(1)}KB`)
+    
+    // Create safe filename (no special characters, spaces, or non-ASCII)
+    const safeSlug = recipeSlug
+      .toLowerCase()
+      .replace(/[æøå]/g, (match) => {
+        const replacements: { [key: string]: string } = { 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }
+        return replacements[match] || match
+      })
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+    
     const hash = createHash('md5').update(imageUrl).digest('hex').substring(0, 8)
-    const filename = `${recipeSlug}-${hash}.${fileExtension}`
+    const filename = `${safeSlug}-${hash}.webp`
     
     console.log(`   📤 Uploading to Supabase Storage: ${filename}`)
     
@@ -65,8 +85,8 @@ export async function downloadAndStoreImage(imageUrl: string, recipeSlug: string
     const supabase = createSupabaseClient()
     const { data, error } = await supabase.storage
       .from('recipe-images')
-      .upload(filename, imageBlob, {
-        contentType: contentType,
+      .upload(filename, optimizedBuffer, {
+        contentType: 'image/webp',
         upsert: true
       })
     
