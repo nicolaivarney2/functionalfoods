@@ -6,48 +6,35 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Starting image download process...')
     
-    // Check if we're in a serverless environment
-    const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-    
-    if (isServerless) {
-      console.log('⚠️  Serverless environment detected - image download not supported')
-      return NextResponse.json({
-        success: false,
-        message: 'Image download not supported in serverless environment',
-        error: 'This feature requires a local environment with file system access'
-      }, { status: 400 })
-    }
-    
-    // Get recipes from request body instead of file system
     const body = await request.json()
     const { recipes } = body
     
     if (!recipes || !Array.isArray(recipes)) {
       return NextResponse.json({
         success: false,
-        message: 'No recipes provided in request body'
+        message: 'Invalid request body. Expected recipes array.'
       }, { status: 400 })
     }
     
-    console.log(`📸 Processing ${recipes.length} recipes for image download...`)
+    console.log(`📋 Processing ${recipes.length} recipes for image download...`)
     
-    // Download images for recipes
+    // Download and store images using Supabase Storage
     const updatedRecipes = await downloadBulkImages(recipes)
     
-    console.log('✅ Successfully processed recipes for image download')
+    console.log('✅ Image download process completed successfully')
     
     return NextResponse.json({
       success: true,
-      message: `Successfully processed ${updatedRecipes.length} recipes for image download`,
-      recipeCount: updatedRecipes.length,
+      message: `Successfully processed ${updatedRecipes.length} recipes`,
       recipes: updatedRecipes
     })
     
   } catch (error) {
-    console.error('❌ Error processing image download:', error)
+    console.error('❌ Error in image download API:', error)
+    
     return NextResponse.json({
       success: false,
-      message: 'Failed to process image download',
+      message: 'Failed to process image downloads',
       error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
