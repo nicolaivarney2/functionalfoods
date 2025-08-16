@@ -47,11 +47,11 @@ export function useAdminAuth() {
       }
       
       if (!user || !session) {
-        console.log('🔒 useAdminAuth: No user or session, redirecting to login')
+        console.log('🔒 useAdminAuth: No user or session, redirecting to home')
         setIsAdmin(false)
         setChecking(false)
         checkingRef.current = false
-        router.push('/login')
+        router.push('/')
         return
       }
 
@@ -74,11 +74,11 @@ export function useAdminAuth() {
         })
 
         if (error) {
-          console.log('🔒 useAdminAuth: Profile error, redirecting to login')
+          console.log('🔒 useAdminAuth: Profile error, redirecting to home')
           setIsAdmin(false)
           setChecking(false)
           checkingRef.current = false
-          router.push('/login')
+          router.push('/')
           return
         }
 
@@ -99,7 +99,7 @@ export function useAdminAuth() {
         setIsAdmin(false)
         setChecking(false)
         checkingRef.current = false
-        router.push('/login')
+        router.push('/')
       } finally {
         checkingRef.current = false
       }
