@@ -12,7 +12,7 @@ export class DatabaseService {
       .from('recipes')
       .select('*')
       .eq('status', 'published') // Kun udgivne opskrifter
-      .order('updated_at', { ascending: false })
+      .order('updatedAt', { ascending: false })
     
     if (error) {
       console.error('Error fetching recipes:', error)
@@ -55,7 +55,7 @@ export class DatabaseService {
       difficulty: recipe.difficulty,
       author: recipe.author,
       publishedAt: recipe.publishedat,
-      updatedAt: recipe.updated_at,
+      updatedAt: recipe.updatedAt,
       metaTitle: recipe.metatitle,
       metaDescription: recipe.metadescription,
       keywords: recipe.keywords,
@@ -164,7 +164,7 @@ export class DatabaseService {
       commonNames: ingredient.common_names || [],
       isActive: ingredient.is_active ?? true,
       createdAt: new Date(ingredient.created_at),
-      updatedAt: new Date(ingredient.updated_at || ingredient.created_at)
+      updatedAt: new Date(ingredient.updatedAt || ingredient.createdAt)
     }))
     
     return transformedIngredients
