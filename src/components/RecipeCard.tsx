@@ -16,6 +16,11 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
     return mins > 0 ? `${hours}t ${mins}min` : `${hours}t`
   }
 
+  const formatCategory = (category: string) => {
+    // Remove brackets and clean up the category name
+    return category.replace(/[\[\]]/g, '').trim()
+  }
+
   return (
     <article className="recipe-card">
       <Link href={`/opskrift/${recipe.slug}`} className="block">
@@ -82,7 +87,7 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
                   key={category}
                   className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700"
                 >
-                  {category}
+                  {formatCategory(category)}
                 </span>
               ))}
               {recipe.dietaryCategories.length > 2 && (
