@@ -80,11 +80,11 @@ export async function GET(request: NextRequest) {
         id,
         title,
         slug,
-        image_url,
-        created_at,
-        updated_at
+        imageUrl,
+        createdAt,
+        updatedAt
       `)
-      .order('created_at', { ascending: false })
+      .order('createdAt', { ascending: false })
 
     if (error) {
       console.error('Error fetching recipes:', error)

@@ -9,9 +9,9 @@ interface RecipeImage {
   id: string
   title: string
   slug: string
-  image_url: string
-  created_at: string
-  updated_at: string
+  imageUrl: string
+  createdAt: string
+  updatedAt: string
 }
 
 export default function AdminImagesPage() {
@@ -38,13 +38,13 @@ export default function AdminImagesPage() {
         
         // Calculate stats
         const supabaseImages = data.recipes.filter((img: RecipeImage) => 
-          img.image_url && img.image_url.includes('supabase.co')
+          img.imageUrl && img.imageUrl.includes('supabase.co')
         )
         const localImages = data.recipes.filter((img: RecipeImage) => 
-          img.image_url && img.image_url.startsWith('/images/')
+          img.imageUrl && img.imageUrl.startsWith('/images/')
         )
         const externalImages = data.recipes.filter((img: RecipeImage) => 
-          img.image_url && !img.image_url.includes('supabase.co') && !img.image_url.startsWith('/images/')
+          img.imageUrl && !img.imageUrl.includes('supabase.co') && !img.imageUrl.startsWith('/images/')
         )
         
         setStats({
@@ -177,7 +177,7 @@ export default function AdminImagesPage() {
                         <div className="flex-shrink-0 h-16 w-16">
                           <img
                             className="h-16 w-16 rounded-lg object-cover"
-                            src={image.image_url}
+                            src={image.imageUrl}
                             alt={image.title}
                             onError={(e) => {
                               const target = e.target as HTMLImageElement
@@ -191,26 +191,26 @@ export default function AdminImagesPage() {
                         <div className="text-sm text-gray-500">{image.slug}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getImageSourceColor(image.image_url)}`}>
-                          {getImageSource(image.image_url)}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getImageSourceColor(image.imageUrl)}`}>
+                          {getImageSource(image.imageUrl)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 max-w-xs truncate">
-                          {image.image_url}
+                          {image.imageUrl}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => downloadImage(image.image_url, image.title)}
+                            onClick={() => downloadImage(image.imageUrl, image.title)}
                             className="text-blue-600 hover:text-blue-900"
                             title="Download image"
                           >
                             <Download className="w-4 h-4" />
                           </button>
                           <a
-                            href={image.image_url}
+                            href={image.imageUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-green-600 hover:text-green-900"
