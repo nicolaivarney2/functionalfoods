@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { User, Lock, Save, CheckCircle } from 'lucide-react'
+import { User, Lock, Save, CheckCircle, AlertCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export default function ProfilePage() {
