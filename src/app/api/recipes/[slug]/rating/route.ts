@@ -7,10 +7,10 @@ export const revalidate = 0
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = params
+    const { slug } = await params
     const { rating, userId } = await request.json()
     
     if (!rating || rating < 1 || rating > 5) {
