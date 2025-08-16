@@ -1,5 +1,6 @@
 import { Recipe, Ingredient, RecipeStep } from '@/types/recipe'
 import { FridaDTUMatcher } from './frida-dtu-matcher'
+import { downloadAndStoreImage } from './image-downloader'
 
 export interface RawRecipeData {
   id?: string
@@ -196,22 +197,23 @@ async function fetchKetolivImage(imageUrl: string, title: string): Promise<{ ima
   try {
     // Check if it's a Ketoliv URL
     if (imageUrl.includes('ketoliv.dk') || imageUrl.includes('ketoliv')) {
-      console.log(`🖼️ Fetching image for: ${title}`)
+      console.log(`🖼️ Fetching and storing image for: ${title}`)
       
-      // Try to fetch the image
-      const response = await fetch(imageUrl)
-      if (response.ok) {
-        console.log(`✅ Successfully fetched image for: ${title}`)
+      // Download and store image in Supabase Storage
+      const result = await downloadAndStoreImage(imageUrl, title)
+      
+      if (result.success && result.storageUrl) {
+        console.log(`✅ Successfully stored image for: ${title} in Supabase Storage`)
         return {
-          imageUrl,
+          imageUrl: result.storageUrl,
           imageAlt: title
         }
       } else {
-        console.warn(`⚠️ Failed to fetch image for: ${title}, using fallback`)
+        console.warn(`⚠️ Failed to store image for: ${title}, using fallback`)
       }
     }
   } catch (error) {
-    console.warn(`⚠️ Error fetching image for ${title}:`, error)
+    console.warn(`⚠️ Error fetching/storing image for ${title}:`, error)
   }
   
   // Return fallback image
