@@ -33,7 +33,10 @@ export default function AdminDashboard() {
         const response = await fetch('/api/admin/recipes')
         if (response.ok) {
           const data = await response.json()
-          setRecipes(data.recipes || [])
+          // API returns recipes array directly, not wrapped in data.recipes
+          setRecipes(Array.isArray(data) ? data : [])
+        } else {
+          console.error('Failed to load recipes:', response.status, response.statusText)
         }
       } catch (error) {
         console.error('Error loading recipes:', error)
@@ -64,8 +67,14 @@ export default function AdminDashboard() {
 
   const stats = {
     totalRecipes: recipes.length,
-    ketoRecipes: recipes.filter(r => r.dietaryCategories?.includes('Keto')).length,
-    senseRecipes: recipes.filter(r => r.dietaryCategories?.includes('SENSE')).length,
+    ketoRecipes: recipes.filter(r => {
+      const categories = r.dietaryCategories
+      return Array.isArray(categories) && categories.includes('Keto')
+    }).length,
+    senseRecipes: recipes.filter(r => {
+      const categories = r.dietaryCategories
+      return Array.isArray(categories) && categories.includes('SENSE')
+    }).length,
     publishedToday: recipes.filter(r => {
       const today = new Date()
       const recipeDate = r.publishedAt ? new Date(r.publishedAt) : null

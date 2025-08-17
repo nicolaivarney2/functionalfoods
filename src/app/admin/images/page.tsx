@@ -34,21 +34,23 @@ export default function AdminImagesPage() {
       const response = await fetch('/api/admin/images')
       if (response.ok) {
         const data = await response.json()
-        setImages(data.recipes || [])
+        // API returns recipes array directly, not wrapped in data.recipes
+        const recipesArray = Array.isArray(data) ? data : []
+        setImages(recipesArray)
         
         // Calculate stats
-        const supabaseImages = data.recipes.filter((img: RecipeImage) => 
+        const supabaseImages = recipesArray.filter((img: RecipeImage) => 
           img.imageUrl && img.imageUrl.includes('supabase.co')
         )
-        const localImages = data.recipes.filter((img: RecipeImage) => 
+        const localImages = recipesArray.filter((img: RecipeImage) => 
           img.imageUrl && img.imageUrl.startsWith('/images/')
         )
-        const externalImages = data.recipes.filter((img: RecipeImage) => 
+        const externalImages = recipesArray.filter((img: RecipeImage) => 
           img.imageUrl && !img.imageUrl.includes('supabase.co') && !img.imageUrl.startsWith('/images/')
         )
         
         setStats({
-          total: data.recipes.length,
+          total: recipesArray.length,
           local: localImages.length,
           external: externalImages.length,
           supabase: supabaseImages.length

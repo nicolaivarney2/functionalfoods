@@ -44,7 +44,8 @@ export default function AdminRecipesPage() {
       }
       
       const data = await response.json()
-      setRecipes(data.recipes)
+      // API returns recipes array directly, not wrapped in data.recipes
+      setRecipes(Array.isArray(data) ? data : [])
       
     } catch (error) {
       console.error('Error loading recipes:', error)
