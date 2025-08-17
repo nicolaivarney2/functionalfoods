@@ -21,7 +21,7 @@ interface RecipePageClientProps {
 
 export default function RecipePageClient({ recipe, allRecipes }: RecipePageClientProps) {
   const [servings, setServings] = useState(recipe.servings || 2)
-  const [currentRating, setCurrentRating] = useState(4)
+  const [currentRating, setCurrentRating] = useState(recipe.rating || 0)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
   const [commentCount, setCommentCount] = useState(0)
@@ -127,6 +127,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
               key={i}
               onClick={() => setIsRatingModalOpen(true)}
               className="hover:scale-110 transition-transform"
+              title={`Giv ${i + 1} stjerner`}
             >
               <Star
                 size={16}
@@ -134,6 +135,11 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
               />
             </button>
           ))}
+          {recipe.reviewCount && recipe.reviewCount > 0 && (
+            <span className="text-xs text-gray-600 ml-2 self-center">
+              ({recipe.reviewCount})
+            </span>
+          )}
         </div>
       </div>
 

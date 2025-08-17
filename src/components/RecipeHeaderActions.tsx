@@ -30,14 +30,23 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
   const viewCount = generateViewCount()
 
   const handleRatingClick = () => {
-    // Open rating modal instead of scrolling to non-existent section
-    // This will be handled by the floating rating stars
-    document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })
+    // Trigger click on floating rating stars to open rating modal
+    const floatingRatingStars = document.getElementById('rating-stars')
+    if (floatingRatingStars) {
+      const firstStar = floatingRatingStars.querySelector('button')
+      if (firstStar) {
+        firstStar.click()
+      }
+    }
   }
 
   const handleCommentsClick = () => {
     document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })
   }
+
+  // Get rating from recipe data, default to 0 if no rating
+  const currentRating = recipe.rating || 0
+  const reviewCount = recipe.reviewCount || 0
 
   return (
     <div className="flex items-center space-x-6 text-sm">
@@ -50,17 +59,19 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
         onClick={handleRatingClick}
         className="flex items-center space-x-1 hover:opacity-80 transition-opacity cursor-pointer"
         id="top-rating-stars"
+        title="Klik for at bedømme opskriften"
       >
         {[...Array(5)].map((_, i) => (
           <Star
             key={i}
             size={14}
-            className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
+            className={i < currentRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}
           />
         ))}
+        {reviewCount > 0 && (
+          <span className="text-gray-600 ml-1">({reviewCount})</span>
+        )}
       </button>
-      {/* Rating count hidden until we have real data */}
-      {/* <span className="text-gray-600">(15)</span> */}
       
       <button 
         onClick={handleCommentsClick}
