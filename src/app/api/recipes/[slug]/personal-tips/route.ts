@@ -38,7 +38,7 @@ export async function PUT(
 
     const { error } = await supabase
       .from('recipes')
-      .update({ personal_tips: personalTips })
+      .update({ personalTips: personalTips })
       .eq('slug', slug)
 
     if (error) {
@@ -92,7 +92,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('recipes')
-      .select('personal_tips')
+      .select('personalTips')
       .eq('slug', slug)
       .single()
 
@@ -104,7 +104,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ personalTips: data?.personal_tips || '' })
+    return NextResponse.json({ personalTips: data?.personalTips || '' })
   } catch (error) {
     console.error('Error in personal tips API:', error)
     return NextResponse.json(
