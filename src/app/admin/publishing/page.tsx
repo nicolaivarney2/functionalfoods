@@ -87,6 +87,8 @@ export default function AdminPublishingPage() {
     setEditingTips(false)
     setEditingDescription(false)
     setEditingCategories(false)
+    
+    // Sæt de oprindelige værdier fra opskriften
     setDescription(recipe.description || '')
     setCategories(recipe.dietaryCategories || [])
     
