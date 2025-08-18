@@ -26,6 +26,11 @@ export default function AdminPublishingPage() {
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeWithTips | null>(null)
   const [personalTips, setPersonalTips] = useState('')
   const [editingTips, setEditingTips] = useState(false)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [editingCategories, setEditingCategories] = useState(false)
+  const [description, setDescription] = useState('')
+  const [categories, setCategories] = useState<string[]>([])
+  const [newCategory, setNewCategory] = useState('')
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
@@ -80,6 +85,10 @@ export default function AdminPublishingPage() {
   const handleRecipeSelect = async (recipe: RecipeWithTips) => {
     setSelectedRecipe(recipe)
     setEditingTips(false)
+    setEditingDescription(false)
+    setEditingCategories(false)
+    setDescription(recipe.description || '')
+    setCategories(recipe.dietaryCategories || [])
     
     // Sæt selectedDate og selectedTime baseret på eksisterende planlægning
     const existingSchedule = schedules.find(s => s.recipeId === recipe.id)
@@ -141,6 +150,91 @@ export default function AdminPublishingPage() {
       console.error('❌ Error saving tips:', error)
       alert('Kunne ikke gemme tips. Prøv igen.')
     }
+  }
+
+  const saveDescription = async () => {
+    if (!selectedRecipe) return
+
+    try {
+      // Gem til database via API
+      const response = await fetch(`/api/admin/recipes/${selectedRecipe.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ description }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke gemme beskrivelse')
+      }
+
+      // Opdater local state
+      const updatedRecipes = recipes.map(recipe => 
+        recipe.id === selectedRecipe.id 
+          ? { ...recipe, description: description }
+          : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      const updatedRecipe = { ...selectedRecipe, description: description }
+      setSelectedRecipe(updatedRecipe)
+      setEditingDescription(false)
+      
+      console.log('✅ Beskrivelse gemt for:', selectedRecipe.title)
+      
+    } catch (error) {
+      console.error('❌ Error saving description:', error)
+      alert('Kunne ikke gemme beskrivelse. Prøv igen.')
+    }
+  }
+
+  const saveCategories = async () => {
+    if (!selectedRecipe) return
+
+    try {
+      // Gem til database via API
+      const response = await fetch(`/api/admin/recipes/${selectedRecipe.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dietaryCategories: categories }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke gemme kategorier')
+      }
+
+      // Opdater local state
+      const updatedRecipes = recipes.map(recipe => 
+        recipe.id === selectedRecipe.id 
+          ? { ...recipe, dietaryCategories: categories }
+          : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      const updatedRecipe = { ...selectedRecipe, dietaryCategories: categories }
+      setSelectedRecipe(updatedRecipe)
+      setEditingCategories(false)
+      
+      console.log('✅ Kategorier gemt for:', selectedRecipe.title)
+      
+    } catch (error) {
+      console.error('❌ Error saving categories:', error)
+      alert('Kunne ikke gemme kategorier. Prøv igen.')
+    }
+  }
+
+  const addCategory = () => {
+    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
+      setCategories([...categories, newCategory.trim()])
+      setNewCategory('')
+    }
+  }
+
+  const removeCategory = (categoryToRemove: string) => {
+    setCategories(categories.filter(cat => cat !== categoryToRemove))
   }
 
   const deleteRecipe = async (recipeSlug: string, recipeName: string) => {
@@ -422,29 +516,140 @@ export default function AdminPublishingPage() {
                     <h3 className="text-lg font-medium text-gray-900 mb-2">
                       {selectedRecipe.title}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      {selectedRecipe.description}
-                    </p>
                     
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {selectedRecipe.dietaryCategories?.map((category, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                        >
-                          {category}
-                        </span>
-                      ))}
+                    {/* Beskrivelse sektion */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Beskrivelse</h4>
+                        {!editingDescription && (
+                          <button
+                            onClick={() => setEditingDescription(true)}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger
+                          </button>
+                        )}
+                      </div>
+                      
+                      {editingDescription ? (
+                        <div>
+                          <textarea
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="Skriv beskrivelsen af opskriften..."
+                            className="w-full h-24 p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <div className="flex gap-3 mt-3">
+                            <button
+                              onClick={saveDescription}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                            >
+                              Gem beskrivelse
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingDescription(false)
+                                setDescription(selectedRecipe.description || '')
+                              }}
+                              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                            >
+                              Annuller
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600">
+                          {description || 'Ingen beskrivelse endnu. Klik "Rediger" for at tilføje.'}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Kategorier/Tags sektion */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Kategorier/Tags</h4>
+                        {!editingCategories && (
+                          <button
+                            onClick={() => setEditingCategories(true)}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger
+                          </button>
+                        )}
+                      </div>
+                      
+                      {editingCategories ? (
+                        <div>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {categories.map((category, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {category}
+                                <button
+                                  onClick={() => removeCategory(category)}
+                                  className="ml-1 text-blue-600 hover:text-blue-800"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 mb-3">
+                            <input
+                              type="text"
+                              value={newCategory}
+                              onChange={(e) => setNewCategory(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && addCategory()}
+                              placeholder="Tilføj ny kategori..."
+                              className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <button
+                              onClick={addCategory}
+                              className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700"
+                            >
+                              Tilføj
+                            </button>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={saveCategories}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+                            >
+                              Gem kategorier
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingCategories(false)
+                                setCategories(selectedRecipe.dietaryCategories || [])
+                                setNewCategory('')
+                              }}
+                              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                            >
+                              Annuller
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {categories.length > 0 ? (
+                            categories.map((category, index) => (
+                              <span
+                                key={index}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {category}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-sm text-gray-500 italic">Ingen kategorier endnu. Klik "Rediger" for at tilføje.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => generateAITips(selectedRecipe)}
-                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 text-sm"
-                      >
-                        🤖 AI-Assisted Tips
-                      </button>
-                      
                       {selectedRecipe.status === 'draft' && (
                         <button
                           onClick={() => publishRecipeNow(selectedRecipe.id)}
@@ -460,14 +665,22 @@ export default function AdminPublishingPage() {
                   <div className="border-t border-gray-200 pt-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
                       <h4 className="text-md font-medium text-gray-900">Mine tips til opskriften</h4>
-                      {!editingTips && (
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => setEditingTips(true)}
-                          className="text-blue-600 hover:text-blue-700 text-sm"
+                          onClick={() => generateAITips(selectedRecipe)}
+                          className="bg-purple-600 text-white px-3 py-1 rounded-md hover:bg-purple-700 text-sm"
                         >
-                          Rediger
+                          🤖 AI Tips
                         </button>
-                      )}
+                        {!editingTips && (
+                          <button
+                            onClick={() => setEditingTips(true)}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger
+                          </button>
+                        )}
+                      </div>
                     </div>
                     
                     {editingTips ? (
@@ -501,7 +714,7 @@ export default function AdminPublishingPage() {
                         {personalTips ? (
                           <div className="whitespace-pre-wrap text-gray-700">{personalTips}</div>
                         ) : (
-                          <p className="text-gray-500 italic">Ingen personlige tips endnu. Klik "Rediger" for at tilføje.</p>
+                          <p className="text-gray-500 italic">Ingen personlige tips endnu. Klik "Rediger" for at tilføje eller "AI Tips" for at generere.</p>
                         )}
                       </div>
                     )}

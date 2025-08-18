@@ -10,14 +10,14 @@ export async function PUT(
   try {
     const resolvedParams = await params
     const { slug } = resolvedParams
-    const { tips } = await request.json()
+    const { personalTips } = await request.json()
 
     // Create Supabase client dynamically
     const supabase = createSupabaseServerClient()
 
     const { error } = await supabase
       .from('recipes')
-      .update({ personal_tips: tips })
+      .update({ personal_tips: personalTips })
       .eq('slug', slug)
 
     if (error) {
@@ -63,7 +63,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ tips: data?.personal_tips || '' })
+    return NextResponse.json({ personalTips: data?.personal_tips || '' })
   } catch (error) {
     console.error('Error in personal tips API:', error)
     return NextResponse.json(
