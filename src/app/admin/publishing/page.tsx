@@ -38,6 +38,8 @@ export default function AdminPublishingPage() {
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
+  const [isScheduling, setIsScheduling] = useState(false)
+  const [scheduleSuccess, setScheduleSuccess] = useState(false)
 
   useEffect(() => {
     loadRecipes()
@@ -301,9 +303,14 @@ export default function AdminPublishingPage() {
 
   const scheduleRecipe = async (recipeId: string, date: string, time: string) => {
     try {
+      setIsScheduling(true)
+      setScheduleSuccess(false)
+      
       // Find recipe slug
       const recipe = recipes.find(r => r.id === recipeId)
       if (!recipe) return
+
+      console.log('📅 Scheduling recipe:', { recipeId, date, time })
 
       // Opdater status i database via API
       const response = await fetch(`/api/recipes/${recipe.slug}/status`, {
@@ -330,11 +337,25 @@ export default function AdminPublishingPage() {
       )
       setSchedules(newSchedules)
       
+      // Opdater recipe status i recipes array
+      const updatedRecipes = recipes.map(r => 
+        r.id === recipeId ? { ...r, status: 'scheduled' as const } : r
+      )
+      setRecipes(updatedRecipes)
+      
+      setScheduleSuccess(true)
       console.log('✅ Status opdateret til scheduled for:', recipe.title, 'at', time)
+      
+      // Reset success message after 3 seconds
+      setTimeout(() => {
+        setScheduleSuccess(false)
+      }, 3000)
       
     } catch (error) {
       console.error('❌ Error updating status:', error)
       alert('Kunne ikke opdatere status. Prøv igen.')
+    } finally {
+      setIsScheduling(false)
     }
   }
 
@@ -811,14 +832,27 @@ export default function AdminPublishingPage() {
                             scheduleRecipe(selectedRecipe.id, selectedDate, selectedTime)
                           }
                         }}
-                        disabled={!selectedDate}
-                        className={`px-4 py-2 rounded-md ${
-                          selectedDate 
+                        disabled={!selectedDate || isScheduling}
+                        className={`px-4 py-2 rounded-md flex items-center justify-center ${
+                          selectedDate && !isScheduling
                             ? 'bg-green-600 text-white hover:bg-green-700' 
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                       >
-                        💾 Gem planlægning
+                        {isScheduling ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Gemmer...
+                          </>
+                        ) : scheduleSuccess ? (
+                          <>
+                            ✅ Gemet!
+                          </>
+                        ) : (
+                          <>
+                            💾 Gem planlægning
+                          </>
+                        )}
                       </button>
                       <p className="text-xs text-gray-500 mt-1">
                         {selectedDate 
@@ -826,6 +860,11 @@ export default function AdminPublishingPage() {
                           : 'Vælg en dato først'
                         }
                       </p>
+                      {scheduleSuccess && (
+                        <p className="text-xs text-green-600 mt-1">
+                          ✅ Planlægning gemt! Opskriften vil blive udgivet automatisk.
+                        </p>
+                      )}
                     </div>
 
                     {schedules.find(s => s.recipeId === selectedRecipe.id)?.scheduledDate && (

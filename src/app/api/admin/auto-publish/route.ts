@@ -127,6 +127,16 @@ export async function GET() {
     
     console.log(`📊 Found ${todaysScheduled?.length || 0} recipes scheduled for today:`, todaysScheduled)
     
+    // Debug: Tjek alle opskrifter med scheduled status
+    const { data: allScheduled, error: allScheduledError } = await supabase
+      .from('recipes')
+      .select('id, title, "scheduledDate", "scheduledTime", status')
+      .eq('status', 'scheduled')
+    
+    if (!allScheduledError) {
+      console.log('📊 All scheduled recipes:', allScheduled)
+    }
+    
     const upcoming = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime > currentTime) || []
     const overdue = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime <= currentTime) || []
     const published = todaysScheduled?.filter(r => r.status === 'published') || []
@@ -137,6 +147,10 @@ export async function GET() {
       published: published.length,
       total: todaysScheduled?.length || 0
     })
+    
+    console.log('📊 Upcoming recipes:', upcoming)
+    console.log('📊 Overdue recipes:', overdue)
+    console.log('📊 Published recipes:', published)
     
     const result = {
       currentTime,
