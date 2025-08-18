@@ -9,6 +9,7 @@ interface RecipeTipsProps {
   recipeSlug?: string
   recipeTitle?: string
   onTipsUpdate?: (newTips: string) => void
+  isAdmin?: boolean
 }
 
 export default function RecipeTips({ 
@@ -16,7 +17,8 @@ export default function RecipeTips({
   dietaryCategory, 
   recipeSlug,
   recipeTitle,
-  onTipsUpdate 
+  onTipsUpdate,
+  isAdmin = false
 }: RecipeTipsProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedTips, setEditedTips] = useState(personalTips || '')
@@ -141,26 +143,29 @@ export default function RecipeTips({
             <h3 className="text-lg font-semibold text-gray-900">Mine tips til opskriften</h3>
           </div>
           
-          <div className="flex items-center space-x-2">
-            {recipeSlug && (
+          {/* Kun vis redigeringsknapper hvis brugeren er admin */}
+          {isAdmin && (
+            <div className="flex items-center space-x-2">
+              {recipeSlug && (
+                <button
+                  onClick={generateAITips}
+                  disabled={isGeneratingAI}
+                  className="flex items-center space-x-2 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  <Bot size={14} />
+                  <span>{isGeneratingAI ? 'Genererer...' : 'AI Tips'}</span>
+                </button>
+              )}
+              
               <button
-                onClick={generateAITips}
-                disabled={isGeneratingAI}
-                className="flex items-center space-x-2 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                onClick={() => setIsEditing(true)}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
               >
-                <Bot size={14} />
-                <span>{isGeneratingAI ? 'Genererer...' : 'AI Tips'}</span>
+                <Edit size={14} />
+                <span>Rediger</span>
               </button>
-            )}
-            
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center space-x-2 px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <Edit size={14} />
-              <span>Rediger</span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
         
         {isEditing ? (

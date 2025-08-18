@@ -26,13 +26,6 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
   const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
   const [commentCount, setCommentCount] = useState(0)
   
-  // Editing states
-  const [isEditingDescription, setIsEditingDescription] = useState(false)
-  const [editedDescription, setEditedDescription] = useState(recipe.shortDescription || '')
-  const [isEditingCategories, setIsEditingCategories] = useState(false)
-  const [editedCategories, setEditedCategories] = useState(recipe.dietaryCategories || [])
-  const [personalTips, setPersonalTips] = useState(recipe.personalTips || '')
-
   // Update comment count when comments change
   const handleCommentUpdate = (newCount: number) => {
     setCommentCount(newCount)
@@ -64,53 +57,6 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' })
     }
-  }
-
-  const saveDescription = async () => {
-    try {
-      const response = await fetch(`/api/recipes/${recipe.slug}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ shortDescription: editedDescription }),
-      })
-
-      if (response.ok) {
-        setIsEditingDescription(false)
-      }
-    } catch (error) {
-      console.error('Error saving description:', error)
-    }
-  }
-
-  const saveCategories = async () => {
-    try {
-      const response = await fetch(`/api/recipes/${recipe.slug}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ dietaryCategories: editedCategories }),
-      })
-
-      if (response.ok) {
-        setIsEditingCategories(false)
-      }
-    } catch (error) {
-      console.error('Error saving categories:', error)
-    }
-  }
-
-  const addCategory = () => {
-    const newCategory = prompt('Indtast ny kategori:')
-    if (newCategory && newCategory.trim()) {
-      setEditedCategories([...editedCategories, newCategory.trim()])
-    }
-  }
-
-  const removeCategory = (index: number) => {
-    setEditedCategories(editedCategories.filter((_, i) => i !== index))
   }
 
   return (
@@ -145,11 +91,11 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
       <section className="bg-gray-50 py-12">
         <div className="container">
           <RecipeTips 
-            personalTips={personalTips}
+            personalTips={recipe.personalTips || ''}
             dietaryCategory={recipe.dietaryCategories?.[0] || 'sunde'}
             recipeSlug={recipe.slug}
             recipeTitle={recipe.title}
-            onTipsUpdate={setPersonalTips}
+            onTipsUpdate={() => {}} // No editing for personal tips
           />
         </div>
       </section>
@@ -159,124 +105,31 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
         <div className="container">
           <div className="max-w-4xl mx-auto space-y-8">
             
-            {/* Description Editing */}
+            {/* Description */}
             <div className="bg-gray-50 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Beskrivelse</h3>
-                <button
-                  onClick={() => setIsEditingDescription(!isEditingDescription)}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <Edit size={14} />
-                  <span>{isEditingDescription ? 'Annuller' : 'Rediger'}</span>
-                </button>
-              </div>
-              
-              {isEditingDescription ? (
-                <div className="space-y-4">
-                  <textarea
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e.target.value)}
-                    className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Skriv beskrivelse af opskriften..."
-                  />
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={saveDescription}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Save size={14} />
-                      <span>Gem</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditedDescription(recipe.shortDescription || '')
-                        setIsEditingDescription(false)
-                      }}
-                      className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      <X size={14} />
-                      <span>Annuller</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-700 leading-relaxed">
-                  {recipe.shortDescription || 'Ingen beskrivelse tilgængelig.'}
-                </p>
-              )}
+              <h3 className="text-lg font-semibold text-gray-900">Beskrivelse</h3>
+              <p className="text-gray-700 leading-relaxed">
+                {recipe.shortDescription || 'Ingen beskrivelse tilgængelig.'}
+              </p>
             </div>
 
-            {/* Categories Editing */}
+            {/* Categories */}
             <div className="bg-gray-50 rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Kategorier & Tags</h3>
-                <button
-                  onClick={() => setIsEditingCategories(!isEditingCategories)}
-                  className="flex items-center space-x-2 px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  <Edit size={14} />
-                  <span>{isEditingCategories ? 'Annuller' : 'Rediger'}</span>
-                </button>
+              <h3 className="text-lg font-semibold text-gray-900">Kategorier & Tags</h3>
+              <div className="flex flex-wrap gap-2">
+                {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? (
+                  recipe.dietaryCategories.map((category, index) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
+                    >
+                      {category}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-gray-500">Ingen kategorier tilgængelige.</span>
+                )}
               </div>
-              
-              {isEditingCategories ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {editedCategories.map((category, index) => (
-                      <div key={index} className="flex items-center space-x-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                        <span>{category}</span>
-                        <button
-                          onClick={() => removeCategory(index)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={addCategory}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      + Tilføj kategori
-                    </button>
-                    <button
-                      onClick={saveCategories}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Save size={14} />
-                      <span>Gem</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditedCategories(recipe.dietaryCategories || [])
-                        setIsEditingCategories(false)
-                      }}
-                      className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      <X size={14} />
-                      <span>Annuller</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? (
-                    recipe.dietaryCategories.map((category, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
-                      >
-                        {category}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-gray-500">Ingen kategorier tilgængelige.</span>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
