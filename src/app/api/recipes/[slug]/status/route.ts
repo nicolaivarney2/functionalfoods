@@ -10,27 +10,43 @@ export async function PUT(
   try {
     const resolvedParams = await params
     const { slug } = resolvedParams
-    const { status } = await request.json()
+    const { status, scheduledDate, scheduledTime } = await request.json()
+
+    console.log('📝 Updating recipe status:', { slug, status, scheduledDate, scheduledTime })
 
     // Create Supabase client dynamically
     const supabase = createSupabaseServerClient()
 
+    // Build update data object
+    const updateData: any = { status }
+    
+    if (scheduledDate !== undefined) {
+      updateData.scheduledDate = scheduledDate
+    }
+    
+    if (scheduledTime !== undefined) {
+      updateData.scheduledTime = scheduledTime
+    }
+
+    console.log('📝 Update data:', updateData)
+
     const { error } = await supabase
       .from('recipes')
-      .update({ status })
+      .update(updateData)
       .eq('slug', slug)
 
     if (error) {
-      console.error('Error updating recipe status:', error)
+      console.error('❌ Error updating recipe status:', error)
       return NextResponse.json(
         { error: 'Failed to update recipe status' },
         { status: 500 }
       )
     }
 
+    console.log('✅ Recipe status updated successfully')
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in recipe status API:', error)
+    console.error('❌ Error in recipe status API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -51,7 +67,7 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('recipes')
-      .select('status')
+      .select('status, "scheduledDate", "scheduledTime"')
       .eq('slug', slug)
       .single()
 
@@ -63,7 +79,11 @@ export async function GET(
       )
     }
 
-    return NextResponse.json({ status: data?.status || 'draft' })
+    return NextResponse.json({ 
+      status: data?.status || 'draft',
+      scheduledDate: data?.scheduledDate,
+      scheduledTime: data?.scheduledTime
+    })
   } catch (error) {
     console.error('Error in recipe status API:', error)
     return NextResponse.json(
