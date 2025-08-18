@@ -15,18 +15,39 @@ export default function AutoPublisher() {
   const [status, setStatus] = useState<AutoPublishStatus | null>(null)
   const [lastCheck, setLastCheck] = useState<Date | null>(null)
   const [isRunning, setIsRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Tjek status og udfør auto-publish
   const checkAndPublish = async () => {
     try {
       setIsRunning(true)
+      setError(null)
+      
+      console.log('🔍 Checking auto-publish status...')
       
       // Først tjek status
       const statusResponse = await fetch('/api/admin/auto-publish')
+      console.log('📡 Status response:', statusResponse.status, statusResponse.ok)
+      
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
         setStatus(statusData)
         console.log('📊 Auto-publish status:', statusData)
+      } else {
+        const errorText = await statusResponse.text()
+        console.error('❌ API error:', statusResponse.status, errorText)
+        setError(`API Error: ${statusResponse.status}`)
+        
+        // Sæt fallback status hvis API fejler
+        const now = new Date()
+        setStatus({
+          currentTime: now.toTimeString().slice(0, 5),
+          currentDate: now.toISOString().split('T')[0],
+          upcoming: 0,
+          overdue: 0,
+          published: 0,
+          total: 0
+        })
       }
       
       // Hvis der er forfaldne opskrifter, udfør auto-publish
@@ -52,6 +73,18 @@ export default function AutoPublisher() {
       
     } catch (error) {
       console.error('❌ Error in auto-publish check:', error)
+      setError('Network error')
+      
+      // Sæt fallback status ved network error
+      const now = new Date()
+      setStatus({
+        currentTime: now.toTimeString().slice(0, 5),
+        currentDate: now.toISOString().split('T')[0],
+        upcoming: 0,
+          overdue: 0,
+          published: 0,
+          total: 0
+      })
     } finally {
       setIsRunning(false)
     }
@@ -69,27 +102,50 @@ export default function AutoPublisher() {
     return () => clearInterval(interval)
   }, [])
 
-  if (!status) return null
-
+  // Vis altid widget, selv hvis status er null
   return (
-    <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+    <div className="fixed bottom-4 right-4 bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm z-50">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-medium text-gray-900">🤖 Auto-Publisher</h3>
-        <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+        <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-yellow-400' : error ? 'bg-red-400' : 'bg-green-400'}`}></div>
       </div>
       
-      <div className="text-xs text-gray-600 space-y-1">
-        <div>⏰ {status.currentTime} • {status.currentDate}</div>
-        <div>📅 I dag: {status.total} opskrifter</div>
-        <div className="flex space-x-3">
-          <span className="text-blue-600">⏳ {status.upcoming} planlagt</span>
-          <span className="text-yellow-600">⚠️ {status.overdue} forfalden</span>
-          <span className="text-green-600">✅ {status.published} udgivet</span>
+      {error ? (
+        <div className="text-xs text-red-600 space-y-1">
+          <div>❌ {error}</div>
+          <button
+            onClick={checkAndPublish}
+            disabled={isRunning}
+            className="mt-2 w-full bg-red-600 text-white text-xs px-3 py-1 rounded hover:bg-red-700 disabled:opacity-50"
+          >
+            {isRunning ? 'Tjekker...' : 'Prøv igen'}
+          </button>
         </div>
-        <div className="text-xs text-gray-500 mt-1">
-          🔄 Tjekker hvert kvarter automatisk
+      ) : status ? (
+        <div className="text-xs text-gray-600 space-y-1">
+          <div>⏰ {status.currentTime} • {status.currentDate}</div>
+          <div>📅 I dag: {status.total} opskrifter</div>
+          <div className="flex space-x-3">
+            <span className="text-blue-600">⏳ {status.upcoming} planlagt</span>
+            <span className="text-yellow-600">⚠️ {status.overdue} forfalden</span>
+            <span className="text-green-600">✅ {status.published} udgivet</span>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            🔄 Tjekker hvert kvarter automatisk
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="text-xs text-gray-600 space-y-1">
+          <div>⏳ Indlæser status...</div>
+          <button
+            onClick={checkAndPublish}
+            disabled={isRunning}
+            className="mt-2 w-full bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isRunning ? 'Tjekker...' : 'Tjek status'}
+          </button>
+        </div>
+      )}
       
       {lastCheck && (
         <div className="text-xs text-gray-500 mt-2">
@@ -97,7 +153,7 @@ export default function AutoPublisher() {
         </div>
       )}
       
-      {status.overdue > 0 && (
+      {status && status.overdue > 0 && (
         <button
           onClick={checkAndPublish}
           disabled={isRunning}
