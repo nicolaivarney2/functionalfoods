@@ -39,6 +39,8 @@ export interface DayPlan {
   totalFiber?: number;
   totalSugar?: number;
   totalSodium?: number;
+  totalVitamins?: { [key: string]: number };
+  totalMinerals?: { [key: string]: number };
   notes?: string;
 }
 

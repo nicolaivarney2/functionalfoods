@@ -246,6 +246,8 @@ export class MealPlanGenerator {
     let totalFiber = 0;
     let totalSugar = 0;
     let totalSodium = 0;
+    let totalVitamins: { [key: string]: number } = {};
+    let totalMinerals: { [key: string]: number } = {};
 
     // Generate meals for each meal type
     for (const mealDistribution of config.mealStructure.mealDistribution) {
@@ -259,6 +261,20 @@ export class MealPlanGenerator {
       totalFiber += meal.adjustedFiber || 0;
       totalSugar += meal.adjustedSugar || 0;
       totalSodium += meal.adjustedSodium || 0;
+      
+      // Add vitamins
+      if (meal.adjustedVitamins) {
+        Object.entries(meal.adjustedVitamins).forEach(([vitamin, amount]) => {
+          totalVitamins[vitamin] = (totalVitamins[vitamin] || 0) + amount;
+        });
+      }
+      
+      // Add minerals
+      if (meal.adjustedMinerals) {
+        Object.entries(meal.adjustedMinerals).forEach(([mineral, amount]) => {
+          totalMinerals[mineral] = (totalMinerals[mineral] || 0) + amount;
+        });
+      }
     }
 
     return {
@@ -270,7 +286,9 @@ export class MealPlanGenerator {
       totalFat,
       totalFiber,
       totalSugar,
-      totalSodium
+      totalSodium,
+      totalVitamins,
+      totalMinerals
     };
   }
 
@@ -319,13 +337,28 @@ export class MealPlanGenerator {
   private filterRecipes(config: MealPlanConfig): Recipe[] {
     return this.recipes.filter(recipe => {
       // Check dietary approach compatibility
-      if (!recipe.dietaryApproaches.includes(config.dietaryApproach.id)) {
+      const hasDietaryApproach = recipe.dietaryApproaches.some(approach => 
+        approach.toLowerCase() === config.dietaryApproach.id.toLowerCase()
+      );
+      
+      if (!hasDietaryApproach) {
+        console.log(`Recipe ${recipe.title} excluded: no ${config.dietaryApproach.id} approach`);
         return false;
+      }
+
+      // Additional keto-specific filtering
+      if (config.dietaryApproach.id.toLowerCase() === 'keto') {
+        const carbsPer100g = recipe.nutritionalInfo.carbsPer100g || 0;
+        if (carbsPer100g > 10) { // Keto: max 10g carbs per 100g
+          console.log(`Recipe ${recipe.title} excluded: too high carbs (${carbsPer100g}g/100g) for keto`);
+          return false;
+        }
       }
 
       // Check for excluded ingredients
       const violations = ingredientService.checkRecipeExclusions(recipe, config.excludedIngredients);
       if (violations.length > 0) {
+        console.log(`Recipe ${recipe.title} excluded: contains excluded ingredients: ${violations.join(', ')}`);
         return false;
       }
 
@@ -333,9 +366,10 @@ export class MealPlanGenerator {
       for (const allergy of config.allergies) {
         const hasAllergy = recipe.ingredients.some(ingredient => {
           const ingredientData = ingredientService.getIngredientById(ingredient.ingredientId);
-          return ingredientData?.allergens.includes(allergy);
+          return ingredientData?.allergens?.includes(allergy);
         });
         if (hasAllergy) {
+          console.log(`Recipe ${recipe.title} excluded: contains allergy: ${allergy}`);
           return false;
         }
       }
@@ -454,9 +488,9 @@ export class MealPlanGenerator {
    * Calculate variety score
    */
   private calculateVarietyScore(recipe: Recipe): number {
-    // Penalty for recently used recipes
+    // Strong penalty for recently used recipes
     if (this.usedRecipes.has(recipe.id)) {
-      return 50; // Reduced score for used recipes
+      return 0; // No score for used recipes - force variety
     }
     return 100;
   }
@@ -483,16 +517,30 @@ export class MealPlanGenerator {
   }
 
   /**
-   * Select the best recipe
+   * Select the best recipe with variety consideration
    */
   private selectRecipe(scoredRecipes: RecipeScore[], date: Date): Recipe {
     if (scoredRecipes.length === 0) {
       throw new Error('No suitable recipes found');
     }
 
-    // For now, select the highest scoring recipe
-    const selectedRecipe = scoredRecipes[0].recipe;
+    // Filter out recipes that have been used recently
+    const unusedRecipes = scoredRecipes.filter(score => !this.usedRecipes.has(score.recipe.id));
+    
+    if (unusedRecipes.length === 0) {
+      // If all recipes have been used, reset the used recipes set and continue
+      console.log('All recipes used, resetting variety tracking');
+      this.usedRecipes.clear();
+      return scoredRecipes[0].recipe;
+    }
+
+    // Select from top 3 unused recipes with some randomness
+    const topRecipes = unusedRecipes.slice(0, Math.min(3, unusedRecipes.length));
+    const randomIndex = Math.floor(Math.random() * topRecipes.length);
+    const selectedRecipe = topRecipes[randomIndex].recipe;
+    
     this.usedRecipes.add(selectedRecipe.id);
+    console.log(`Selected recipe: ${selectedRecipe.title} (variety score: ${topRecipes[randomIndex].compatibility.varietyScore})`);
 
     return selectedRecipe;
   }
