@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabaseServer'
+import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +12,28 @@ export async function PUT(
     const { slug } = resolvedParams
     const { personalTips } = await request.json()
 
-    // Create Supabase client dynamically
-    const supabase = createSupabaseServerClient()
+    // Create Supabase client with service role key for admin access
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ Missing Supabase environment variables')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+    
+    const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
+      cookies: {
+        get(name: string) {
+          return undefined // Service role doesn't need cookies
+        },
+        set(name: string, value: string, options: any) {
+          // Service role doesn't need cookies
+        },
+        remove(name: string, options: any) {
+          // Service role doesn't need cookies
+        },
+      },
+    })
 
     const { error } = await supabase
       .from('recipes')
@@ -46,8 +66,28 @@ export async function GET(
     const resolvedParams = await params
     const { slug } = resolvedParams
 
-    // Create Supabase client dynamically
-    const supabase = createSupabaseServerClient()
+    // Create Supabase client with service role key for admin access
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('❌ Missing Supabase environment variables')
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+    
+    const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
+      cookies: {
+        get(name: string) {
+          return undefined // Service role doesn't need cookies
+        },
+        set(name: string, value: string, options: any) {
+          // Service role doesn't need cookies
+        },
+        remove(name: string, options: any) {
+          // Service role doesn't need cookies
+        },
+      },
+    })
 
     const { data, error } = await supabase
       .from('recipes')
