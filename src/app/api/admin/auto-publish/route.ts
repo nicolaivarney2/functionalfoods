@@ -101,6 +101,18 @@ export async function GET() {
     
     console.log(`🔍 Checking auto-publish status for ${currentDate} at ${currentTime}`)
     
+    // Først tjek alle opskrifter for at se hvad der er i databasen
+    const { data: allRecipes, error: allRecipesError } = await supabase
+      .from('recipes')
+      .select('id, title, status, "scheduledDate", "scheduledTime"')
+      .limit(5)
+    
+    if (allRecipesError) {
+      console.error('❌ Error fetching all recipes:', allRecipesError)
+    } else {
+      console.log('📊 Sample recipes from database:', allRecipes)
+    }
+    
     // Find alle planlagte opskrifter for i dag
     const { data: todaysScheduled, error: fetchError } = await supabase
       .from('recipes')
@@ -113,11 +125,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch scheduled recipes' }, { status: 500 })
     }
     
-    console.log(`📊 Found ${todaysScheduled?.length || 0} recipes scheduled for today`)
+    console.log(`📊 Found ${todaysScheduled?.length || 0} recipes scheduled for today:`, todaysScheduled)
     
     const upcoming = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime > currentTime) || []
     const overdue = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime <= currentTime) || []
     const published = todaysScheduled?.filter(r => r.status === 'published') || []
+    
+    console.log(`📊 Filtered results:`, {
+      upcoming: upcoming.length,
+      overdue: overdue.length,
+      published: published.length,
+      total: todaysScheduled?.length || 0
+    })
     
     const result = {
       currentTime,
