@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ recipes: recipes || [] })
+    return NextResponse.json(recipes || [])
   } catch (error) {
     console.error('Error in images API:', error)
     

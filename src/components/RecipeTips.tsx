@@ -243,7 +243,8 @@ export default function RecipeTips({
           <h3 className="text-lg font-semibold text-gray-900">Generelle tips</h3>
         </div>
         
-        {recipeSlug && (
+        {/* Kun vis AI tips knap hvis brugeren er admin */}
+        {isAdmin && recipeSlug && (
           <button
             onClick={generateAITips}
             disabled={isGeneratingAI}
