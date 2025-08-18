@@ -18,14 +18,10 @@ export async function GET() {
   try {
     const supabase = createSupabaseClient()
     
-    // Get all ingredient matches from the database
+    // Get all ingredient matches from the database (without joins)
     const { data: matches, error } = await supabase
       .from('ingredient_matches')
-      .select(`
-        *,
-        recipe_ingredient:ingredients(name, category),
-        frida_ingredient:frida_ingredients(name, category)
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
