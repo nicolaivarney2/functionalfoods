@@ -33,6 +33,28 @@ export default function AutoPublisher() {
         const statusData = await statusResponse.json()
         setStatus(statusData)
         console.log('📊 Auto-publish status:', statusData)
+        
+        // Hvis der er forfaldne opskrifter, udfør auto-publish automatisk
+        if (statusData.overdue > 0) {
+          console.log(`🚀 Auto-publishing ${statusData.overdue} overdue recipes...`)
+          
+          const publishResponse = await fetch('/api/admin/auto-publish', {
+            method: 'POST'
+          })
+          
+          if (publishResponse.ok) {
+            const publishData = await publishResponse.json()
+            console.log('✅ Auto-publish completed:', publishData)
+            
+            // Opdater status efter udgivelse
+            setTimeout(() => {
+              checkAndPublish()
+            }, 1000)
+          } else {
+            console.error('❌ Auto-publish failed:', publishResponse.status)
+            setError('Auto-publish failed')
+          }
+        }
       } else {
         const errorText = await statusResponse.text()
         console.error('❌ API error:', statusResponse.status, errorText)
@@ -50,25 +72,6 @@ export default function AutoPublisher() {
         })
       }
       
-      // Hvis der er forfaldne opskrifter, udfør auto-publish
-      if (status && status.overdue > 0) {
-        console.log(`🚀 Auto-publishing ${status.overdue} overdue recipes...`)
-        
-        const publishResponse = await fetch('/api/admin/auto-publish', {
-          method: 'POST'
-        })
-        
-        if (publishResponse.ok) {
-          const publishData = await publishResponse.json()
-          console.log('✅ Auto-publish completed:', publishData)
-          
-          // Opdater status efter udgivelse
-          setTimeout(() => {
-            checkAndPublish()
-          }, 1000)
-        }
-      }
-      
       setLastCheck(new Date())
       
     } catch (error) {
@@ -81,9 +84,9 @@ export default function AutoPublisher() {
         currentTime: now.toTimeString().slice(0, 5),
         currentDate: now.toISOString().split('T')[0],
         upcoming: 0,
-          overdue: 0,
-          published: 0,
-          total: 0
+        overdue: 0,
+        published: 0,
+        total: 0
       })
     } finally {
       setIsRunning(false)
@@ -154,13 +157,9 @@ export default function AutoPublisher() {
       )}
       
       {status && status.overdue > 0 && (
-        <button
-          onClick={checkAndPublish}
-          disabled={isRunning}
-          className="mt-2 w-full bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isRunning ? 'Udgiver...' : `Udgiv ${status.overdue} opskrifter`}
-        </button>
+        <div className="text-xs text-yellow-600 mt-2">
+          ⚠️ {status.overdue} opskrifter bliver udgivet automatisk...
+        </div>
       )}
     </div>
   )
