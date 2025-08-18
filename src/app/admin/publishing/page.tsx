@@ -57,8 +57,8 @@ export default function AdminPublishingPage() {
       const recipesWithTips = recipesArray.map((recipe: any) => ({
         ...recipe,
         personalTips: recipe.personalTips || '',
-        scheduledDate: recipe.scheduleddate ? new Date(recipe.scheduleddate) : undefined,
-        scheduledTime: recipe.scheduledtime || '09:00'
+        scheduledDate: recipe.scheduledDate ? new Date(recipe.scheduledDate) : undefined,
+        scheduledTime: recipe.scheduledTime || '09:00'
       }))
       
       setRecipes(recipesWithTips)

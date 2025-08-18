@@ -32,10 +32,10 @@ export async function POST() {
     // Find alle planlagte opskrifter der skal udgives nu
     const { data: scheduledRecipes, error: fetchError } = await supabase
       .from('recipes')
-      .select('id, title, slug, scheduleddate, scheduledtime')
+      .select('id, title, slug, "scheduledDate", "scheduledTime"')
       .eq('status', 'scheduled')
-      .eq('scheduleddate', currentDate)
-      .lte('scheduledtime', currentTime)
+      .eq('scheduledDate', currentDate)
+      .lte('scheduledTime', currentTime)
     
     if (fetchError) {
       console.error('❌ Error fetching scheduled recipes:', fetchError)
@@ -99,29 +99,38 @@ export async function GET() {
     const currentTime = now.toTimeString().slice(0, 5)
     const currentDate = now.toISOString().split('T')[0]
     
+    console.log(`🔍 Checking auto-publish status for ${currentDate} at ${currentTime}`)
+    
     // Find alle planlagte opskrifter for i dag
     const { data: todaysScheduled, error: fetchError } = await supabase
       .from('recipes')
-      .select('id, title, slug, scheduleddate, scheduledtime, status')
-      .eq('scheduleddate', currentDate)
-      .order('scheduledtime')
+      .select('id, title, slug, "scheduledDate", "scheduledTime", status')
+      .eq('scheduledDate', currentDate)
+      .order('scheduledTime')
     
     if (fetchError) {
+      console.error('❌ Error fetching scheduled recipes:', fetchError)
       return NextResponse.json({ error: 'Failed to fetch scheduled recipes' }, { status: 500 })
     }
     
-    const upcoming = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledtime > currentTime) || []
-    const overdue = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledtime <= currentTime) || []
+    console.log(`📊 Found ${todaysScheduled?.length || 0} recipes scheduled for today`)
+    
+    const upcoming = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime > currentTime) || []
+    const overdue = todaysScheduled?.filter(r => r.status === 'scheduled' && r.scheduledTime <= currentTime) || []
     const published = todaysScheduled?.filter(r => r.status === 'published') || []
     
-    return NextResponse.json({
+    const result = {
       currentTime,
       currentDate,
       upcoming: upcoming.length,
       overdue: overdue.length,
       published: published.length,
       total: todaysScheduled?.length || 0
-    })
+    }
+    
+    console.log('📊 Auto-publish status result:', result)
+    
+    return NextResponse.json(result)
     
   } catch (error) {
     console.error('❌ Error in auto-publish GET:', error)
