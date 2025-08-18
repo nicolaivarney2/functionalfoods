@@ -100,41 +100,6 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
         </div>
       </section>
 
-      {/* Recipe Description and Categories Editing */}
-      <section className="bg-white py-12">
-        <div className="container">
-          <div className="max-w-4xl mx-auto space-y-8">
-            
-            {/* Description */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900">Beskrivelse</h3>
-              <p className="text-gray-700 leading-relaxed">
-                {recipe.shortDescription || 'Ingen beskrivelse tilgængelig.'}
-              </p>
-            </div>
-
-            {/* Categories */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900">Kategorier & Tags</h3>
-              <div className="flex flex-wrap gap-2">
-                {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 ? (
-                  recipe.dietaryCategories.map((category, index) => (
-                    <span
-                      key={index}
-                      className="px-3 py-1 text-sm font-medium bg-green-100 text-green-800 rounded-full"
-                    >
-                      {category}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-gray-500">Ingen kategorier tilgængelige.</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Comment System - Moved up */}
       <section id="comments-section" className="bg-gray-50 py-12">
         <div className="container">
