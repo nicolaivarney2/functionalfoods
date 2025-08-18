@@ -157,12 +157,15 @@ export default function AdminPublishingPage() {
 
     try {
       // Gem til database via API
-      const response = await fetch(`/api/admin/recipes/${selectedRecipe.id}`, {
+      const response = await fetch(`/api/admin/recipes`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ description }),
+        body: JSON.stringify({ 
+          recipeId: selectedRecipe.id,
+          description: description 
+        }),
       })
 
       if (!response.ok) {
@@ -194,12 +197,15 @@ export default function AdminPublishingPage() {
 
     try {
       // Gem til database via API
-      const response = await fetch(`/api/admin/recipes/${selectedRecipe.id}`, {
+      const response = await fetch(`/api/admin/recipes`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ dietaryCategories: categories }),
+        body: JSON.stringify({ 
+          recipeId: selectedRecipe.id,
+          dietaryCategories: categories 
+        }),
       })
 
       if (!response.ok) {
