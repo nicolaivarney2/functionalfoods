@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
 
+// Updated to use createServerClient for production compatibility
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
