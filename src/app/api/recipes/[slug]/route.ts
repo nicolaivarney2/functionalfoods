@@ -1,31 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { databaseService } from '@/lib/database-service'
+import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
-export async function GET(
+export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const resolvedParams = await params
-    const { slug } = resolvedParams
+    const { slug } = await params
+    const body = await request.json()
     
-    const recipes = await databaseService.getRecipes()
-    const recipe = recipes.find(r => r.slug === slug)
-
-    if (!recipe) {
-      return NextResponse.json({
-        error: 'Recipe not found'
-      }, { status: 404 })
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
-
-    return NextResponse.json(recipe)
-
+    
+    const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
+      cookies: {
+        get(name: string) {
+          return undefined
+        },
+        set(name: string, value: string, options: any) {
+          // Service role doesn't need cookies
+        },
+        remove(name: string, options: any) {
+          // Service role doesn't need cookies
+        },
+      },
+    })
+    
+    // Update recipe with provided fields
+    const { data, error } = await supabase
+      .from('recipes')
+      .update(body)
+      .eq('slug', slug)
+      .select()
+    
+    if (error) {
+      console.error('Error updating recipe:', error)
+      return NextResponse.json({ error: 'Failed to update recipe' }, { status: 500 })
+    }
+    
+    return NextResponse.json({ 
+      success: true, 
+      recipe: data[0],
+      message: 'Recipe updated successfully'
+    })
+    
   } catch (error) {
-    console.error('Error getting recipe:', error)
-    return NextResponse.json({
-      error: 'Failed to get recipe'
-    }, { status: 500 })
+    console.error('Error in PUT /api/recipes/[slug]:', error)
+    return NextResponse.json(
+      { error: 'Failed to update recipe' },
+      { status: 500 }
+    )
   }
 } 
