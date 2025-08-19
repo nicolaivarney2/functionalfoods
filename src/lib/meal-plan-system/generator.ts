@@ -57,52 +57,123 @@ export class MealPlanGenerator {
       // Get recipes from database
       const dbRecipes = await databaseService.getRecipes();
       
-      // Convert database recipes to the format expected by the meal plan system
-      this.recipes = dbRecipes.map(recipe => ({
-        id: recipe.id,
-        title: recipe.title,
-        description: recipe.description,
-        ingredients: recipe.ingredients?.map(ing => ({
-          ingredientId: ing.id || ing.name,
-          amount: ing.amount,
-          unit: ing.unit
-        })) || [],
-        instructions: recipe.instructions?.map(inst => inst.instruction) || [],
-        prepTime: recipe.preparationTime || 0,
-        cookTime: recipe.cookingTime || 0,
-        servings: recipe.servings || 4,
-        categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
-        dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
-         nutritionalInfo: {
-          caloriesPer100g: recipe.calories || 0,
-          proteinPer100g: recipe.protein || 0,
-          carbsPer100g: recipe.carbs || 0,
-          fatPer100g: recipe.fat || 0,
-          fiberPer100g: recipe.fiber || 0,
-          // If full Frida per-portion JSON exists, map it as per-portion fields
-          ...(recipe.nutritionalInfo ? {
-            caloriesPerPortion: recipe.nutritionalInfo.calories,
-            proteinPerPortion: recipe.nutritionalInfo.protein,
-            carbsPerPortion: recipe.nutritionalInfo.carbs,
-            fatPerPortion: recipe.nutritionalInfo.fat,
-            fiberPerPortion: recipe.nutritionalInfo.fiber,
-            vitaminMap: recipe.nutritionalInfo.vitamins || {},
-            mineralMap: recipe.nutritionalInfo.minerals || {}
-          } : {})
-        },
-        images: [recipe.imageUrl || ''],
-        slug: recipe.slug || '',
-        isActive: true,
-        createdAt: recipe.publishedAt || new Date(),
-        updatedAt: recipe.updatedAt || new Date()
-      }));
-      
-      console.log(`Loaded ${this.recipes.length} recipes from database for meal planning`);
+      if (dbRecipes && dbRecipes.length > 0) {
+        // Convert database recipes to the format expected by the meal plan system
+        this.recipes = dbRecipes.map(recipe => ({
+          id: recipe.id,
+          title: recipe.title,
+          description: recipe.description,
+          ingredients: recipe.ingredients?.map(ing => ({
+            ingredientId: ing.id || ing.name,
+            amount: ing.amount,
+            unit: ing.unit
+          })) || [],
+          instructions: recipe.instructions?.map(inst => inst.instruction) || [],
+          prepTime: recipe.preparationTime || 0,
+          cookTime: recipe.cookingTime || 0,
+          servings: recipe.servings || 4,
+          categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
+          dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
+           nutritionalInfo: {
+             caloriesPer100g: recipe.calories || 0,
+             proteinPer100g: recipe.protein || 0,
+             carbsPer100g: recipe.carbs || 0,
+             fatPer100g: recipe.fat || 0,
+             fiberPer100g: recipe.fiber || 0,
+             // If full Frida per-portion JSON exists, map it as per-portion fields
+             ...(
+               recipe.nutritionalInfo ? {
+                 caloriesPerPortion: recipe.nutritionalInfo.calories,
+                 proteinPerPortion: recipe.nutritionalInfo.protein,
+                 carbsPerPortion: recipe.nutritionalInfo.carbs,
+                 fatPerPortion: recipe.nutritionalInfo.fat,
+                 fiberPerPortion: recipe.nutritionalInfo.fiber,
+                 vitaminMap: recipe.nutritionalInfo.vitamins || {},
+                 mineralMap: recipe.nutritionalInfo.minerals || {}
+               } : {}
+             )
+           },
+          images: [recipe.imageUrl || ''],
+          slug: recipe.slug || '',
+          isActive: true,
+          createdAt: recipe.publishedAt || new Date(),
+          updatedAt: recipe.updatedAt || new Date()
+        }));
+        
+        console.log(`✅ Loaded ${this.recipes.length} recipes from database for meal planning`);
+      } else {
+        console.warn('⚠️ No recipes found in database, using fallback sample data');
+        this.loadFallbackRecipes();
+      }
     } catch (error) {
-      console.error('Error loading recipes from database:', error);
-      // Fallback to empty array if database fails
-      this.recipes = [];
+      console.error('❌ Error loading recipes from database:', error);
+      console.warn('⚠️ Using fallback sample data due to database error');
+      this.loadFallbackRecipes();
     }
+  }
+
+  /**
+   * Load fallback sample recipes when database is unavailable
+   */
+  private loadFallbackRecipes(): void {
+    this.recipes = [
+      {
+        id: 'fallback-1',
+        title: 'Kylling og grøntsager',
+        description: 'Sund kylling med friske grøntsager',
+        ingredients: [
+          { ingredientId: 'kylling', amount: 200, unit: 'g' },
+          { ingredientId: 'broccoli', amount: 150, unit: 'g' }
+        ],
+        instructions: ['Steg kylling', 'Kog grøntsager'],
+        prepTime: 10,
+        cookTime: 20,
+        servings: 2,
+        categories: [RecipeCategory.Dinner],
+        dietaryApproaches: ['keto', 'low-carb'],
+        nutritionalInfo: {
+          caloriesPer100g: 120,
+          proteinPer100g: 25,
+          carbsPer100g: 5,
+          fatPer100g: 3,
+          fiberPer100g: 4
+        },
+        images: [''],
+        slug: 'kylling-grontsager',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'fallback-2',
+        title: 'Laks med spinat',
+        description: 'Omega-3 rig laks med spinat',
+        ingredients: [
+          { ingredientId: 'laks', amount: 150, unit: 'g' },
+          { ingredientId: 'spinat', amount: 100, unit: 'g' }
+        ],
+        instructions: ['Steg laks', 'Tilbered spinat'],
+        prepTime: 5,
+        cookTime: 15,
+        servings: 1,
+        categories: [RecipeCategory.Dinner],
+        dietaryApproaches: ['keto', 'paleo'],
+        nutritionalInfo: {
+          caloriesPer100g: 180,
+          proteinPer100g: 22,
+          carbsPer100g: 3,
+          fatPer100g: 10,
+          fiberPer100g: 2
+        },
+        images: [''],
+        slug: 'laks-spinat',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    ];
+    
+    console.log(`📋 Loaded ${this.recipes.length} fallback recipes for meal planning`);
   }
 
   /**
@@ -335,14 +406,17 @@ export class MealPlanGenerator {
    * Filter recipes based on dietary approach and exclusions
    */
   private filterRecipes(config: MealPlanConfig): Recipe[] {
-    return this.recipes.filter(recipe => {
+    console.log(`🔍 Filtering ${this.recipes.length} recipes for dietary approach: ${config.dietaryApproach.id}`);
+    console.log(`🔍 Available recipes:`, this.recipes.map(r => ({ title: r.title, approaches: r.dietaryApproaches })));
+    
+    const filteredRecipes = this.recipes.filter(recipe => {
       // Check dietary approach compatibility
       const hasDietaryApproach = recipe.dietaryApproaches.some(approach => 
         approach.toLowerCase() === config.dietaryApproach.id.toLowerCase()
       );
       
       if (!hasDietaryApproach) {
-        console.log(`Recipe ${recipe.title} excluded: no ${config.dietaryApproach.id} approach`);
+        console.log(`❌ Recipe ${recipe.title} excluded: no ${config.dietaryApproach.id} approach (has: ${recipe.dietaryApproaches.join(', ')})`);
         return false;
       }
 
@@ -350,7 +424,7 @@ export class MealPlanGenerator {
       if (config.dietaryApproach.id.toLowerCase() === 'keto') {
         const carbsPer100g = recipe.nutritionalInfo.carbsPer100g || 0;
         if (carbsPer100g > 10) { // Keto: max 10g carbs per 100g
-          console.log(`Recipe ${recipe.title} excluded: too high carbs (${carbsPer100g}g/100g) for keto`);
+          console.log(`❌ Recipe ${recipe.title} excluded: too high carbs (${carbsPer100g}g/100g) for keto`);
           return false;
         }
       }
@@ -358,7 +432,7 @@ export class MealPlanGenerator {
       // Check for excluded ingredients
       const violations = ingredientService.checkRecipeExclusions(recipe, config.excludedIngredients);
       if (violations.length > 0) {
-        console.log(`Recipe ${recipe.title} excluded: contains excluded ingredients: ${violations.join(', ')}`);
+        console.log(`❌ Recipe ${recipe.title} excluded: contains excluded ingredients: ${violations.join(', ')}`);
         return false;
       }
 
@@ -369,13 +443,17 @@ export class MealPlanGenerator {
           return ingredientData?.allergens?.includes(allergy);
         });
         if (hasAllergy) {
-          console.log(`Recipe ${recipe.title} excluded: contains allergy: ${allergy}`);
+          console.log(`❌ Recipe ${recipe.title} excluded: contains allergy: ${allergy}`);
           return false;
         }
       }
 
+      console.log(`✅ Recipe ${recipe.title} passed all filters`);
       return true;
     });
+    
+    console.log(`🔍 Filtered to ${filteredRecipes.length} suitable recipes`);
+    return filteredRecipes;
   }
 
   /**
