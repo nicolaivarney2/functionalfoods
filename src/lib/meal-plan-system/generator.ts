@@ -43,6 +43,7 @@ import { databaseService } from '../database-service';
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
+  private dailyUsedRecipes: Map<string, Set<string>> = new Map(); // Track per-day usage
 
   constructor() {
     // Initialize recipes asynchronously
@@ -75,24 +76,24 @@ export class MealPlanGenerator {
           categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
           dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
            nutritionalInfo: {
-             caloriesPer100g: recipe.calories || 0,
-             proteinPer100g: recipe.protein || 0,
-             carbsPer100g: recipe.carbs || 0,
-             fatPer100g: recipe.fat || 0,
-             fiberPer100g: recipe.fiber || 0,
-             // If full Frida per-portion JSON exists, map it as per-portion fields
-             ...(
-               recipe.nutritionalInfo ? {
-                 caloriesPerPortion: recipe.nutritionalInfo.calories,
-                 proteinPerPortion: recipe.nutritionalInfo.protein,
-                 carbsPerPortion: recipe.nutritionalInfo.carbs,
-                 fatPerPortion: recipe.nutritionalInfo.fat,
-                 fiberPerPortion: recipe.nutritionalInfo.fiber,
-                 vitaminMap: recipe.nutritionalInfo.vitamins || {},
-                 mineralMap: recipe.nutritionalInfo.minerals || {}
-               } : {}
-             )
-           },
+            caloriesPer100g: recipe.calories || 0,
+            proteinPer100g: recipe.protein || 0,
+            carbsPer100g: recipe.carbs || 0,
+            fatPer100g: recipe.fat || 0,
+            fiberPer100g: recipe.fiber || 0,
+            // If full Frida per-portion JSON exists, map it as per-portion fields
+            ...(
+              recipe.nutritionalInfo ? {
+                caloriesPerPortion: recipe.nutritionalInfo.calories,
+                proteinPerPortion: recipe.nutritionalInfo.protein,
+                carbsPerPortion: recipe.nutritionalInfo.carbs,
+                fatPerPortion: recipe.nutritionalInfo.fat,
+                fiberPerPortion: recipe.nutritionalInfo.fiber,
+                vitaminMap: recipe.nutritionalInfo.vitamins || {},
+                mineralMap: recipe.nutritionalInfo.minerals || {}
+              } : {}
+            )
+          },
           images: [recipe.imageUrl || ''],
           slug: recipe.slug || '',
           isActive: true,
@@ -167,6 +168,60 @@ export class MealPlanGenerator {
         },
         images: [''],
         slug: 'laks-spinat',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'fallback-3',
+        title: 'Æggehvider med avocado',
+        description: 'Protein-rig morgenmad med sundt fedt',
+        ingredients: [
+          { ingredientId: 'æggehvider', amount: 200, unit: 'g' },
+          { ingredientId: 'avocado', amount: 100, unit: 'g' }
+        ],
+        instructions: ['Steg æggehvider', 'Skær avocado'],
+        prepTime: 5,
+        cookTime: 10,
+        servings: 1,
+        categories: [RecipeCategory.Breakfast],
+        dietaryApproaches: ['keto', 'high-protein'],
+        nutritionalInfo: {
+          caloriesPer100g: 140,
+          proteinPer100g: 20,
+          carbsPer100g: 2,
+          fatPer100g: 8,
+          fiberPer100g: 3
+        },
+        images: [''],
+        slug: 'aeggehvider-avocado',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      },
+      {
+        id: 'fallback-4',
+        title: 'Tun med grønne bønner',
+        description: 'Lean protein med fiber-rige grøntsager',
+        ingredients: [
+          { ingredientId: 'tun', amount: 150, unit: 'g' },
+          { ingredientId: 'grønne bønner', amount: 100, unit: 'g' }
+        ],
+        instructions: ['Steg tun', 'Kog bønner'],
+        prepTime: 5,
+        cookTime: 15,
+        servings: 1,
+        categories: [RecipeCategory.Lunch],
+        dietaryApproaches: ['keto', 'low-carb'],
+        nutritionalInfo: {
+          caloriesPer100g: 160,
+          proteinPer100g: 28,
+          carbsPer100g: 4,
+          fatPer100g: 2,
+          fiberPer100g: 5
+        },
+        images: [''],
+        slug: 'tun-gronne-bonner',
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -377,8 +432,8 @@ export class MealPlanGenerator {
     // Score and rank recipes
     const scoredRecipes = this.scoreRecipes(availableRecipes, mealDistribution, config);
     
-    // Select the best recipe
-    const selectedRecipe = this.selectRecipe(scoredRecipes, date);
+    // Select the best recipe with meal type consideration
+    const selectedRecipe = this.selectRecipe(scoredRecipes, date, mealDistribution.mealType);
     
     // Calculate servings to meet macro targets
     const servings = this.calculateServings(selectedRecipe, mealDistribution);
@@ -597,28 +652,42 @@ export class MealPlanGenerator {
   /**
    * Select the best recipe with variety consideration
    */
-  private selectRecipe(scoredRecipes: RecipeScore[], date: Date): Recipe {
+  private selectRecipe(scoredRecipes: RecipeScore[], date: Date, mealType: MealType): Recipe {
     if (scoredRecipes.length === 0) {
       throw new Error('No suitable recipes found');
     }
 
-    // Filter out recipes that have been used recently
-    const unusedRecipes = scoredRecipes.filter(score => !this.usedRecipes.has(score.recipe.id));
+    const dateKey = date.toDateString();
+    const mealKey = `${dateKey}-${mealType}`;
     
-    if (unusedRecipes.length === 0) {
-      // If all recipes have been used, reset the used recipes set and continue
-      console.log('All recipes used, resetting variety tracking');
-      this.usedRecipes.clear();
+    // Initialize daily tracking if not exists
+    if (!this.dailyUsedRecipes.has(dateKey)) {
+      this.dailyUsedRecipes.set(dateKey, new Set());
+    }
+    
+    const dailyUsed = this.dailyUsedRecipes.get(dateKey)!;
+    
+    // Filter out recipes that have been used today
+    const unusedTodayRecipes = scoredRecipes.filter(score => !dailyUsed.has(score.recipe.id));
+    
+    if (unusedTodayRecipes.length === 0) {
+      // If all recipes used today, clear daily tracking and continue
+      console.log(`🔄 All recipes used for ${dateKey}, clearing daily tracking`);
+      dailyUsed.clear();
       return scoredRecipes[0].recipe;
     }
 
-    // Select from top 3 unused recipes with some randomness
-    const topRecipes = unusedRecipes.slice(0, Math.min(3, unusedRecipes.length));
+    // Select from top 3 unused recipes today with some randomness
+    const topRecipes = unusedTodayRecipes.slice(0, Math.min(3, unusedTodayRecipes.length));
     const randomIndex = Math.floor(Math.random() * topRecipes.length);
     const selectedRecipe = topRecipes[randomIndex].recipe;
     
+    // Mark as used today
+    dailyUsed.add(selectedRecipe.id);
     this.usedRecipes.add(selectedRecipe.id);
-    console.log(`Selected recipe: ${selectedRecipe.title} (variety score: ${topRecipes[randomIndex].compatibility.varietyScore})`);
+    
+    console.log(`✅ Selected recipe for ${mealKey}: ${selectedRecipe.title} (variety score: ${topRecipes[randomIndex].compatibility.varietyScore})`);
+    console.log(`📊 Daily usage for ${dateKey}: ${dailyUsed.size} recipes used`);
 
     return selectedRecipe;
   }
