@@ -15,12 +15,12 @@ const mainMenuItems = [
 ]
 
 const dietaryCategories = [
+  { name: 'FAMILIEMAD', href: '/opskrifter/familie' },
   { name: 'KETO', href: '/opskrifter/keto' },
   { name: 'SENSE', href: '/opskrifter/sense' },
-  { name: 'LCHF/PALEO', href: '/opskrifter/lchf-paleo' },
+  { name: 'LCHF/PALEO', href: '/opskrifter/lchch-paleo' },
   { name: 'MEAL PREP', href: '/opskrifter/meal-prep' },
   { name: 'ANTI-INFLAMMATORISK', href: '/opskrifter/anti-inflammatory' },
-  { name: 'MIDDELHAVSDIÆTEN', href: '/opskrifter/mediterranean' },
   { name: 'FLEKSITARISK', href: '/opskrifter/flexitarian' },
   { name: '5:2 DIÆT', href: '/opskrifter/5-2-diet' },
 ]

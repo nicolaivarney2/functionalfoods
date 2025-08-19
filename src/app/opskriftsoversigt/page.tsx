@@ -103,6 +103,16 @@ const extendedDietaryCategories = [
     imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
   },
   {
+    id: '1',
+    name: 'FAMILIEMAD',
+    slug: 'familie',
+    description: 'Almindelige familiemad opskrifter',
+    color: 'bg-blue-500',
+    recipeCount: 450,
+    imageUrl: '/images/categories/familie.webp',
+    imageAlt: 'Familievenlige retter til hverdagen'
+  },
+  {
     id: '6',
     name: 'MIDDELHAVSDIÆTEN',
     slug: 'mediterranean',
@@ -412,6 +422,7 @@ export default function RecipeOverviewPage() {
               className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             >
               <option value="all">Alle mad ideologier</option>
+              <option value="FAMILIEMAD">Familiemad</option>
               <option value="Keto">Keto</option>
               <option value="SENSE">SENSE</option>
               <option value="LCHF/PALEO">LCHF/Paleo</option>
