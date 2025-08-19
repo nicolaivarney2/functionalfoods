@@ -203,7 +203,7 @@ const mockStores = [
 
 export default function DagligvarerPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(['all'])
   const [showOnlyOffers, setShowOnlyOffers] = useState(false)
   const [selectedStores, setSelectedStores] = useState([1, 2]) // REMA 1000 and Netto
   const [groupByDepartment, setGroupByDepartment] = useState(false)
@@ -214,7 +214,7 @@ export default function DagligvarerPage() {
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
+    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category)
     const matchesOffers = !showOnlyOffers || product.isOnSale
     const matchesStores = selectedStores.includes(product.store === 'REMA 1000' ? 1 : 2)
     
@@ -227,6 +227,21 @@ export default function DagligvarerPage() {
         ? prev.filter(id => id !== storeId)
         : [...prev, storeId]
     )
+  }
+
+  const toggleCategory = (categoryName: string) => {
+    if (categoryName === 'all') {
+      setSelectedCategories(['all'])
+    } else {
+      setSelectedCategories(prev => {
+        const newCategories = prev.filter(cat => cat !== 'all')
+        if (prev.includes(categoryName)) {
+          return newCategories.filter(cat => cat !== categoryName)
+        } else {
+          return [...newCategories, categoryName]
+        }
+      })
+    }
   }
 
   const nextSlide = () => {
@@ -279,14 +294,22 @@ export default function DagligvarerPage() {
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="border-b border-gray-200">
                 <button
-                  onClick={() => setSelectedCategory('all')}
+                  onClick={() => toggleCategory('all')}
                   className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors ${
-                    selectedCategory === 'all' 
+                    selectedCategories.includes('all') 
                       ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' 
                       : 'hover:bg-gray-50'
                   }`}
                 >
-                  <span className="text-sm font-medium">Alle kategorier</span>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes('all')}
+                      onChange={() => toggleCategory('all')}
+                      className="text-blue-600 rounded"
+                    />
+                    <span className="text-sm font-medium">Alle kategorier</span>
+                  </div>
                   <span className="text-xs text-gray-500">({mockCategories.reduce((sum, cat) => sum + cat.count, 0)})</span>
                 </button>
               </div>
@@ -295,14 +318,20 @@ export default function DagligvarerPage() {
                 {mockCategories.map(category => (
                   <button
                     key={category.id}
-                    onClick={() => setSelectedCategory(category.name)}
+                    onClick={() => toggleCategory(category.name)}
                     className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors border-b border-gray-100 last:border-b-0 ${
-                      selectedCategory === category.name 
+                      selectedCategories.includes(category.name) 
                         ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' 
                         : 'hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(category.name)}
+                        onChange={() => toggleCategory(category.name)}
+                        className="text-blue-600 rounded"
+                      />
                       <span className="text-base">{category.icon}</span>
                       <span className="text-sm font-medium">{category.name}</span>
                     </div>
@@ -506,11 +535,11 @@ export default function DagligvarerPage() {
 
                     {/* Actions */}
                     <div className="flex space-x-2">
-                      <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-3 rounded-lg text-sm font-medium transition-colors shadow-sm">
-                        Tilføj til indkøbsliste
+                      <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                        Tilføj
                       </button>
-                      <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-3 rounded-lg text-sm transition-colors">
-                        <TrendingUp size={16} />
+                      <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-xs transition-colors">
+                        <TrendingUp size={14} />
                       </button>
                     </div>
                   </div>
@@ -526,69 +555,73 @@ export default function DagligvarerPage() {
                     className="flex transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                   >
-                    {filteredProducts.map(product => (
-                      <div key={product.id} className="w-full flex-shrink-0 px-2">
-                        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                          {/* Product Image */}
-                          <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
-                            <div className="absolute top-2 right-2">
-                              <button
-                                onClick={() => toggleFavorite(product.id)}
-                                className={`p-1.5 rounded-full shadow-sm ${
-                                  product.isFavorite 
-                                    ? 'bg-red-500 text-white' 
-                                    : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
-                                } transition-all duration-200`}
-                              >
-                                <Heart size={14} fill={product.isFavorite ? 'currentColor' : 'none'} />
-                              </button>
-                            </div>
-                            {product.isOnSale && (
-                              <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm">
-                                {product.discount}% rabat
+                    {Array.from({ length: Math.ceil(filteredProducts.length / 3) }).map((_, slideIndex) => (
+                      <div key={slideIndex} className="w-full flex-shrink-0 px-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          {filteredProducts.slice(slideIndex * 3, slideIndex * 3 + 3).map(product => (
+                            <div key={product.id} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                              {/* Product Image */}
+                              <div className="relative h-24 bg-gradient-to-br from-gray-50 to-gray-100">
+                                <div className="absolute top-1 right-1">
+                                  <button
+                                    onClick={() => toggleFavorite(product.id)}
+                                    className={`p-1 rounded-full shadow-sm ${
+                                      product.isFavorite 
+                                        ? 'bg-red-500 text-white' 
+                                        : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
+                                    } transition-all duration-200`}
+                                  >
+                                    <Heart size={12} fill={product.isFavorite ? 'currentColor' : 'none'} />
+                                  </button>
+                                </div>
+                                {product.isOnSale && (
+                                  <div className="absolute top-1 left-1 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold shadow-sm">
+                                    {product.discount}% rabat
+                                  </div>
+                                )}
+                                <div className="absolute bottom-1 left-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-xs font-medium shadow-sm">
+                                  {product.store}
+                                </div>
                               </div>
-                            )}
-                            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium shadow-sm">
-                              {product.store}
-                            </div>
-                          </div>
 
-                          {/* Product Info */}
-                          <div className="p-3">
-                            <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight">
-                              {product.name}
-                            </h3>
-                            <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
-                              {product.unit}
-                            </p>
-                            
-                            {/* Price */}
-                            <div className="flex items-center space-x-2 mb-2">
-                              <span className="text-lg font-bold text-gray-900">
-                                {product.currentPrice.toFixed(2)} kr
-                              </span>
-                              {product.isOnSale && (
-                                <span className="text-xs text-gray-500 line-through">
-                                  {product.originalPrice.toFixed(2)} kr
-                                </span>
-                              )}
-                            </div>
-                            
-                            {/* Unit Price */}
-                            <p className="text-xs text-gray-600 mb-3">
-                              {product.unitPrice.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
-                            </p>
+                              {/* Product Info */}
+                              <div className="p-2">
+                                <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2 text-xs leading-tight">
+                                  {product.name}
+                                </h3>
+                                <p className="text-xs text-gray-500 mb-1 bg-gray-50 px-1 py-0.5 rounded-full inline-block">
+                                  {product.unit}
+                                </p>
+                                
+                                {/* Price */}
+                                <div className="flex items-center space-x-1 mb-1">
+                                  <span className="text-sm font-bold text-gray-900">
+                                    {product.currentPrice.toFixed(2)} kr
+                                  </span>
+                                  {product.isOnSale && (
+                                    <span className="text-xs text-gray-500 line-through">
+                                      {product.originalPrice.toFixed(2)} kr
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Unit Price */}
+                                <p className="text-xs text-gray-600 mb-2">
+                                  {product.unitPrice.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+                                </p>
 
-                            {/* Actions */}
-                            <div className="flex space-x-2">
-                              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-2 rounded-lg text-xs font-medium transition-colors shadow-sm">
-                                Tilføj
-                              </button>
-                              <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-2 rounded-lg text-xs transition-colors">
-                                <TrendingUp size={14} />
-                              </button>
+                                {/* Actions */}
+                                <div className="flex space-x-1">
+                                  <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1 px-1 rounded text-xs font-medium transition-colors shadow-sm">
+                                    Tilføj
+                                  </button>
+                                  <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-1 rounded text-xs transition-colors">
+                                    <TrendingUp size={12} />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
                     ))}
