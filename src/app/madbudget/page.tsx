@@ -175,7 +175,12 @@ export default function MadbudgetPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Butikker:</span>
-                  <span className="font-medium">{familyProfile.selectedStores.length} valgt</span>
+                  <span className="font-medium">
+                    {familyProfile.selectedStores.map(storeId => {
+                      const store = mockStores.find(s => s.id === storeId)
+                      return store?.name
+                    }).filter(Boolean).join(', ')}
+                  </span>
                 </div>
               </div>
             </div>
@@ -413,6 +418,40 @@ export default function MadbudgetPage() {
                   />
                   <span className="text-sm text-gray-700">Prioriter animalsk økologi</span>
                 </label>
+              </div>
+              
+              {/* Store Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Vælg butikker tæt på dig</label>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {mockStores.map(store => (
+                    <label key={store.id} className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={familyProfile.selectedStores.includes(store.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFamilyProfile(prev => ({
+                              ...prev,
+                              selectedStores: [...prev.selectedStores, store.id]
+                            }))
+                          } else {
+                            setFamilyProfile(prev => ({
+                              ...prev,
+                              selectedStores: prev.selectedStores.filter(id => id !== store.id)
+                            }))
+                          }
+                        }}
+                        className="text-blue-600 rounded"
+                      />
+                      <div className={`w-4 h-4 rounded-full ${store.color}`}></div>
+                      <span className="text-sm text-gray-700">{store.name}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Disse butikker bruges til at beregne besparelser og generere madplaner
+                </p>
               </div>
               
               <button
