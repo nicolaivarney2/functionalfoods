@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown } from 'lucide-react'
+import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Mock data for development
 const mockStores = [
@@ -85,6 +85,7 @@ export default function MadbudgetPage() {
   const [basicItems, setBasicItems] = useState(mockBasicItems)
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [basicItemsOpen, setBasicItemsOpen] = useState(true)
+  const [currentDayOffset, setCurrentDayOffset] = useState(0)
 
   const toggleBasicItem = (itemId: number) => {
     setBasicItems(prev => 
@@ -119,6 +120,18 @@ export default function MadbudgetPage() {
   const calculateSavings = () => {
     // Calculate total savings logic will go here
     return { totalSavings: 156.80, percentageSavings: 18.5 }
+  }
+
+  const nextDays = () => {
+    setCurrentDayOffset(prev => Math.min(prev + 3, 4)) // Max 4 (so we can show days 5-7)
+  }
+
+  const prevDays = () => {
+    setCurrentDayOffset(prev => Math.max(prev - 3, 0))
+  }
+
+  const getVisibleDays = () => {
+    return days.slice(currentDayOffset, currentDayOffset + 3)
   }
 
   const mealTypes = [
@@ -262,54 +275,98 @@ export default function MadbudgetPage() {
                 </button>
               </div>
 
-              {/* Week Grid */}
-              <div className="grid grid-cols-7 gap-4">
-                {days.map((day, index) => (
-                  <div key={day} className="text-center">
-                    <div className="font-medium text-gray-900 mb-3">{dayLabels[index]}</div>
-                    <div className="space-y-2">
-                      {mealTypes.map(mealType => {
-                        const dayKey = day as DayKey
-                        const mealKey = mealType.key as MealType
-                        const currentMeal = mealPlan[dayKey][mealKey]
-                        
-                        return (
-                                                  <div
-                          key={`${day}-${mealType.key}`}
-                          className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
-                            currentMeal
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-300'
-                          }`}
-                          onClick={() => {
-                            setSelectedMealSlot(`${day}-${mealType.key}`)
-                            setShowRecipeSelector(true)
-                          }}
-                          title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
-                        >
-                            {currentMeal ? (
-                              <div className="text-center">
-                                <div className="text-sm font-medium text-gray-900 mb-1">
-                                  {currentMeal.title}
-                                </div>
-                                <div className="text-xs text-gray-500 mb-1">
-                                  {currentMeal.store}
-                                </div>
-                                <div className="text-xs text-green-600 font-medium">
-                                  Sparer {currentMeal.savings.toFixed(0)} kr
-                                </div>
+              {/* 3-Day Slider */}
+              <div className="relative">
+                {/* Navigation Arrows */}
+                <button
+                  onClick={prevDays}
+                  disabled={currentDayOffset === 0}
+                  className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-gray-200 transition-colors ${
+                    currentDayOffset === 0 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'bg-white hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                
+                <button
+                  onClick={nextDays}
+                  disabled={currentDayOffset >= 4}
+                  className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-gray-200 transition-colors ${
+                    currentDayOffset >= 4 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                      : 'bg-white hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <ChevronRight size={20} />
+                </button>
+
+                {/* Days Grid */}
+                <div className="grid grid-cols-3 gap-4 px-12">
+                  {getVisibleDays().map((day, index) => {
+                    const actualIndex = currentDayOffset + index
+                    return (
+                      <div key={day} className="text-center">
+                        <div className="font-medium text-gray-900 mb-3">{dayLabels[actualIndex]}</div>
+                        <div className="space-y-2">
+                          {mealTypes.map(mealType => {
+                            const dayKey = day as DayKey
+                            const mealKey = mealType.key as MealType
+                            const currentMeal = mealPlan[dayKey][mealKey]
+                            
+                            return (
+                              <div
+                                key={`${day}-${mealType.key}`}
+                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
+                                  currentMeal
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 hover:border-blue-300'
+                                }`}
+                                onClick={() => {
+                                  setSelectedMealSlot(`${day}-${mealType.key}`)
+                                  setShowRecipeSelector(true)
+                                }}
+                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
+                              >
+                                {currentMeal ? (
+                                  <div className="text-center">
+                                    <div className="text-sm font-medium text-gray-900 mb-1">
+                                      {currentMeal.title}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mb-1">
+                                      {currentMeal.store}
+                                    </div>
+                                    <div className="text-xs text-green-600 font-medium">
+                                      Sparer {currentMeal.savings.toFixed(0)} kr
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center">
+                                    <mealType.icon size={20} className="mx-auto text-gray-400 mb-1" />
+                                    <div className="text-xs text-gray-500">{mealType.label}</div>
+                                  </div>
+                                )}
                               </div>
-                            ) : (
-                              <div className="text-center">
-                                <mealType.icon size={20} className="mx-auto text-gray-400 mb-1" />
-                                <div className="text-xs text-gray-500">{mealType.label}</div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Day Indicator */}
+              <div className="flex justify-center mt-4 space-x-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentDayOffset(index * 3)}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      Math.floor(currentDayOffset / 3) === index ? 'bg-blue-600' : 'bg-gray-300'
+                    }`}
+                  />
                 ))}
               </div>
             </div>
