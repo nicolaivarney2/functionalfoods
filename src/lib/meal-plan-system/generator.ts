@@ -60,48 +60,88 @@ export class MealPlanGenerator {
       
       if (dbRecipes && dbRecipes.length > 0) {
         // Convert database recipes to the format expected by the meal plan system
-        this.recipes = dbRecipes.map(recipe => ({
-          id: recipe.id,
-          title: recipe.title,
-          description: recipe.description,
-          ingredients: recipe.ingredients?.map(ing => ({
-            ingredientId: ing.id || ing.name,
-            amount: ing.amount,
-            unit: ing.unit
-          })) || [],
-          instructions: recipe.instructions?.map(inst => inst.instruction) || [],
-          prepTime: recipe.preparationTime || 0,
-          cookTime: recipe.cookingTime || 0,
-          servings: recipe.servings || 4,
-          categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
-          dietaryApproaches: recipe.dietaryCategories?.map(cat => cat.toLowerCase()) || [],
-           nutritionalInfo: {
-            caloriesPer100g: recipe.calories || 0,
-            proteinPer100g: recipe.protein || 0,
-            carbsPer100g: recipe.carbs || 0,
-            fatPer100g: recipe.fat || 0,
-            fiberPer100g: recipe.fiber || 0,
-            // If full Frida per-portion JSON exists, map it as per-portion fields
-            ...(
-              recipe.nutritionalInfo ? {
-                caloriesPerPortion: recipe.nutritionalInfo.calories,
-                proteinPerPortion: recipe.nutritionalInfo.protein,
-                carbsPerPortion: recipe.nutritionalInfo.carbs,
-                fatPerPortion: recipe.nutritionalInfo.fat,
-                fiberPerPortion: recipe.nutritionalInfo.fiber,
-                vitaminMap: recipe.nutritionalInfo.vitamins || {},
-                mineralMap: recipe.nutritionalInfo.minerals || {}
-              } : {}
-            )
-          },
-          images: [recipe.imageUrl || ''],
-          slug: recipe.slug || '',
-          isActive: true,
-          createdAt: recipe.publishedAt || new Date(),
-          updatedAt: recipe.updatedAt || new Date()
-        }));
+        this.recipes = dbRecipes.map(recipe => {
+          // Debug dietary categories mapping
+          console.log(`🔍 Recipe ${recipe.title}:`, {
+            rawCategories: recipe.dietaryCategories,
+            type: typeof recipe.dietaryCategories,
+            length: recipe.dietaryCategories?.length
+          });
+          
+          // Fix dietary categories mapping
+          let dietaryApproaches: string[] = [];
+          if (recipe.dietaryCategories) {
+            if (Array.isArray(recipe.dietaryCategories)) {
+              dietaryApproaches = recipe.dietaryCategories
+                .filter(cat => cat && typeof cat === 'string')
+                .map(cat => (cat as string).toLowerCase().trim());
+            } else if (typeof recipe.dietaryCategories === 'string') {
+              // Handle case where it's a single string
+              dietaryApproaches = [recipe.dietaryCategories.toLowerCase().trim()];
+            }
+          }
+          
+          // Add fallback if no categories found
+          if (dietaryApproaches.length === 0) {
+            // Check if title contains keto-related keywords
+            const title = recipe.title.toLowerCase();
+            if (title.includes('keto') || title.includes('low-carb') || title.includes('lav-carb')) {
+              dietaryApproaches = ['keto'];
+              console.log(`🔧 Added 'keto' to ${recipe.title} based on title`);
+            }
+          }
+          
+          console.log(`✅ Final dietary approaches for ${recipe.title}:`, dietaryApproaches);
+          
+          return {
+            id: recipe.id,
+            title: recipe.title,
+            description: recipe.description,
+            ingredients: recipe.ingredients?.map(ing => ({
+              ingredientId: ing.id || ing.name,
+              amount: ing.amount,
+              unit: ing.unit
+            })) || [],
+            instructions: recipe.instructions?.map(inst => inst.instruction) || [],
+            prepTime: recipe.preparationTime || 0,
+            cookTime: recipe.cookingTime || 0,
+            servings: recipe.servings || 4,
+            categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
+            dietaryApproaches,
+             nutritionalInfo: {
+              caloriesPer100g: recipe.calories || 0,
+              proteinPer100g: recipe.protein || 0,
+              carbsPer100g: recipe.carbs || 0,
+              fatPer100g: recipe.fat || 0,
+              fiberPer100g: recipe.fiber || 0,
+              // If full Frida per-portion JSON exists, map it as per-portion fields
+              ...(
+                recipe.nutritionalInfo ? {
+                  caloriesPerPortion: recipe.nutritionalInfo.calories,
+                  proteinPerPortion: recipe.nutritionalInfo.protein,
+                  carbsPerPortion: recipe.nutritionalInfo.carbs,
+                  fatPerPortion: recipe.nutritionalInfo.fat,
+                  fiberPerPortion: recipe.nutritionalInfo.fiber,
+                  vitaminMap: recipe.nutritionalInfo.vitamins || {},
+                  mineralMap: recipe.nutritionalInfo.minerals || {}
+                } : {}
+              )
+            },
+            images: [recipe.imageUrl || ''],
+            slug: recipe.slug || '',
+            isActive: true,
+            createdAt: recipe.publishedAt || new Date(),
+            updatedAt: recipe.updatedAt || new Date()
+          };
+        });
         
         console.log(`✅ Loaded ${this.recipes.length} recipes from database for meal planning`);
+        console.log(`📊 Dietary approaches summary:`, this.recipes.reduce((acc, recipe) => {
+          recipe.dietaryApproaches.forEach(approach => {
+            acc[approach] = (acc[approach] || 0) + 1;
+          });
+          return acc;
+        }, {} as Record<string, number>));
       } else {
         console.warn('⚠️ No recipes found in database, using fallback sample data');
         this.loadFallbackRecipes();
