@@ -401,7 +401,7 @@ export default function DagligvarerPage() {
             <button
               onClick={() => {
                 setSearchQuery('')
-                setSelectedCategory('all')
+                setSelectedCategories(['all'])
                 setShowOnlyOffers(false)
                 setSelectedStores([1, 2])
                 setGroupByDepartment(false)
@@ -420,11 +420,11 @@ export default function DagligvarerPage() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 {/* Active Filters */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {selectedCategory !== 'all' && (
+                  {selectedCategories.length > 0 && !selectedCategories.includes('all') && (
                     <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center">
-                      {selectedCategory}
+                      {selectedCategories.join(', ')}
                       <button
-                        onClick={() => setSelectedCategory('all')}
+                        onClick={() => setSelectedCategories(['all'])}
                         className="ml-2 hover:text-blue-600"
                       >
                         <X size={14} />
