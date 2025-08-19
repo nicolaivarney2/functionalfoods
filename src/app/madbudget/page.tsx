@@ -246,36 +246,42 @@ export default function MadbudgetPage() {
                   <div key={day} className="text-center">
                     <div className="font-medium text-gray-900 mb-3">{dayLabels[index]}</div>
                     <div className="space-y-2">
-                      {mealTypes.map(mealType => (
-                        <div
-                          key={`${day}-${mealType.key}`}
-                          className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
-                            mealPlan[day][mealType.key]
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-blue-300'
-                          }`}
-                          onClick={() => {
-                            setSelectedMealSlot(`${day}-${mealType.key}`)
-                            setShowRecipeSelector(true)
-                          }}
-                        >
-                          {mealPlan[day][mealType.key] ? (
-                            <div className="text-center">
-                              <div className="text-sm font-medium text-gray-900 truncate">
-                                {mealPlan[day][mealType.key]?.title}
+                      {mealTypes.map(mealType => {
+                        const dayKey = day as DayKey
+                        const mealKey = mealType.key as MealType
+                        const currentMeal = mealPlan[dayKey][mealKey]
+                        
+                        return (
+                          <div
+                            key={`${day}-${mealType.key}`}
+                            className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
+                              currentMeal
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-blue-300'
+                            }`}
+                            onClick={() => {
+                              setSelectedMealSlot(`${day}-${mealType.key}`)
+                              setShowRecipeSelector(true)
+                            }}
+                          >
+                            {currentMeal ? (
+                              <div className="text-center">
+                                <div className="text-sm font-medium text-gray-900 truncate">
+                                  {currentMeal.title}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {currentMeal.store}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500">
-                                {mealPlan[day][mealType.key]?.store}
+                            ) : (
+                              <div className="text-center">
+                                <mealType.icon size={20} className="mx-auto text-gray-400 mb-1" />
+                                <div className="text-xs text-gray-500">{mealType.label}</div>
                               </div>
-                            </div>
-                          ) : (
-                            <div className="text-center">
-                              <mealType.icon size={20} className="mx-auto text-gray-400 mb-1" />
-                              <div className="text-xs text-gray-500">{mealType.label}</div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 ))}
