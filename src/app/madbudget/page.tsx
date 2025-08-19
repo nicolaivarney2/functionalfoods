@@ -67,7 +67,10 @@ export default function MadbudgetPage() {
     selectedStores: [1, 2, 8] // REMA 1000, Netto, Løvbjerg
   })
   
-  const [mealPlan, setMealPlan] = useState({
+  type MealType = 'breakfast' | 'lunch' | 'dinner'
+  type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+  
+  const [mealPlan, setMealPlan] = useState<Record<DayKey, Record<MealType, any | null>>>({
     monday: { breakfast: null, lunch: null, dinner: null },
     tuesday: { breakfast: null, lunch: null, dinner: null },
     wednesday: { breakfast: null, lunch: null, dinner: null },
@@ -94,11 +97,11 @@ export default function MadbudgetPage() {
 
   const addRecipeToMeal = (recipe: any) => {
     if (selectedMealSlot) {
-      const [day, meal] = selectedMealSlot.split('-')
+      const [day, meal] = selectedMealSlot.split('-') as [DayKey, MealType]
       setMealPlan(prev => ({
         ...prev,
         [day]: {
-          ...prev[day as keyof typeof prev],
+          ...prev[day],
           [meal]: recipe
         }
       }))
@@ -247,7 +250,7 @@ export default function MadbudgetPage() {
                         <div
                           key={`${day}-${mealType.key}`}
                           className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
-                            mealPlan[day as keyof typeof mealPlan][mealType.key as keyof typeof mealPlan[typeof day]]
+                            mealPlan[day][mealType.key]
                               ? 'border-blue-500 bg-blue-50'
                               : 'border-gray-200 hover:border-blue-300'
                           }`}
@@ -256,13 +259,13 @@ export default function MadbudgetPage() {
                             setShowRecipeSelector(true)
                           }}
                         >
-                          {mealPlan[day as keyof typeof mealPlan][mealType.key as keyof typeof mealPlan[typeof day]] ? (
+                          {mealPlan[day][mealType.key] ? (
                             <div className="text-center">
                               <div className="text-sm font-medium text-gray-900 truncate">
-                                {mealPlan[day as keyof typeof mealPlan][mealType.key as keyof typeof mealPlan[typeof day]]?.title}
+                                {mealPlan[day][mealType.key]?.title}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {mealPlan[day as keyof typeof mealPlan][mealType.key as keyof typeof mealPlan[typeof day]]?.store}
+                                {mealPlan[day][mealType.key]?.store}
                               </div>
                             </div>
                           ) : (
