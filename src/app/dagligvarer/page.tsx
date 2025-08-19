@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Filter, Heart, TrendingUp, Store, Tag, Grid, X } from 'lucide-react'
+import { Search, Filter, Heart, TrendingUp, Store, Tag, Grid, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 // Mock data for development
 const mockProducts = [
@@ -46,6 +46,132 @@ const mockProducts = [
     image: '/images/products/laks.jpg',
     isFavorite: false,
     isOnSale: true
+  },
+  {
+    id: 4,
+    name: 'Bananner Ecuador',
+    store: 'Netto',
+    category: 'Frugt og grønt',
+    currentPrice: 12.95,
+    originalPrice: 19.95,
+    discount: 35,
+    unit: '1kg',
+    unitPrice: 12.95,
+    image: '/images/products/bananer.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 5,
+    name: 'Kyllingebryst',
+    store: 'Føtex',
+    category: 'Kød, fisk & fjerkræ',
+    currentPrice: 45.00,
+    originalPrice: 59.95,
+    discount: 25,
+    unit: '500g',
+    unitPrice: 90.00,
+    image: '/images/products/kylling.jpg',
+    isFavorite: true,
+    isOnSale: true
+  },
+  {
+    id: 6,
+    name: 'Grovt rugbrød',
+    store: 'REMA 1000',
+    category: 'Brød og kager',
+    currentPrice: 18.50,
+    originalPrice: 24.95,
+    discount: 26,
+    unit: '800g',
+    unitPrice: 23.13,
+    image: '/images/products/rugbrød.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 7,
+    name: 'Mælk 3.5%',
+    store: 'Netto',
+    category: 'Mejeri og køl',
+    currentPrice: 8.95,
+    originalPrice: 12.95,
+    discount: 31,
+    unit: '1L',
+    unitPrice: 8.95,
+    image: '/images/products/mælk.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 8,
+    name: 'Tomatpuré',
+    store: 'Bilka',
+    category: 'Kolonial',
+    currentPrice: 6.95,
+    originalPrice: 9.95,
+    discount: 30,
+    unit: '140g',
+    unitPrice: 49.64,
+    image: '/images/products/tomatpuré.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 9,
+    name: 'Frosne grønne bønner',
+    store: 'Føtex',
+    category: 'Frost',
+    currentPrice: 22.50,
+    originalPrice: 29.95,
+    discount: 25,
+    unit: '400g',
+    unitPrice: 56.25,
+    image: '/images/products/bønner.jpg',
+    isFavorite: true,
+    isOnSale: true
+  },
+  {
+    id: 10,
+    name: 'Havregryn',
+    store: 'REMA 1000',
+    category: 'Kolonial',
+    currentPrice: 14.95,
+    originalPrice: 19.95,
+    discount: 25,
+    unit: '1kg',
+    unitPrice: 14.95,
+    image: '/images/products/havregryn.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 11,
+    name: 'Æg fra fritgående høns',
+    store: 'Netto',
+    category: 'Mejeri og køl',
+    currentPrice: 24.95,
+    originalPrice: 34.95,
+    discount: 29,
+    unit: '15 stk',
+    unitPrice: 1.66,
+    image: '/images/products/æg.jpg',
+    isFavorite: false,
+    isOnSale: true
+  },
+  {
+    id: 12,
+    name: 'Løg',
+    store: 'Bilka',
+    category: 'Frugt og grønt',
+    currentPrice: 8.95,
+    originalPrice: 12.95,
+    discount: 31,
+    unit: '1kg',
+    unitPrice: 8.95,
+    image: '/images/products/løg.jpg',
+    isFavorite: false,
+    isOnSale: true
   }
 ]
 
@@ -84,6 +210,7 @@ export default function DagligvarerPage() {
   const [showFavorites, setShowFavorites] = useState(false)
   const [sortBy, setSortBy] = useState('discount')
   const [products, setProducts] = useState(mockProducts)
+  const [currentSlide, setCurrentSlide] = useState(0)
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -100,6 +227,14 @@ export default function DagligvarerPage() {
         ? prev.filter(id => id !== storeId)
         : [...prev, storeId]
     )
+  }
+
+  const nextSlide = () => {
+    setCurrentSlide(prev => (prev + 1) % Math.ceil(filteredProducts.length / 3))
+  }
+
+  const prevSlide = () => {
+    setCurrentSlide(prev => prev === 0 ? Math.ceil(filteredProducts.length / 3) - 1 : prev - 1)
   }
 
   const toggleFavorite = (productId: number) => {
@@ -151,27 +286,27 @@ export default function DagligvarerPage() {
                       : 'hover:bg-gray-50'
                   }`}
                 >
-                  <span className="font-medium">Alle kategorier</span>
-                  <span className="text-sm text-gray-500">({mockCategories.reduce((sum, cat) => sum + cat.count, 0)})</span>
+                  <span className="text-sm font-medium">Alle kategorier</span>
+                  <span className="text-xs text-gray-500">({mockCategories.reduce((sum, cat) => sum + cat.count, 0)})</span>
                 </button>
               </div>
               
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-48 overflow-y-auto">
                 {mockCategories.map(category => (
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.name)}
-                    className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors border-b border-gray-100 last:border-b-0 ${
+                    className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors border-b border-gray-100 last:border-b-0 ${
                       selectedCategory === category.name 
                         ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' 
                         : 'hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center space-x-2">
-                      <span className="text-lg">{category.icon}</span>
-                      <span className="font-medium">{category.name}</span>
+                      <span className="text-base">{category.icon}</span>
+                      <span className="text-sm font-medium">{category.name}</span>
                     </div>
-                    <span className="text-sm text-gray-500">({category.count})</span>
+                    <span className="text-xs text-gray-500">({category.count})</span>
                   </button>
                 ))}
               </div>
@@ -316,7 +451,7 @@ export default function DagligvarerPage() {
             </div>
 
             {/* Products Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProducts.map(product => (
                 <div key={product.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100">
                   {/* Product Image */}
@@ -381,6 +516,118 @@ export default function DagligvarerPage() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Mobile Slider */}
+            <div className="md:hidden">
+              <div className="relative">
+                <div className="flex overflow-hidden">
+                  <div 
+                    className="flex transition-transform duration-300 ease-in-out"
+                    style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                  >
+                    {filteredProducts.map(product => (
+                      <div key={product.id} className="w-full flex-shrink-0 px-2">
+                        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                          {/* Product Image */}
+                          <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
+                            <div className="absolute top-2 right-2">
+                              <button
+                                onClick={() => toggleFavorite(product.id)}
+                                className={`p-1.5 rounded-full shadow-sm ${
+                                  product.isFavorite 
+                                    ? 'bg-red-500 text-white' 
+                                    : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
+                                } transition-all duration-200`}
+                              >
+                                <Heart size={14} fill={product.isFavorite ? 'currentColor' : 'none'} />
+                              </button>
+                            </div>
+                            {product.isOnSale && (
+                              <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-sm">
+                                {product.discount}% rabat
+                              </div>
+                            )}
+                            <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium shadow-sm">
+                              {product.store}
+                            </div>
+                          </div>
+
+                          {/* Product Info */}
+                          <div className="p-3">
+                            <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight">
+                              {product.name}
+                            </h3>
+                            <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
+                              {product.unit}
+                            </p>
+                            
+                            {/* Price */}
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="text-lg font-bold text-gray-900">
+                                {product.currentPrice.toFixed(2)} kr
+                              </span>
+                              {product.isOnSale && (
+                                <span className="text-xs text-gray-500 line-through">
+                                  {product.originalPrice.toFixed(2)} kr
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Unit Price */}
+                            <p className="text-xs text-gray-600 mb-3">
+                              {product.unitPrice.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+                            </p>
+
+                            {/* Actions */}
+                            <div className="flex space-x-2">
+                              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-2 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                                Tilføj
+                              </button>
+                              <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-2 rounded-lg text-xs transition-colors">
+                                <TrendingUp size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Navigation Arrows */}
+                {filteredProducts.length > 3 && (
+                  <>
+                    <button
+                      onClick={prevSlide}
+                      className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-200 hover:bg-white transition-colors"
+                    >
+                      <ChevronLeft size={20} className="text-gray-600" />
+                    </button>
+                    <button
+                      onClick={nextSlide}
+                      className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-lg border border-gray-200 hover:bg-white transition-colors"
+                    >
+                      <ChevronRight size={20} className="text-gray-600" />
+                    </button>
+                  </>
+                )}
+              </div>
+              
+              {/* Dots Indicator */}
+              {filteredProducts.length > 3 && (
+                <div className="flex justify-center mt-4 space-x-2">
+                  {Array.from({ length: Math.ceil(filteredProducts.length / 3) }).map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentSlide(index)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        index === currentSlide ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* No Products */}

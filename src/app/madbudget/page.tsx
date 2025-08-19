@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils } from 'lucide-react'
+import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown } from 'lucide-react'
 
 // Mock data for development
 const mockStores = [
@@ -84,6 +84,7 @@ export default function MadbudgetPage() {
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
   const [basicItems, setBasicItems] = useState(mockBasicItems)
   const [showFamilySettings, setShowFamilySettings] = useState(false)
+  const [basicItemsOpen, setBasicItemsOpen] = useState(true)
 
   const toggleBasicItem = (itemId: number) => {
     setBasicItems(prev => 
@@ -188,27 +189,41 @@ export default function MadbudgetPage() {
             </div>
 
             {/* Basic Items */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Basisvarer</h2>
-              <p className="text-gray-600 text-sm mb-4">Kryds af hvad du allerede har</p>
-              <div className="space-y-2">
-                {basicItems.map(item => (
-                  <label key={item.id} className="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={item.isOwned}
-                      onChange={() => toggleBasicItem(item.id)}
-                      className="text-blue-600 rounded"
-                    />
-                    <span className={`text-sm ${item.isOwned ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                      {item.name}
-                    </span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {item.category}
-                    </span>
-                  </label>
-                ))}
-              </div>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setBasicItemsOpen(!basicItemsOpen)}
+                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <h2 className="text-xl font-semibold text-gray-900">Basisvarer</h2>
+                <ChevronDown 
+                  size={20} 
+                  className={`text-gray-500 transition-transform ${basicItemsOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              {basicItemsOpen && (
+                <div className="px-6 pb-6 border-t border-gray-100">
+                  <p className="text-gray-600 text-sm mb-4">Kryds af hvad du allerede har</p>
+                  <div className="space-y-2">
+                    {basicItems.map(item => (
+                      <label key={item.id} className="flex items-center space-x-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={item.isOwned}
+                          onChange={() => toggleBasicItem(item.id)}
+                          className="text-blue-600 rounded"
+                        />
+                        <span className={`text-sm ${item.isOwned ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                          {item.name}
+                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                          {item.category}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Savings Summary */}
