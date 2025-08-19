@@ -506,9 +506,12 @@ export class MealPlanGenerator {
     
     const filteredRecipes = this.recipes.filter(recipe => {
       // Check dietary approach compatibility
-      const hasDietaryApproach = recipe.dietaryApproaches.some(approach => 
-        approach.toLowerCase() === config.dietaryApproach.id.toLowerCase()
-      );
+      const hasDietaryApproach = recipe.dietaryApproaches.some(approach => {
+        // Handle both "Keto" and "[Keto]" formats by removing brackets
+        const cleanApproach = approach.toLowerCase().replace(/[\[\]]/g, '');
+        const targetApproach = config.dietaryApproach.id.toLowerCase();
+        return cleanApproach === targetApproach;
+      });
       
       if (!hasDietaryApproach) {
         console.log(`❌ Recipe ${recipe.title} excluded: no ${config.dietaryApproach.id} approach (has: ${recipe.dietaryApproaches.join(', ')})`);
