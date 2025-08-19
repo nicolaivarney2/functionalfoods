@@ -65,7 +65,9 @@ export class MealPlanGenerator {
           console.log(`🔍 Recipe ${recipe.title}:`, {
             rawCategories: recipe.dietaryCategories,
             type: typeof recipe.dietaryCategories,
-            length: recipe.dietaryCategories?.length
+            length: recipe.dietaryCategories?.length,
+            mainCategory: recipe.mainCategory,
+            mappedCategory: this.mapCategory(recipe.mainCategory || 'Aftensmad')
           });
           
           // Fix dietary categories mapping
