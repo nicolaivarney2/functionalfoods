@@ -60,7 +60,7 @@ export default function MadbudgetPage() {
   const [familyProfile, setFamilyProfile] = useState({
     adults: 2,
     children: 2,
-    childrenAge: 8,
+    childrenAges: ['4-8', '4-8'],
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
     dislikedIngredients: ['oliven', 'fetaost'],
@@ -167,7 +167,9 @@ export default function MadbudgetPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Børn:</span>
-                  <span className="font-medium">{familyProfile.children} ({familyProfile.childrenAge} år)</span>
+                  <span className="font-medium">
+                    {familyProfile.children} ({familyProfile.childrenAges?.join(', ') || 'Ingen alder valgt'})
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Økologi prioriteret:</span>
@@ -257,25 +259,29 @@ export default function MadbudgetPage() {
                         const currentMeal = mealPlan[dayKey][mealKey]
                         
                         return (
-                          <div
-                            key={`${day}-${mealType.key}`}
-                            className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
-                              currentMeal
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-blue-300'
-                            }`}
-                            onClick={() => {
-                              setSelectedMealSlot(`${day}-${mealType.key}`)
-                              setShowRecipeSelector(true)
-                            }}
-                          >
+                                                  <div
+                          key={`${day}-${mealType.key}`}
+                          className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
+                            currentMeal
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-300'
+                          }`}
+                          onClick={() => {
+                            setSelectedMealSlot(`${day}-${mealType.key}`)
+                            setShowRecipeSelector(true)
+                          }}
+                          title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
+                        >
                             {currentMeal ? (
                               <div className="text-center">
-                                <div className="text-sm font-medium text-gray-900 truncate">
+                                <div className="text-sm font-medium text-gray-900 mb-1">
                                   {currentMeal.title}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-xs text-gray-500 mb-1">
                                   {currentMeal.store}
+                                </div>
+                                <div className="text-xs text-green-600 font-medium">
+                                  Sparer {currentMeal.savings.toFixed(0)} kr
                                 </div>
                               </div>
                             ) : (
@@ -363,7 +369,7 @@ export default function MadbudgetPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Antal voksne</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Antal voksne i familien</label>
                 <input
                   type="number"
                   min="1"
@@ -386,17 +392,33 @@ export default function MadbudgetPage() {
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Børnenes alder</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="18"
-                  value={familyProfile.childrenAge}
-                  onChange={(e) => setFamilyProfile(prev => ({ ...prev, childrenAge: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+              {/* Dynamic Age Fields */}
+              {familyProfile.children > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Børnenes aldre</label>
+                  <p className="text-xs text-gray-500 mb-3">Vi spørger om dit barns alder for at optimere madplanen efter det.</p>
+                  <div className="space-y-2">
+                    {Array.from({ length: familyProfile.children }, (_, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600 w-16">Barn {index + 1}:</span>
+                        <select
+                          value={familyProfile.childrenAges?.[index] || '0-3'}
+                          onChange={(e) => {
+                            const newAges = [...(familyProfile.childrenAges || [])]
+                            newAges[index] = e.target.value
+                            setFamilyProfile(prev => ({ ...prev, childrenAges: newAges }))
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="0-3">0-3 år</option>
+                          <option value="4-8">4-8 år</option>
+                          <option value="8+">8+ år</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               <div className="space-y-2">
                 <label className="flex items-center space-x-3">
