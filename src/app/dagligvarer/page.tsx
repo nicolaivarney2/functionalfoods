@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Filter, Heart, TrendingUp, Store, Tag, Grid, X } from 'lucide-react'
+import { Search, Filter, Heart, TrendingUp, Store, Tag, Grid, X, Plus } from 'lucide-react'
 
 // Mock data for development
 const mockProducts = [
@@ -259,7 +259,7 @@ export default function DagligvarerPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+      <div className="bg-green-50 border-b border-green-200">
         <div className="container mx-auto px-4 py-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Dagligvarer</h1>
           <p className="text-lg text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
@@ -279,7 +279,7 @@ export default function DagligvarerPage() {
                   placeholder="Søg efter dagligvarer..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                  className="w-full pl-10 pr-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-lg"
                 />
               </div>
             </div>
@@ -291,7 +291,7 @@ export default function DagligvarerPage() {
                   onClick={() => toggleCategory('all')}
                   className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors ${
                     selectedCategories.includes('all') 
-                      ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' 
+                      ? 'bg-green-50 text-green-700 border-r-2 border-green-500' 
                       : 'hover:bg-gray-50'
                   }`}
                 >
@@ -300,7 +300,7 @@ export default function DagligvarerPage() {
                       type="checkbox"
                       checked={selectedCategories.includes('all')}
                       onChange={() => toggleCategory('all')}
-                      className="text-blue-600 rounded"
+                      className="text-green-600 rounded"
                     />
                     <span className="text-sm font-medium">Alle kategorier</span>
                   </div>
@@ -315,7 +315,7 @@ export default function DagligvarerPage() {
                     onClick={() => toggleCategory(category.name)}
                     className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors border-b border-gray-100 last:border-b-0 ${
                       selectedCategories.includes(category.name) 
-                        ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-500' 
+                        ? 'bg-green-50 text-green-700 border-r-2 border-green-500' 
                         : 'hover:bg-gray-50'
                     }`}
                   >
@@ -324,7 +324,7 @@ export default function DagligvarerPage() {
                         type="checkbox"
                         checked={selectedCategories.includes(category.name)}
                         onChange={() => toggleCategory(category.name)}
-                        className="text-blue-600 rounded"
+                        className="text-green-600 rounded"
                       />
                       <span className="text-base">{category.icon}</span>
                       <span className="text-sm font-medium">{category.name}</span>
@@ -344,7 +344,7 @@ export default function DagligvarerPage() {
                     type="checkbox"
                     checked={showOnlyOffers}
                     onChange={(e) => setShowOnlyOffers(e.target.checked)}
-                    className="text-blue-600 rounded"
+                    className="text-green-600 rounded"
                   />
                   <span className="text-sm text-gray-700">Kun tilbudsvarer</span>
                 </label>
@@ -353,7 +353,7 @@ export default function DagligvarerPage() {
                     type="checkbox"
                     checked={groupByDepartment}
                     onChange={(e) => setGroupByDepartment(e.target.checked)}
-                    className="text-blue-600 rounded"
+                    className="text-green-600 rounded"
                   />
                   <span className="text-sm text-gray-700">Gruppér efter kategori</span>
                 </label>
@@ -362,7 +362,7 @@ export default function DagligvarerPage() {
                     type="checkbox"
                     checked={showFavorites}
                     onChange={(e) => setShowFavorites(e.target.checked)}
-                    className="text-blue-600 rounded"
+                    className="text-green-600 rounded"
                   />
                   <span className="text-sm text-gray-700">Mine favoritprodukter</span>
                 </label>
@@ -529,11 +529,12 @@ export default function DagligvarerPage() {
 
                     {/* Actions */}
                     <div className="flex space-x-2">
-                      <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-xs font-medium transition-colors shadow-sm">
+                      <button className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-2 rounded text-xs font-medium transition-colors">
+                        <Plus size={12} className="inline mr-1" />
                         Tilføj
                       </button>
-                      <button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-3 rounded-lg text-xs transition-colors">
-                        <TrendingUp size={14} />
+                      <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
+                        <TrendingUp size={12} />
                       </button>
                     </div>
                   </div>
