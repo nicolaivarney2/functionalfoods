@@ -7,11 +7,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import LoginModal from './LoginModal'
 
 const mainMenuItems = [
-  { name: 'Vægttab', href: '/vaegttab' },
-  { name: 'Mad budget', href: '/mad-budget' },
-  { name: 'Mental sundhed', href: '/mental-sundhed' },
-  { name: 'Opskrifter til vægttab', href: '/opskrifter-til-vaegttab' },
-  { name: 'Bag om FF', href: '/bag-om-ff' },
+  { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
+  { name: 'DAGLIGVARER', href: '/dagligvarer' },
+  { name: 'MADBUDGET', href: '/madbudget' },
+  { name: 'VÆGTTAB', href: '/vaegttab' },
+  { name: 'BAG OM FF', href: '/bag-om-ff' },
 ]
 
 const dietaryCategories = [
