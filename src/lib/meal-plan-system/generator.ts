@@ -77,7 +77,7 @@ export class MealPlanGenerator {
                 .map(cat => (cat as string).toLowerCase().trim());
             } else if (typeof recipe.dietaryCategories === 'string') {
               // Handle case where it's a single string
-              dietaryApproaches = [recipe.dietaryCategories.toLowerCase().trim()];
+              dietaryApproaches = [(recipe.dietaryCategories as string).toLowerCase().trim()];
             }
           }
           
