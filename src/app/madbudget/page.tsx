@@ -269,22 +269,73 @@ export default function MadbudgetPage() {
                 </h2>
                 <button
                   onClick={generateMealPlan}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
                 >
                   Generer AI madplan
                 </button>
               </div>
 
-              {/* 3-Day Slider */}
-              <div className="relative">
+              {/* Desktop: 7 Days Grid */}
+              <div className="hidden lg:grid lg:grid-cols-7 gap-4">
+                {days.map((day, index) => (
+                  <div key={day} className="text-center">
+                    <div className="font-medium text-gray-900 mb-3">{dayLabels[index]}</div>
+                    <div className="space-y-2">
+                      {mealTypes.map(mealType => {
+                        const dayKey = day as DayKey
+                        const mealKey = mealType.key as MealType
+                        const currentMeal = mealPlan[dayKey][mealKey]
+                        
+                                                    return (
+                              <div
+                                key={`${day}-${mealType.key}`}
+                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                                  currentMeal
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
+                                }`}
+                                onClick={() => {
+                                  setSelectedMealSlot(`${day}-${mealType.key}`)
+                                  setShowRecipeSelector(true)
+                                }}
+                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
+                              >
+                                {currentMeal ? (
+                                  <div className="text-center">
+                                    <div className="text-sm font-medium text-gray-900 mb-1">
+                                      {currentMeal.title}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mb-1">
+                                      {currentMeal.store}
+                                    </div>
+                                    <div className="text-xs text-green-600 font-medium">
+                                      Sparer {currentMeal.savings.toFixed(0)} kr
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center">
+                                    <mealType.icon size={20} className="mx-auto text-gray-400 mb-1" />
+                                    <div className="text-xs text-gray-500">{mealType.label}</div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Mobile: 3-Day Slider */}
+              <div className="lg:hidden relative">
                 {/* Navigation Arrows */}
                 <button
                   onClick={prevDays}
                   disabled={currentDayOffset === 0}
-                  className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-gray-200 transition-colors ${
+                  className={`absolute left-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-yellow-200 transition-colors ${
                     currentDayOffset === 0 
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                      : 'bg-white hover:bg-gray-50 text-gray-600'
+                      : 'bg-white hover:bg-yellow-50 text-yellow-600 border-yellow-300'
                   }`}
                 >
                   <ChevronLeft size={20} />
@@ -293,10 +344,10 @@ export default function MadbudgetPage() {
                 <button
                   onClick={nextDays}
                   disabled={currentDayOffset >= 4}
-                  className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-gray-200 transition-colors ${
+                  className={`absolute right-0 top-1/2 transform -translate-y-1/2 z-10 p-2 rounded-full shadow-lg border border-yellow-200 transition-colors ${
                     currentDayOffset >= 4 
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                      : 'bg-white hover:bg-gray-50 text-gray-600'
+                      : 'bg-white hover:bg-yellow-50 text-yellow-600 border-yellow-300'
                   }`}
                 >
                   <ChevronRight size={20} />
@@ -318,10 +369,10 @@ export default function MadbudgetPage() {
                             return (
                               <div
                                 key={`${day}-${mealType.key}`}
-                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer hover:border-blue-300 transition-colors ${
+                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
                                   currentMeal
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 hover:border-blue-300'
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
                                 }`}
                                 onClick={() => {
                                   setSelectedMealSlot(`${day}-${mealType.key}`)
@@ -357,14 +408,14 @@ export default function MadbudgetPage() {
                 </div>
               </div>
 
-              {/* Day Indicator */}
-              <div className="flex justify-center mt-4 space-x-2">
+              {/* Mobile Day Indicator */}
+              <div className="lg:hidden flex justify-center mt-4 space-x-2">
                 {Array.from({ length: 3 }).map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentDayOffset(index * 3)}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      Math.floor(currentDayOffset / 3) === index ? 'bg-blue-600' : 'bg-gray-300'
+                      Math.floor(currentDayOffset / 3) === index ? 'bg-yellow-500' : 'bg-gray-300'
                     }`}
                   />
                 ))}
