@@ -13,6 +13,7 @@ import RelatedRecipes from './RelatedRecipes'
 import AboutFunctionalFoods from './AboutFunctionalFoods'
 import FloatingRecipeNavigation from './FloatingRecipeNavigation'
 import RatingModal from './RatingModal'
+import SupermarketProducts from './SupermarketProducts'
 
 interface RecipePageClientProps {
   recipe: Recipe
@@ -96,6 +97,16 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
             recipeSlug={recipe.slug}
             recipeTitle={recipe.title}
             onTipsUpdate={() => {}} // No editing for personal tips
+          />
+        </div>
+      </section>
+
+      {/* Supermarket Products */}
+      <section className="bg-white py-12">
+        <div className="container">
+          <SupermarketProducts 
+            recipeTitle={recipe.title}
+            maxProducts={6}
           />
         </div>
       </section>

@@ -99,6 +99,53 @@ export class DatabaseService {
   }
 
   /**
+   * Get supermarket products from database
+   */
+  async getSupermarketProducts(): Promise<any[]> {
+    try {
+      const supabase = createSupabaseClient()
+      const { data, error } = await supabase
+        .from('supermarket_products')
+        .select('*')
+        .order('last_updated', { ascending: false })
+        .limit(50) // Limit to most recent 50 products
+      
+      if (error) {
+        console.error('Error fetching supermarket products:', error)
+        return []
+      }
+      
+      // Transform database fields to match frontend interface
+      const transformedProducts = (data || []).map(product => ({
+        id: product.external_id || product.id,
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        subcategory: product.subcategory,
+        price: product.price,
+        originalPrice: product.original_price || product.price,
+        unit: product.unit,
+        unitPrice: product.unit_price || product.price,
+        isOnSale: product.is_on_sale || false,
+        saleEndDate: product.sale_end_date,
+        imageUrl: product.image_url,
+        store: product.store,
+        available: product.available !== false,
+        temperatureZone: product.temperature_zone,
+        nutritionInfo: product.nutrition_info || {},
+        labels: product.labels || [],
+        lastUpdated: product.last_updated,
+        source: product.source
+      }))
+      
+      return transformedProducts
+    } catch (error) {
+      console.error('Error in getSupermarketProducts:', error)
+      return []
+    }
+  }
+
+  /**
    * Generate unique IDs for recipes that don't have one
    */
   async assignUniqueIds(recipes: Recipe[]): Promise<Recipe[]> {
