@@ -80,6 +80,7 @@ export class Rema1000Scraper implements SupermarketAPI {
   /**
    * Discover products by systematically searching through all categories
    * This will find hundreds of products instead of just a few
+   * OPTIMIZED for Vercel serverless functions (10s timeout)
    */
   async discoverProducts(): Promise<SupermarketProduct[]> {
     const discoveredProducts: SupermarketProduct[] = []
@@ -87,66 +88,37 @@ export class Rema1000Scraper implements SupermarketAPI {
     console.log('🔍 Discovering products systematically through all categories...')
     
     // Method 1: Aggressive sequential search through known product ID ranges
+    // OPTIMIZED: Reduced ranges and limits to avoid Vercel timeout
     const searchRanges = [
-      { name: 'Frugt & grønt', start: 300000, end: 310000, step: 50 },
-      { name: 'Kød & fisk', start: 440000, end: 450000, step: 50 },
-      { name: 'Køl', start: 500000, end: 510000, step: 50 },
-      { name: 'Ost m.v.', start: 600000, end: 610000, step: 50 },
-      { name: 'Frost', start: 700000, end: 710000, step: 50 },
-      { name: 'Mejeri', start: 800000, end: 810000, step: 50 },
-      { name: 'Kolonial', start: 900000, end: 910000, step: 50 }
+      { name: 'Frugt & grønt', start: 300000, end: 301000, step: 100, limit: 15 },
+      { name: 'Kød & fisk', start: 440000, end: 441000, step: 100, limit: 15 },
+      { name: 'Køl', start: 500000, end: 501000, step: 100, limit: 10 },
+      { name: 'Ost m.v.', start: 600000, end: 601000, step: 100, limit: 10 },
+      { name: 'Frost', start: 700000, end: 701000, step: 100, limit: 8 },
+      { name: 'Mejeri', start: 800000, end: 801000, step: 100, limit: 8 },
+      { name: 'Kolonial', start: 900000, end: 901000, step: 100, limit: 8 }
     ]
     
     for (const range of searchRanges) {
-      console.log(`📂 Searching ${range.name}: IDs ${range.start}-${range.end}`)
+      console.log(`🔍 Searching ${range.name} (IDs ${range.start}-${range.end})...`)
+      const categoryProducts = await this.sequentialSearch(range.start, range.end, range.step, range.limit)
+      discoveredProducts.push(...categoryProducts)
       
-      try {
-        const categoryProducts = await this.sequentialSearch(range.start, range.end, range.step, range.name)
-        discoveredProducts.push(...categoryProducts)
-        
-        console.log(`✅ Found ${categoryProducts.length} products in ${range.name}`)
-        
-        // Add delay between categories to be respectful
-        await this.delay(1000)
-      } catch (error) {
-        console.log(`⚠️ Error searching ${range.name}:`, error)
-      }
+      // Reduced delay to avoid Vercel timeout
+      await this.delay(50)
     }
     
-    // Method 2: Fallback to known product IDs if sequential search fails
-    if (discoveredProducts.length === 0) {
-      console.log('🔄 Sequential search failed, falling back to known product IDs...')
-      
-      for (const productId of KNOWN_PRODUCT_IDS) {
-        try {
-          const product = await this.fetchProduct(productId)
-          if (product) {
-            discoveredProducts.push(product)
-            console.log(`✅ Discovered product: ${product.name}`)
-          }
-          await this.delay(500)
-        } catch (error) {
-          console.log(`⚠️ Failed to fetch product ${productId}:`, error)
-        }
-      }
-    }
-    
-    // Remove duplicates based on product ID
-    const uniqueProducts = discoveredProducts.filter((product, index, self) => 
-      index === self.findIndex(p => p.id === product.id)
-    )
-    
-    console.log(`🎯 Discovery complete: Found ${uniqueProducts.length} unique products`)
-    return uniqueProducts
+    console.log(`🎯 Discovery complete: Found ${discoveredProducts.length} unique products`)
+    return discoveredProducts
   }
 
   /**
    * Sequential search through a range of product IDs
    */
-  private async sequentialSearch(startId: number, endId: number, step: number, categoryName: string): Promise<SupermarketProduct[]> {
+  private async sequentialSearch(startId: number, endId: number, step: number, limit: number): Promise<SupermarketProduct[]> {
     const products: SupermarketProduct[] = []
     
-    console.log(`🔍 Sequential search in ${categoryName}: IDs ${startId}-${endId} (step: ${step})`)
+    console.log(`🔍 Sequential search in (IDs ${startId}-${endId})...`)
     
     // Search through IDs in the range with the specified step
     for (let id = startId; id <= endId; id += step) {
@@ -157,11 +129,13 @@ export class Rema1000Scraper implements SupermarketAPI {
           console.log(`✅ Found product: ${product.name} (ID: ${id})`)
         }
         
-        await this.delay(200) // Shorter delay for faster discovery
+        // Add delay to be respectful to REMA's API
+        // OPTIMIZED: Reduced delay to avoid Vercel timeout
+        await this.delay(50)
         
         // Limit to 30 products per category to avoid overwhelming the API
-        if (products.length >= 30) {
-          console.log(`🎯 Reached limit of 30 products for ${categoryName}`)
+        if (products.length >= limit) {
+          console.log(`🎯 Reached limit of ${limit} products for this category`)
           break
         }
       } catch (error) {
@@ -169,7 +143,7 @@ export class Rema1000Scraper implements SupermarketAPI {
       }
     }
     
-    console.log(`✅ Sequential search complete for ${categoryName}: ${products.length} products found`)
+    console.log(`✅ Sequential search complete: ${products.length} products found`)
     return products
   }
 
