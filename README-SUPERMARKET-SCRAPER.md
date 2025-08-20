@@ -31,10 +31,10 @@ Et automatiseret system til at hente produktdata og priser fra danske supermarke
 
 ```bash
 # Test REMA 1000 scraper
-curl -X GET "http://localhost:3000/api/supermarket/test-rema"
+curl -X GET "http://localhost:3000/api/admin/dagligvarer/test-rema"
 
 # Hent alle produkter
-curl -X POST "http://localhost:3000/api/supermarket/test-rema" \
+curl -X POST "http://localhost:3000/api/admin/dagligvarer/test-rema" \
   -H "Content-Type: application/json" \
   -d '{"action":"fetchAllProducts"}'
 ```
@@ -43,13 +43,13 @@ curl -X POST "http://localhost:3000/api/supermarket/test-rema" \
 
 ```bash
 # Scrape alle produkter fra REMA 1000
-curl -X POST "http://localhost:3000/api/supermarket/store-products" \
+curl -X POST "http://localhost:3000/api/admin/dagligvarer/store-products" \
   -H "Content-Type: application/json"
 ```
 
 ### 3. Åbn Admin Panel
 
-Gå til `/admin/supermarket-scraper` i din browser for at:
+Gå til `/admin/dagligvarer` i din browser for at:
 - Teste scraperen
 - Se statistikker
 - Starte/stoppe automatisk scraping
@@ -126,10 +126,10 @@ src/
 │   ├── rema1000-scraper.ts   # REMA 1000 implementation
 │   ├── database-service.ts   # Database operations
 │   └── index.ts              # Scraper manager
-├── app/api/supermarket/
+├── app/api/admin/dagligvarer/
 │   ├── test-rema/            # Test endpoint
 │   └── store-products/       # Storage endpoint
-└── app/admin/supermarket-scraper/
+└── app/admin/dagligvarer/
     └── page.tsx              # Admin interface
 ```
 
@@ -264,21 +264,21 @@ export async function GET() {
 ### Test Scraperen
 ```bash
 # Test enkelt produkt
-curl "http://localhost:3000/api/supermarket/test-rema"
+curl "http://localhost:3000/api/admin/dagligvarer/test-rema"
 
 # Test produkt discovery
-curl -X POST "http://localhost:3000/api/supermarket/test-rema" \
+curl -X POST "http://localhost:3000/api/admin/dagligvarer/test-rema" \
   -d '{"action":"fetchAllProducts"}'
 ```
 
 ### Test Storage
 ```bash
 # Scrape og gem produkter
-curl -X POST "http://localhost:3000/api/supermarket/store-products"
+curl -X POST "http://localhost:3000/api/admin/dagligvarer/store-products"
 ```
 
 ### Admin Interface
-Gå til `/admin/supermarket-scraper` for at:
+Gå til `/admin/dagligvarer` for at:
 - Se real-time statistikker
 - Teste scraper funktionalitet
 - Overvåge scraping processer
