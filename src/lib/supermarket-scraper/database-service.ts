@@ -338,9 +338,9 @@ export class SupermarketDatabaseService {
 
     const totalProducts = products?.length || 0
     const productsOnSale = products?.filter(p => p.is_on_sale).length || 0
-    const categories = [...new Set(products?.map(p => p.category) || [])]
+    const categories = products?.map(p => p.category).filter((cat, index, arr) => arr.indexOf(cat) === index) || []
     const lastUpdate = products?.length > 0 
-      ? Math.max(...products.map(p => new Date(p.last_updated).getTime()))
+      ? Math.max(...(products?.map(p => new Date(p.last_updated).getTime()) || []))
       : null
     const averagePrice = products?.length > 0
       ? products.reduce((sum, p) => sum + p.price, 0) / products.length
