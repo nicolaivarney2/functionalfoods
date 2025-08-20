@@ -356,6 +356,7 @@ export class Rema1000Scraper implements SupermarketAPI {
   /**
    * Investigate REMA's API for delta update capabilities
    * This will help us find smart endpoints for price updates
+   * OPTIMIZED for Vercel serverless functions (10s timeout)
    */
   async investigateDeltaEndpoints(): Promise<{
     hasDeltaUpdates: boolean
@@ -365,14 +366,11 @@ export class Rema1000Scraper implements SupermarketAPI {
   }> {
     console.log('🔍 Investigating REMA API for delta update capabilities...')
     
+    // Only test the most promising endpoints to avoid Vercel timeout
     const endpoints = [
-      '/departments',
-      '/departments/changes',
       '/products/changes',
-      '/products/updated',
       '/prices/changes',
-      '/campaigns/active',
-      '/last-modified'
+      '/campaigns/active'
     ]
     
     const results = {
@@ -419,11 +417,30 @@ export class Rema1000Scraper implements SupermarketAPI {
           console.log(`❌ Endpoint ${endpoint} failed: ${response.status}`)
         }
         
-        await this.delay(500) // Be respectful
+        // Reduced delay to avoid Vercel timeout
+        await this.delay(100)
         
       } catch (error) {
         console.log(`⚠️ Error testing ${endpoint}:`, error)
       }
+    }
+    
+    // Quick test for last-modified support on main products endpoint
+    try {
+      const testUrl = `${this.baseUrl}/products/1`
+      const testResponse = await fetch(testUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      })
+      
+      const lastModified = testResponse.headers.get('last-modified')
+      if (lastModified) {
+        results.lastModifiedSupport = true
+        console.log('✅ REMA supports last-modified headers')
+      }
+    } catch (error) {
+      console.log('⚠️ Could not test last-modified support')
     }
     
     console.log('🎯 Delta update investigation complete:', results)

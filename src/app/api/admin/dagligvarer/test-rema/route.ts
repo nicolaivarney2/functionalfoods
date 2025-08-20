@@ -1,43 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
+import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🧪 Testing REMA 1000 scraper...')
+    console.log('🧠 Testing REMA 1000 delta update capabilities...')
     
-    // Test the scraper with a known product ID
-    const testProductId = 304020 // ØKO. BANANER FAIRTRADE
-    const product = await rema1000Scraper.fetchProduct(testProductId)
+    const scraper = new Rema1000Scraper()
     
-    if (!product) {
-      return NextResponse.json(
-        { error: 'Failed to fetch test product' },
-        { status: 500 }
-      )
+    // Test basic product fetching first
+    console.log('🔍 Testing basic product fetching...')
+    const testProduct = await scraper.fetchProduct(1)
+    
+    if (!testProduct) {
+      return NextResponse.json({
+        success: false,
+        message: 'Could not fetch basic product - REMA API may be down',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
     }
     
-    // Get scraping result
-    const result = await rema1000Scraper.getScrapingResult()
+    console.log('✅ Basic product fetch successful, investigating delta capabilities...')
     
-    return NextResponse.json({
+    // Investigate delta update capabilities
+    const deltaCapabilities = await scraper.investigateDeltaEndpoints()
+    
+    // Test conditional request with last-modified if supported
+    let conditionalRequestTest = null
+    if (deltaCapabilities.lastModifiedSupport) {
+      console.log('📅 Testing conditional request with last-modified...')
+      try {
+        const testUrl = `${scraper.baseUrl}/products/1`
+        const response = await fetch(testUrl, {
+          headers: {
+            'If-Modified-Since': new Date(Date.now() - 24 * 60 * 60 * 1000).toUTCString(), // 24 hours ago
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        })
+        
+        conditionalRequestTest = {
+          status: response.status,
+          supports304: response.status === 304,
+          hasLastModified: !!response.headers.get('last-modified')
+        }
+      } catch (error) {
+        console.log('⚠️ Conditional request test failed:', error)
+      }
+    }
+    
+    const result = {
       success: true,
-      message: 'REMA 1000 scraper test completed',
-      testProduct: product,
-      scrapingResult: result,
-      timestamp: new Date().toISOString()
-    })
+      message: 'REMA API delta capabilities investigation complete',
+      timestamp: new Date().toISOString(),
+      basicApi: {
+        working: true,
+        testProduct: testProduct.name
+      },
+      deltaCapabilities,
+      conditionalRequestTest,
+      recommendations: generateRecommendations(deltaCapabilities)
+    }
+    
+    console.log('🎯 REMA delta investigation complete:', result)
+    return NextResponse.json(result)
     
   } catch (error) {
-    console.error('❌ Error testing REMA scraper:', error)
-    
-    return NextResponse.json(
-      { 
-        error: 'Scraper test failed',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    )
+    console.error('❌ Error testing REMA delta capabilities:', error)
+    return NextResponse.json({
+      success: false,
+      message: 'Failed to test REMA delta capabilities',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
   }
+}
+
+function generateRecommendations(capabilities: any) {
+  const recommendations = []
+  
+  if (capabilities.hasDeltaUpdates) {
+    recommendations.push('🎉 Use REMA\'s native delta endpoints for efficient updates')
+  }
+  
+  if (capabilities.lastModifiedSupport) {
+    recommendations.push('📅 Use conditional requests with If-Modified-Since headers')
+  }
+  
+  if (!capabilities.hasDeltaUpdates && !capabilities.lastModifiedSupport) {
+    recommendations.push('🔄 Implement intelligent batch updates by product category priority')
+    recommendations.push('⏰ Update high-priority categories (frugt, kød) more frequently')
+    recommendations.push('💡 Consider implementing change detection based on price history')
+  }
+  
+  return recommendations
 }
 
 export async function POST(request: NextRequest) {
