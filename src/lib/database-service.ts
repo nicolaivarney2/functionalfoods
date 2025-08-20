@@ -2,6 +2,29 @@ import { createSupabaseClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 
+// Define SupermarketProduct interface locally since the import doesn't exist
+interface SupermarketProduct {
+  id: string
+  name: string
+  description: string
+  category: string
+  subcategory: string
+  price: number
+  originalPrice: number
+  unit: string
+  unitPrice: number
+  isOnSale: boolean
+  saleEndDate: string | null
+  imageUrl: string | null
+  store: string
+  available: boolean
+  temperatureZone: string | null
+  nutritionInfo: Record<string, string>
+  labels: string[]
+  lastUpdated: string
+  source: string
+}
+
 export class DatabaseService {
   /**
    * Get all recipes from database (published only) - for frontend use
@@ -99,49 +122,104 @@ export class DatabaseService {
   }
 
   /**
-   * Get supermarket products from database
+   * Get all supermarket products from the database
    */
-  async getSupermarketProducts(): Promise<any[]> {
+  async getSupermarketProducts(): Promise<SupermarketProduct[]> {
     try {
-      const supabase = createSupabaseClient()
-      const { data, error } = await supabase
+      const { data, error } = await createSupabaseClient()
         .from('supermarket_products')
         .select('*')
-        .order('last_updated', { ascending: false })
-        .limit(50) // Limit to most recent 50 products
-      
+        .order('name', { ascending: true })
+
       if (error) {
         console.error('Error fetching supermarket products:', error)
         return []
       }
-      
-      // Transform database fields to match frontend interface
-      const transformedProducts = (data || []).map(product => ({
-        id: product.external_id || product.id,
-        name: product.name,
-        description: product.description,
-        category: product.category,
-        subcategory: product.subcategory,
-        price: product.price,
-        originalPrice: product.original_price || product.price,
-        unit: product.unit,
-        unitPrice: product.unit_price || product.price,
-        isOnSale: product.is_on_sale || false,
-        saleEndDate: product.sale_end_date,
-        imageUrl: product.image_url,
-        store: product.store,
-        available: product.available !== false,
-        temperatureZone: product.temperature_zone,
-        nutritionInfo: product.nutrition_info || {},
-        labels: product.labels || [],
-        lastUpdated: product.last_updated,
-        source: product.source
-      }))
-      
-      return transformedProducts
+
+      return data || []
     } catch (error) {
       console.error('Error in getSupermarketProducts:', error)
       return []
+    }
+  }
+
+  /**
+   * Update an existing supermarket product
+   */
+  async updateSupermarketProduct(product: SupermarketProduct): Promise<boolean> {
+    try {
+      const { error } = await createSupabaseClient()
+        .from('supermarket_products')
+        .update({
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          subcategory: product.subcategory,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          unit: product.unit,
+          unitPrice: product.unitPrice,
+          isOnSale: product.isOnSale,
+          saleEndDate: product.saleEndDate,
+          imageUrl: product.imageUrl,
+          available: product.available,
+          temperatureZone: product.temperatureZone,
+          nutritionInfo: product.nutritionInfo,
+          labels: product.labels,
+          lastUpdated: product.lastUpdated
+        })
+        .eq('id', product.id)
+
+      if (error) {
+        console.error('Error updating supermarket product:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in updateSupermarketProduct:', error)
+      return false
+    }
+  }
+
+  /**
+   * Add a new supermarket product
+   */
+  async addSupermarketProduct(product: SupermarketProduct): Promise<boolean> {
+    try {
+      const { error } = await createSupabaseClient()
+        .from('supermarket_products')
+        .insert({
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          subcategory: product.subcategory,
+          price: product.price,
+          originalPrice: product.originalPrice,
+          unit: product.unit,
+          unitPrice: product.unitPrice,
+          isOnSale: product.isOnSale,
+          saleEndDate: product.saleEndDate,
+          imageUrl: product.imageUrl,
+          store: product.store,
+          available: product.available,
+          temperatureZone: product.temperatureZone,
+          nutritionInfo: product.nutritionInfo,
+          labels: product.labels,
+          lastUpdated: product.lastUpdated,
+          source: product.source
+        })
+
+      if (error) {
+        console.error('Error adding supermarket product:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error in addSupermarketProduct:', error)
+      return false
     }
   }
 
