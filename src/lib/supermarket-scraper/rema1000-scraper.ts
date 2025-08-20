@@ -70,7 +70,7 @@ const KNOWN_PRODUCT_IDS = [
 ]
 
 export class Rema1000Scraper implements SupermarketAPI {
-  private baseUrl = 'https://api.digital.rema1000.dk/api/v3'
+  public baseUrl = 'https://api.digital.rema1000.dk/api/v3'
   private storeName = 'REMA 1000'
   
   constructor() {
