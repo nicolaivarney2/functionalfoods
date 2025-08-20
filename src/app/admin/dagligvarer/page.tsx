@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Play, Square, RefreshCw, Database, Settings, AlertCircle, CheckCircle, Clock, Save, TrendingUp } from 'lucide-react'
+import { Play, Square, RefreshCw, Database, Settings, AlertCircle, CheckCircle, Clock, Save, TrendingUp, Search } from 'lucide-react'
 
 interface ScrapingResult {
   success: boolean
@@ -72,6 +72,8 @@ export default function SupermarketScraperPage() {
   const [databaseStats, setDatabaseStats] = useState<DatabaseStats | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+  const [isScraping, setIsScraping] = useState(false)
+  const [isTestingDelta, setIsTestingDelta] = useState(false)
 
   // Fetch database statistics on component mount
   useEffect(() => {
@@ -221,6 +223,56 @@ export default function SupermarketScraperPage() {
     setScrapingStatus('idle')
   }
 
+  const handleScrapeAndStore = async () => {
+    setIsScraping(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/store-products', {
+        method: 'POST'
+      })
+      const result: StorageResult = await response.json()
+      setStorageResult(result)
+      if (result.success) {
+        setScrapingStatus('completed')
+        setLastScraping(new Date().toISOString())
+        setDatabaseStats(result.database)
+        console.log('✅ Products successfully stored:', result)
+      } else {
+        setScrapingStatus('error')
+        console.error('❌ Failed to store products:', result)
+      }
+    } catch (error) {
+      console.error('Error storing products:', error)
+      setScrapingStatus('error')
+    } finally {
+      setIsScraping(false)
+    }
+  }
+
+  const handleTestDeltaCapabilities = async () => {
+    setIsTestingDelta(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+        method: 'GET'
+      })
+      const result: TestResult = await response.json()
+      setTestResult(result)
+      if (result.success) {
+        console.log('✅ REMA delta update test successful:', result)
+      } else {
+        console.error('❌ REMA delta update test failed:', result)
+      }
+    } catch (error) {
+      console.error('Error testing REMA delta update:', error)
+      setTestResult({
+        success: false,
+        message: 'Test failed due to network error',
+        timestamp: new Date().toISOString()
+      })
+    } finally {
+      setIsTestingDelta(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -303,65 +355,31 @@ export default function SupermarketScraperPage() {
               </div>
             </div>
 
-            {/* Database Storage */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <Save size={20} className="mr-2" />
-                  Database Lagring
-                </h2>
-              
-              <div className="space-y-4">
+            {/* Database Lagring */}
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center mb-4">
+                <Database className="h-6 w-6 text-purple-600 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-900">Database Lagring</h3>
+              </div>
+              <div className="space-y-3">
                 <button
-                  onClick={storeProductsInDatabase}
-                  disabled={isLoading}
-                  className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={handleScrapeAndStore}
+                  disabled={isScraping}
+                  className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
-                  <Database size={16} />
-                  Scrape & Gem Produkter
+                  <Database className="h-5 w-5" />
+                  <span>{isScraping ? 'Scraper...' : 'Scrape & Gem Produkter'}</span>
                 </button>
-
-                {/* Storage Results */}
-                {storageResult && (
-                  <div className={`p-4 rounded-lg border ${
-                    storageResult.success 
-                      ? 'border-green-200 bg-green-50' 
-                      : 'border-red-200 bg-red-50'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {storageResult.success ? (
-                        <CheckCircle size={16} className="text-green-600" />
-                      ) : (
-                        <AlertCircle size={16} className="text-red-600" />
-                      )}
-                      <span className={`font-medium ${
-                        storageResult.success ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {storageResult.success ? 'Storage Successful' : 'Storage Failed'}
-                      </span>
-                    </div>
-                    
-                    {storageResult.success && (
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>Total Scraped:</span>
-                          <span className="font-medium">{storageResult.scraping.totalScraped}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>New Products:</span>
-                          <span className="font-medium text-green-600">{storageResult.scraping.newProducts}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Updated Products:</span>
-                          <span className="font-medium text-blue-600">{storageResult.scraping.updatedProducts}</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <p className="text-xs text-gray-500 mt-2">
-                      {new Date(storageResult.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                )}
+                
+                {/* Test Delta Capabilities Button */}
+                <button
+                  onClick={handleTestDeltaCapabilities}
+                  disabled={isTestingDelta}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  <Search className="h-4 w-4" />
+                  <span>{isTestingDelta ? 'Tester...' : 'Test Delta Update Endpoints'}</span>
+                </button>
               </div>
             </div>
 

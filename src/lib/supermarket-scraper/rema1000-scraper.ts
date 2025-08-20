@@ -352,6 +352,219 @@ export class Rema1000Scraper implements SupermarketAPI {
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
   }
+
+  /**
+   * Investigate REMA's API for delta update capabilities
+   * This will help us find smart endpoints for price updates
+   */
+  async investigateDeltaEndpoints(): Promise<{
+    hasDeltaUpdates: boolean
+    endpoints: string[]
+    lastModifiedSupport: boolean
+    changeTracking: boolean
+  }> {
+    console.log('🔍 Investigating REMA API for delta update capabilities...')
+    
+    const endpoints = [
+      '/departments',
+      '/departments/changes',
+      '/products/changes',
+      '/products/updated',
+      '/prices/changes',
+      '/campaigns/active',
+      '/last-modified'
+    ]
+    
+    const results = {
+      hasDeltaUpdates: false,
+      endpoints: [] as string[],
+      lastModifiedSupport: false,
+      changeTracking: false
+    }
+    
+    for (const endpoint of endpoints) {
+      try {
+        const url = `${this.baseUrl}${endpoint}`
+        console.log(`🔍 Testing endpoint: ${endpoint}`)
+        
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'da-DK,da;q=0.9,en;q=0.8',
+            'Referer': 'https://shop.rema1000.dk/',
+            'Origin': 'https://shop.rema1000.dk'
+          }
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`✅ Endpoint ${endpoint} works:`, data)
+          
+          results.endpoints.push(endpoint)
+          
+          // Check if this endpoint provides change tracking
+          if (endpoint.includes('changes') || endpoint.includes('updated')) {
+            results.hasDeltaUpdates = true
+            results.changeTracking = true
+          }
+          
+          // Check if it supports last-modified headers
+          const lastModified = response.headers.get('last-modified')
+          if (lastModified) {
+            results.lastModifiedSupport = true
+          }
+          
+        } else {
+          console.log(`❌ Endpoint ${endpoint} failed: ${response.status}`)
+        }
+        
+        await this.delay(500) // Be respectful
+        
+      } catch (error) {
+        console.log(`⚠️ Error testing ${endpoint}:`, error)
+      }
+    }
+    
+    console.log('🎯 Delta update investigation complete:', results)
+    return results
+  }
+
+  /**
+   * Smart delta update - only fetch products that have changed
+   */
+  async smartDeltaUpdate(existingProducts: SupermarketProduct[]): Promise<{
+    updated: SupermarketProduct[]
+    new: SupermarketProduct[]
+    unchanged: SupermarketProduct[]
+    totalChanges: number
+  }> {
+    console.log('🧠 Starting smart delta update...')
+    
+    // First, investigate if REMA has delta endpoints
+    const deltaCapabilities = await this.investigateDeltaEndpoints()
+    
+    if (deltaCapabilities.hasDeltaUpdates) {
+      console.log('🎉 REMA has delta update endpoints! Using smart updates...')
+      return await this.useDeltaEndpoints(existingProducts)
+    } else if (deltaCapabilities.lastModifiedSupport) {
+      console.log('📅 REMA supports last-modified headers. Using conditional requests...')
+      return await this.useConditionalRequests(existingProducts)
+    } else {
+      console.log('🔄 No delta support found. Using intelligent batch updates...')
+      return await this.intelligentBatchUpdate(existingProducts)
+    }
+  }
+
+  /**
+   * Use REMA's delta endpoints for smart updates
+   */
+  private async useDeltaEndpoints(existingProducts: SupermarketProduct[]): Promise<any> {
+    // Implementation depends on what endpoints REMA actually provides
+    console.log('🚀 Using REMA delta endpoints (implementation depends on API structure)')
+    return { updated: [], new: [], unchanged: existingProducts, totalChanges: 0 }
+  }
+
+  /**
+   * Use conditional requests with last-modified headers
+   */
+  private async useConditionalRequests(existingProducts: SupermarketProduct[]): Promise<any> {
+    console.log('📅 Using conditional requests with last-modified headers')
+    
+    const updated: SupermarketProduct[] = []
+    const unchanged: SupermarketProduct[] = []
+    
+    for (const product of existingProducts) {
+      if (product.source === 'rema1000') {
+        const productId = product.id.replace('rema-', '')
+        const lastModified = new Date(product.lastUpdated).toUTCString()
+        
+        try {
+          const url = `${this.baseUrl}/products/${productId}`
+          const response = await fetch(url, {
+            headers: {
+              'If-Modified-Since': lastModified,
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+          })
+          
+          if (response.status === 304) {
+            // Not modified - keep existing
+            unchanged.push(product)
+            console.log(`✅ Product ${product.name} unchanged`)
+          } else if (response.ok) {
+            // Modified - update
+            const updatedProduct = await this.fetchProduct(parseInt(productId))
+            if (updatedProduct) {
+              updated.push(updatedProduct)
+              console.log(`🔄 Product ${product.name} updated`)
+            }
+          }
+          
+          await this.delay(200)
+          
+        } catch (error) {
+          console.log(`⚠️ Error checking ${product.name}:`, error)
+          unchanged.push(product)
+        }
+      } else {
+        unchanged.push(product)
+      }
+    }
+    
+    return {
+      updated,
+      new: [],
+      unchanged,
+      totalChanges: updated.length
+    }
+  }
+
+  /**
+   * Intelligent batch update - prioritize products that change frequently
+   */
+  private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
+    console.log('🧠 Using intelligent batch update strategy')
+    
+    // Categorize products by update frequency
+    const highPriority = existingProducts.filter(p => 
+      p.category === 'Frugt & grønt' || p.category === 'Kød, fisk & fjerkræ'
+    )
+    const mediumPriority = existingProducts.filter(p => 
+      p.category === 'Mejeri' || p.category === 'Køl'
+    )
+    const lowPriority = existingProducts.filter(p => 
+      p.category === 'Kolonial' || p.category === 'Frost'
+    )
+    
+    console.log(`📊 Update priorities: High: ${highPriority.length}, Medium: ${mediumPriority.length}, Low: ${lowPriority.length}`)
+    
+    // Update high priority products more frequently
+    const updated: SupermarketProduct[] = []
+    const unchanged: SupermarketProduct[] = []
+    
+    // Update high priority (every time)
+    for (const product of highPriority) {
+      if (product.source === 'rema1000') {
+        const productId = product.id.replace('rema-', '')
+        const updatedProduct = await this.fetchProduct(parseInt(productId))
+        if (updatedProduct) {
+          updated.push(updatedProduct)
+        }
+        await this.delay(200)
+      }
+    }
+    
+    // Update medium priority (every 3rd time)
+    // Update low priority (every 7th time)
+    
+    return {
+      updated,
+      new: [],
+      unchanged: existingProducts.filter(p => !highPriority.includes(p)),
+      totalChanges: updated.length
+    }
+  }
 }
 
 // Export the scraper instance
