@@ -79,34 +79,43 @@ export class Rema1000Scraper implements SupermarketAPI {
 
   /**
    * Discover products by systematically searching through all categories
-   * This will find thousands of products instead of just a few
+   * This will find hundreds of products instead of just a few
    */
   async discoverProducts(): Promise<SupermarketProduct[]> {
     const discoveredProducts: SupermarketProduct[] = []
     
     console.log('🔍 Discovering products systematically through all categories...')
     
-    // Method 1: Search through all REMA categories systematically
-    for (const [categoryName, categoryId] of Object.entries(REMA_CATEGORIES)) {
-      console.log(`📂 Searching category: ${categoryName} (ID: ${categoryId})`)
+    // Method 1: Aggressive sequential search through known product ID ranges
+    const searchRanges = [
+      { name: 'Frugt & grønt', start: 300000, end: 310000, step: 50 },
+      { name: 'Kød & fisk', start: 440000, end: 450000, step: 50 },
+      { name: 'Køl', start: 500000, end: 510000, step: 50 },
+      { name: 'Ost m.v.', start: 600000, end: 610000, step: 50 },
+      { name: 'Frost', start: 700000, end: 710000, step: 50 },
+      { name: 'Mejeri', start: 800000, end: 810000, step: 50 },
+      { name: 'Kolonial', start: 900000, end: 910000, step: 50 }
+    ]
+    
+    for (const range of searchRanges) {
+      console.log(`📂 Searching ${range.name}: IDs ${range.start}-${range.end}`)
       
       try {
-        // Search for products in this category
-        const categoryProducts = await this.searchCategory(categoryId, categoryName)
+        const categoryProducts = await this.sequentialSearch(range.start, range.end, range.step, range.name)
         discoveredProducts.push(...categoryProducts)
         
-        console.log(`✅ Found ${categoryProducts.length} products in ${categoryName}`)
+        console.log(`✅ Found ${categoryProducts.length} products in ${range.name}`)
         
         // Add delay between categories to be respectful
         await this.delay(1000)
       } catch (error) {
-        console.log(`⚠️ Error searching category ${categoryName}:`, error)
+        console.log(`⚠️ Error searching ${range.name}:`, error)
       }
     }
     
-    // Method 2: Fallback to known product IDs if category search fails
+    // Method 2: Fallback to known product IDs if sequential search fails
     if (discoveredProducts.length === 0) {
-      console.log('🔄 Category search failed, falling back to known product IDs...')
+      console.log('🔄 Sequential search failed, falling back to known product IDs...')
       
       for (const productId of KNOWN_PRODUCT_IDS) {
         try {
@@ -132,83 +141,15 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
-   * Search for products in a specific category
+   * Sequential search through a range of product IDs
    */
-  private async searchCategory(categoryId: number, categoryName: string): Promise<SupermarketProduct[]> {
+  private async sequentialSearch(startId: number, endId: number, step: number, categoryName: string): Promise<SupermarketProduct[]> {
     const products: SupermarketProduct[] = []
     
-    try {
-      // Try to get products from category endpoint
-      const url = `${this.baseUrl}/departments/${categoryId}/products?limit=100&offset=0`
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'application/json',
-          'Accept-Language': 'da-DK,da;q=0.9,en;q=0.8',
-          'Referer': 'https://shop.rema1000.dk/',
-          'Origin': 'https://shop.rema1000.dk'
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        
-        // Process products from category response
-        if (data.products && Array.isArray(data.products)) {
-          for (const productData of data.products.slice(0, 50)) { // Limit to 50 per category for now
-            try {
-              const product = await this.fetchProduct(productData.id)
-              if (product) {
-                products.push(product)
-              }
-              await this.delay(200) // Small delay between products
-            } catch (error) {
-              // Skip failed products
-            }
-          }
-        }
-      } else {
-        // If category endpoint fails, try sequential search in category range
-        console.log(`🔄 Category endpoint failed for ${categoryName}, trying sequential search...`)
-        const categoryProducts = await this.sequentialCategorySearch(categoryId, categoryName)
-        products.push(...categoryProducts)
-      }
-    } catch (error) {
-      console.log(`⚠️ Error in category search for ${categoryName}:`, error)
-      // Fallback to sequential search
-      const categoryProducts = await this.sequentialCategorySearch(categoryId, categoryName)
-      products.push(...categoryProducts)
-    }
+    console.log(`🔍 Sequential search in ${categoryName}: IDs ${startId}-${endId} (step: ${step})`)
     
-    return products
-  }
-
-  /**
-   * Sequential search within a category range
-   * This is a fallback method when category endpoints don't work
-   */
-  private async sequentialCategorySearch(categoryId: number, categoryName: string): Promise<SupermarketProduct[]> {
-    const products: SupermarketProduct[] = []
-    
-    // Calculate category ID ranges based on REMA's structure
-    const categoryRanges = {
-      20: { start: 300000, end: 310000 }, // Frugt & grønt
-      30: { start: 440000, end: 450000 }, // Kød, fisk & fjerkræ
-      40: { start: 500000, end: 510000 }, // Køl
-      50: { start: 600000, end: 610000 }, // Ost m.v.
-      60: { start: 700000, end: 710000 }, // Frost
-      70: { start: 800000, end: 810000 }, // Mejeri
-      80: { start: 900000, end: 910000 }  // Kolonial
-    }
-    
-    const range = categoryRanges[categoryId as keyof typeof categoryRanges]
-    if (!range) return products
-    
-    console.log(`🔍 Sequential search in ${categoryName}: IDs ${range.start}-${range.end}`)
-    
-    // Search through a sample of IDs in the range (every 100th to avoid too many requests)
-    for (let id = range.start; id <= range.end; id += 100) {
+    // Search through IDs in the range with the specified step
+    for (let id = startId; id <= endId; id += step) {
       try {
         const product = await this.fetchProduct(id)
         if (product) {
@@ -216,15 +157,19 @@ export class Rema1000Scraper implements SupermarketAPI {
           console.log(`✅ Found product: ${product.name} (ID: ${id})`)
         }
         
-        await this.delay(300) // Respectful delay
+        await this.delay(200) // Shorter delay for faster discovery
         
-        // Limit to 20 products per category to avoid overwhelming the API
-        if (products.length >= 20) break
+        // Limit to 30 products per category to avoid overwhelming the API
+        if (products.length >= 30) {
+          console.log(`🎯 Reached limit of 30 products for ${categoryName}`)
+          break
+        }
       } catch (error) {
-        // Skip failed IDs
+        // Skip failed IDs silently
       }
     }
     
+    console.log(`✅ Sequential search complete for ${categoryName}: ${products.length} products found`)
     return products
   }
 
