@@ -26,33 +26,132 @@ const mockBasicItems = [
   { id: 8, name: 'Pasta', category: 'Kolonial', isOwned: true }
 ]
 
+// Enhanced mock recipes with images and detailed ingredients
 const mockRecipes = [
   {
     id: 1,
     title: 'Kylling med grøntsager',
-    ingredients: ['kylling', 'broccoli', 'gulerødder', 'løg'],
-    price: 45.50,
+    image: '/images/recipes/kylling-groentsager.jpg',
+    ingredients: [
+      { name: 'kylling', amount: '400g', unit: 'g', price: 25.00 },
+      { name: 'broccoli', amount: '1', unit: 'stk', price: 8.50 },
+      { name: 'gulerødder', amount: '4', unit: 'stk', price: 6.00 },
+      { name: 'løg', amount: '2', unit: 'stk', price: 3.00 },
+      { name: 'hvidløg', amount: '3', unit: 'fed', price: 2.00 },
+      { name: 'olivenolie', amount: '2', unit: 'spsk', price: 1.00 }
+    ],
+    totalPrice: 45.50,
     savings: 15.30,
     store: 'REMA 1000',
-    mealType: 'dinner'
+    mealType: 'dinner',
+    prepTime: '25 min',
+    servings: 4,
+    category: 'Kylling',
+    dietaryTags: ['Proteinrig', 'Grøntsager']
   },
   {
     id: 2,
-    title: 'Laks med spinat',
-    ingredients: ['laks', 'spinat', 'citron', 'hvidløg'],
-    price: 52.80,
+    title: 'Laks med spinat og citron',
+    image: '/images/recipes/laks-spinat.jpg',
+    ingredients: [
+      { name: 'laks', amount: '400g', unit: 'g', price: 35.00 },
+      { name: 'spinat', amount: '200g', unit: 'g', price: 12.00 },
+      { name: 'citron', amount: '1', unit: 'stk', price: 3.50 },
+      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
+      { name: 'olivenolie', amount: '1', unit: 'spsk', price: 0.50 },
+      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
+    ],
+    totalPrice: 52.80,
     savings: 22.40,
     store: 'Netto',
-    mealType: 'dinner'
+    mealType: 'dinner',
+    prepTime: '20 min',
+    servings: 4,
+    category: 'Fisk',
+    dietaryTags: ['Omega-3', 'Proteinrig']
   },
   {
     id: 3,
-    title: 'Havregrød med bær',
-    ingredients: ['havregryn', 'mælk', 'bær', 'honning'],
-    price: 18.90,
+    title: 'Havregrød med bær og honning',
+    image: '/images/recipes/havregrod-baer.jpg',
+    ingredients: [
+      { name: 'havregryn', amount: '200g', unit: 'g', price: 4.00 },
+      { name: 'mælk', amount: '400ml', unit: 'ml', price: 6.00 },
+      { name: 'bær', amount: '150g', unit: 'g', price: 12.00 },
+      { name: 'honning', amount: '2', unit: 'spsk', price: 3.00 },
+      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
+    ],
+    totalPrice: 18.90,
     savings: 8.50,
     store: 'REMA 1000',
-    mealType: 'breakfast'
+    mealType: 'breakfast',
+    prepTime: '15 min',
+    servings: 4,
+    category: 'Morgenmad',
+    dietaryTags: ['Fiberrig', 'Naturlig søde']
+  },
+  {
+    id: 4,
+    title: 'Pasta med tomater og pesto',
+    image: '/images/recipes/pasta-tomater.jpg',
+    ingredients: [
+      { name: 'pasta', amount: '400g', unit: 'g', price: 8.00 },
+      { name: 'tomater', amount: '6', unit: 'stk', price: 18.00 },
+      { name: 'pesto', amount: '100g', unit: 'g', price: 15.00 },
+      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
+      { name: 'olivenolie', amount: '2', unit: 'spsk', price: 1.00 },
+      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
+    ],
+    totalPrice: 43.80,
+    savings: 12.20,
+    store: 'Netto',
+    mealType: 'dinner',
+    prepTime: '20 min',
+    servings: 4,
+    category: 'Pasta',
+    dietaryTags: ['Vegetar', 'Hurtig']
+  },
+  {
+    id: 5,
+    title: 'Omelet med grøntsager',
+    image: '/images/recipes/omelet-groentsager.jpg',
+    ingredients: [
+      { name: 'æg', amount: '6', unit: 'stk', price: 18.00 },
+      { name: 'spinat', amount: '100g', unit: 'g', price: 6.00 },
+      { name: 'tomat', amount: '2', unit: 'stk', price: 6.00 },
+      { name: 'ost', amount: '100g', unit: 'g', price: 12.00 },
+      { name: 'olivenolie', amount: '1', unit: 'spsk', price: 0.50 },
+      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
+    ],
+    totalPrice: 42.97,
+    savings: 8.03,
+    store: 'REMA 1000',
+    mealType: 'breakfast',
+    prepTime: '15 min',
+    servings: 4,
+    category: 'Morgenmad',
+    dietaryTags: ['Proteinrig', 'Grøntsager']
+  },
+  {
+    id: 6,
+    title: 'Suppe med kylling og grøntsager',
+    image: '/images/recipes/suppe-kylling.jpg',
+    ingredients: [
+      { name: 'kylling', amount: '300g', unit: 'g', price: 18.75 },
+      { name: 'gulerødder', amount: '3', unit: 'stk', price: 4.50 },
+      { name: 'løg', amount: '2', unit: 'stk', price: 3.00 },
+      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
+      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 },
+      { name: 'peber', amount: '1', unit: 'knsp', price: 0.47 }
+    ],
+    totalPrice: 28.52,
+    savings: 5.48,
+    store: 'Føtex',
+    mealType: 'lunch',
+    prepTime: '30 min',
+    servings: 4,
+    category: 'Suppe',
+    dietaryTags: ['Varmende', 'Nærende']
   }
 ]
 
@@ -86,6 +185,69 @@ export default function MadbudgetPage() {
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [basicItemsOpen, setBasicItemsOpen] = useState(true)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
+  const [showRecipeDetail, setShowRecipeDetail] = useState(false)
+  const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
+  const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
+  const [showCostSavings, setShowCostSavings] = useState(true)
+
+  // Calculate ingredient overlap and cost savings
+  const calculateIngredientOverlap = (recipe: any, selectedDay: DayKey, selectedMeal: MealType) => {
+    if (!mealPlan[selectedDay] || !mealPlan[selectedDay][selectedMeal]) {
+      return { overlap: 0, savings: 0, sharedIngredients: [] }
+    }
+
+    const existingRecipe = mealPlan[selectedDay][selectedMeal]
+    const existingIngredients = existingRecipe.ingredients.map((ing: any) => ing.name.toLowerCase())
+    const newIngredients = recipe.ingredients.map((ing: any) => ing.name.toLowerCase())
+    
+    const sharedIngredients = existingIngredients.filter((ing: string) => newIngredients.includes(ing))
+    const overlap = sharedIngredients.length
+    const savings = sharedIngredients.reduce((total: number, ingName: string) => {
+      const existingIng = existingRecipe.ingredients.find((ing: any) => ing.name.toLowerCase() === ingName)
+      const newIng = recipe.ingredients.find((ing: any) => ing.name.toLowerCase() === ingName)
+      if (existingIng && newIng) {
+        // Calculate savings based on unused portions
+        const existingAmount = parseFloat(existingIng.amount)
+        const newAmount = parseFloat(newIng.amount)
+        const maxAmount = Math.max(existingAmount, newAmount)
+        const minAmount = Math.min(existingAmount, newAmount)
+        return total + (minAmount * newIng.price / newAmount)
+      }
+      return total
+    }, 0)
+
+    return { overlap, savings, sharedIngredients }
+  }
+
+  // Get filtered recipes based on search, category, and cost savings
+  const getFilteredRecipes = () => {
+    let filtered = mockRecipes
+
+    // Filter by search query
+    if (recipeSearchQuery) {
+      filtered = filtered.filter(recipe => 
+        recipe.title.toLowerCase().includes(recipeSearchQuery.toLowerCase()) ||
+        recipe.ingredients.some(ing => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
+      )
+    }
+
+    // Filter by category
+    if (recipeCategoryFilter !== 'all') {
+      filtered = filtered.filter(recipe => recipe.category === recipeCategoryFilter)
+    }
+
+    // Sort by cost savings if enabled
+    if (showCostSavings && selectedMealSlot) {
+      const [day, meal] = selectedMealSlot.split('-') as [DayKey, MealType]
+      filtered = filtered.map(recipe => ({
+        ...recipe,
+        costSavings: calculateIngredientOverlap(recipe, day, meal)
+      })).sort((a, b) => b.costSavings.savings - a.costSavings.savings)
+    }
+
+    return filtered
+  }
 
   const toggleBasicItem = (itemId: number) => {
     setBasicItems(prev => 
@@ -110,6 +272,18 @@ export default function MadbudgetPage() {
       setShowRecipeSelector(false)
       setSelectedMealSlot('')
     }
+  }
+
+  const openRecipeSelector = (day: DayKey, meal: MealType) => {
+    setSelectedMealSlot(`${day}-${meal}`)
+    setShowRecipeSelector(true)
+    setRecipeSearchQuery('')
+    setRecipeCategoryFilter('all')
+  }
+
+  const openRecipeDetail = (recipe: any) => {
+    setSelectedRecipe(recipe)
+    setShowRecipeDetail(true)
   }
 
   const generateMealPlan = () => {
@@ -192,7 +366,7 @@ export default function MadbudgetPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Butikker:</span>
                   <span className="font-medium">
-                    {familyProfile.selectedStores.map(storeId => {
+                    {familyProfile.selectedStores.map((storeId, index) => {
                       const store = mockStores.find(s => s.id === storeId)
                       return store?.name
                     }).filter(Boolean).join(', ')}
@@ -295,8 +469,9 @@ export default function MadbudgetPage() {
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
                                 }`}
                                 onClick={() => {
-                                  setSelectedMealSlot(`${day}-${mealType.key}`)
-                                  setShowRecipeSelector(true)
+                                  const dayKey = day as DayKey
+                                  const mealKey = mealType.key as MealType
+                                  openRecipeSelector(dayKey, mealKey)
                                 }}
                                 title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
@@ -375,8 +550,9 @@ export default function MadbudgetPage() {
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
                                 }`}
                                 onClick={() => {
-                                  setSelectedMealSlot(`${day}-${mealType.key}`)
-                                  setShowRecipeSelector(true)
+                                  const dayKey = day as DayKey
+                                  const mealKey = mealType.key as MealType
+                                  openRecipeSelector(dayKey, mealKey)
                                 }}
                                 title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
@@ -440,37 +616,263 @@ export default function MadbudgetPage() {
       {/* Recipe Selector Modal */}
       {showRecipeSelector && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Vælg opskrift</h3>
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Vælg opskrift</h3>
               <button
                 onClick={() => setShowRecipeSelector(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-2"
               >
                 <X size={24} />
               </button>
             </div>
+
+            {/* Search and Filters */}
+            <div className="mb-6 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    placeholder="Søg efter opskrifter..."
+                    value={recipeSearchQuery}
+                    onChange={(e) => setRecipeSearchQuery(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={recipeCategoryFilter}
+                    onChange={(e) => setRecipeCategoryFilter(e.target.value)}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="all">Alle kategorier</option>
+                    <option value="Kylling">Kylling</option>
+                    <option value="Fisk">Fisk</option>
+                    <option value="Morgenmad">Morgenmad</option>
+                    <option value="Pasta">Pasta</option>
+                    <option value="Suppe">Suppe</option>
+                  </select>
+                  <label className="flex items-center space-x-2 px-4 py-3 border border-gray-300 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showCostSavings}
+                      onChange={(e) => setShowCostSavings(e.target.checked)}
+                      className="text-green-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700">Vis pengebesparelser</span>
+                  </label>
+                </div>
+              </div>
+            </div>
             
-            <div className="space-y-4">
-              {mockRecipes.map(recipe => (
+            {/* Recipe Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {getFilteredRecipes().map(recipe => (
                 <div
                   key={recipe.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"
-                  onClick={() => addRecipeToMeal(recipe)}
+                  className="border border-gray-200 rounded-xl overflow-hidden hover:border-green-300 hover:shadow-lg transition-all cursor-pointer group"
+                  onClick={() => openRecipeDetail(recipe)}
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{recipe.title}</h4>
-                      <p className="text-sm text-gray-600">{recipe.ingredients.join(', ')}</p>
+                  {/* Recipe Image */}
+                  <div className="h-48 bg-gray-100 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-blue-400/20 flex items-center justify-center">
+                      <div className="text-center text-gray-500">
+                        <ChefHat size={48} className="mx-auto mb-2" />
+                        <span className="text-sm">Billede kommer snart</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-gray-900">{recipe.price.toFixed(2)} kr</div>
-                      <div className="text-sm text-green-600">Sparer {recipe.savings.toFixed(2)} kr</div>
-                      <div className="text-xs text-gray-500">{recipe.store}</div>
+                    {/* Cost Savings Badge */}
+                    {showCostSavings && selectedMealSlot && (recipe as any).costSavings && (recipe as any).costSavings.savings > 0 && (
+                      <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        Sparer {(recipe as any).costSavings.savings.toFixed(2)} kr
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Recipe Info */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <h4 className="font-semibold text-gray-900 text-lg group-hover:text-green-600 transition-colors">
+                        {recipe.title}
+                      </h4>
+                      <div className="text-right">
+                        <div className="font-bold text-gray-900 text-lg">{recipe.totalPrice.toFixed(2)} kr</div>
+                        <div className="text-sm text-green-600">Sparer {recipe.savings.toFixed(2)} kr</div>
+                      </div>
+                    </div>
+
+                    {/* Recipe Details */}
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                      <span>{recipe.prepTime}</span>
+                      <span>{recipe.servings} portioner</span>
+                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">{recipe.category}</span>
+                    </div>
+
+                    {/* Ingredients Preview */}
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 mb-2">Ingredienser:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {recipe.ingredients.slice(0, 4).map((ingredient, index) => (
+                          <span
+                            key={index}
+                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                          >
+                            {ingredient.name}
+                          </span>
+                        ))}
+                        {recipe.ingredients.length > 4 && (
+                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            +{recipe.ingredients.length - 4} mere
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Store and Actions */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">{recipe.store}</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openRecipeDetail(recipe)
+                          }}
+                          className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Se detaljer
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            addRecipeToMeal(recipe)
+                          }}
+                          className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Tilføj til madplan
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipe Detail Modal */}
+      {showRecipeDetail && selectedRecipe && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Opskrift detaljer</h3>
+              <button
+                onClick={() => setShowRecipeDetail(false)}
+                className="text-gray-400 hover:text-gray-600 p-2"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Recipe Header */}
+            <div className="mb-6">
+              <div className="h-64 bg-gray-100 rounded-lg relative overflow-hidden mb-4">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-blue-400/20 flex items-center justify-center">
+                  <div className="text-center text-gray-500">
+                    <ChefHat size={64} className="mx-auto mb-3" />
+                    <span className="text-lg">Billede kommer snart</span>
+                  </div>
+                </div>
+              </div>
+              
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{selectedRecipe.title}</h2>
+              <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+                <span>{selectedRecipe.prepTime}</span>
+                <span>•</span>
+                <span>{selectedRecipe.servings} portioner</span>
+                <span>•</span>
+                <span className="bg-gray-100 px-2 py-1 rounded">{selectedRecipe.category}</span>
+              </div>
+            </div>
+
+            {/* Recipe Info Grid */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-gray-900">{selectedRecipe.totalPrice.toFixed(2)} kr</div>
+                <div className="text-sm text-gray-600">Total pris</div>
+              </div>
+              <div className="bg-green-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">{selectedRecipe.savings.toFixed(2)} kr</div>
+                <div className="text-sm text-gray-600">Besparer</div>
+              </div>
+            </div>
+
+            {/* Ingredients */}
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">Ingredienser</h4>
+              <div className="space-y-2">
+                {selectedRecipe.ingredients.map((ingredient: any, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm font-medium text-gray-900">{ingredient.name}</span>
+                      <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded">
+                        {ingredient.amount} {ingredient.unit}
+                      </span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{ingredient.price.toFixed(2)} kr</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Dietary Tags */}
+            {selectedRecipe.dietaryTags && selectedRecipe.dietaryTags.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-3">Kosthold</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedRecipe.dietaryTags.map((tag: string, index: number) => (
+                    <span
+                      key={index}
+                      className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Store Info */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-gray-900">Tilgængelig i</h4>
+                  <p className="text-sm text-gray-600">{selectedRecipe.store}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-600">Pris</div>
+                  <div className="text-lg font-bold text-gray-900">{selectedRecipe.totalPrice.toFixed(2)} kr</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowRecipeDetail(false)}
+                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Luk
+              </button>
+              <button
+                onClick={() => {
+                  addRecipeToMeal(selectedRecipe)
+                  setShowRecipeDetail(false)
+                }}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Tilføj til madplan
+              </button>
             </div>
           </div>
         </div>
