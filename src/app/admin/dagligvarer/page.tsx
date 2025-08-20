@@ -41,6 +41,28 @@ interface StorageResult {
   timestamp: string
 }
 
+interface Product {
+  id: string
+  name: string
+  description: string
+  category: string
+  subcategory: string
+  price: number
+  originalPrice: number
+  unit: string
+  unitPrice: number
+  isOnSale: boolean
+  saleEndDate: string | null
+  imageUrl: string | null
+  store: string
+  available: boolean
+  temperatureZone: string | null
+  nutritionInfo: Record<string, string>
+  labels: string[]
+  lastUpdated: string
+  source: string
+}
+
 export default function SupermarketScraperPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
@@ -48,10 +70,13 @@ export default function SupermarketScraperPage() {
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle')
   const [lastScraping, setLastScraping] = useState<string | null>(null)
   const [databaseStats, setDatabaseStats] = useState<DatabaseStats | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
 
   // Fetch database statistics on component mount
   useEffect(() => {
     fetchDatabaseStats()
+    loadLatestProducts()
   }, [])
 
   const fetchDatabaseStats = async () => {
@@ -64,6 +89,30 @@ export default function SupermarketScraperPage() {
       }
     } catch (error) {
       console.error('Failed to fetch database stats:', error)
+    }
+  }
+
+  const loadLatestProducts = async () => {
+    setIsLoadingProducts(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetchAllProducts'
+        })
+      })
+      
+      const result = await response.json()
+      if (result.success && result.products) {
+        setProducts(result.products)
+      }
+    } catch (error) {
+      console.error('Failed to load products:', error)
+    } finally {
+      setIsLoadingProducts(false)
     }
   }
 
@@ -116,6 +165,11 @@ export default function SupermarketScraperPage() {
           message: `Successfully fetched ${result.productsCount} products`,
           timestamp: new Date().toISOString()
         })
+        
+        // Update products list if available
+        if (result.products) {
+          setProducts(result.products)
+        }
       }
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -482,6 +536,96 @@ export default function SupermarketScraperPage() {
             </div>
           </div>
         </div>
+
+        {/* Product List Section */}
+        {products.length > 0 && (
+          <div className="mt-8">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Database size={20} className="mr-2" />
+                  Scraped Produkter ({products.length})
+                </h2>
+                <button
+                  onClick={loadLatestProducts}
+                  disabled={isLoadingProducts}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <RefreshCw size={16} className={isLoadingProducts ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {products.map((product) => (
+                  <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
+                        {product.name}
+                      </h3>
+                      {product.isOnSale && (
+                        <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full ml-2 flex-shrink-0">
+                          TILBUD
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex justify-between">
+                        <span>Pris:</span>
+                        <div className="text-right">
+                          {product.isOnSale ? (
+                            <>
+                              <span className="font-semibold text-red-600">kr {product.price}</span>
+                              <span className="line-through text-gray-400 ml-2">kr {product.originalPrice}</span>
+                            </>
+                          ) : (
+                            <span className="font-semibold">kr {product.price}</span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span>Kategori:</span>
+                        <span className="text-right">{product.category}</span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span>Butik:</span>
+                        <span className="text-right">{product.store}</span>
+                      </div>
+                      
+                      {product.unit && (
+                        <div className="flex justify-between">
+                          <span>Enhed:</span>
+                          <span className="text-right">{product.unit}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {product.description && (
+                      <p className="text-xs text-gray-500 mt-3 line-clamp-2">
+                        {product.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading state for products */}
+        {isLoadingProducts && products.length === 0 && (
+          <div className="mt-8">
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw size={24} className="animate-spin mr-3" />
+                <span className="text-gray-600">Henter produkter...</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
