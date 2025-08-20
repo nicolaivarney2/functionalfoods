@@ -73,14 +73,19 @@ export class SupermarketScraperManager {
   async fetchProductsFromAllStores(): Promise<Record<string, SupermarketProduct[]>> {
     const results: Record<string, SupermarketProduct[]> = {}
     
-    for (const [storeId, scraper] of this.scrapers) {
+    const storeIds = Array.from(this.scrapers.keys())
+    
+    for (let i = 0; i < storeIds.length; i++) {
+      const storeId = storeIds[i]
+      const scraper = this.scrapers.get(storeId)!
+      
       try {
         console.log(`Fetching products from ${storeId}...`)
         const products = await scraper.fetchAllProducts()
         results[storeId] = products
         
         // Add delay between stores to be respectful
-        if (storeId !== Array.from(this.scrapers.keys()).slice(-1)[0]) {
+        if (i < storeIds.length - 1) {
           await this.delay(2000)
         }
       } catch (error) {
@@ -111,7 +116,12 @@ export class SupermarketScraperManager {
   async getScrapingResults(): Promise<Record<string, ScrapingResult>> {
     const results: Record<string, ScrapingResult> = {}
     
-    for (const [storeId, scraper] of this.scrapers) {
+    const storeIds = Array.from(this.scrapers.keys())
+    
+    for (let i = 0; i < storeIds.length; i++) {
+      const storeId = storeIds[i]
+      const scraper = this.scrapers.get(storeId)!
+      
       try {
         const result = await scraper.getScrapingResult()
         results[storeId] = result
