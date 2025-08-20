@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Store, Tag, TrendingUp, Clock, ShoppingCart } from 'lucide-react'
+import { Store, Tag, TrendingUp, Clock, ShoppingCart, ExternalLink } from 'lucide-react'
+import Link from 'next/link'
 
 interface SupermarketProduct {
   id: string
@@ -34,6 +35,8 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
   const [products, setProducts] = useState<SupermarketProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [shoppingList, setShoppingList] = useState<SupermarketProduct[]>([])
+  const [showAddedMessage, setShowAddedMessage] = useState<string | null>(null)
 
   useEffect(() => {
     fetchSupermarketProducts()
@@ -56,6 +59,31 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
     } finally {
       setIsLoading(false)
     }
+  }
+
+  /**
+   * Add product to shopping list
+   */
+  const addToShoppingList = (product: SupermarketProduct) => {
+    // Check if product is already in shopping list
+    const isAlreadyAdded = shoppingList.some(item => item.id === product.id)
+    
+    if (isAlreadyAdded) {
+      setShowAddedMessage('Produkt er allerede i indkøbslisten')
+    } else {
+      setShoppingList(prev => [...prev, product])
+      setShowAddedMessage(`${product.name} tilføjet til indkøbsliste`)
+    }
+    
+    // Hide message after 3 seconds
+    setTimeout(() => setShowAddedMessage(null), 3000)
+  }
+
+  /**
+   * Remove product from shopping list
+   */
+  const removeFromShoppingList = (productId: string) => {
+    setShoppingList(prev => prev.filter(item => item.id !== productId))
   }
 
   const formatPrice = (price: number) => {
@@ -141,6 +169,13 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
 
       {/* Products Grid */}
       <div className="p-6">
+        {/* Shopping List Notification */}
+        {showAddedMessage && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+            {showAddedMessage}
+          </div>
+        )}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {products.map((product) => (
             <div key={product.id} className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -161,9 +196,14 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
 
               {/* Product Info */}
               <div className="space-y-2">
-                <h4 className="font-medium text-gray-900 text-sm line-clamp-2">
-                  {product.name}
-                </h4>
+                <Link 
+                  href={`/dagligvarer/produkt/${product.id}`}
+                  className="block hover:bg-gray-100 rounded p-1 -m-1 transition-colors"
+                >
+                  <h4 className="font-medium text-gray-900 text-sm line-clamp-2 cursor-pointer hover:text-green-600">
+                    {product.name}
+                  </h4>
+                </Link>
                 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
@@ -176,6 +216,17 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
                       </span>
                     )}
                   </div>
+                  
+                  {/* External store link */}
+                  <Link 
+                    href={`https://shop.rema1000.dk/produkt/${product.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-green-600 transition-colors"
+                    title="Åbn i REMA 1000"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
                 </div>
 
                 {/* Price */}
@@ -236,7 +287,10 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
               </div>
 
               {/* Action Button */}
-              <button className="w-full mt-3 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2">
+              <button 
+                onClick={() => addToShoppingList(product)}
+                className="w-full mt-3 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+              >
                 <ShoppingCart className="h-4 w-4" />
                 <span>Tilføj til indkøbsliste</span>
               </button>
