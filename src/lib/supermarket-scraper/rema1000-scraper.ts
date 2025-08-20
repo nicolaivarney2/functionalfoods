@@ -87,16 +87,16 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     console.log('🔍 Discovering products systematically through all categories...')
     
-    // Method 1: Aggressive sequential search through known product ID ranges
-    // OPTIMIZED: Reduced ranges and limits to avoid Vercel timeout
+    // Method 1: Sequential search around known working product IDs
+    // OPTIMIZED: Use realistic ID ranges based on known products
     const searchRanges = [
-      { name: 'Frugt & grønt', start: 300000, end: 301000, step: 100, limit: 15 },
-      { name: 'Kød & fisk', start: 440000, end: 441000, step: 100, limit: 15 },
-      { name: 'Køl', start: 500000, end: 501000, step: 100, limit: 10 },
-      { name: 'Ost m.v.', start: 600000, end: 601000, step: 100, limit: 10 },
-      { name: 'Frost', start: 700000, end: 701000, step: 100, limit: 8 },
-      { name: 'Mejeri', start: 800000, end: 801000, step: 100, limit: 8 },
-      { name: 'Kolonial', start: 900000, end: 901000, step: 100, limit: 8 }
+      { name: 'Frugt & grønt', start: 304000, end: 305000, step: 50, limit: 15 },
+      { name: 'Kød & fisk', start: 440000, end: 441000, step: 50, limit: 15 },
+      { name: 'Køl', start: 410000, end: 411000, step: 50, limit: 10 },
+      { name: 'Ost m.v.', start: 500000, end: 501000, step: 50, limit: 10 },
+      { name: 'Frost', start: 600000, end: 601000, step: 50, limit: 8 },
+      { name: 'Mejeri', start: 700000, end: 701000, step: 50, limit: 8 },
+      { name: 'Kolonial', start: 800000, end: 801000, step: 50, limit: 8 }
     ]
     
     for (const range of searchRanges) {
@@ -106,6 +106,24 @@ export class Rema1000Scraper implements SupermarketAPI {
       
       // Reduced delay to avoid Vercel timeout
       await this.delay(50)
+    }
+    
+    // Method 2: Fallback to known product IDs if sequential search finds too few
+    if (discoveredProducts.length < 20) {
+      console.log('🔄 Sequential search found too few products, adding known products...')
+      
+      for (const productId of KNOWN_PRODUCT_IDS) {
+        try {
+          const product = await this.fetchProduct(productId)
+          if (product && !discoveredProducts.find(p => p.id === product.id)) {
+            discoveredProducts.push(product)
+            console.log(`✅ Added known product: ${product.name}`)
+          }
+          await this.delay(25)
+        } catch (error) {
+          console.log(`⚠️ Failed to fetch known product ${productId}:`, error)
+        }
+      }
     }
     
     console.log(`🎯 Discovery complete: Found ${discoveredProducts.length} unique products`)
