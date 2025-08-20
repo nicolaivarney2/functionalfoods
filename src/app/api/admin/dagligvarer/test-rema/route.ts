@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     
     // Test basic product fetching first
     console.log('🔍 Testing basic product fetching...')
-    const testProduct = await scraper.fetchProduct(1)
+    const testProduct = await scraper.fetchProduct(304020) // Use known working product ID: ØKO. BANANER FAIRTRADE
     
     if (!testProduct) {
       return NextResponse.json({
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (deltaCapabilities.lastModifiedSupport) {
       console.log('📅 Testing conditional request with last-modified...')
       try {
-        const testUrl = `${scraper.baseUrl}/products/1`
+        const testUrl = `${scraper.baseUrl}/products/304020` // Use known working product ID
         const response = await fetch(testUrl, {
           headers: {
             'If-Modified-Since': new Date(Date.now() - 24 * 60 * 60 * 1000).toUTCString(), // 24 hours ago
