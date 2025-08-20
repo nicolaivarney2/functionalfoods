@@ -73,6 +73,12 @@ const adminNavItems = [
     description: 'Administrer brugerroller'
   },
   {
+    name: 'Dagligvarer',
+    href: '/admin/dagligvarer',
+    icon: Database,
+    description: 'Supermarked produkter og priser'
+  },
+  {
     name: 'Indstillinger',
     href: '/admin/settings',
     icon: Settings,

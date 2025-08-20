@@ -56,7 +56,7 @@ export default function SupermarketScraperPage() {
 
   const fetchDatabaseStats = async () => {
     try {
-      const response = await fetch('/api/supermarket/store-products')
+      const response = await fetch('/api/admin/dagligvarer/store-products')
       const data = await response.json()
       
       if (data.success) {
@@ -70,7 +70,7 @@ export default function SupermarketScraperPage() {
   const testRemascraper = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/supermarket/test-rema', {
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
         method: 'GET'
       })
       
@@ -97,7 +97,7 @@ export default function SupermarketScraperPage() {
   const fetchAllProducts = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/supermarket/test-rema', {
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -129,7 +129,7 @@ export default function SupermarketScraperPage() {
     setScrapingStatus('running')
     
     try {
-      const response = await fetch('/api/supermarket/store-products', {
+      const response = await fetch('/api/admin/dagligvarer/store-products', {
         method: 'POST'
       })
       
@@ -172,8 +172,8 @@ export default function SupermarketScraperPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Supermarket Scraper</h1>
-          <p className="text-gray-600">Test and manage automated product data collection from supermarkets</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dagligvarer Scraper</h1>
+          <p className="text-gray-600">Test og administrer automatisk indsamling af produktdata fra supermarkeder</p>
         </div>
       </div>
 
@@ -251,10 +251,10 @@ export default function SupermarketScraperPage() {
 
             {/* Database Storage */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Save size={20} className="mr-2" />
-                Database Storage
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Save size={20} className="mr-2" />
+                  Database Lagring
+                </h2>
               
               <div className="space-y-4">
                 <button
@@ -263,7 +263,7 @@ export default function SupermarketScraperPage() {
                   className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   <Database size={16} />
-                  Scrape & Store Products
+                  Scrape & Gem Produkter
                 </button>
 
                 {/* Storage Results */}
@@ -313,10 +313,10 @@ export default function SupermarketScraperPage() {
 
             {/* Scraper Configuration */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Settings size={20} className="mr-2" />
-                Configuration
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Settings size={20} className="mr-2" />
+                  Konfiguration
+                </h2>
               
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
@@ -348,10 +348,10 @@ export default function SupermarketScraperPage() {
           <div className="space-y-6">
             {/* Scraping Control */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Play size={20} className="mr-2" />
-                Scraping Control
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Play size={20} className="mr-2" />
+                  Scraping Kontrol
+                </h2>
               
               <div className="space-y-4">
                 <div className="flex gap-3">
@@ -404,10 +404,10 @@ export default function SupermarketScraperPage() {
 
             {/* Database Statistics */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <TrendingUp size={20} className="mr-2" />
-                Database Statistics
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <TrendingUp size={20} className="mr-2" />
+                  Database Statistikker
+                </h2>
               
               {databaseStats ? (
                 <div className="space-y-3">
@@ -463,10 +463,10 @@ export default function SupermarketScraperPage() {
 
             {/* Next Scheduled Run */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Clock size={20} className="mr-2" />
-                Next Scheduled Run
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Clock size={20} className="mr-2" />
+                  Næste Planlagte Kørsel
+                </h2>
               
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600 mb-2">
