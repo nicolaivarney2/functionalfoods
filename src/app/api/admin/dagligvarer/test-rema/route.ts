@@ -97,6 +97,7 @@ function generateRecommendations(capabilities: any) {
 export async function POST(request: NextRequest) {
   try {
     const { action, productId } = await request.json()
+    const scraper = new Rema1000Scraper()
     
     switch (action) {
       case 'fetchProduct':
@@ -107,12 +108,12 @@ export async function POST(request: NextRequest) {
           )
         }
         
-        const product = await rema1000Scraper.fetchProduct(productId)
+        const product = await scraper.fetchProduct(productId)
         return NextResponse.json({ success: true, product })
         
       case 'fetchAllProducts':
         console.log('🔄 Fetching all products from REMA 1000...')
-        const products = await rema1000Scraper.fetchAllProducts()
+        const products = await scraper.fetchAllProducts()
         return NextResponse.json({ 
           success: true, 
           productsCount: products.length,
