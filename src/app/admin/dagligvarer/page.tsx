@@ -76,6 +76,7 @@ export default function SupermarketScraperPage() {
   const [isScraping, setIsScraping] = useState(false)
   const [isTestingDelta, setIsTestingDelta] = useState(false)
   const [importResult, setImportResult] = useState<{success: boolean, message: string} | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   // Fetch database statistics on component mount
   useEffect(() => {
@@ -356,6 +357,77 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      setImportResult(null)
+    }
+  }
+
+  const uploadAndImport = async () => {
+    if (!selectedFile) return
+    
+    setIsLoading(true)
+    setImportResult(null)
+    
+    try {
+      // Read the file content
+      const text = await selectedFile.text()
+      let products
+      
+      try {
+        // Try to parse as JSON
+        if (selectedFile.name.endsWith('.json')) {
+          products = JSON.parse(text)
+        } else if (selectedFile.name.endsWith('.jsonl')) {
+          // Parse JSONL (one JSON object per line)
+          products = text.trim().split('\n').map(line => JSON.parse(line))
+        } else {
+          throw new Error('Unsupported file format')
+        }
+      } catch (parseError) {
+        throw new Error('Invalid JSON format in file')
+      }
+      
+      // Send products to API
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ products })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        setImportResult({
+          success: true,
+          message: `✅ File import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+        })
+        // Clear file selection
+        setSelectedFile(null)
+        // Refresh database stats
+        fetchDatabaseStats()
+        loadLatestProducts()
+      } else {
+        setImportResult({
+          success: false,
+          message: `❌ Import failed: ${result.error || 'Unknown error'}`
+        })
+      }
+    } catch (error) {
+      console.error('Error importing from file:', error)
+      setImportResult({
+        success: false,
+        message: `❌ Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -565,9 +637,44 @@ export default function SupermarketScraperPage() {
               </h2>
               
               <div className="space-y-4">
+                {/* File Upload Section */}
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="font-medium text-green-800 mb-3">📁 Upload JSON Fil</h3>
+                  <p className="text-sm text-green-700 mb-3">
+                    Upload en JSON fil med REMA 1000 produkter
+                  </p>
+                  
+                  <div className="space-y-3">
+                    <input
+                      type="file"
+                      accept=".json,.jsonl"
+                      onChange={handleFileUpload}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-600 file:text-white hover:file:bg-green-700"
+                    />
+                    
+                    {selectedFile && (
+                      <div className="flex items-center gap-2 text-sm text-green-700">
+                        <CheckCircle size={16} />
+                        Valgt fil: {selectedFile.name}
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={uploadAndImport}
+                      disabled={!selectedFile || isLoading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Database size={16} />
+                      {isLoading ? 'Importerer...' : 'Upload & Import'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Import Section */}
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-800 mb-3">
-                    Import REMA 1000 produkter direkte til databasen
+                  <h3 className="font-medium text-blue-800 mb-3">⚡ Hurtig Import</h3>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Import fra foruddefinerede data filer
                   </p>
                   
                   <div className="flex gap-3">
@@ -589,17 +696,17 @@ export default function SupermarketScraperPage() {
                       {isLoading ? 'Importerer...' : 'Import Alle Produkter'}
                     </button>
                   </div>
-                  
-                  {importResult && (
-                    <div className={`mt-3 p-3 rounded-lg ${
-                      importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
-                    }`}>
-                      <p className={`text-sm ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                        {importResult.message}
-                      </p>
-                    </div>
-                  )}
                 </div>
+                
+                {importResult && (
+                  <div className={`mt-3 p-3 rounded-lg ${
+                    importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <p className={`text-sm ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                      {importResult.message}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
