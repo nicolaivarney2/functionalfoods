@@ -282,7 +282,7 @@ export default function DagligvarerPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all'])
   const [showOnlyOffers, setShowOnlyOffers] = useState(false)
-  const [selectedStores, setSelectedStores] = useState([1, 2]) // REMA 1000 and Netto
+  const [selectedStores, setSelectedStores] = useState(['REMA 1000']) // REMA 1000
   const [groupByDepartment, setGroupByDepartment] = useState(false)
   const [showFavorites, setShowFavorites] = useState(false)
   const [sortBy, setSortBy] = useState('discount')
@@ -330,17 +330,17 @@ export default function DagligvarerPage() {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category)
-    const matchesOffers = !showOnlyOffers || product.isOnSale
-    const matchesStores = selectedStores.includes(product.store === 'REMA 1000' ? 1 : 2)
+    const matchesOffers = !showOnlyOffers || product.is_on_sale
+    const matchesStores = selectedStores.includes(product.store)
     
     return matchesSearch && matchesCategory && matchesOffers && matchesStores
   })
 
-  const toggleStore = (storeId: number) => {
+  const toggleStore = (storeName: string) => {
     setSelectedStores(prev => 
-      prev.includes(storeId) 
-        ? prev.filter(id => id !== storeId)
-        : [...prev, storeId]
+      prev.includes(storeName) 
+        ? prev.filter(name => name !== storeName)
+        : [...prev, storeName]
     )
   }
 
@@ -462,7 +462,7 @@ export default function DagligvarerPage() {
                     />
                     <span className="text-sm font-medium">Alle kategorier</span>
                   </div>
-                  <span className="text-xs text-gray-500">({mockCategories.reduce((sum, cat) => sum + cat.count, 0)})</span>
+                  <span className="text-xs text-gray-500">({products.length})</span>
                 </button>
               </div>
               
@@ -487,7 +487,7 @@ export default function DagligvarerPage() {
                       <span className="text-base">{category.icon}</span>
                       <span className="text-sm font-medium">{category.name}</span>
                     </div>
-                    <span className="text-xs text-gray-500">({category.count})</span>
+                    <span className="text-xs text-gray-500">({products.filter(p => p.category === category.name).length})</span>
                   </button>
                 ))}
               </div>
@@ -534,16 +534,17 @@ export default function DagligvarerPage() {
                 Butik
               </h3>
               <div className="space-y-2">
-                {mockStores.map(store => (
-                  <label key={store.id} className="flex items-center space-x-3 cursor-pointer">
+                {Array.from(new Set(products.map(p => p.store))).map(storeName => (
+                  <label key={storeName} className="flex items-center space-x-3 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedStores.includes(store.id)}
-                      onChange={() => toggleStore(store.id)}
+                      checked={selectedStores.includes(storeName)}
+                      onChange={() => toggleStore(storeName)}
                       className="text-blue-600 rounded"
                     />
-                    <div className={`w-4 h-4 rounded-full ${store.color}`}></div>
-                    <span className="text-sm text-gray-700">{store.name}</span>
+                    <div className="w-4 h-4 rounded-full bg-blue-600"></div>
+                    <span className="text-sm text-gray-700">{storeName}</span>
+                    <span className="text-xs text-gray-500">({products.filter(p => p.store === storeName).length})</span>
                   </label>
                 ))}
               </div>
@@ -555,7 +556,7 @@ export default function DagligvarerPage() {
                 setSearchQuery('')
                 setSelectedCategories(['all'])
                 setShowOnlyOffers(false)
-                setSelectedStores([1, 2])
+                setSelectedStores(['REMA 1000'])
                 setGroupByDepartment(false)
                 setShowFavorites(false)
               }}
@@ -594,20 +595,17 @@ export default function DagligvarerPage() {
                       </button>
                     </span>
                   )}
-                  {selectedStores.map(storeId => {
-                    const store = mockStores.find(s => s.id === storeId)
-                    return (
-                      <span key={storeId} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center">
-                        {store?.name}
-                        <button
-                          onClick={() => toggleStore(storeId)}
-                          className="ml-2 hover:text-gray-600"
-                        >
-                          <X size={14} />
-                        </button>
-                      </span>
-                    )
-                  })}
+                  {selectedStores.map(storeName => (
+                    <span key={storeName} className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center">
+                      {storeName}
+                      <button
+                        onClick={() => toggleStore(storeName)}
+                        className="ml-2 hover:text-gray-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
                 </div>
 
                 {/* Sort */}
@@ -627,7 +625,7 @@ export default function DagligvarerPage() {
             {/* Product Count */}
             <div className="mb-4">
               <p className="text-gray-600">
-                {filteredProducts.length} produkter fundet
+                {loading ? 'Henter produkter...' : `${filteredProducts.length} produkter fundet`}
               </p>
             </div>
 
@@ -641,7 +639,7 @@ export default function DagligvarerPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
                   <p className="text-gray-600">Vent venligst</p>
                 </div>
-              ) : (products.length > 0 ? products : mockProducts).map(product => (
+              ) : products.map(product => (
                 <div 
                   key={product.id} 
                   className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
