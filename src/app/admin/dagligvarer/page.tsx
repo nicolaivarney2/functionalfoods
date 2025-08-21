@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Play, Square, RefreshCw, Database, Settings, AlertCircle, CheckCircle, Clock, Save, TrendingUp, Search } from 'lucide-react'
+import Link from 'next/link'
 
 interface ScrapingResult {
   success: boolean
@@ -41,25 +42,25 @@ interface StorageResult {
   timestamp: string
 }
 
-interface Product {
+interface SupermarketProduct {
   id: string
+  external_id: string
   name: string
-  description: string
-  category: string
-  subcategory: string
+  description: string | null
+  category: string | null
+  subcategory: string | null
   price: number
-  originalPrice: number
-  unit: string
-  unitPrice: number
-  isOnSale: boolean
-  saleEndDate: string | null
-  imageUrl: string | null
+  original_price: number
+  unit: string | null
+  amount: number | null
+  quantity: string | null
+  unit_price: number | null
+  currency: string
   store: string
+  store_url: string | null
+  image_url: string | null
   available: boolean
-  temperatureZone: string | null
-  nutritionInfo: Record<string, string>
-  labels: string[]
-  lastUpdated: string
+  last_updated: string
   source: string
 }
 
@@ -70,7 +71,7 @@ export default function SupermarketScraperPage() {
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle')
   const [lastScraping, setLastScraping] = useState<string | null>(null)
   const [databaseStats, setDatabaseStats] = useState<DatabaseStats | null>(null)
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<SupermarketProduct[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [isScraping, setIsScraping] = useState(false)
   const [isTestingDelta, setIsTestingDelta] = useState(false)
@@ -577,51 +578,84 @@ export default function SupermarketScraperPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {products.map((product) => (
                   <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    {/* Product Image */}
+                    {product.image_url && (
+                      <div className="mb-3 flex justify-center">
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-32 h-32 object-cover rounded-lg shadow-sm"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
                         {product.name}
                       </h3>
-                      {product.isOnSale && (
+                      {product.price < product.original_price && (
                         <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full ml-2 flex-shrink-0">
                           TILBUD
                         </span>
                       )}
                     </div>
                     
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex justify-between">
-                        <span>Pris:</span>
-                        <div className="text-right">
-                          {product.isOnSale ? (
-                            <>
-                              <span className="font-semibold text-red-600">kr {product.price}</span>
-                              <span className="line-through text-gray-400 ml-2">kr {product.originalPrice}</span>
-                            </>
-                          ) : (
-                            <span className="font-semibold">kr {product.price}</span>
-                          )}
-                        </div>
-                      </div>
+                    {/* Product Info section */}
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/dagligvarer/produkt/${product.id}`}
+                        className="block hover:bg-gray-100 rounded p-1 -m-1 transition-colors"
+                      >
+                        <h4 className="font-medium text-gray-900 text-sm line-clamp-2 cursor-pointer hover:text-green-600">
+                          {product.name}
+                        </h4>
+                      </Link>
                       
-                      <div className="flex justify-between">
-                        <span>Kategori:</span>
-                        <span className="text-right">{product.category}</span>
-                      </div>
-                      
-                      <div className="flex justify-between">
-                        <span>Butik:</span>
-                        <span className="text-right">{product.store}</span>
-                      </div>
-                      
-                      {product.unit && (
+                      {/* Price and quantity info */}
+                      <div className="mt-2 space-y-1 text-xs text-gray-600">
                         <div className="flex justify-between">
-                          <span>Enhed:</span>
-                          <span className="text-right">{product.unit}</span>
+                          <span>Pris:</span>
+                          <span className="text-right font-medium">
+                            {product.price ? `${product.price.toFixed(2)} kr` : 'Ikke tilgængelig'}
+                          </span>
                         </div>
-                      )}
+                        
+                        {/* Show amount and unit separately if available */}
+                        {product.amount && product.unit && (
+                          <div className="flex justify-between">
+                            <span>Mængde:</span>
+                            <span className="text-right font-medium">
+                              {product.amount} {product.unit}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Show quantity as fallback */}
+                        {product.quantity && !product.amount && (
+                          <div className="flex justify-between">
+                            <span>Mængde:</span>
+                            <span className="text-right font-medium">
+                              {product.quantity}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Show unit price if available */}
+                        {product.unit_price && product.unit_price > 0 && (
+                          <div className="flex justify-between">
+                            <span>Pris pr. {product.unit || 'enhed'}:</span>
+                            <span className="text-right font-medium">
+                              {product.unit_price.toFixed(2)} kr
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
-                    {product.description && (
+                    {product.description && !product.description.match(/^\d+\s+(GR|ML|L|KG|G|CL|DL)/i) && (
                       <p className="text-xs text-gray-500 mt-3 line-clamp-2">
                         {product.description}
                       </p>

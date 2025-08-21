@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Search, Filter, Heart, TrendingUp, Store, Tag, Grid, X, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { Search, Filter, Heart, TrendingUp, TrendingDown, Store, Tag, Grid, X, Plus } from 'lucide-react'
 
-// Mock data for development
+// Mock data for development (fallback)
 const mockProducts = [
   {
     id: 1,
@@ -201,6 +202,82 @@ const mockStores = [
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false }
 ]
 
+// 🚀 MINI PRICE CHART FOR HOVER CARDS
+function MiniPriceChart({ data }: { data: any[] }) {
+  if (!data || data.length < 2) return null
+  
+  const chartWidth = 280
+  const chartHeight = 80
+  const padding = 10
+  
+  const prices = data.map(d => d.price)
+  const minPrice = Math.min(...prices)
+  const maxPrice = Math.max(...prices)
+  const priceRange = maxPrice - minPrice || 1
+  
+  // Create path
+  const points = data.map((d, i) => {
+    const x = padding + (i / (data.length - 1)) * (chartWidth - 2 * padding)
+    const y = padding + ((maxPrice - d.price) / priceRange) * (chartHeight - 2 * padding)
+    return `${x},${y}`
+  })
+  
+  const path = `M${points.join(' L')}`
+  
+  // Calculate trend
+  const priceChange = data[data.length - 1].price - data[0].price
+  const isPositive = priceChange >= 0
+  
+  return (
+    <div className="space-y-3">
+      <div className={`flex items-center gap-2 text-xs ${isPositive ? 'text-red-600' : 'text-green-600'}`}>
+        {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+        <span className="font-medium">
+          {isPositive ? '+' : ''}{priceChange.toFixed(2)} kr siden start
+        </span>
+      </div>
+      
+      <svg width={chartWidth} height={chartHeight} className="w-full">
+        {/* Simple area fill */}
+        <path
+          d={`${path} L${chartWidth - padding},${chartHeight - padding} L${padding},${chartHeight - padding} Z`}
+          fill={isPositive ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)'}
+        />
+        
+        {/* Price line */}
+        <path
+          d={path}
+          fill="none"
+          stroke={isPositive ? '#EF4444' : '#22C55E'}
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        
+        {/* Points */}
+        {data.map((point, i) => {
+          const x = padding + (i / (data.length - 1)) * (chartWidth - 2 * padding)
+          const y = padding + ((maxPrice - point.price) / priceRange) * (chartHeight - 2 * padding)
+          
+          return (
+            <circle
+              key={i}
+              cx={x}
+              cy={y}
+              r="2"
+              fill={isPositive ? '#EF4444' : '#22C55E'}
+            />
+          )
+        })}
+      </svg>
+      
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>{minPrice.toFixed(2)} kr</span>
+        <span>{maxPrice.toFixed(2)} kr</span>
+      </div>
+    </div>
+  )
+}
+
 export default function DagligvarerPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all'])
@@ -209,7 +286,45 @@ export default function DagligvarerPage() {
   const [groupByDepartment, setGroupByDepartment] = useState(false)
   const [showFavorites, setShowFavorites] = useState(false)
   const [sortBy, setSortBy] = useState('discount')
-  const [products, setProducts] = useState(mockProducts)
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [hoveredProduct, setHoveredProduct] = useState<any>(null)
+  const [priceHistoryCache, setPriceHistoryCache] = useState<{[key: string]: any[]}>({})
+  const [loadingHistory, setLoadingHistory] = useState<{[key: string]: boolean}>({})
+
+  // Fetch real products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true)
+        const response = await fetch('/api/admin/dagligvarer/test-rema', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'fetchAllProducts'
+          })
+        })
+
+        const data = await response.json()
+        if (data.success && data.products) {
+          setProducts(data.products)
+        } else {
+          // Fallback to mock data if API fails
+          setProducts(mockProducts)
+        }
+      } catch (error) {
+        console.error('Failed to fetch products:', error)
+        // Fallback to mock data if API fails
+        setProducts(mockProducts)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProducts()
+  }, [])
 
 
   const filteredProducts = products.filter(product => {
@@ -256,8 +371,51 @@ export default function DagligvarerPage() {
     )
   }
 
+  // 📈 Fetch price history for a product
+  const fetchPriceHistory = async (productId: string) => {
+    if (priceHistoryCache[productId] || loadingHistory[productId]) return
+    
+    try {
+      setLoadingHistory(prev => ({ ...prev, [productId]: true }))
+      
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'fetchPriceHistory',
+          productId: productId
+        })
+      })
+
+      const data = await response.json()
+      if (data.success && data.priceHistory) {
+        setPriceHistoryCache(prev => ({ ...prev, [productId]: data.priceHistory }))
+      }
+    } catch (err) {
+      console.error('Error fetching price history:', err)
+    } finally {
+      setLoadingHistory(prev => ({ ...prev, [productId]: false }))
+    }
+  }
+
+  // Handle product hover for price history
+  const handleProductHover = (product: any) => {
+    setHoveredProduct(product)
+    if (product) {
+      fetchPriceHistory(product.id.toString())
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
+      
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-green-50 border-b border-green-200">
         <div className="container mx-auto px-4 py-8">
@@ -475,10 +633,38 @@ export default function DagligvarerPage() {
 
             {/* Products Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100">
+              {loading ? (
+                <div className="col-span-full text-center py-12">
+                  <div className="text-gray-400 mb-4">
+                    <Search size={48} className="mx-auto" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
+                  <p className="text-gray-600">Vent venligst</p>
+                </div>
+              ) : (products.length > 0 ? products : mockProducts).map(product => (
+                <div 
+                  key={product.id} 
+                  className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
+                  onMouseEnter={() => handleProductHover(product)}
+                  onMouseLeave={() => setHoveredProduct(null)}
+                >
                   {/* Product Image */}
-                  <div className="relative h-40 bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100">
+                    {product.image_url ? (
+                      <img 
+                        src={product.image_url} 
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-gray-400 text-sm">Intet billede</span>
+                      </div>
+                    )}
+                    
                     <div className="absolute top-3 right-3">
                       <button
                         onClick={() => toggleFavorite(product.id)}
@@ -491,9 +677,9 @@ export default function DagligvarerPage() {
                         <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
                       </button>
                     </div>
-                    {product.isOnSale && (
+                    {product.is_on_sale && (
                       <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                        {product.discount}% rabat
+                        TILBUD
                       </div>
                     )}
                     <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
@@ -503,28 +689,30 @@ export default function DagligvarerPage() {
 
                   {/* Product Info */}
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight">
+                    <Link href={`/dagligvarer/produkt/${product.id}`}>
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
                       {product.name}
                     </h3>
+                    </Link>
                     <p className="text-xs text-gray-500 mb-3 bg-gray-50 px-2 py-1 rounded-full inline-block">
-                      {product.unit}
+                      {product.unit || 'stk'}
                     </p>
                     
                     {/* Price */}
                     <div className="flex items-center space-x-2 mb-3">
                       <span className="text-xl font-bold text-gray-900">
-                        {product.currentPrice.toFixed(2)} kr
+                        {product.price?.toFixed(2)} kr
                       </span>
-                      {product.isOnSale && (
+                      {product.is_on_sale && (
                         <span className="text-sm text-gray-500 line-through">
-                          {product.originalPrice.toFixed(2)} kr
+                          {product.original_price?.toFixed(2)} kr
                         </span>
                       )}
                     </div>
                     
                     {/* Unit Price */}
                     <p className="text-sm text-gray-600 mb-4">
-                      {product.unitPrice.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+                      {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
                     </p>
 
                     {/* Actions */}
@@ -542,10 +730,56 @@ export default function DagligvarerPage() {
               ))}
             </div>
 
-
+            {/* 🚀 FLOATING PRICE HISTORY CARD */}
+            {hoveredProduct && (
+              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                <div 
+                  className="bg-white rounded-2xl shadow-2xl p-6 border border-gray-100 max-w-sm"
+                  style={{
+                    animation: 'fadeIn 0.2s ease-out',
+                    '--tw-shadow': '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+                  }}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-lg overflow-hidden">
+                      {hoveredProduct.image_url ? (
+                        <img 
+                          src={hoveredProduct.image_url} 
+                          alt={hoveredProduct.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-400 text-xs">📦</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 text-sm line-clamp-2">
+                        {hoveredProduct.name}
+                      </h4>
+                      <p className="text-xs text-gray-500">{hoveredProduct.price?.toFixed(2)} kr</p>
+                    </div>
+                  </div>
+                  
+                  {loadingHistory[hoveredProduct.id] ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : priceHistoryCache[hoveredProduct.id] && priceHistoryCache[hoveredProduct.id].length > 1 ? (
+                    <MiniPriceChart data={priceHistoryCache[hoveredProduct.id]} />
+                  ) : (
+                    <div className="py-6 text-center">
+                      <TrendingUp className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Ingen prishistorik tilgængelig</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* No Products */}
-            {filteredProducts.length === 0 && (
+            {filteredProducts.length === 0 && products.length > 0 && (
               <div className="text-center py-12">
                 <div className="text-gray-400 mb-4">
                   <Search size={48} className="mx-auto" />
@@ -558,5 +792,6 @@ export default function DagligvarerPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

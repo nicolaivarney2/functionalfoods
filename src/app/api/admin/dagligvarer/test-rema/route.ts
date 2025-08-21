@@ -108,21 +108,137 @@ export async function POST(request: NextRequest) {
           )
         }
         
-        const product = await scraper.fetchProduct(productId)
-        return NextResponse.json({ success: true, product })
+        console.log(`🔍 Fetching product ${productId} from database...`)
         
+        try {
+          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?id=eq.${productId}&select=*`, {
+            headers: {
+              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            }
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Database query failed: ${response.status}`)
+          }
+          
+          const products = await response.json()
+          const product = products[0] // Get first (and only) product
+          
+          if (!product) {
+            console.log(`❌ Product ${productId} not found in database`)
+            return NextResponse.json({ success: true, product: null })
+          }
+          
+          console.log(`✅ Found product: ${product.name}`)
+          return NextResponse.json({ success: true, product })
+          
+        } catch (dbError) {
+          console.error('❌ Database query failed:', dbError)
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Failed to fetch product from database',
+            details: dbError instanceof Error ? dbError.message : 'Unknown error'
+          }, { status: 500 })
+        }
+        
+      case 'fetchPriceHistory':
+        if (!productId) {
+          return NextResponse.json(
+            { error: 'Product ID is required for price history' },
+            { status: 400 }
+          )
+        }
+        
+        console.log(`📈 Fetching price history for product ${productId}...`)
+        
+        try {
+          // First get the product's external_id
+          const productResponse = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?id=eq.${productId}&select=external_id`, {
+            headers: {
+              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            }
+          })
+          
+          if (!productResponse.ok) {
+            throw new Error(`Product query failed: ${productResponse.status}`)
+          }
+          
+          const products = await productResponse.json()
+          if (!products[0]) {
+            return NextResponse.json({ success: false, error: 'Product not found' }, { status: 404 })
+          }
+          
+          const externalId = products[0].external_id
+          
+          // Now get price history for this external_id
+          const historyResponse = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_price_history?product_external_id=eq.${externalId}&order=timestamp.asc`, {
+            headers: {
+              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            }
+          })
+          
+          if (!historyResponse.ok) {
+            throw new Error(`Price history query failed: ${historyResponse.status}`)
+          }
+          
+          const priceHistory = await historyResponse.json()
+          console.log(`✅ Found ${priceHistory.length} price history entries`)
+          
+          return NextResponse.json({ 
+            success: true, 
+            priceHistory,
+            externalId
+          })
+          
+        } catch (dbError) {
+          console.error('❌ Price history query failed:', dbError)
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Failed to fetch price history from database',
+            details: dbError instanceof Error ? dbError.message : 'Unknown error'
+          }, { status: 500 })
+        }
+
       case 'fetchAllProducts':
-        console.log('🔄 Fetching all products from REMA 1000...')
-        const products = await scraper.fetchAllProducts()
-        return NextResponse.json({ 
-          success: true, 
-          productsCount: products.length,
-          products: products.slice(0, 10) // Return first 10 for testing
-        })
+        console.log('🔄 Fetching all products from database...')
+        
+        // Use our new import API to get products from database
+        try {
+          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?select=*&store=eq.REMA 1000`, {
+            headers: {
+              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            }
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Database query failed: ${response.status}`)
+          }
+          
+          const products = await response.json()
+          console.log(`✅ Fetched ${products.length} products from database`)
+          
+          return NextResponse.json({ 
+            success: true, 
+            productsCount: products.length,
+            products: products.slice(0, 50) // Return first 50 for display
+          })
+          
+        } catch (dbError) {
+          console.error('❌ Database query failed:', dbError)
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Failed to fetch products from database',
+            details: dbError instanceof Error ? dbError.message : 'Unknown error'
+          }, { status: 500 })
+        }
         
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Use: fetchProduct, fetchAllProducts' },
+          { error: 'Invalid action. Use: fetchProduct, fetchAllProducts, fetchPriceHistory' },
           { status: 400 }
         )
     }

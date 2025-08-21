@@ -11,9 +11,9 @@ from typing import Dict, List, Any
 import httpx
 from datetime import datetime
 import asyncio
+import argparse
 
 # Configuration
-JSONL_FILE = "data/rema_products.jsonl"
 SUPABASE_URL = "https://najaxycfjgultwdwffhv.supabase.co"
 SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"  # Replace with your key
 
@@ -130,14 +130,27 @@ async def import_to_supabase(products: List[Dict[str, Any]]) -> None:
     
     print(f"🚀 Importing {len(products)} products to Supabase...")
     
-    # Use your existing store-products API endpoint
-    api_url = f"{SUPABASE_URL}/api/admin/dagligvarer/store-products"
+    # Use your existing import-rema-products API endpoint
+    api_url = "http://localhost:3000/api/admin/dagligvarer/import-rema-products"
     
-    # Transform all products
+    # Transform all products to match your API schema
     transformed_products = []
     for i, product in enumerate(products):
         try:
-            transformed = transform_product(product)
+            # Transform to match your import-rema-products API schema
+            transformed = {
+                "id": product.get("id"),
+                "name": product.get("name", ""),
+                "description": product.get("description", ""),
+                "underline": product.get("underline", ""),
+                "department": product.get("department", {}),
+                "prices": product.get("prices", []),
+                "images": product.get("images", []),
+                "is_available_in_all_stores": product.get("is_available_in_all_stores", True),
+                "temperature_zone": product.get("temperature_zone"),
+                "detail": product.get("detail", {}),
+                "labels": product.get("labels", [])
+            }
             transformed_products.append(transformed)
             
             if (i + 1) % 100 == 0:
@@ -161,41 +174,50 @@ async def import_to_supabase(products: List[Dict[str, Any]]) -> None:
         print(f"📦 Importing batch {batch_num}/{total_batches} ({len(batch)} products)...")
         
         try:
-            # Create a mock scraping result for your API
+            # Send to your import-rema-products API
             import_data = {
-                "products": batch,
-                "source": "python_scraper",
-                "batch": batch_num,
-                "total_batches": total_batches
+                "products": batch
             }
             
-            # You'll need to modify your store-products API to handle this format
-            # For now, just save to a file
-            batch_file = f"data/batch_{batch_num}.json"
-            with open(batch_file, 'w', encoding='utf-8') as f:
-                json.dump(import_data, f, ensure_ascii=False, indent=2)
-            
-            print(f"✅ Saved batch {batch_num} to {batch_file}")
-            total_imported += len(batch)
+            async with httpx.AsyncClient() as client:
+                response = await client.post(api_url, json=import_data, timeout=30.0)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    print(f"✅ Batch {batch_num} imported successfully: {result.get('message', 'OK')}")
+                    total_imported += len(batch)
+                else:
+                    print(f"❌ Batch {batch_num} failed: {response.status_code} - {response.text}")
             
         except Exception as e:
             print(f"❌ Error importing batch {batch_num}: {e}")
     
     print(f"🎉 Import completed! Total products: {total_imported}")
-    print("📁 Check the 'data/' folder for batch files")
 
 async def main():
     """Main import function"""
     print("🚀 Starting REMA products import to Supabase...")
     print("=" * 50)
     
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Import REMA products to Supabase')
+    parser.add_argument('--input', required=True, help='Input JSONL file path')
+    parser.add_argument('--limit', type=int, help='Limit number of products to import')
+    
+    args = parser.parse_args()
+    
     try:
         # Step 1: Load products from JSONL
-        products = load_jsonl(JSONL_FILE)
+        products = load_jsonl(args.input)
         
         if not products:
             print("❌ No products found to import!")
             return
+        
+        # Apply limit if specified
+        if args.limit:
+            products = products[:args.limit]
+            print(f"📊 Limiting import to {len(products)} products")
         
         # Step 2: Import to Supabase
         await import_to_supabase(products)
