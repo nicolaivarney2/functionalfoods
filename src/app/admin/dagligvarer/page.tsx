@@ -75,6 +75,7 @@ export default function SupermarketScraperPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [isScraping, setIsScraping] = useState(false)
   const [isTestingDelta, setIsTestingDelta] = useState(false)
+  const [importResult, setImportResult] = useState<{success: boolean, message: string} | null>(null)
 
   // Fetch database statistics on component mount
   useEffect(() => {
@@ -271,6 +272,87 @@ export default function SupermarketScraperPage() {
       })
     } finally {
       setIsTestingDelta(false)
+    }
+  }
+
+  const importTestProducts = async () => {
+    setIsLoading(true)
+    setImportResult(null)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          test: true,
+          limit: 5
+        })
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setImportResult({
+          success: true,
+          message: `✅ Test import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+        })
+        // Refresh database stats
+        fetchDatabaseStats()
+        loadLatestProducts()
+      } else {
+        setImportResult({
+          success: false,
+          message: `❌ Import failed: ${result.error || 'Unknown error'}`
+        })
+      }
+    } catch (error) {
+      console.error('Error importing test products:', error)
+      setImportResult({
+        success: false,
+        message: '❌ Import failed due to network error'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const importAllProducts = async () => {
+    setIsLoading(true)
+    setImportResult(null)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          test: false
+        })
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setImportResult({
+          success: true,
+          message: `✅ Full import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+        })
+        // Refresh database stats
+        fetchDatabaseStats()
+        loadLatestProducts()
+      } else {
+        setImportResult({
+          success: false,
+          message: `❌ Import failed: ${result.error || 'Unknown error'}`
+        })
+      }
+    } catch (error) {
+      console.error('Error importing all products:', error)
+      setImportResult({
+        success: false,
+        message: '❌ Import failed due to network error'
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -475,12 +557,58 @@ export default function SupermarketScraperPage() {
               </div>
             </div>
 
+            {/* Import Products */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <Database size={20} className="mr-2" />
+                Import Produkter
+              </h2>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800 mb-3">
+                    Import REMA 1000 produkter direkte til databasen
+                  </p>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => importTestProducts()}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Database size={16} />
+                      {isLoading ? 'Importerer...' : 'Import Test (5 produkter)'}
+                    </button>
+                    
+                    <button
+                      onClick={() => importAllProducts()}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <TrendingUp size={16} />
+                      {isLoading ? 'Importerer...' : 'Import Alle Produkter'}
+                    </button>
+                  </div>
+                  
+                  {importResult && (
+                    <div className={`mt-3 p-3 rounded-lg ${
+                      importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <p className={`text-sm ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                        {importResult.message}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Database Statistics */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <TrendingUp size={20} className="mr-2" />
-                  Database Statistikker
-                </h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <TrendingUp size={20} className="mr-2" />
+                Database Statistikker
+              </h2>
               
               {databaseStats ? (
                 <div className="space-y-3">
