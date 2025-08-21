@@ -77,6 +77,25 @@ export default function SupermarketScraperPage() {
   const [isTestingDelta, setIsTestingDelta] = useState(false)
   const [importResult, setImportResult] = useState<{success: boolean, message: string} | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  
+  // Batch processing states
+  const [isBatchImporting, setIsBatchImporting] = useState(false)
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number
+    total: number
+    processed: number
+    success: number
+    errors: number
+  } | null>(null)
+  const [batchResults, setBatchResults] = useState<Array<{
+    batchNumber: number
+    success: boolean
+    message: string
+    productsProcessed: number
+    newProducts: number
+    updatedProducts: number
+    errors: string[]
+  }>>([])
 
   // Fetch database statistics on component mount
   useEffect(() => {
@@ -365,6 +384,61 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  // Batch processing function
+  const processBatch = async (products: any[], batchNumber: number, batchSize: number): Promise<{
+    success: boolean
+    message: string
+    productsProcessed: number
+    newProducts: number
+    updatedProducts: number
+    errors: string[]
+  }> => {
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          products: products,
+          batchNumber: batchNumber,
+          batchSize: batchSize
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        return {
+          success: true,
+          message: `✅ Batch ${batchNumber} successful`,
+          productsProcessed: products.length,
+          newProducts: result.import?.newProducts || 0,
+          updatedProducts: result.import?.updatedProducts || 0,
+          errors: result.import?.errors || []
+        }
+      } else {
+        return {
+          success: false,
+          message: `❌ Batch ${batchNumber} failed: ${result.error || 'Unknown error'}`,
+          productsProcessed: products.length,
+          newProducts: 0,
+          updatedProducts: 0,
+          errors: [result.error || 'Unknown error']
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        message: `❌ Batch ${batchNumber} network error`,
+        productsProcessed: products.length,
+        newProducts: 0,
+        updatedProducts: 0,
+        errors: [error instanceof Error ? error.message : 'Network error']
+      }
+    }
+  }
+
   const uploadAndImport = async () => {
     if (!selectedFile) return
     
@@ -390,33 +464,69 @@ export default function SupermarketScraperPage() {
         throw new Error('Invalid JSON format in file')
       }
       
-      // Send products to API
-      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ products })
+      // Start batch processing
+      setIsBatchImporting(true)
+      setBatchProgress({
+        current: 1,
+        total: Math.ceil(products.length / 100),
+        processed: 0,
+        success: 0,
+        errors: 0
+      })
+      setBatchResults([])
+      
+      const batchSize = 100
+      const totalBatches = Math.ceil(products.length / 100)
+      let totalNewProducts = 0
+      let totalUpdatedProducts = 0
+      let totalErrors = 0
+      
+      // Process products in batches
+      for (let i = 0; i < products.length; i += batchSize) {
+        const batchNumber = Math.floor(i / batchSize) + 1
+        const batch = products.slice(i, i + batchSize)
+        
+        // Update progress
+        setBatchProgress(prev => prev ? {
+          ...prev,
+          current: batchNumber,
+          processed: i + batch.length
+        } : null)
+        
+        // Process this batch
+        const batchResult = await processBatch(batch, batchNumber, batchSize)
+        
+        // Add to results with batch number
+        setBatchResults(prev => [...prev, { ...batchResult, batchNumber }])
+        
+        // Update totals
+        if (batchResult.success) {
+          totalNewProducts += batchResult.newProducts
+          totalUpdatedProducts += batchResult.updatedProducts
+          totalErrors += batchResult.errors.length
+          setBatchProgress(prev => prev ? { ...prev, success: totalNewProducts + totalUpdatedProducts } : null)
+        } else {
+          totalErrors += batchResult.productsProcessed
+          setBatchProgress(prev => prev ? { ...prev, errors: totalErrors } : null)
+        }
+        
+        // Small delay between batches to be respectful
+        if (batchNumber < totalBatches) {
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      }
+      
+      // Final result
+      setImportResult({
+        success: totalErrors === 0,
+        message: `✅ Batch import completed! ${totalNewProducts} new, ${totalUpdatedProducts} updated products. ${totalErrors} errors.`
       })
       
-      const result = await response.json()
-      
-      if (result.success) {
-        setImportResult({
-          success: true,
-          message: `✅ File import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
-        })
-        // Clear file selection
-        setSelectedFile(null)
-        // Refresh database stats
-        fetchDatabaseStats()
-        loadLatestProducts()
-      } else {
-        setImportResult({
-          success: false,
-          message: `❌ Import failed: ${result.error || 'Unknown error'}`
-        })
-      }
+      // Clear file selection
+      setSelectedFile(null)
+      // Refresh database stats
+      fetchDatabaseStats()
+      loadLatestProducts()
     } catch (error) {
       console.error('Error importing from file:', error)
       setImportResult({
@@ -425,6 +535,8 @@ export default function SupermarketScraperPage() {
       })
     } finally {
       setIsLoading(false)
+      setIsBatchImporting(false)
+      setBatchProgress(null)
     }
   }
 
@@ -705,6 +817,62 @@ export default function SupermarketScraperPage() {
                     <p className={`text-sm ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
                       {importResult.message}
                     </p>
+                  </div>
+                )}
+
+                {/* Batch Progress */}
+                {isBatchImporting && batchProgress && (
+                  <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium text-blue-800">Batch Import Progress</h4>
+                      <span className="text-sm text-blue-600">
+                        {batchProgress.current}/{batchProgress.total} batches
+                      </span>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="w-full bg-blue-200 rounded-full h-2 mb-3">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${(batchProgress.processed / (batchProgress.total * 100)) * 100}%` }}
+                      ></div>
+                    </div>
+                    
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="text-blue-600 font-semibold">{batchProgress.processed}</div>
+                        <div className="text-blue-500">Processed</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-green-600 font-semibold">{batchProgress.success}</div>
+                        <div className="text-green-500">Success</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-red-600 font-semibold">{batchProgress.errors}</div>
+                        <div className="text-red-500">Errors</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Batch Results */}
+                {batchResults.length > 0 && (
+                  <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <h4 className="font-medium text-gray-800 mb-3">Batch Results</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {batchResults.map((result, index) => (
+                        <div key={index} className={`text-xs p-2 rounded ${
+                          result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          <div className="font-medium">Batch {result.batchNumber}</div>
+                          <div>{result.message}</div>
+                          <div className="text-gray-600">
+                            {result.productsProcessed} products, {result.newProducts} new, {result.updatedProducts} updated
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
