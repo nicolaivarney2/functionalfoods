@@ -531,16 +531,7 @@ export default function ProductPage() {
                   <ShoppingCart size={20} />
                   Tilføj til kurv
                 </button>
-                {product.store_url && (
-                  <a 
-                    href={product.store_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center"
-                  >
-                    Se i butik
-                  </a>
-                )}
+                {/* "Se i butik" knap fjernet - REMA 1000 links giver 404 fejl */}
               </div>
             </div>
           </div>
