@@ -176,21 +176,38 @@ const mockProducts = [
   }
 ]
 
-const mockCategories = [
-  { id: 1, name: 'Frugt og grønt', icon: '🍎', count: 1250 },
-  { id: 2, name: 'Kød og fisk', icon: '🥩', count: 890 },
-  { id: 3, name: 'Mejeri og køl', icon: '🥛', count: 1100 },
-  { id: 4, name: 'Kolonial', icon: '🌾', count: 2100 },
-  { id: 5, name: 'Frost', icon: '❄️', count: 750 },
-  { id: 6, name: 'Brød og kager', icon: '🥐', count: 450 },
-  { id: 7, name: 'Drikkevarer', icon: '☕', count: 680 },
-  { id: 8, name: 'Slik og snacks', icon: '🍪', count: 320 },
-  { id: 9, name: 'Nemt og hurtigt', icon: '⚡', count: 280 },
-  { id: 10, name: 'Diverse', icon: '📦', count: 150 },
-  { id: 11, name: 'Baby og småbørn', icon: '👶', count: 120 },
-  { id: 12, name: 'Husholdning', icon: '🏠', count: 200 },
-  { id: 13, name: 'Personlig pleje', icon: '🧴', count: 180 }
-]
+// Dynamisk kategorier baseret på REMA data
+const getDynamicCategories = (products: any[]) => {
+  if (!products || products.length === 0) return []
+  
+  const categoryCounts = products.reduce((acc, product) => {
+    const category = product.category || 'Ukategoriseret'
+    acc[category] = (acc[category] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  
+  // Konverter til array format med ikoner
+  const categoryIcons: Record<string, string> = {
+    'Frugt & grønt': '🍎',
+    'Kolonial': '🌾',
+    'Kød, fisk & fjerkræ': '🥩',
+    'Mejeri': '🥛',
+    'Brød & kager': '🥐',
+    'Drikkevarer': '☕',
+    'Snacks & slik': '🍪',
+    'Husholdning & rengøring': '🏠',
+    'Baby & børn': '👶',
+    'Kæledyr': '🐕',
+    'Ukategoriseret': '📦'
+  }
+  
+  return Object.entries(categoryCounts).map(([name, count], id) => ({
+    id: id + 1,
+    name,
+    icon: categoryIcons[name] || '📦',
+    count
+  }))
+}
 
 const mockStores = [
   { id: 1, name: 'REMA 1000', color: 'bg-blue-600', isSelected: true },
@@ -467,7 +484,7 @@ export default function DagligvarerPage() {
               </div>
               
               <div className="max-h-48 overflow-y-auto">
-                {mockCategories.map(category => (
+                {getDynamicCategories(products).map(category => (
                   <button
                     key={category.id}
                     onClick={() => toggleCategory(category.name)}
