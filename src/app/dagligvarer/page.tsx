@@ -664,7 +664,7 @@ export default function DagligvarerPage() {
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   {/* Product Image */}
-                  <div className="relative h-24 bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="relative h-20 bg-gradient-to-br from-gray-50 to-gray-100">
                     {product.image_url ? (
                       <img 
                         src={product.image_url} 
@@ -703,9 +703,9 @@ export default function DagligvarerPage() {
                   </div>
 
                   {/* Product Info */}
-                  <div className="p-5">
+                  <div className="p-6">
                     <Link href={`/dagligvarer/produkt/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
+                      <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
                       {product.name}
                     </h3>
                     </Link>
@@ -726,7 +726,7 @@ export default function DagligvarerPage() {
                     </div>
                     
                     {/* Unit Price */}
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-600 mb-5">
                       {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
                     </p>
 

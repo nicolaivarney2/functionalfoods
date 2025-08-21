@@ -82,6 +82,12 @@ Kategoriser dette produkt i en af følgende kategorier:
 Returner kun kategorinavnet, intet andet.
 `
 
+    // Check if OpenAI API key is available
+    if (!process.env.OPENAI_API_KEY) {
+      console.log('⚠️ OpenAI API key not found, using fallback categorization')
+      return fallbackCategoryMapping(productData.name)
+    }
+
     // Kald AI for kategorisering
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -107,14 +113,20 @@ Returner kun kategorinavnet, intet andet.
     })
 
     if (!response.ok) {
-      throw new Error(`AI API error: ${response.status}`)
+      const errorText = await response.text()
+      console.log(`⚠️ AI API error ${response.status}: ${errorText}`)
+      return fallbackCategoryMapping(productData.name)
     }
 
-    const result = await response.json()
-    const category = result.choices[0]?.message?.content?.trim()
-    
-    if (category && category !== 'Ukategoriseret') {
-      return category
+    try {
+      const result = await response.json()
+      const category = result.choices[0]?.message?.content?.trim()
+      
+      if (category && category !== 'Ukategoriseret') {
+        return category
+      }
+    } catch (parseError) {
+      console.log('⚠️ Failed to parse AI response:', parseError)
     }
     
     // Fallback til manuel kategorisering hvis AI fejler
