@@ -57,122 +57,88 @@ const standardizeUnit = (unit: string) => {
   return unitMap[unit.toLowerCase()] || 'stk'
 }
 
-// Map product categories based on name and department
-const mapCategory = (productName: string, department: any) => {
+// AI-baseret produkt kategorisering
+const categorizeProductWithAI = async (productData: any) => {
+  try {
+    // Byg kontekst for AI
+    const context = `
+Produkt: ${productData.name}
+Beskrivelse: ${productData.description || 'Ingen beskrivelse'}
+Labels: ${productData.labels?.map((l: any) => l.name).join(', ') || 'Ingen labels'}
+Mængde: ${productData.underline || 'Ukendt mængde'}
+
+Kategoriser dette produkt i en af følgende kategorier:
+- Frugt & grønt (friske frugter, grøntsager, frisk kød/fisk)
+- Kolonial (tørrede varer, konserves, basis madvarer)
+- Kød, fisk & fjerkræ (frisk kød, fisk, fjerkræ)
+- Mejeri (mælk, ost, yoghurt, fløde)
+- Brød & kager (brød, kager, boller)
+- Drikkevarer (drikke, juice, vand, kaffe)
+- Snacks & slik (chips, slik, nødder)
+- Husholdning & rengøring (rengøring, papir, personlig pleje)
+- Baby & børn (babymad, ble, legetøj)
+- Kæledyr (hundemad, kattemad)
+
+Returner kun kategorinavnet, intet andet.
+`
+
+    // Kald AI for kategorisering
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Du er en ekspert i dansk supermarked kategorisering. Kategoriser produkter præcist og logisk.'
+          },
+          {
+            role: 'user',
+            content: context
+          }
+        ],
+        max_tokens: 50,
+        temperature: 0.1
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`)
+    }
+
+    const result = await response.json()
+    const category = result.choices[0]?.message?.content?.trim()
+    
+    if (category && category !== 'Ukategoriseret') {
+      return category
+    }
+    
+    // Fallback til manuel kategorisering hvis AI fejler
+    return fallbackCategoryMapping(productData.name)
+    
+  } catch (error) {
+    console.log('⚠️ AI kategorisering fejlede, bruger fallback:', error)
+    return fallbackCategoryMapping(productData.name)
+  }
+}
+
+// Fallback kategorisering hvis AI fejler
+const fallbackCategoryMapping = (productName: string) => {
   const name = productName.toLowerCase()
   
-  // 🥬 Frugt & grønt - Udvidet liste
-  if (name.includes('banan') || name.includes('æble') || name.includes('tomat') || 
-      name.includes('agurk') || name.includes('salat') || name.includes('løg') ||
-      name.includes('kartoffel') || name.includes('gulerod') || name.includes('broccoli') ||
-      name.includes('tranebær') || name.includes('jordbær') || name.includes('blåbær') ||
-      name.includes('hindbær') || name.includes('solbær') || name.includes('stikkelsbær') ||
-      name.includes('citron') || name.includes('lime') ||
-      name.includes('appelsin') || name.includes('mandarin') || name.includes('grapefrugt') ||
-      name.includes('ananas') || name.includes('mango') || name.includes('kiwi') ||
-      name.includes('druer') || name.includes('vandmelon') || name.includes('melon') ||
-      name.includes('pære') || name.includes('fersken') || name.includes('nektarin') ||
-      name.includes('plomme') || name.includes('kirsebær') || name.includes('morel') ||
-      name.includes('porre') || name.includes('selleri') || name.includes('spinat') ||
-      name.includes('kål') || name.includes('blomkål') || name.includes('rosenkål') ||
-      name.includes('rødbede') || name.includes('peberfrugt') || name.includes('aubergine') ||
-      name.includes('squash') || name.includes('ingefær') || name.includes('hvidløg')) {
-    return 'Frugt & grønt'
-  }
-  
-  // 🥩 Kød, fisk & fjerkræ - Udvidet liste
-  if (name.includes('kød') || name.includes('hakket') || name.includes('steak') ||
-      name.includes('pølse') || name.includes('skinke') || name.includes('bacon') ||
-      name.includes('kylling') || name.includes('fisk') || name.includes('laks') ||
-      name.includes('torsk') || name.includes('reje') || name.includes('laks') ||
-      name.includes('ørred') || name.includes('sej') || name.includes('kuller') ||
-      name.includes('makrel') || name.includes('sild') || name.includes('ansjos') ||
-      name.includes('kalmar') || name.includes('musling') || name.includes('østers') ||
-      name.includes('okse') || name.includes('kalv') || name.includes('lam') ||
-      name.includes('gris') || name.includes('and') || name.includes('gås') ||
-      name.includes('kalkun') || name.includes('hønse') || name.includes('æg')) {
-    return 'Kød, fisk & fjerkræ'
-  }
-  
-  // 🥛 Mejeri - Udvidet liste
-  if (name.includes('mælk') || name.includes('ost') || name.includes('yoghurt') ||
-      name.includes('fløde') || name.includes('smør') || name.includes('kærnemælk') ||
-      name.includes('kefir') || name.includes('skyr') || name.includes('quark') ||
-      name.includes('creme fraiche') || name.includes('rømme') || name.includes('tykmælk') ||
-      name.includes('koldskål') || name.includes('piskefløde') || name.includes('kødmælk')) {
-    return 'Mejeri'
-  }
-  
-  // 🥖 Brød & kager - Udvidet liste
-  if (name.includes('brød') || name.includes('kage') || name.includes('boller') ||
-      name.includes('rundstykker') || name.includes('croissant') || name.includes('wienerbrød') ||
-      name.includes('kringle') || name.includes('franskbrød') || name.includes('rugbrød') ||
-      name.includes('hvidbrød') || name.includes('fuldkornsbrød') || name.includes('surdejsbrød') ||
-      name.includes('konditorværk') || name.includes('muffin') || name.includes('cupcake')) {
-    return 'Brød & kager'
-  }
-  
-  // 🍚 Kolonial - Udvidet liste (inklusive kikærter!)
-  if (name.includes('ris') || name.includes('pasta') || name.includes('kartoffel') ||
-      name.includes('bønner') || name.includes('linser') || name.includes('quinoa') ||
-      name.includes('kikærter') || name.includes('ærter') || name.includes('majs') ||
-      name.includes('bulgur') || name.includes('couscous') || name.includes('buckwheat') ||
-      name.includes('marmelade') || name.includes('honning') || name.includes('sirup') ||
-      name.includes('oliven') || name.includes('pesto') || name.includes('bouillon') ||
-      name.includes('ketchup') || name.includes('sennep') || name.includes('mayonnaise') ||
-      name.includes('soya') || name.includes('olie') || name.includes('eddike') ||
-      name.includes('salt') || name.includes('peber') || name.includes('krydderier') ||
-      name.includes('tørrede tomater') || name.includes('tørrede svampe') || name.includes('nødder') ||
-      name.includes('frø') || name.includes('tørrede frugter') || name.includes('konserves') ||
-      name.includes('rosiner') || name.includes('dadler') || name.includes('aprikoser') ||
-      name.includes('pruner') || name.includes('figen') || name.includes('kranbær')) {
+  // Basis kategorisering for kritiske produkter
+  if (name.includes('kikærter') || name.includes('bønner') || name.includes('ris') || name.includes('pasta')) {
     return 'Kolonial'
   }
-  
-  // 🥤 Drikkevarer - Kun rigtige drikkevarer
-  if (name.includes('øl') || name.includes('vin') || name.includes('sodavand') ||
-      name.includes('juice') || name.includes('vand') || name.includes('kaffe') ||
-      name.includes('te') || name.includes('cocacola') || name.includes('pepsi') ||
-      name.includes('fanta') || name.includes('sprite') || name.includes('red bull') ||
-      name.includes('monster') || name.includes('energidrik') || name.includes('smoothie') ||
-      name.includes('shake') || name.includes('milkshake') || name.includes('kakao')) {
-    return 'Drikkevarer'
+  if (name.includes('æble') || name.includes('tomat') || name.includes('agurk')) {
+    return 'Frugt & grønt'
   }
-  
-  // 🍫 Snacks & slik - Udvidet liste
-  if (name.includes('chips') || name.includes('nødder') || name.includes('chokolade') ||
-      name.includes('slik') || name.includes('kiks') || name.includes('kiks') ||
-      name.includes('popcorn') || name.includes('pretzels') || name.includes('crackers') ||
-      name.includes('kartoffelchips') || name.includes('tortillachips') || name.includes('nøddechips') ||
-      name.includes('lakrids') || name.includes('karamel') || name.includes('toffee') ||
-      name.includes('gummi') || name.includes('pastiller') || name.includes('tyggegummi')) {
-    return 'Snacks & slik'
-  }
-  
-  // 🧴 Husholdning & rengøring
-  if (name.includes('vaskemiddel') || name.includes('ble') || name.includes('toiletpapir') ||
-      name.includes('håndsæbe') || name.includes('shampoo') || name.includes('tandpasta') ||
-      name.includes('deodorant') || name.includes('parfume') || name.includes('creme') ||
-      name.includes('sæbe') || name.includes('opvaskemiddel') || name.includes('rengøringsmiddel') ||
-      name.includes('køkkenrulle') || name.includes('alufolie') || name.includes('fryseposer')) {
-    return 'Husholdning & rengøring'
-  }
-  
-  // 🧸 Baby & børn
-  if (name.includes('babymad') || name.includes('ble') || name.includes('baby') ||
-      name.includes('børne') || name.includes('legetøj') || name.includes('børnetøj')) {
-    return 'Baby & børn'
-  }
-  
-  // 🐕 Kæledyr
-  if (name.includes('hundemad') || name.includes('katte') || name.includes('dyremad') ||
-      name.includes('kæledyr') || name.includes('hund') || name.includes('kat')) {
-    return 'Kæledyr'
-  }
-  
-  // Try to use department info if available and it makes sense
-  if (department?.name && !department.name.includes('Ukendt')) {
-    return department.name
+  if (name.includes('mælk') || name.includes('ost') || name.includes('yoghurt')) {
+    return 'Mejeri'
   }
   
   return 'Ukategoriseret'
@@ -212,7 +178,7 @@ export async function POST(request: NextRequest) {
           external_id: `python-${product.id}`, // Clear unique prefix
           name: product.name,
           description: product.description || product.underline || null,
-          category: mapCategory(product.name, product.department || null),
+          category: await categorizeProductWithAI(product),
           subcategory: product.department?.parent?.name || 'Ukategoriseret',
           price: product.prices?.[0]?.price || 0,
           original_price: product.prices?.[0]?.price || 0,
