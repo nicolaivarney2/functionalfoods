@@ -67,7 +67,7 @@ const mapCategory = (productName: string, department: any) => {
       name.includes('kartoffel') || name.includes('gulerod') || name.includes('broccoli') ||
       name.includes('tranebær') || name.includes('jordbær') || name.includes('blåbær') ||
       name.includes('hindbær') || name.includes('solbær') || name.includes('stikkelsbær') ||
-      name.includes('bær') || name.includes('citron') || name.includes('lime') ||
+      name.includes('citron') || name.includes('lime') ||
       name.includes('appelsin') || name.includes('mandarin') || name.includes('grapefrugt') ||
       name.includes('ananas') || name.includes('mango') || name.includes('kiwi') ||
       name.includes('druer') || name.includes('vandmelon') || name.includes('melon') ||
@@ -123,7 +123,9 @@ const mapCategory = (productName: string, department: any) => {
       name.includes('soya') || name.includes('olie') || name.includes('eddike') ||
       name.includes('salt') || name.includes('peber') || name.includes('krydderier') ||
       name.includes('tørrede tomater') || name.includes('tørrede svampe') || name.includes('nødder') ||
-      name.includes('frø') || name.includes('tørrede frugter') || name.includes('konserves')) {
+      name.includes('frø') || name.includes('tørrede frugter') || name.includes('konserves') ||
+      name.includes('rosiner') || name.includes('dadler') || name.includes('aprikoser') ||
+      name.includes('pruner') || name.includes('figen') || name.includes('kranbær')) {
     return 'Kolonial'
   }
   
