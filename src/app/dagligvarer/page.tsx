@@ -664,7 +664,7 @@ export default function DagligvarerPage() {
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   {/* Product Image */}
-                  <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
                     {product.image_url ? (
                       <img 
                         src={product.image_url} 

@@ -171,14 +171,26 @@ export async function POST(request: NextRequest) {
     
     for (const product of products) {
       try {
+        console.log(`🔍 Processing product: ${product.name} (ID: ${product.id})`)
+        
         const underlineInfo = parseUnderline(product.underline)
+        
+        // Get category with better error handling
+        let category
+        try {
+          category = await categorizeProductWithAI(product)
+          console.log(`✅ AI categorized "${product.name}" as: ${category}`)
+        } catch (aiError) {
+          console.log(`⚠️ AI categorization failed for "${product.name}", using fallback:`, aiError)
+          category = fallbackCategoryMapping(product.name)
+        }
         
         // Transform REMA product to our schema
         const productData = {
           external_id: `python-${product.id}`, // Clear unique prefix
           name: product.name,
           description: product.description || product.underline || null,
-          category: await categorizeProductWithAI(product),
+          category: category,
           subcategory: product.department?.parent?.name || 'Ukategoriseret',
           price: product.prices?.[0]?.price || 0,
           original_price: product.prices?.[0]?.price || 0,

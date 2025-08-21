@@ -819,7 +819,7 @@ export default function SupermarketScraperPage() {
                         <img 
                           src={product.image_url} 
                           alt={product.name}
-                          className="w-32 h-32 object-cover rounded-lg shadow-sm"
+                          className="w-24 h-24 object-cover rounded-lg shadow-sm"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}

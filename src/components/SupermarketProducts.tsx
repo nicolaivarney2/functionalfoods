@@ -180,7 +180,7 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
           {products.map((product) => (
             <div key={product.id} className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow">
               {/* Product Image */}
-              <div className="aspect-square bg-gray-200 rounded-lg mb-3 overflow-hidden">
+              <div className="aspect-[4/3] bg-gray-200 rounded-lg mb-3 overflow-hidden">
                 {product.imageUrl ? (
                   <img 
                     src={product.imageUrl} 
