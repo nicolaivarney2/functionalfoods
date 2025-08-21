@@ -295,7 +295,7 @@ export default function SupermarketScraperPage() {
       if (result.success) {
         setImportResult({
           success: true,
-          message: `✅ Test import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+          message: `✅ Test import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
         })
         // Refresh database stats
         fetchDatabaseStats()
@@ -335,7 +335,7 @@ export default function SupermarketScraperPage() {
       if (result.success) {
         setImportResult({
           success: true,
-          message: `✅ Full import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+          message: `✅ Full import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
         })
         // Refresh database stats
         fetchDatabaseStats()
@@ -404,7 +404,7 @@ export default function SupermarketScraperPage() {
       if (result.success) {
         setImportResult({
           success: true,
-          message: `✅ File import successful! ${result.newProducts} new, ${result.updatedProducts} updated products`
+          message: `✅ File import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
         })
         // Clear file selection
         setSelectedFile(null)
