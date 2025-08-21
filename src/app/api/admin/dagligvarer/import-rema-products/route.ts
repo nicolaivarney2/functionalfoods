@@ -61,56 +61,115 @@ const standardizeUnit = (unit: string) => {
 const mapCategory = (productName: string, department: any) => {
   const name = productName.toLowerCase()
   
-  // Food category mapping based on product names
+  // 🥬 Frugt & grønt - Udvidet liste
   if (name.includes('banan') || name.includes('æble') || name.includes('tomat') || 
       name.includes('agurk') || name.includes('salat') || name.includes('løg') ||
-      name.includes('kartoffel') || name.includes('gulerod') || name.includes('broccoli')) {
+      name.includes('kartoffel') || name.includes('gulerod') || name.includes('broccoli') ||
+      name.includes('tranebær') || name.includes('jordbær') || name.includes('blåbær') ||
+      name.includes('hindbær') || name.includes('solbær') || name.includes('stikkelsbær') ||
+      name.includes('bær') || name.includes('citron') || name.includes('lime') ||
+      name.includes('appelsin') || name.includes('mandarin') || name.includes('grapefrugt') ||
+      name.includes('ananas') || name.includes('mango') || name.includes('kiwi') ||
+      name.includes('druer') || name.includes('vandmelon') || name.includes('melon') ||
+      name.includes('pære') || name.includes('fersken') || name.includes('nektarin') ||
+      name.includes('plomme') || name.includes('kirsebær') || name.includes('morel') ||
+      name.includes('porre') || name.includes('selleri') || name.includes('spinat') ||
+      name.includes('kål') || name.includes('blomkål') || name.includes('rosenkål') ||
+      name.includes('rødbede') || name.includes('peberfrugt') || name.includes('aubergine') ||
+      name.includes('squash') || name.includes('ingefær') || name.includes('hvidløg')) {
     return 'Frugt & grønt'
   }
   
+  // 🥩 Kød, fisk & fjerkræ - Udvidet liste
   if (name.includes('kød') || name.includes('hakket') || name.includes('steak') ||
       name.includes('pølse') || name.includes('skinke') || name.includes('bacon') ||
       name.includes('kylling') || name.includes('fisk') || name.includes('laks') ||
-      name.includes('torsk') || name.includes('reje')) {
+      name.includes('torsk') || name.includes('reje') || name.includes('laks') ||
+      name.includes('ørred') || name.includes('sej') || name.includes('kuller') ||
+      name.includes('makrel') || name.includes('sild') || name.includes('ansjos') ||
+      name.includes('kalmar') || name.includes('musling') || name.includes('østers') ||
+      name.includes('okse') || name.includes('kalv') || name.includes('lam') ||
+      name.includes('gris') || name.includes('and') || name.includes('gås') ||
+      name.includes('kalkun') || name.includes('hønse') || name.includes('æg')) {
     return 'Kød, fisk & fjerkræ'
   }
   
+  // 🥛 Mejeri - Udvidet liste
   if (name.includes('mælk') || name.includes('ost') || name.includes('yoghurt') ||
-      name.includes('fløde') || name.includes('smør') || name.includes('kærnemælk')) {
+      name.includes('fløde') || name.includes('smør') || name.includes('kærnemælk') ||
+      name.includes('kefir') || name.includes('skyr') || name.includes('quark') ||
+      name.includes('creme fraiche') || name.includes('rømme') || name.includes('tykmælk') ||
+      name.includes('koldskål') || name.includes('piskefløde') || name.includes('kødmælk')) {
     return 'Mejeri'
   }
   
+  // 🥖 Brød & kager - Udvidet liste
   if (name.includes('brød') || name.includes('kage') || name.includes('boller') ||
-      name.includes('rundstykker') || name.includes('croissant')) {
+      name.includes('rundstykker') || name.includes('croissant') || name.includes('wienerbrød') ||
+      name.includes('kringle') || name.includes('franskbrød') || name.includes('rugbrød') ||
+      name.includes('hvidbrød') || name.includes('fuldkornsbrød') || name.includes('surdejsbrød') ||
+      name.includes('konditorværk') || name.includes('muffin') || name.includes('cupcake')) {
     return 'Brød & kager'
   }
   
+  // 🍚 Kolonial - Udvidet liste (inklusive kikærter!)
   if (name.includes('ris') || name.includes('pasta') || name.includes('kartoffel') ||
-      name.includes('bønner') || name.includes('linser') || name.includes('quinoa')) {
+      name.includes('bønner') || name.includes('linser') || name.includes('quinoa') ||
+      name.includes('kikærter') || name.includes('ærter') || name.includes('majs') ||
+      name.includes('bulgur') || name.includes('couscous') || name.includes('buckwheat') ||
+      name.includes('marmelade') || name.includes('honning') || name.includes('sirup') ||
+      name.includes('oliven') || name.includes('pesto') || name.includes('bouillon') ||
+      name.includes('ketchup') || name.includes('sennep') || name.includes('mayonnaise') ||
+      name.includes('soya') || name.includes('olie') || name.includes('eddike') ||
+      name.includes('salt') || name.includes('peber') || name.includes('krydderier') ||
+      name.includes('tørrede tomater') || name.includes('tørrede svampe') || name.includes('nødder') ||
+      name.includes('frø') || name.includes('tørrede frugter') || name.includes('konserves')) {
     return 'Kolonial'
   }
   
+  // 🥤 Drikkevarer - Kun rigtige drikkevarer
   if (name.includes('øl') || name.includes('vin') || name.includes('sodavand') ||
       name.includes('juice') || name.includes('vand') || name.includes('kaffe') ||
-      name.includes('te')) {
+      name.includes('te') || name.includes('cocacola') || name.includes('pepsi') ||
+      name.includes('fanta') || name.includes('sprite') || name.includes('red bull') ||
+      name.includes('monster') || name.includes('energidrik') || name.includes('smoothie') ||
+      name.includes('shake') || name.includes('milkshake') || name.includes('kakao')) {
     return 'Drikkevarer'
   }
   
+  // 🍫 Snacks & slik - Udvidet liste
   if (name.includes('chips') || name.includes('nødder') || name.includes('chokolade') ||
-      name.includes('slik') || name.includes('kiks')) {
+      name.includes('slik') || name.includes('kiks') || name.includes('kiks') ||
+      name.includes('popcorn') || name.includes('pretzels') || name.includes('crackers') ||
+      name.includes('kartoffelchips') || name.includes('tortillachips') || name.includes('nøddechips') ||
+      name.includes('lakrids') || name.includes('karamel') || name.includes('toffee') ||
+      name.includes('gummi') || name.includes('pastiller') || name.includes('tyggegummi')) {
     return 'Snacks & slik'
   }
   
-  if (name.includes('marmelade') || name.includes('honning') || name.includes('sirup')) {
-    return 'Kolonial'
+  // 🧴 Husholdning & rengøring
+  if (name.includes('vaskemiddel') || name.includes('ble') || name.includes('toiletpapir') ||
+      name.includes('håndsæbe') || name.includes('shampoo') || name.includes('tandpasta') ||
+      name.includes('deodorant') || name.includes('parfume') || name.includes('creme') ||
+      name.includes('sæbe') || name.includes('opvaskemiddel') || name.includes('rengøringsmiddel') ||
+      name.includes('køkkenrulle') || name.includes('alufolie') || name.includes('fryseposer')) {
+    return 'Husholdning & rengøring'
   }
   
-  if (name.includes('oliven') || name.includes('pesto') || name.includes('bouillon')) {
-    return 'Kolonial'
+  // 🧸 Baby & børn
+  if (name.includes('babymad') || name.includes('ble') || name.includes('baby') ||
+      name.includes('børne') || name.includes('legetøj') || name.includes('børnetøj')) {
+    return 'Baby & børn'
   }
   
-  // Try to use department info if available
-  if (department?.name) {
+  // 🐕 Kæledyr
+  if (name.includes('hundemad') || name.includes('katte') || name.includes('dyremad') ||
+      name.includes('kæledyr') || name.includes('hund') || name.includes('kat')) {
+    return 'Kæledyr'
+  }
+  
+  // Try to use department info if available and it makes sense
+  if (department?.name && !department.name.includes('Ukendt')) {
     return department.name
   }
   
