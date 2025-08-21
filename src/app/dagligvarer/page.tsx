@@ -738,7 +738,7 @@ export default function DagligvarerPage() {
                   style={{
                     animation: 'fadeIn 0.2s ease-out',
                     '--tw-shadow': '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                  }}
+                  } as React.CSSProperties}
                 >
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 rounded-lg overflow-hidden">
