@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ 
             success: true, 
             productsCount: products.length,
-            products: products.slice(0, 50) // Return first 50 for display
+            products: products // Return all products
           })
           
         } catch (dbError) {
