@@ -664,7 +664,7 @@ export default function DagligvarerPage() {
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   {/* Product Image */}
-                  <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="relative h-24 bg-gradient-to-br from-gray-50 to-gray-100">
                     {product.image_url ? (
                       <img 
                         src={product.image_url} 
@@ -703,7 +703,7 @@ export default function DagligvarerPage() {
                   </div>
 
                   {/* Product Info */}
-                  <div className="p-4">
+                  <div className="p-5">
                     <Link href={`/dagligvarer/produkt/${product.id}`}>
                       <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
                       {product.name}
