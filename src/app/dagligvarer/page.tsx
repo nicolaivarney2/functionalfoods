@@ -99,7 +99,7 @@ export default function DagligvarerPage() {
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '50', // Fast loading with pagination
+        limit: '20', // Ultra fast loading with pagination
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
         ...(searchQuery ? { search: searchQuery } : {}),
         ...(showOnlyOffers ? { offers: 'true' } : {})
@@ -123,10 +123,26 @@ export default function DagligvarerPage() {
           is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
         }))
         
+        // Smart sorting: Offers first, then meat category, then others
+        const sortedProducts = fixedProducts.sort((a: any, b: any) => {
+          // First: Offers (is_on_sale = true)
+          if (a.is_on_sale && !b.is_on_sale) return -1
+          if (!a.is_on_sale && b.is_on_sale) return 1
+          
+          // Second: Meat category comes first
+          const aIsMeat = a.category === 'Kød, fisk & fjerkræ'
+          const bIsMeat = b.category === 'Kød, fisk & fjerkræ'
+          if (aIsMeat && !bIsMeat) return -1
+          if (!aIsMeat && bIsMeat) return 1
+          
+          // Third: Sort by name
+          return a.name.localeCompare(b.name)
+        })
+        
         if (append) {
-          setProducts(prev => [...prev, ...fixedProducts])
+          setProducts(prev => [...prev, ...sortedProducts])
         } else {
-          setProducts(fixedProducts)
+          setProducts(sortedProducts)
         }
         
         setHasMore(data.pagination?.hasMore || false)
@@ -276,11 +292,13 @@ export default function DagligvarerPage() {
       setSelectedCategories(['all'])
     } else {
       setSelectedCategories(prev => {
-        const newCategories = prev.filter(cat => cat !== 'all')
+        // If selecting a specific category, remove 'all' and add the category
         if (prev.includes(categoryName)) {
-          return newCategories.filter(cat => cat !== categoryName)
+          // If category is already selected, remove it and go back to 'all'
+          return ['all']
         } else {
-          return [...newCategories, categoryName]
+          // Select this category instead of 'all'
+          return [categoryName]
         }
       })
     }
@@ -296,39 +314,16 @@ export default function DagligvarerPage() {
     )
   }
 
-  // 📈 Fetch price history for a product
+  // 📈 Fetch price history for a product - DISABLED FOR PERFORMANCE
   const fetchPriceHistory = async (productId: string) => {
-    if (priceHistoryCache[productId] || loadingHistory[productId]) return
-    
-    try {
-      setLoadingHistory(prev => ({ ...prev, [productId]: true }))
-      
-      const response = await fetch('/api/admin/dagligvarer/test-rema', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'fetchPriceHistory',
-          productId: productId
-        })
-      })
-
-      const data = await response.json()
-      if (data.success && data.priceHistory) {
-        setPriceHistoryCache(prev => ({ ...prev, [productId]: data.priceHistory }))
-      }
-    } catch (err) {
-      console.error('Error fetching price history:', err)
-    } finally {
-      setLoadingHistory(prev => ({ ...prev, [productId]: false }))
-    }
+    // DISABLED: Performance optimization
+    return
   }
 
-  // Handle product hover for price history
+  // Handle product hover for price history - DISABLED FOR PERFORMANCE
   const handleProductHover = (product: any) => {
-    setHoveredProduct(product)
-    if (product) {
-      fetchPriceHistory(product.id.toString())
-    }
+    // DISABLED: Performance optimization
+    return
   }
 
   return (
