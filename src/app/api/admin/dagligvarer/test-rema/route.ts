@@ -306,10 +306,16 @@ export async function POST(request: NextRequest) {
             supabaseQuery = supabaseQuery.eq('is_on_sale', true)
           }
           
-          // Apply pagination
-          supabaseQuery = supabaseQuery
-            .range(offset, offset + limit - 1)
-            .order('name', { ascending: true })
+          // Apply pagination only if limit is reasonable
+          if (limit <= 10000) {
+            // For reasonable limits, get all products without range
+            supabaseQuery = supabaseQuery.order('name', { ascending: true })
+          } else {
+            // For very high limits, apply range to avoid memory issues
+            supabaseQuery = supabaseQuery
+              .range(offset, offset + limit - 1)
+              .order('name', { ascending: true })
+          }
           
           const { data: products, error, count } = await supabaseQuery
           
