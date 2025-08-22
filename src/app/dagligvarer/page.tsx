@@ -308,6 +308,7 @@ export default function DagligvarerPage() {
   const [hoveredProduct, setHoveredProduct] = useState<any>(null)
   const [priceHistoryCache, setPriceHistoryCache] = useState<{[key: string]: any[]}>({})
   const [loadingHistory, setLoadingHistory] = useState<{[key: string]: boolean}>({})
+  const [displayedProducts, setDisplayedProducts] = useState<number>(50) // Lazy loading
 
   // Fetch real products from API
   useEffect(() => {
@@ -326,7 +327,12 @@ export default function DagligvarerPage() {
 
         const data = await response.json()
         if (data.success && data.products) {
-          setProducts(data.products)
+          // Fix false offers - only show as offer if price is actually lower
+          const fixedProducts = data.products.map((product: any) => ({
+            ...product,
+            is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
+          }))
+          setProducts(fixedProducts)
         } else {
           // Fallback to mock data if API fails
           setProducts(mockProducts)
@@ -343,15 +349,42 @@ export default function DagligvarerPage() {
     fetchProducts()
   }, [])
 
+  // Lazy loading - load more products when scrolling
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1000) {
+        setDisplayedProducts(prev => Math.min(prev + 50, products.length))
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [products.length])
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category)
     const matchesOffers = !showOnlyOffers || product.is_on_sale
     const matchesStores = selectedStores.includes(product.store)
+    const matchesFavorites = !showFavorites || product.isFavorite
     
-    return matchesSearch && matchesCategory && matchesOffers && matchesStores
+    return matchesSearch && matchesCategory && matchesOffers && matchesStores && matchesFavorites
   })
+
+  // Group products by category if enabled
+  const groupedProducts = groupByDepartment 
+    ? filteredProducts.reduce((groups: { [key: string]: any[] }, product) => {
+        const category = product.category || 'Ukategoriseret'
+        if (!groups[category]) groups[category] = []
+        groups[category].push(product)
+        return groups
+      }, {})
+    : {}
+
+  // Get products to display (with lazy loading)
+  const productsToDisplay = groupByDepartment 
+    ? Object.entries(groupedProducts).flatMap(([category, products]: [string, any[]]) => products)
+    : filteredProducts.slice(0, displayedProducts)
 
   const toggleStore = (storeName: string) => {
     setSelectedStores(prev => 
@@ -375,8 +408,6 @@ export default function DagligvarerPage() {
       })
     }
   }
-
-
 
   const toggleFavorite = (productId: number) => {
     setProducts(prev => 
@@ -475,7 +506,7 @@ export default function DagligvarerPage() {
                       type="checkbox"
                       checked={selectedCategories.includes('all')}
                       onChange={() => toggleCategory('all')}
-                      className="text-green-600 rounded"
+                      className="text-green-600 rounded cursor-pointer"
                     />
                     <span className="text-sm font-medium">Alle kategorier</span>
                   </div>
@@ -499,10 +530,10 @@ export default function DagligvarerPage() {
                         type="checkbox"
                         checked={selectedCategories.includes(category.name)}
                         onChange={() => toggleCategory(category.name)}
-                        className="text-green-600 rounded"
+                        className="text-green-600 rounded cursor-pointer"
                       />
-                      <span className="text-base">{category.icon}</span>
-                      <span className="text-sm font-medium">{category.name}</span>
+                      <span className="text-xs">{category.icon}</span>
+                      <span className="text-xs font-medium">{category.name}</span>
                     </div>
                     <span className="text-xs text-gray-500">({products.filter(p => p.category === category.name).length})</span>
                   </button>
@@ -656,7 +687,112 @@ export default function DagligvarerPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
                   <p className="text-gray-600">Vent venligst</p>
                 </div>
-              ) : filteredProducts.map(product => (
+              ) : groupByDepartment && Object.keys(groupedProducts).length > 0 ? (
+                // Grouped by category display
+                Object.entries(groupedProducts).map(([category, categoryProducts]: [string, any[]]) => (
+                  <div key={category} className="col-span-full">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <span className="mr-2">{getDynamicCategories(products).find(c => c.name === category)?.icon || '📦'}</span>
+                      {category} ({categoryProducts.length})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+                      {categoryProducts.slice(0, displayedProducts).map(product => (
+                        <div 
+                          key={product.id} 
+                          className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
+                          onMouseEnter={() => handleProductHover(product)}
+                          onMouseLeave={() => setHoveredProduct(null)}
+                        >
+                          {/* Product Image */}
+                          <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
+                            {product.image_url ? (
+                              <img 
+                                src={product.image_url} 
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-gray-400 text-sm">Intet billede</span>
+                              </div>
+                            )}
+                            
+                            <div className="absolute top-3 right-3">
+                              <button
+                                onClick={() => toggleFavorite(product.id)}
+                                className={`p-2 rounded-full shadow-sm ${
+                                  product.isFavorite 
+                                    ? 'bg-red-500 text-white' 
+                                    : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
+                                } transition-all duration-200`}
+                              >
+                                <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
+                              </button>
+                            </div>
+                            {product.is_on_sale && (
+                              <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                                TILBUD
+                              </div>
+                            )}
+                            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
+                              {product.store}
+                            </div>
+                          </div>
+
+                          {/* Product Info */}
+                          <div className="p-4">
+                            <Link href={`/dagligvarer/produkt/${product.id}`}>
+                              <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
+                                {product.name}
+                              </h3>
+                            </Link>
+                            
+                            {/* Quantity and Unit */}
+                            <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
+                              {product.amount} {product.unit || 'stk'}
+                            </p>
+                            
+                            {/* Price */}
+                            <div className="flex items-center space-x-2 mb-2">
+                              <span className="text-lg font-bold text-gray-900">
+                                {product.price?.toFixed(2)} kr
+                              </span>
+                              {product.is_on_sale && (
+                                <span className="text-xs text-gray-500 line-through">
+                                  {product.original_price?.toFixed(2)} kr
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Unit Price */}
+                            <p className="text-xs text-gray-600 mb-3">
+                              {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+                            </p>
+
+                            {/* Actions */}
+                            <div className="flex space-x-2">
+                              <button className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-2 rounded text-xs font-medium transition-colors">
+                                <Plus size={12} className="inline mr-1" />
+                                Tilføj
+                              </button>
+                              <Link href={`/dagligvarer/produkt/${product.id}`}>
+                                <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
+                                  <TrendingUp size={12} />
+                                </button>
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // Normal grid display
+                productsToDisplay.map(product => (
                 <div 
                   key={product.id} 
                   className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
@@ -664,7 +800,7 @@ export default function DagligvarerPage() {
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
                   {/* Product Image */}
-                  <div className="relative h-20 bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
                     {product.image_url ? (
                       <img 
                         src={product.image_url} 
@@ -703,30 +839,32 @@ export default function DagligvarerPage() {
                   </div>
 
                   {/* Product Info */}
-                  <div className="p-6">
+                  <div className="p-4">
                     <Link href={`/dagligvarer/produkt/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-3 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
-                      {product.name}
-                    </h3>
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
+                        {product.name}
+                      </h3>
                     </Link>
-                    <p className="text-xs text-gray-500 mb-3 bg-gray-50 px-2 py-1 rounded-full inline-block">
-                      {product.unit || 'stk'}
+                    
+                    {/* Quantity and Unit */}
+                    <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
+                      {product.amount} {product.unit || 'stk'}
                     </p>
                     
                     {/* Price */}
-                    <div className="flex items-center space-x-2 mb-3">
-                      <span className="text-xl font-bold text-gray-900">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-lg font-bold text-gray-900">
                         {product.price?.toFixed(2)} kr
                       </span>
                       {product.is_on_sale && (
-                        <span className="text-sm text-gray-500 line-through">
+                        <span className="text-xs text-gray-500 line-through">
                           {product.original_price?.toFixed(2)} kr
                         </span>
                       )}
                     </div>
                     
                     {/* Unit Price */}
-                    <p className="text-sm text-gray-600 mb-5">
+                    <p className="text-xs text-gray-600 mb-3">
                       {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
                     </p>
 
@@ -736,9 +874,11 @@ export default function DagligvarerPage() {
                         <Plus size={12} className="inline mr-1" />
                         Tilføj
                       </button>
-                      <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
-                        <TrendingUp size={12} />
-                      </button>
+                      <Link href={`/dagligvarer/produkt/${product.id}`}>
+                        <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
+                          <TrendingUp size={12} />
+                        </button>
+                      </Link>
                     </div>
                   </div>
                 </div>
