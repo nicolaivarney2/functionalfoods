@@ -306,8 +306,11 @@ export async function POST(request: NextRequest) {
             baseQuery = baseQuery.eq('is_on_sale', true)
           }
           
-          // Get total count first
-          const { count: totalCount, error: countError } = await baseQuery
+                    // Get total count first using a separate count query
+          const { count: totalCount, error: countError } = await supabase
+            .from('supermarket_products')
+            .select('*', { count: 'exact', head: true })
+            .eq('store', 'REMA 1000')
           
           if (countError) {
             throw new Error(`Count query failed: ${countError.message}`)
