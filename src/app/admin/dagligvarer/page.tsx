@@ -134,11 +134,29 @@ export default function SupermarketScraperPage() {
       if (result.success && result.products) {
         setProducts(result.products)
         console.log(`✅ Loaded ${result.products.length} products in admin (fast mode)`)
+        
+        // Automatically simulate meat offers after loading products
+        simulateMeatOffers()
       }
     } catch (error) {
       console.error('Failed to load products:', error)
     } finally {
       setIsLoadingProducts(false)
+    }
+  }
+
+  const simulateMeatOffers = async () => {
+    try {
+      console.log('🥩 Automatically simulating meat offers...')
+      const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
+        method: 'POST'
+      })
+      const data = await response.json()
+      if (data.success) {
+        console.log('🎯 Meat offers simulated automatically:', data)
+      }
+    } catch (error) {
+      console.error('Auto meat offers failed:', error)
     }
   }
 
