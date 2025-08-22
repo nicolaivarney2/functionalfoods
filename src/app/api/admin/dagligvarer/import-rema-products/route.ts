@@ -218,33 +218,19 @@ export async function POST(request: NextRequest) {
         // Process batch in parallel for speed
         const batchPromises = batch.map(async (product) => {
           try {
-            // Check if this product has a campaign price in price history
-            const { data: priceHistory } = await supabase
-              .from('supermarket_price_history')
-              .select('price, original_price, is_on_sale')
-              .eq('product_external_id', product.external_id)
-              .order('created_at', { ascending: false })
-              .limit(5)
-            
-            // If we have price history, check for price changes
+            // Simple logic: if price < original_price, it's on sale
             let isOnSale = false
             let originalPrice = product.original_price
             
-            if (priceHistory && priceHistory.length > 1) {
-              // Look for price changes that indicate sales
-              const recentPrices = priceHistory.map(ph => ph.price)
-              const uniquePrices = Array.from(new Set(recentPrices))
-              
-              if (uniquePrices.length > 1) {
-                // Price has changed - might be a sale
-                const currentPrice = product.price
-                const previousPrice = priceHistory[1]?.price || product.original_price
-                
-                if (currentPrice < previousPrice) {
-                  isOnSale = true
-                  originalPrice = previousPrice
-                }
-              }
+            // Check if current price is lower than original price
+            if (product.price < product.original_price) {
+              isOnSale = true
+              console.log(`🎯 Product ${product.name}: ON SALE! Price: ${product.price}, Original: ${product.original_price}`)
+            } else {
+              // If not on sale, set original_price to current price
+              originalPrice = product.price
+              isOnSale = false
+              console.log(`📦 Product ${product.name}: Not on sale. Price: ${product.price}`)
             }
             
             // Update the product with corrected sale information
