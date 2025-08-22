@@ -165,6 +165,12 @@ export default function DagligvarerPage() {
           const priceDifference = hasValidOriginalPrice && hasValidPrice ? product.original_price - product.price : 0
           const isPriceLower = priceDifference > 0.01
           
+          // Calculate discount percentage
+          let discountPercentage = 0
+          if (hasValidOriginalPrice && hasValidPrice && isPriceLower) {
+            discountPercentage = Math.round(((product.original_price - product.price) / product.original_price) * 100)
+          }
+          
           const finalIsOnSale = isActuallyOnSale && isPriceLower
           
           // Debug logging for each product
@@ -175,44 +181,56 @@ export default function DagligvarerPage() {
               priceDifference: priceDifference.toFixed(4),
               isPriceLower,
               finalIsOnSale,
+              discountPercentage: `${discountPercentage}%`,
               category: product.category
             })
           }
           
           return {
             ...product,
-            is_on_sale: finalIsOnSale
+            is_on_sale: finalIsOnSale,
+            discount_percentage: discountPercentage
           }
         })
         
         // Log offer status for debugging
-        const offersCount = fixedProducts.filter((p: any) => p.is_on_sale).length
+        const offersCount = fixedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
         console.log(`🎯 Products with offers: ${offersCount}/${fixedProducts.length}`)
         if (offersCount > 0) {
-          const offers = fixedProducts.filter((p: any) => p.is_on_sale)
+          const offers = fixedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0)
           console.log('🎯 Sample offers:', offers.slice(0, 3).map((p: any) => ({
             name: p.name,
             price: p.price,
             original_price: p.original_price,
-            is_on_sale: p.is_on_sale
+            is_on_sale: p.is_on_sale,
+            discount_percentage: p.discount_percentage
           })))
         } else {
-          console.log('❌ NO OFFERS FOUND! All products have is_on_sale: false or price >= original_price')
+          console.log('❌ NO OFFERS FOUND! All products have is_on_sale: false or no valid discount')
           // Show first few products for debugging
           console.log('🔍 First 3 products:', fixedProducts.slice(0, 3).map((p: any) => ({
             name: p.name,
             price: p.price,
             original_price: p.original_price,
             is_on_sale: p.is_on_sale,
-            priceCheck: p.price < p.original_price
+            discount_percentage: p.discount_percentage
           })))
         }
         
-        // Smart sorting: Offers ALWAYS first, then meat category, then others
+        // Smart sorting: Offers ALWAYS first by discount percentage, then meat category, then others
         const sortedProducts = fixedProducts.sort((a: any, b: any) => {
-          // First: Offers (is_on_sale = true) - ALWAYS PRIORITY
-          if (a.is_on_sale && !b.is_on_sale) return -1
-          if (!a.is_on_sale && b.is_on_sale) return 1
+          // First: Offers (is_on_sale = true) - ALWAYS PRIORITY, sorted by discount percentage
+          if (a.is_on_sale && a.discount_percentage > 0 && !b.is_on_sale) return -1
+          if (!a.is_on_sale && b.is_on_sale && b.discount_percentage > 0) return 1
+          
+          // If both are offers, sort by discount percentage (highest first)
+          if (a.is_on_sale && a.discount_percentage > 0 && b.is_on_sale && b.discount_percentage > 0) {
+            const aDiscount = a.discount_percentage || 0
+            const bDiscount = b.discount_percentage || 0
+            if (aDiscount !== bDiscount) {
+              return bDiscount - aDiscount // Highest discount first
+            }
+          }
           
           // Second: Meat category comes first (among non-offer products)
           const aIsMeat = a.category === 'Kød, fisk & fjerkræ'
@@ -294,7 +312,7 @@ export default function DagligvarerPage() {
       
       const data = await response.json()
       if (data.success && data.products) {
-        const offersCount = data.products.filter((p: any) => p.is_on_sale).length
+        const offersCount = data.products.filter((p: any) => p.is_on_sale && p.original_price && p.price < p.original_price).length
         console.log(`🎯 Database check: ${offersCount} offers available in database`)
         setOffersAvailableInDB(offersCount)
         
@@ -450,7 +468,7 @@ export default function DagligvarerPage() {
   }
 
   // Check if there are any offers available in the current product set
-  const hasOffersAvailable = products.some(p => p.is_on_sale && p.original_price && p.price < p.original_price)
+  const hasOffersAvailable = products.some(p => p.is_on_sale && p.discount_percentage > 0)
   
   // Auto-enable offers filter if there are offers available and user hasn't explicitly disabled it
   useEffect(() => {
@@ -557,7 +575,7 @@ export default function DagligvarerPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-green-600">🎯</span>
                       <span className="text-sm text-green-800">
-                        {products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length} tilbud vises først
+                        {products.filter(p => p.is_on_sale && p.discount_percentage > 0).length} tilbud vises først
                       </span>
                     </div>
                     <p className="text-xs text-green-600 mt-1">
@@ -575,7 +593,7 @@ export default function DagligvarerPage() {
                   />
                   <span className="text-xs">Vis kun tilbud</span>
                   <span className="ml-auto text-xs text-green-600 font-medium">
-                    ({products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length})
+                    ({products.filter(p => p.is_on_sale && p.discount_percentage > 0).length})
                   </span>
                 </label>
                 
@@ -678,7 +696,7 @@ export default function DagligvarerPage() {
                         Tilbud vises først!
                       </h3>
                       <p className="text-sm text-green-600">
-                        {products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length} tilbud prioriteres øverst af {totalProducts} produkter
+                        {products.filter(p => p.is_on_sale && p.discount_percentage > 0).length} tilbud prioriteres øverst af {totalProducts} produkter
                       </p>
                     </div>
                   </div>
@@ -758,6 +776,11 @@ export default function DagligvarerPage() {
                                 TILBUD
                               </div>
                             )}
+                            {product.is_on_sale && (
+                              <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                                {product.discount_percentage ? `-${product.discount_percentage}%` : 'TILBUD'}
+                              </div>
+                            )}
                             <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
                               {product.store}
                             </div>
@@ -782,9 +805,14 @@ export default function DagligvarerPage() {
                                 {product.price?.toFixed(2)} kr
                               </span>
                               {product.is_on_sale && (
-                                <span className="text-xs text-gray-500 line-through">
-                                  {product.original_price?.toFixed(2)} kr
-                                </span>
+                                <>
+                                  <span className="text-xs text-gray-500 line-through">
+                                    {product.original_price?.toFixed(2)} kr
+                                  </span>
+                                  <span className="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded-full">
+                                    -{product.discount_percentage}%
+                                  </span>
+                                </>
                               )}
                             </div>
                             
@@ -854,6 +882,11 @@ export default function DagligvarerPage() {
                           TILBUD
                         </div>
                       )}
+                      {product.is_on_sale && (
+                        <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                          {product.discount_percentage ? `-${product.discount_percentage}%` : 'TILBUD'}
+                        </div>
+                      )}
                       <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
                         {product.store}
                       </div>
@@ -878,9 +911,14 @@ export default function DagligvarerPage() {
                           {product.price?.toFixed(2)} kr
                         </span>
                         {product.is_on_sale && (
-                          <span className="text-xs text-gray-500 line-through">
-                            {product.original_price?.toFixed(2)} kr
-                          </span>
+                          <>
+                            <span className="text-xs text-gray-500 line-through">
+                              {product.original_price?.toFixed(2)} kr
+                            </span>
+                            <span className="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded-full">
+                              -{product.discount_percentage}%
+                            </span>
+                          </>
                         )}
                       </div>
                       
