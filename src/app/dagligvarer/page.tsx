@@ -135,6 +135,14 @@ export default function DagligvarerPage() {
       if (data.success && data.products) {
         console.log(`✅ Got ${data.products.length} products for page ${page}`)
         
+        // Log raw data from API for debugging
+        console.log('🔍 Raw products from API:', data.products.slice(0, 3).map((p: any) => ({
+          name: p.name,
+          price: p.price,
+          original_price: p.original_price,
+          is_on_sale: p.is_on_sale
+        })))
+        
         // Fix false offers - only show as offer if price is actually lower
         const fixedProducts = data.products.map((product: any) => ({
           ...product,
@@ -151,6 +159,16 @@ export default function DagligvarerPage() {
             price: p.price,
             original_price: p.original_price,
             is_on_sale: p.is_on_sale
+          })))
+        } else {
+          console.log('❌ NO OFFERS FOUND! All products have is_on_sale: false or price >= original_price')
+          // Show first few products for debugging
+          console.log('🔍 First 3 products:', fixedProducts.slice(0, 3).map((p: any) => ({
+            name: p.name,
+            price: p.price,
+            original_price: p.original_price,
+            is_on_sale: p.is_on_sale,
+            priceCheck: p.price < p.original_price
           })))
         }
         

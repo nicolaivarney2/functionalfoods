@@ -870,6 +870,32 @@ export default function SupermarketScraperPage() {
                       <RefreshCw size={16} />
                       {isLoading ? 'Fikser...' : 'Fix Eksisterende Produkter'}
                     </button>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/admin/dagligvarer/test-rema?limit=5', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'fetchAllProducts' })
+                          })
+                          const data = await response.json()
+                          if (data.success) {
+                            console.log('🔍 Test products from database:', data.products.map((p: any) => ({
+                              name: p.name,
+                              price: p.price,
+                              original_price: p.original_price,
+                              is_on_sale: p.is_on_sale
+                            })))
+                          }
+                        } catch (error) {
+                          console.error('Test failed:', error)
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      🔍 Test Database
+                    </button>
                   </div>
                 </div>
                 
