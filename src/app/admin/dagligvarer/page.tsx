@@ -119,34 +119,22 @@ export default function SupermarketScraperPage() {
   const loadLatestProducts = async () => {
     setIsLoadingProducts(true)
     try {
-      // Use pagination to get all products
-      let allProducts: any[] = []
-      let page = 1
-      let hasMore = true
-      
-      while (hasMore) {
-        const response = await fetch(`/api/admin/dagligvarer/test-rema?page=${page}&limit=1000`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'fetchAllProducts'
-          })
+      // Only load first 50 products for admin display (much faster)
+      const response = await fetch('/api/admin/dagligvarer/test-rema?page=1&limit=50', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetchAllProducts'
         })
-        
-        const result = await response.json()
-        if (result.success && result.products) {
-          allProducts = [...allProducts, ...result.products]
-          hasMore = result.pagination?.hasMore || false
-          page++
-        } else {
-          break
-        }
-      }
+      })
       
-      setProducts(allProducts)
-      console.log(`✅ Loaded ${allProducts.length} products in admin`)
+      const result = await response.json()
+      if (result.success && result.products) {
+        setProducts(result.products)
+        console.log(`✅ Loaded ${result.products.length} products in admin (fast mode)`)
+      }
     } catch (error) {
       console.error('Failed to load products:', error)
     } finally {
