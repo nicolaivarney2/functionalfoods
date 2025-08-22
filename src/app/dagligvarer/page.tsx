@@ -563,99 +563,98 @@ export default function DagligvarerPage() {
               ) : (
                 // Normal grid display
                 productsToDisplay.map(product => (
-                <div 
-                  key={product.id} 
-                  className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
-                  onMouseEnter={() => handleProductHover(product)}
-                  onMouseLeave={() => setHoveredProduct(null)}
-                >
-                  {/* Product Image */}
-                  <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
-                    {product.image_url ? (
-                      <img 
-                        src={product.image_url} 
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-gray-400 text-sm">Intet billede</span>
-                      </div>
-                    )}
-                    
-                    <div className="absolute top-3 right-3">
-                      <button
-                        onClick={() => toggleFavorite(product.id)}
-                        className={`p-2 rounded-full shadow-sm ${
-                          product.isFavorite 
-                            ? 'bg-red-500 text-white' 
-                            : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
-                        } transition-all duration-200`}
-                      >
-                        <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
-                      </button>
-                    </div>
-                    {product.is_on_sale && (
-                      <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                        TILBUD
-                      </div>
-                    )}
-                    <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
-                      {product.store}
-                    </div>
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="p-4">
-                    <Link href={`/dagligvarer/produkt/${product.id}`}>
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
-                      {product.name}
-                    </h3>
-                    </Link>
-                    
-                    {/* Quantity and Unit */}
-                    <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
-                      {product.amount} {product.unit || 'stk'}
-                    </p>
-                    
-                    {/* Price */}
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="text-lg font-bold text-gray-900">
-                        {product.price?.toFixed(2)} kr
-                      </span>
-                      {product.is_on_sale && (
-                        <span className="text-xs text-gray-500 line-through">
-                          {product.original_price?.toFixed(2)} kr
-                        </span>
+                  <div 
+                    key={product.id} 
+                    className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
+                    onMouseEnter={() => handleProductHover(product)}
+                    onMouseLeave={() => setHoveredProduct(null)}
+                  >
+                    {/* Product Image */}
+                    <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
+                      {product.image_url ? (
+                        <img 
+                          src={product.image_url} 
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-gray-400 text-sm">Intet billede</span>
+                        </div>
                       )}
+                      
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={() => toggleFavorite(product.id)}
+                          className={`p-2 rounded-full shadow-sm ${
+                            product.isFavorite 
+                              ? 'bg-red-500 text-white' 
+                              : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
+                          } transition-all duration-200`}
+                        >
+                          <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
+                        </button>
+                      </div>
+                      {product.is_on_sale && (
+                        <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                          TILBUD
+                        </div>
+                      )}
+                      <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
+                        {product.store}
+                      </div>
                     </div>
-                    
-                    {/* Unit Price */}
-                    <p className="text-xs text-gray-600 mb-3">
-                      {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
-                    </p>
 
-                    {/* Actions */}
-                    <div className="flex space-x-2">
-                      <button className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-2 rounded text-xs font-medium transition-colors">
-                        <Plus size={12} className="inline mr-1" />
-                        Tilføj
-                      </button>
+                    {/* Product Info */}
+                    <div className="p-4">
                       <Link href={`/dagligvarer/produkt/${product.id}`}>
-                      <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
-                        <TrendingUp size={12} />
-                      </button>
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
+                          {product.name}
+                        </h3>
                       </Link>
+                      
+                      {/* Quantity and Unit */}
+                      <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
+                        {product.amount} {product.unit || 'stk'}
+                      </p>
+                      
+                      {/* Price */}
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="text-lg font-bold text-gray-900">
+                          {product.price?.toFixed(2)} kr
+                        </span>
+                        {product.is_on_sale && (
+                          <span className="text-xs text-gray-500 line-through">
+                            {product.original_price?.toFixed(2)} kr
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Unit Price */}
+                      <p className="text-xs text-gray-600 mb-3">
+                        {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+                      </p>
+
+                      {/* Actions */}
+                      <div className="flex space-x-2">
+                        <button className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-2 rounded text-xs font-medium transition-colors">
+                          <Plus size={12} className="inline mr-1" />
+                          Tilføj
+                        </button>
+                        <Link href={`/dagligvarer/produkt/${product.id}`}>
+                          <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
+                            <TrendingUp size={12} />
+                          </button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
-
-            )} {/* Close ternary operator */}
 
             {/* 🚀 FLOATING PRICE HISTORY CARD */}
             {hoveredProduct && (
