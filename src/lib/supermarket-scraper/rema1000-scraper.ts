@@ -90,13 +90,13 @@ export class Rema1000Scraper implements SupermarketAPI {
     // Method 1: Sequential search around known working product IDs
     // OPTIMIZED: Use realistic ID ranges based on known products
     const searchRanges = [
-      { name: 'Frugt & grønt', start: 304000, end: 305000, step: 50, limit: 15 },
-      { name: 'Kød & fisk', start: 440000, end: 441000, step: 50, limit: 15 },
-      { name: 'Køl', start: 410000, end: 411000, step: 50, limit: 10 },
-      { name: 'Ost m.v.', start: 500000, end: 501000, step: 50, limit: 10 },
-      { name: 'Frost', start: 600000, end: 601000, step: 50, limit: 8 },
-      { name: 'Mejeri', start: 700000, end: 701000, step: 50, limit: 8 },
-      { name: 'Kolonial', start: 800000, end: 801000, step: 50, limit: 8 }
+      { name: 'Frugt & grønt', start: 304000, end: 305000, step: 50, limit: 100 },
+      { name: 'Kød & fisk', start: 440000, end: 441000, step: 50, limit: 100 },
+      { name: 'Køl', start: 410000, end: 411000, step: 50, limit: 100 },
+      { name: 'Ost m.v.', start: 500000, end: 501000, step: 50, limit: 100 },
+      { name: 'Frost', start: 600000, end: 601000, step: 50, limit: 100 },
+      { name: 'Mejeri', start: 700000, end: 701000, step: 50, limit: 100 },
+      { name: 'Kolonial', start: 800000, end: 801000, step: 50, limit: 100 }
     ]
     
     for (const range of searchRanges) {
