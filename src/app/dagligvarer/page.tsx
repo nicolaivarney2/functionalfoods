@@ -102,8 +102,8 @@ export default function DagligvarerPage() {
       // Build cache key
       const cacheKey = `${selectedCategories.join(',')}-${searchQuery}-${showOnlyOffers}-${page}`
       
-      // Check cache first
-      if (productsCache[cacheKey] && !append) {
+      // Check cache first (but skip cache for offers to ensure fresh data)
+      if (productsCache[cacheKey] && !append && !showOnlyOffers) {
         console.log('🚀 Using cached products for:', cacheKey)
         setProducts(productsCache[cacheKey])
         setLoading(false)
@@ -140,6 +140,19 @@ export default function DagligvarerPage() {
           ...product,
           is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
         }))
+        
+        // Log offer status for debugging
+        const offersCount = fixedProducts.filter((p: any) => p.is_on_sale).length
+        console.log(`🎯 Products with offers: ${offersCount}/${fixedProducts.length}`)
+        if (offersCount > 0) {
+          const offers = fixedProducts.filter((p: any) => p.is_on_sale)
+          console.log('🎯 Sample offers:', offers.slice(0, 3).map((p: any) => ({
+            name: p.name,
+            price: p.price,
+            original_price: p.original_price,
+            is_on_sale: p.is_on_sale
+          })))
+        }
         
         // Smart sorting: Offers first, then meat category, then others
         const sortedProducts = fixedProducts.sort((a: any, b: any) => {
@@ -513,6 +526,18 @@ export default function DagligvarerPage() {
               className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-xs"
             >
               Nulstil filtre
+            </button>
+            
+            {/* Force Refresh Products */}
+            <button
+              onClick={() => {
+                setProductsCache({}) // Clear cache
+                fetchProducts(1, false) // Refresh first page
+                fetchCategoryCounts() // Refresh counts
+              }}
+              className="w-full bg-blue-100 text-blue-700 py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors text-xs mt-2"
+            >
+              🔄 Opdater produkter
             </button>
           </div>
 
