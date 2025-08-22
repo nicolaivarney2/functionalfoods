@@ -90,16 +90,30 @@ export default function DagligvarerPage() {
   const [hasMore, setHasMore] = useState(true)
   const [totalProducts, setTotalProducts] = useState(0)
   const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({})
+  
+  // Cache for products to avoid refetching
+  const [productsCache, setProductsCache] = useState<{[key: string]: any[]}>({})
 
-  // Fetch products with pagination
+  // Fetch products with pagination and caching
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
     try {
       if (!append) setLoading(true)
       
+      // Build cache key
+      const cacheKey = `${selectedCategories.join(',')}-${searchQuery}-${showOnlyOffers}-${page}`
+      
+      // Check cache first
+      if (productsCache[cacheKey] && !append) {
+        console.log('🚀 Using cached products for:', cacheKey)
+        setProducts(productsCache[cacheKey])
+        setLoading(false)
+        return
+      }
+      
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '20', // Ultra fast loading with pagination
+        limit: '10', // Super ultra fast loading with pagination
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
         ...(searchQuery ? { search: searchQuery } : {}),
         ...(showOnlyOffers ? { offers: 'true' } : {})
@@ -143,6 +157,8 @@ export default function DagligvarerPage() {
           setProducts(prev => [...prev, ...sortedProducts])
         } else {
           setProducts(sortedProducts)
+          // Cache the results
+          setProductsCache(prev => ({ ...prev, [cacheKey]: sortedProducts }))
         }
         
         setHasMore(data.pagination?.hasMore || false)
@@ -292,13 +308,16 @@ export default function DagligvarerPage() {
       setSelectedCategories(['all'])
     } else {
       setSelectedCategories(prev => {
-        // If selecting a specific category, remove 'all' and add the category
+        // If 'all' is selected, remove it and add the specific category
+        if (prev.includes('all')) {
+          return [categoryName]
+        }
+        // If category is already selected, remove it and go back to 'all'
         if (prev.includes(categoryName)) {
-          // If category is already selected, remove it and go back to 'all'
           return ['all']
         } else {
-          // Select this category instead of 'all'
-          return [categoryName]
+          // Add this category to existing selection
+          return [...prev, categoryName]
         }
       })
     }
@@ -427,7 +446,7 @@ export default function DagligvarerPage() {
                   />
                   <span className="text-xs">Vis kun tilbud</span>
                   <span className="ml-auto text-xs text-gray-500">
-                    ({products.filter(p => p.is_on_sale).length})
+                    ({products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length})
                   </span>
                 </label>
 
