@@ -210,7 +210,8 @@ export async function POST(request: NextRequest) {
           const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?select=*&store=eq.REMA 1000`, {
             headers: {
               'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Range': '0-4999' // Get up to 5000 products instead of default 1000
             }
           })
           
