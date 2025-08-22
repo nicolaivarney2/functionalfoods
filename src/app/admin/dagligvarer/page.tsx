@@ -885,7 +885,9 @@ export default function SupermarketScraperPage() {
                               name: p.name,
                               price: p.price,
                               original_price: p.original_price,
-                              is_on_sale: p.is_on_sale
+                              is_on_sale: p.is_on_sale,
+                              // Log ALL fields to see what exists
+                              allFields: Object.keys(p)
                             })))
                           }
                         } catch (error) {
@@ -894,7 +896,7 @@ export default function SupermarketScraperPage() {
                       }}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                     >
-                      🔍 Test Database
+                      🔍 Test Database Fields
                     </button>
                   </div>
                 </div>
