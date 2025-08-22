@@ -94,7 +94,7 @@ export default function DagligvarerPage() {
   // Cache for products to avoid refetching
   const [productsCache, setProductsCache] = useState<{[key: string]: any[]}>({})
 
-  // Fetch products with pagination and caching
+  // Fetch products with REAL pagination - only 10 products at a time
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
     try {
       if (!append) setLoading(true)
@@ -113,11 +113,13 @@ export default function DagligvarerPage() {
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '10', // Super ultra fast loading with pagination
+        limit: '10', // ONLY 10 products per page
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
         ...(searchQuery ? { search: searchQuery } : {}),
         ...(showOnlyOffers ? { offers: 'true' } : {})
       })
+      
+      console.log(`🔄 Fetching page ${page} with limit 10...`)
       
       const response = await fetch(`/api/admin/dagligvarer/test-rema?${params}`, {
         method: 'POST',
@@ -131,6 +133,8 @@ export default function DagligvarerPage() {
 
       const data = await response.json()
       if (data.success && data.products) {
+        console.log(`✅ Got ${data.products.length} products for page ${page}`)
+        
         // Fix false offers - only show as offer if price is actually lower
         const fixedProducts = data.products.map((product: any) => ({
           ...product,
@@ -162,8 +166,10 @@ export default function DagligvarerPage() {
         }
         
         setHasMore(data.pagination?.hasMore || false)
-        setTotalProducts(data.pagination?.total || fixedProducts.length)
+        setTotalProducts(data.pagination?.total || 0)
         setCurrentPage(page)
+        
+        console.log(`📊 Total products: ${data.pagination?.total || 0}, Current page: ${page}, Has more: ${data.pagination?.hasMore || false}`)
       } else {
         if (!append) setProducts([])
       }
@@ -779,6 +785,19 @@ export default function DagligvarerPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Loading Indicator for Infinite Scroll */}
+            {hasMore && (
+              <div className="text-center py-8">
+                <div className="flex items-center justify-center gap-2 text-gray-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                  <span className="text-sm">Indlæser flere produkter...</span>
+                </div>
+                <p className="text-sm text-gray-400 mt-2">
+                  Viser {products.length} af {totalProducts} produkter
+                </p>
               </div>
             )}
 

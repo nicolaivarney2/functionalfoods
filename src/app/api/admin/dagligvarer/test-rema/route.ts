@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
           query += `&is_on_sale=eq.true`
         }
         
-        // Use service role key with pagination to get all products
+        // Use service role key with REAL pagination - only fetch requested page
         try {
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
           const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
             baseQuery = baseQuery.eq('is_on_sale', true)
           }
           
-                    // Get total count first using a separate count query
+          // Get total count first using a separate count query
           const { count: totalCount, error: countError } = await supabase
             .from('supermarket_products')
             .select('*', { count: 'exact', head: true })
@@ -349,71 +349,27 @@ export async function POST(request: NextRequest) {
           
           console.log(`🔍 Total products in database: ${totalCount}`)
           
-          // If limit is reasonable, get all products using pagination
-          if (limit <= 10000) {
-            let allProducts = []
-            let currentPage = 0
-            const batchSize = 1000
-            
-            while (allProducts.length < (totalCount || 0)) {
-              console.log(`🔄 Fetching batch ${currentPage + 1}: ${allProducts.length + 1} to ${Math.min(allProducts.length + batchSize, totalCount || 0)}`)
-              
-              const { data: batch, error: batchError } = await baseQuery
-                .range(currentPage * batchSize, (currentPage + 1) * batchSize - 1)
-                .order('name', { ascending: true })
-              
-              if (batchError) {
-                throw new Error(`Batch query failed: ${batchError.message}`)
-              }
-              
-              if (batch && batch.length > 0) {
-                allProducts.push(...batch)
-                currentPage++
-              } else {
-                break
-              }
-            }
-            
-            console.log(`✅ Fetched all ${allProducts.length} products in ${currentPage} batches`)
-            
-            const products = allProducts
-            const count = totalCount
-            
-            console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
-            
-            return NextResponse.json({ 
-              success: true, 
-              products: products || [],
-              pagination: {
-                page,
-                limit,
-                total: count || 0,
-                hasMore: false // All products fetched
-              }
-            })
-          } else {
-            // For very high limits, apply range to avoid memory issues
-            const { data: products, error, count } = await baseQuery
-              .range(offset, offset + limit - 1)
-              .order('name', { ascending: true })
-            
-            if (error) {
-              throw new Error(`Database query failed: ${error.message}`)
-            }
-            
-            console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
-            
-            return NextResponse.json({ 
-              success: true, 
-              products: products || [],
-              pagination: {
-                page,
-                limit,
-                total: count || 0,
-                hasMore: (products?.length || 0) === limit
-              }
-            })
+          // Apply REAL pagination - only fetch the requested page
+          const { data: products, error } = await baseQuery
+            .range(offset, offset + limit - 1)
+            .order('name', { ascending: true })
+          
+          if (error) {
+            throw new Error(`Database query failed: ${error.message}`)
           }
+          
+          console.log(`✅ Fetched ${products?.length || 0} products for page ${page} (offset: ${offset}, limit: ${limit})`)
+          
+          return NextResponse.json({ 
+            success: true, 
+            products: products || [],
+            pagination: {
+              page,
+              limit,
+              total: totalCount || 0,
+              hasMore: (offset + limit) < (totalCount || 0)
+            }
+          })
           
         } catch (dbError) {
           console.error('❌ Database query failed:', dbError)
