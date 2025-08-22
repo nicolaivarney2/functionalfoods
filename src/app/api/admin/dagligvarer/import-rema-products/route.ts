@@ -191,66 +191,88 @@ export async function POST(request: NextRequest) {
       let fixedProducts = 0
       const errors: string[] = []
       
-      // Process each existing product
-      for (const product of existingProducts || []) {
-        try {
-          // For existing products, we need to recalculate is_on_sale
-          // Since REMA doesn't provide original_price, we'll use a different approach
-          
-          // Check if this product has a campaign price in price history
-          const { data: priceHistory } = await supabase
-            .from('supermarket_price_history')
-            .select('price, original_price, is_on_sale')
-            .eq('product_external_id', product.external_id)
-            .order('created_at', { ascending: false })
-            .limit(5)
-          
-          // If we have price history, check for price changes
-          let isOnSale = false
-          let originalPrice = product.original_price
-          
-          if (priceHistory && priceHistory.length > 1) {
-            // Look for price changes that indicate sales
-            const recentPrices = priceHistory.map(ph => ph.price)
-            const uniquePrices = Array.from(new Set(recentPrices))
+      // Process products in batches to avoid Vercel timeout
+      const batchSize = 100
+      const totalProducts = existingProducts?.length || 0
+      
+      for (let i = 0; i < totalProducts; i += batchSize) {
+        const batch = existingProducts?.slice(i, i + batchSize) || []
+        console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(totalProducts/batchSize)} (${batch.length} products)`)
+        
+        // Process batch in parallel for speed
+        const batchPromises = batch.map(async (product) => {
+          try {
+            // Check if this product has a campaign price in price history
+            const { data: priceHistory } = await supabase
+              .from('supermarket_price_history')
+              .select('price, original_price, is_on_sale')
+              .eq('product_external_id', product.external_id)
+              .order('created_at', { ascending: false })
+              .limit(5)
             
-            if (uniquePrices.length > 1) {
-              // Price has changed - might be a sale
-              const currentPrice = product.price
-              const previousPrice = priceHistory[1]?.price || product.original_price
+            // If we have price history, check for price changes
+            let isOnSale = false
+            let originalPrice = product.original_price
+            
+            if (priceHistory && priceHistory.length > 1) {
+              // Look for price changes that indicate sales
+              const recentPrices = priceHistory.map(ph => ph.price)
+              const uniquePrices = Array.from(new Set(recentPrices))
               
-              if (currentPrice < previousPrice) {
-                isOnSale = true
-                originalPrice = previousPrice
+              if (uniquePrices.length > 1) {
+                // Price has changed - might be a sale
+                const currentPrice = product.price
+                const previousPrice = priceHistory[1]?.price || product.original_price
+                
+                if (currentPrice < previousPrice) {
+                  isOnSale = true
+                  originalPrice = previousPrice
+                }
               }
             }
+            
+            // Update the product with corrected sale information
+            const { error: updateError } = await supabase
+              .from('supermarket_products')
+              .update({
+                is_on_sale: isOnSale,
+                original_price: originalPrice,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', product.id)
+            
+            if (updateError) {
+              return { success: false, error: `Failed to fix ${product.name}: ${updateError.message}` }
+            } else {
+              return { success: true, product: product.name }
+            }
+            
+          } catch (error) {
+            return { success: false, error: `Error processing ${product.name}: ${error}` }
           }
-          
-          // Update the product with corrected sale information
-          const { error: updateError } = await supabase
-            .from('supermarket_products')
-            .update({
-              is_on_sale: isOnSale,
-              original_price: originalPrice,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', product.id)
-          
-          if (updateError) {
-            errors.push(`Failed to fix ${product.name}: ${updateError.message}`)
-          } else {
+        })
+        
+        // Wait for batch to complete
+        const batchResults = await Promise.all(batchPromises)
+        
+        // Count successes and errors
+        batchResults.forEach(result => {
+          if (result.success) {
             fixedProducts++
+          } else if (result.error) {
+            errors.push(result.error)
           }
-          
-        } catch (error) {
-          errors.push(`Error processing ${product.name}: ${error}`)
-        }
+        })
+        
+        console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} completed: ${batchResults.filter(r => r.success).length} fixed, ${batchResults.filter(r => !r.success).length} errors`)
       }
       
       return NextResponse.json({
         success: true,
-        message: `Fixed ${fixedProducts} products`,
+        message: `Fixed ${fixedProducts} products in ${Math.ceil(totalProducts/batchSize)} batches`,
         fixedProducts,
+        totalProducts,
+        batches: Math.ceil(totalProducts/batchSize),
         errors: errors.length > 0 ? errors : undefined
       })
     }
