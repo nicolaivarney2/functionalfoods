@@ -126,7 +126,20 @@ export class DatabaseService {
    */
   async getSupermarketProducts(): Promise<SupermarketProduct[]> {
     try {
-      const { data, error } = await createSupabaseClient()
+      // Use service role client for admin operations to get all products
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      
+      if (!supabaseUrl || !serviceRoleKey) {
+        console.error('Missing Supabase service role key')
+        return []
+      }
+      
+      // Create service role client
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(supabaseUrl, serviceRoleKey)
+      
+      const { data, error } = await supabase
         .from('supermarket_products')
         .select('*')
         .order('name', { ascending: true })
@@ -136,6 +149,7 @@ export class DatabaseService {
         return []
       }
 
+      console.log(`🔍 Database service: Found ${data?.length || 0} products`)
       return data || []
     } catch (error) {
       console.error('Error in getSupermarketProducts:', error)
