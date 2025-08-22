@@ -886,6 +886,7 @@ export default function SupermarketScraperPage() {
                               price: p.price,
                               original_price: p.original_price,
                               is_on_sale: p.is_on_sale,
+                              priceCheck: p.price < p.original_price,
                               // Log ALL fields to see what exists
                               allFields: Object.keys(p)
                             })))
@@ -897,6 +898,33 @@ export default function SupermarketScraperPage() {
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                     >
                       🔍 Test Database Fields
+                    </button>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'fetchAllProducts' })
+                          })
+                          const data = await response.json()
+                          if (data.success) {
+                            console.log('💰 Price analysis:', data.products.map((p: any) => ({
+                              name: p.name,
+                              price: p.price,
+                              original_price: p.original_price,
+                              priceCheck: p.price < p.original_price,
+                              difference: p.original_price ? (p.original_price - p.price).toFixed(2) : 'N/A'
+                            })))
+                          }
+                        } catch (error) {
+                          console.error('Price test failed:', error)
+                        }
+                      }}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 mt-2"
+                    >
+                      💰 Check Prices
                     </button>
                   </div>
                 </div>
