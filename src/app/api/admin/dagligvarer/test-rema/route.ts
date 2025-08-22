@@ -203,15 +203,36 @@ export async function POST(request: NextRequest) {
         }
 
       case 'fetchAllProducts':
-        console.log('🔄 Fetching all products from database...')
+        console.log('🔄 Fetching products from database...')
+        
+        // Extract pagination parameters from request
+        const url = new URL(request.url)
+        const page = parseInt(url.searchParams.get('page') || '1')
+        const limit = parseInt(url.searchParams.get('limit') || '100')
+        const category = url.searchParams.get('category')
+        const search = url.searchParams.get('search')
+        
+        // Calculate offset for pagination
+        const offset = (page - 1) * limit
+        
+        // Build query with filters
+        let query = `select=*&store=eq.REMA 1000&limit=${limit}&offset=${offset}`
+        
+        if (category && category !== 'all') {
+          query += `&category=eq.${category}`
+        }
+        
+        if (search) {
+          query += `&name=ilike.*${search}*`
+        }
         
         // Use our new import API to get products from database
         try {
-          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?select=*&store=eq.REMA 1000`, {
+          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?${query}`, {
             headers: {
               'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
               'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-              'Range': '0-4999' // Get up to 5000 products instead of default 1000
+              'Prefer': 'count=exact' // Get total count for pagination
             }
           })
           
@@ -220,12 +241,19 @@ export async function POST(request: NextRequest) {
           }
           
           const products = await response.json()
-          console.log(`✅ Fetched ${products.length} products from database`)
+          const totalCount = response.headers.get('content-range')?.split('/')[1] || products.length
+          
+          console.log(`✅ Fetched ${products.length} products (page ${page}, total: ${totalCount})`)
           
           return NextResponse.json({ 
             success: true, 
-            productsCount: products.length,
-            products: products // Return all products
+            products: products,
+            pagination: {
+              page,
+              limit,
+              total: parseInt(totalCount),
+              hasMore: products.length === limit
+            }
           })
           
         } catch (dbError) {

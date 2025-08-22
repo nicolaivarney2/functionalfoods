@@ -86,56 +86,82 @@ export default function DagligvarerPage() {
   const [hoveredProduct, setHoveredProduct] = useState<any>(null)
   const [priceHistoryCache, setPriceHistoryCache] = useState<{[key: string]: any[]}>({})
   const [loadingHistory, setLoadingHistory] = useState<{[key: string]: boolean}>({})
-  const [displayedProducts, setDisplayedProducts] = useState<number>(50) // Lazy loading
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalProducts, setTotalProducts] = useState(0)
 
-  // Fetch real products from API
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setLoading(true)
-        const response = await fetch('/api/admin/dagligvarer/test-rema', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'fetchAllProducts'
-          })
+  // Fetch products with pagination
+  const fetchProducts = async (page: number = 1, append: boolean = false) => {
+    try {
+      if (!append) setLoading(true)
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '100',
+        ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
+        ...(searchQuery ? { search: searchQuery } : {})
+      })
+      
+      const response = await fetch(`/api/admin/dagligvarer/test-rema?${params}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetchAllProducts'
         })
+      })
 
-        const data = await response.json()
-        if (data.success && data.products) {
-          // Fix false offers - only show as offer if price is actually lower
-          const fixedProducts = data.products.map((product: any) => ({
-            ...product,
-            is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
-          }))
-          setProducts(fixedProducts)
+      const data = await response.json()
+      if (data.success && data.products) {
+        // Fix false offers - only show as offer if price is actually lower
+        const fixedProducts = data.products.map((product: any) => ({
+          ...product,
+          is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
+        }))
+        
+        if (append) {
+          setProducts(prev => [...prev, ...fixedProducts])
         } else {
-          setProducts([])
+          setProducts(fixedProducts)
         }
-      } catch (error) {
-        console.error('Failed to fetch products:', error)
-        setProducts([])
-      } finally {
-        setLoading(false)
+        
+        setHasMore(data.pagination?.hasMore || false)
+        setTotalProducts(data.pagination?.total || fixedProducts.length)
+        setCurrentPage(page)
+      } else {
+        if (!append) setProducts([])
       }
+    } catch (error) {
+      console.error('Failed to fetch products:', error)
+      if (!append) setProducts([])
+    } finally {
+      setLoading(false)
     }
+  }
 
-    fetchProducts()
+  // Initial fetch
+  useEffect(() => {
+    fetchProducts(1, false)
   }, [])
 
-  // Lazy loading - load more products when scrolling
+  // Refetch when search or category changes
+  useEffect(() => {
+    fetchProducts(1, false)
+  }, [searchQuery, selectedCategories])
+
+  // Infinite scroll - load more products when scrolling
   useEffect(() => {
     const handleScroll = () => {
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1000) {
-        setDisplayedProducts(prev => Math.min(prev + 50, products.length))
+      if (hasMore && !loading && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1000) {
+        fetchProducts(currentPage + 1, true) // Append next page
       }
     }
 
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [products.length])
+  }, [hasMore, loading, currentPage])
 
   // Dynamic categories from products
   const getDynamicCategories = (products: any[]) => {
@@ -180,14 +206,13 @@ export default function DagligvarerPage() {
     }))
   }
 
+  // Apply local filters that aren't handled by the API
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategories.includes('all') || selectedCategories.includes(product.category)
     const matchesOffers = !showOnlyOffers || product.is_on_sale
     const matchesStores = selectedStores.includes(product.store)
     const matchesFavorites = !showFavorites || product.isFavorite
     
-    return matchesSearch && matchesCategory && matchesOffers && matchesStores && matchesFavorites
+    return matchesOffers && matchesStores && matchesFavorites
   })
 
   // Group products by category if enabled
@@ -200,10 +225,10 @@ export default function DagligvarerPage() {
       }, {})
     : {}
 
-  // Get products to display (with lazy loading)
+  // Get products to display
   const productsToDisplay = groupByDepartment 
     ? Object.entries(groupedProducts).flatMap(([category, products]: [string, any[]]) => products)
-    : filteredProducts // Show all filtered products by default
+    : filteredProducts
 
   const toggleStore = (storeName: string) => {
     setSelectedStores(prev => 
@@ -443,8 +468,11 @@ export default function DagligvarerPage() {
             {/* Product Count */}
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">
-                {loading ? 'Henter produkter...' : `${filteredProducts.length} produkter fundet`}
+                {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
               </h2>
+              {hasMore && (
+                <p className="text-sm text-gray-500">Scroll ned for at se flere</p>
+              )}
             </div>
 
             {/* Products Grid */}
