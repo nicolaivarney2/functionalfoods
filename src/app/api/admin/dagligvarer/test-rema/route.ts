@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
           query += `&is_on_sale=eq.true`
         }
         
-        // Use service role key to get all products without limits
+        // Use service role key with pagination to get all products
         try {
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
           const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -288,53 +288,98 @@ export async function POST(request: NextRequest) {
           const { createClient } = await import('@supabase/supabase-js')
           const supabase = createClient(supabaseUrl, serviceRoleKey)
           
-          // Build query with service role client
-          let supabaseQuery = supabase
+          // Build base query
+          let baseQuery = supabase
             .from('supermarket_products')
             .select('*')
             .eq('store', 'REMA 1000')
           
           if (category && category !== 'all') {
-            supabaseQuery = supabaseQuery.eq('category', category)
+            baseQuery = baseQuery.eq('category', category)
           }
           
           if (search) {
-            supabaseQuery = supabaseQuery.ilike('name', `%${search}%`)
+            baseQuery = baseQuery.ilike('name', `%${search}%`)
           }
           
           if (showOffers) {
-            supabaseQuery = supabaseQuery.eq('is_on_sale', true)
+            baseQuery = baseQuery.eq('is_on_sale', true)
           }
           
-          // Apply pagination only if limit is reasonable
+          // Get total count first
+          const { count: totalCount, error: countError } = await baseQuery
+          
+          if (countError) {
+            throw new Error(`Count query failed: ${countError.message}`)
+          }
+          
+          console.log(`🔍 Total products in database: ${totalCount}`)
+          
+          // If limit is reasonable, get all products using pagination
           if (limit <= 10000) {
-            // For reasonable limits, get all products without range
-            supabaseQuery = supabaseQuery.order('name', { ascending: true })
+            let allProducts = []
+            let currentPage = 0
+            const batchSize = 1000
+            
+            while (allProducts.length < (totalCount || 0)) {
+              console.log(`🔄 Fetching batch ${currentPage + 1}: ${allProducts.length + 1} to ${Math.min(allProducts.length + batchSize, totalCount || 0)}`)
+              
+              const { data: batch, error: batchError } = await baseQuery
+                .range(currentPage * batchSize, (currentPage + 1) * batchSize - 1)
+                .order('name', { ascending: true })
+              
+              if (batchError) {
+                throw new Error(`Batch query failed: ${batchError.message}`)
+              }
+              
+              if (batch && batch.length > 0) {
+                allProducts.push(...batch)
+                currentPage++
+              } else {
+                break
+              }
+            }
+            
+            console.log(`✅ Fetched all ${allProducts.length} products in ${currentPage} batches`)
+            
+            const products = allProducts
+            const count = totalCount
+            
+            console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
+            
+            return NextResponse.json({ 
+              success: true, 
+              products: products || [],
+              pagination: {
+                page,
+                limit,
+                total: count || 0,
+                hasMore: false // All products fetched
+              }
+            })
           } else {
             // For very high limits, apply range to avoid memory issues
-            supabaseQuery = supabaseQuery
+            const { data: products, error, count } = await baseQuery
               .range(offset, offset + limit - 1)
               .order('name', { ascending: true })
-          }
-          
-          const { data: products, error, count } = await supabaseQuery
-          
-          if (error) {
-            throw new Error(`Database query failed: ${error.message}`)
-          }
-          
-          console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
-          
-          return NextResponse.json({ 
-            success: true, 
-            products: products || [],
-            pagination: {
-              page,
-              limit,
-              total: count || 0,
-              hasMore: (products?.length || 0) === limit
+            
+            if (error) {
+              throw new Error(`Database query failed: ${error.message}`)
             }
-          })
+            
+            console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
+            
+            return NextResponse.json({ 
+              success: true, 
+              products: products || [],
+              pagination: {
+                page,
+                limit,
+                total: count || 0,
+                hasMore: (products?.length || 0) === limit
+              }
+            })
+          }
           
         } catch (dbError) {
           console.error('❌ Database query failed:', dbError)
