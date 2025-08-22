@@ -173,20 +173,36 @@ export async function POST(request: NextRequest) {
     if (action === 'fixExistingProducts') {
       console.log('🔧 Starting fix of existing products...')
       
-      // Get all existing products from database
-      const { data: existingProducts, error: fetchError } = await supabase
-        .from('supermarket_products')
-        .select('*')
-        .eq('store', 'REMA 1000')
+      // Get all existing products from database using pagination
+      let existingProducts: any[] = []
+      let offset = 0
+      const limit = 1000
+      let hasMore = true
       
-      if (fetchError) {
-        return NextResponse.json({ 
-          success: false, 
-          error: `Failed to fetch existing products: ${fetchError.message}` 
-        })
+      while (hasMore) {
+        const { data: batch, error: fetchError } = await supabase
+          .from('supermarket_products')
+          .select('*')
+          .eq('store', 'REMA 1000')
+          .range(offset, offset + limit - 1)
+        
+        if (fetchError) {
+          return NextResponse.json({ 
+            success: false, 
+            error: `Failed to fetch existing products: ${fetchError.message}` 
+          })
+        }
+        
+        if (batch && batch.length > 0) {
+          existingProducts = [...existingProducts, ...batch]
+          offset += limit
+          hasMore = batch.length === limit
+        } else {
+          hasMore = false
+        }
       }
       
-      console.log(`🔍 Found ${existingProducts?.length || 0} existing products to fix`)
+      console.log(`🔍 Found ${existingProducts.length} existing products to fix`)
       
       let fixedProducts = 0
       const errors: string[] = []
