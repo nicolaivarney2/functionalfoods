@@ -914,6 +914,28 @@ export default function SupermarketScraperPage() {
                     >
                       💰 Check Prices
                     </button>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          // Simulate offers on meat products
+                          const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
+                            method: 'POST'
+                          })
+                          const data = await response.json()
+                          if (data.success) {
+                            console.log('🎯 Simulated offers:', data)
+                            // Reload products to see changes
+                            loadLatestProducts()
+                          }
+                        } catch (error) {
+                          console.error('Simulate offers failed:', error)
+                        }
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 mt-2"
+                    >
+                      🥩 Simulate Meat Offers
+                    </button>
                   </div>
                 </div>
                 

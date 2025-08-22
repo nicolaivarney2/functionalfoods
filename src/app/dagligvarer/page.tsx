@@ -342,18 +342,19 @@ export default function DagligvarerPage() {
 
   const toggleCategory = (categoryName: string) => {
     if (categoryName === 'all') {
+      // Selecting 'all' clears other selections
       setSelectedCategories(['all'])
     } else {
       setSelectedCategories(prev => {
-        // If 'all' is selected, remove it and add the specific category
+        // If 'all' is currently selected, replace it with this category
         if (prev.includes('all')) {
           return [categoryName]
         }
-        // If category is already selected, remove it and go back to 'all'
+        // If this category is already selected, remove it and go back to 'all'
         if (prev.includes(categoryName)) {
           return ['all']
         } else {
-          // Add this category to existing selection
+          // Add this category to existing selection (multiple categories allowed)
           return [...prev, categoryName]
         }
       })
