@@ -99,7 +99,7 @@ export default function DagligvarerPage() {
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '100',
+        limit: '10000', // Get all products at once
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
         ...(searchQuery ? { search: searchQuery } : {}),
         ...(showOnlyOffers ? { offers: 'true' } : {})
@@ -146,7 +146,7 @@ export default function DagligvarerPage() {
   // Fetch category counts
   const fetchCategoryCounts = async () => {
     try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10000', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
