@@ -46,9 +46,16 @@ export async function POST(request: NextRequest) {
     
     for (const product of meatProducts) {
       try {
-        // Simulate a 20% discount
-        const originalPrice = product.price
-        const discountedPrice = Math.round(originalPrice * 0.8 * 100) / 100 // 20% off, rounded to 2 decimals
+        // Simulate a 20% discount with better precision handling
+        const originalPrice = parseFloat(product.price)
+        const discountMultiplier = 0.8 // 20% off
+        const discountedPrice = Math.round(originalPrice * discountMultiplier * 100) / 100 // Round to 2 decimals
+        
+        // Ensure the discounted price is actually lower
+        if (discountedPrice >= originalPrice) {
+          console.log(`⚠️ Skipping ${product.name}: calculated price ${discountedPrice} >= original ${originalPrice}`)
+          continue
+        }
         
         const { error: updateError } = await supabase
           .from('supermarket_products')
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
           errors.push(`Failed to update ${product.name}: ${updateError.message}`)
         } else {
           updatedCount++
-          console.log(`✅ ${product.name}: ${originalPrice} kr → ${discountedPrice} kr (20% off)`)
+          console.log(`✅ ${product.name}: ${originalPrice} kr → ${discountedPrice} kr (20% off, diff: ${(originalPrice - discountedPrice).toFixed(2)} kr)`)
         }
       } catch (error) {
         errors.push(`Error processing ${product.name}: ${error}`)

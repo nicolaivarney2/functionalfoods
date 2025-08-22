@@ -76,7 +76,7 @@ const MiniPriceChart = ({ data }: { data: any[] }) => {
 export default function DagligvarerPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>(['all'])
-  const [showOnlyOffers, setShowOnlyOffers] = useState(false)
+  const [showOnlyOffers, setShowOnlyOffers] = useState(false) // Show all products by default, but offers first
   const [selectedStores, setSelectedStores] = useState(['REMA 1000']) // REMA 1000
   const [groupByDepartment, setGroupByDepartment] = useState(false)
   const [showFavorites, setShowFavorites] = useState(false)
@@ -93,6 +93,9 @@ export default function DagligvarerPage() {
   
   // Cache for products to avoid refetching
   const [productsCache, setProductsCache] = useState<{[key: string]: any[]}>({})
+  
+  // Track if offers are available in the database
+  const [offersAvailableInDB, setOffersAvailableInDB] = useState<number>(0)
 
   // Fetch products with REAL pagination - only 10 products at a time
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
@@ -140,14 +143,47 @@ export default function DagligvarerPage() {
           name: p.name,
           price: p.price,
           original_price: p.original_price,
-          is_on_sale: p.is_on_sale
+          is_on_sale: p.is_on_sale,
+          category: p.category
         })))
         
+        // Check if we're filtering for offers
+        if (showOnlyOffers) {
+          console.log('🎯 FILTERING FOR OFFERS ONLY - API should return only is_on_sale=true products')
+          const rawOffersCount = data.products.filter((p: any) => p.is_on_sale).length
+          console.log(`🎯 Raw offers count from API: ${rawOffersCount}/${data.products.length}`)
+        }
+        
         // Fix false offers - only show as offer if price is actually lower
-        const fixedProducts = data.products.map((product: any) => ({
-          ...product,
-          is_on_sale: product.is_on_sale && product.original_price && product.price < product.original_price
-        }))
+        const fixedProducts = data.products.map((product: any) => {
+          // Better price comparison with tolerance for floating-point precision
+          const hasValidOriginalPrice = product.original_price && typeof product.original_price === 'number'
+          const hasValidPrice = product.price && typeof product.price === 'number'
+          const isActuallyOnSale = product.is_on_sale && hasValidOriginalPrice && hasValidPrice
+          
+          // Use a small tolerance (0.01 kr) for floating-point comparison
+          const priceDifference = hasValidOriginalPrice && hasValidPrice ? product.original_price - product.price : 0
+          const isPriceLower = priceDifference > 0.01
+          
+          const finalIsOnSale = isActuallyOnSale && isPriceLower
+          
+          // Debug logging for each product
+          if (product.is_on_sale) {
+            console.log(`🔍 Product "${product.name}":`, {
+              original_price: product.original_price,
+              price: product.price,
+              priceDifference: priceDifference.toFixed(4),
+              isPriceLower,
+              finalIsOnSale,
+              category: product.category
+            })
+          }
+          
+          return {
+            ...product,
+            is_on_sale: finalIsOnSale
+          }
+        })
         
         // Log offer status for debugging
         const offersCount = fixedProducts.filter((p: any) => p.is_on_sale).length
@@ -172,13 +208,13 @@ export default function DagligvarerPage() {
           })))
         }
         
-        // Smart sorting: Offers first, then meat category, then others
+        // Smart sorting: Offers ALWAYS first, then meat category, then others
         const sortedProducts = fixedProducts.sort((a: any, b: any) => {
-          // First: Offers (is_on_sale = true)
+          // First: Offers (is_on_sale = true) - ALWAYS PRIORITY
           if (a.is_on_sale && !b.is_on_sale) return -1
           if (!a.is_on_sale && b.is_on_sale) return 1
           
-          // Second: Meat category comes first
+          // Second: Meat category comes first (among non-offer products)
           const aIsMeat = a.category === 'Kød, fisk & fjerkræ'
           const bIsMeat = b.category === 'Kød, fisk & fjerkræ'
           if (aIsMeat && !bIsMeat) return -1
@@ -243,10 +279,40 @@ export default function DagligvarerPage() {
     }
   }
 
+  // Check if there are offers available in the database
+  const checkForOffers = async () => {
+    try {
+      const response = await fetch('/api/admin/dagligvarer/test-rema?page=1&limit=5&offers=true', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetchAllProducts'
+        })
+      })
+      
+      const data = await response.json()
+      if (data.success && data.products) {
+        const offersCount = data.products.filter((p: any) => p.is_on_sale).length
+        console.log(`🎯 Database check: ${offersCount} offers available in database`)
+        setOffersAvailableInDB(offersCount)
+        
+        // Since offers are shown first but all products are visible
+        if (offersCount > 0) {
+          console.log('💡 Offers will be displayed first, but all products are visible')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check for offers:', error)
+    }
+  }
+
   // Initial fetch
   useEffect(() => {
     fetchProducts(1, false)
     fetchCategoryCounts()
+    checkForOffers() // Check if there are offers available
   }, [])
 
   // Refetch when search, category, or offers filter changes
@@ -383,6 +449,16 @@ export default function DagligvarerPage() {
     return
   }
 
+  // Check if there are any offers available in the current product set
+  const hasOffersAvailable = products.some(p => p.is_on_sale && p.original_price && p.price < p.original_price)
+  
+  // Auto-enable offers filter if there are offers available and user hasn't explicitly disabled it
+  useEffect(() => {
+    if (hasOffersAvailable && !showOnlyOffers && products.length > 0) {
+      console.log('🎯 Auto-detected offers available! Consider enabling "Vis kun tilbud" filter')
+    }
+  }, [hasOffersAvailable, showOnlyOffers, products.length])
+
   return (
     <>
       <style jsx global>{`
@@ -475,6 +551,21 @@ export default function DagligvarerPage() {
               <h3 className="font-semibold text-gray-900 mb-3 text-xs">Yderligere filtre</h3>
               
               <div className="space-y-3">
+                {/* Offers notification - shows when offers are available */}
+                {hasOffersAvailable && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600">🎯</span>
+                      <span className="text-sm text-green-800">
+                        {products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length} tilbud vises først
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-600 mt-1">
+                      Alle produkter vises, men tilbud prioriteres øverst
+                    </p>
+                  </div>
+                )}
+                
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -483,8 +574,21 @@ export default function DagligvarerPage() {
                     className="text-green-600 rounded"
                   />
                   <span className="text-xs">Vis kun tilbud</span>
-                  <span className="ml-auto text-xs text-gray-500">
+                  <span className="ml-auto text-xs text-green-600 font-medium">
                     ({products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length})
+                  </span>
+                </label>
+                
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!showOnlyOffers}
+                    onChange={(e) => setShowOnlyOffers(!e.target.checked)}
+                    className="text-blue-600 rounded"
+                  />
+                  <span className="text-xs">Vis alle produkter (tilbud først)</span>
+                  <span className="ml-auto text-xs text-blue-600 font-medium">
+                    ({totalProducts})
                   </span>
                 </label>
 
@@ -537,7 +641,7 @@ export default function DagligvarerPage() {
               onClick={() => {
                 setSearchQuery('')
                 setSelectedCategories(['all'])
-                setShowOnlyOffers(false)
+                setShowOnlyOffers(false) // Show all products by default
                 setSelectedStores(['REMA 1000'])
                 setGroupByDepartment(false)
                 setShowFavorites(false)
@@ -564,14 +668,33 @@ export default function DagligvarerPage() {
           <div className="flex-1">
             {/* Product Count */}
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
-              <div className="text-right">
-                <p className="text-xs text-gray-400">
-                  {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
-                </p>
-                {hasMore && (
-                  <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
-                )}
+              {/* Offers Banner */}
+              {hasOffersAvailable && (
+                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4 mb-4 w-full">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">🎯</span>
+                    <div>
+                      <h3 className="font-semibold text-green-800">
+                        Tilbud vises først!
+                      </h3>
+                      <p className="text-sm text-green-600">
+                        {products.filter(p => p.is_on_sale && p.original_price && p.price < p.original_price).length} tilbud prioriteres øverst af {totalProducts} produkter
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-4">
+                <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
+                <div className="text-right">
+                  <p className="text-xs text-gray-400">
+                    {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
+                  </p>
+                  {hasMore && (
+                    <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
+                  )}
+                </div>
               </div>
             </div>
 

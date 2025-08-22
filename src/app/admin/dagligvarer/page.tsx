@@ -137,6 +137,19 @@ export default function SupermarketScraperPage() {
         
         // Automatically simulate meat offers after loading products
         simulateMeatOffers()
+        
+        // Debug: Check if any products are already on sale
+        const productsOnSale = result.products.filter((p: any) => p.is_on_sale)
+        console.log(`🔍 Admin loaded ${productsOnSale.length} products already on sale`)
+        if (productsOnSale.length > 0) {
+          console.log('🎯 Sample products on sale:', productsOnSale.slice(0, 3).map((p: any) => ({
+            name: p.name,
+            price: p.price,
+            original_price: p.original_price,
+            is_on_sale: p.is_on_sale,
+            category: p.category
+          })))
+        }
       }
     } catch (error) {
       console.error('Failed to load products:', error)
@@ -147,16 +160,43 @@ export default function SupermarketScraperPage() {
 
   const simulateMeatOffers = async () => {
     try {
-      console.log('🥩 Automatically simulating meat offers...')
+      console.log('🥩 Manually simulating meat offers...')
+      setIsLoading(true)
+      
       const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
         method: 'POST'
       })
       const data = await response.json()
+      
       if (data.success) {
-        console.log('🎯 Meat offers simulated automatically:', data)
+        console.log('🎯 Meat offers simulated successfully:', data)
+        
+        // Show success message
+        setTestResult({
+          success: true,
+          message: `🥩 Meat offers simulated on ${data.updated} products! ${data.errors?.length || 0} errors.`,
+          timestamp: new Date().toISOString()
+        })
+        
+        // Refresh the products list to see the changes
+        loadLatestProducts()
+      } else {
+        console.error('❌ Meat simulation failed:', data)
+        setTestResult({
+          success: false,
+          message: `❌ Meat simulation failed: ${data.error || 'Unknown error'}`,
+          timestamp: new Date().toISOString()
+        })
       }
     } catch (error) {
       console.error('Auto meat offers failed:', error)
+      setTestResult({
+        success: false,
+        message: `❌ Meat simulation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        timestamp: new Date().toISOString()
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -640,6 +680,15 @@ export default function SupermarketScraperPage() {
                     <RefreshCw size={16} />
                     Fetch Products
                   </button>
+                  
+                  <button
+                    onClick={simulateMeatOffers}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    🥩
+                    Simulate Meat Offers
+                  </button>
                 </div>
 
                 {/* Test Results */}
@@ -892,7 +941,6 @@ export default function SupermarketScraperPage() {
                               price: p.price,
                               original_price: p.original_price,
                               is_on_sale: p.is_on_sale,
-                              priceCheck: p.price < p.original_price,
                               // Log ALL fields to see what exists
                               allFields: Object.keys(p)
                             })))

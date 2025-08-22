@@ -360,6 +360,22 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Fetched ${products?.length || 0} products for page ${page} (offset: ${offset}, limit: ${limit})`)
           
+          // Debug: Log the first few products to see their offer status
+          if (products && products.length > 0) {
+            console.log('🔍 First 3 products from database:', products.slice(0, 3).map((p: any) => ({
+              name: p.name,
+              price: p.price,
+              original_price: p.original_price,
+              is_on_sale: p.is_on_sale,
+              category: p.category
+            })))
+            
+            if (showOffers) {
+              const offersCount = products.filter((p: any) => p.is_on_sale).length
+              console.log(`🎯 Offers filter active: ${offersCount}/${products.length} products have is_on_sale=true`)
+            }
+          }
+          
           return NextResponse.json({ 
             success: true, 
             products: products || [],
