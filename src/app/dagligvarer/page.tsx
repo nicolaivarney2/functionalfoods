@@ -203,7 +203,7 @@ export default function DagligvarerPage() {
   // Get products to display (with lazy loading)
   const productsToDisplay = groupByDepartment 
     ? Object.entries(groupedProducts).flatMap(([category, products]: [string, any[]]) => products)
-    : filteredProducts.slice(0, displayedProducts)
+    : filteredProducts // Show all filtered products by default
 
   const toggleStore = (storeName: string) => {
     setSelectedStores(prev => 
