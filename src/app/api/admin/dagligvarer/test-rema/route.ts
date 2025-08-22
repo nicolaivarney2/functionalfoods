@@ -275,33 +275,58 @@ export async function POST(request: NextRequest) {
           query += `&is_on_sale=eq.true`
         }
         
-        // Use our new import API to get products from database
+        // Use service role key to get all products without limits
         try {
-          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?${query}`, {
-            headers: {
-              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-              'Prefer': 'count=exact' // Get total count for pagination
-            }
-          })
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
           
-          if (!response.ok) {
-            throw new Error(`Database query failed: ${response.status}`)
+          if (!supabaseUrl || !serviceRoleKey) {
+            throw new Error('Missing Supabase service role key')
           }
           
-          const products = await response.json()
-          const totalCount = response.headers.get('content-range')?.split('/')[1] || products.length
+          // Create service role client
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabase = createClient(supabaseUrl, serviceRoleKey)
           
-          console.log(`✅ Fetched ${products.length} products (page ${page}, total: ${totalCount})`)
+          // Build query with service role client
+          let supabaseQuery = supabase
+            .from('supermarket_products')
+            .select('*')
+            .eq('store', 'REMA 1000')
+          
+          if (category && category !== 'all') {
+            supabaseQuery = supabaseQuery.eq('category', category)
+          }
+          
+          if (search) {
+            supabaseQuery = supabaseQuery.ilike('name', `%${search}%`)
+          }
+          
+          if (showOffers) {
+            supabaseQuery = supabaseQuery.eq('is_on_sale', true)
+          }
+          
+          // Apply pagination
+          supabaseQuery = supabaseQuery
+            .range(offset, offset + limit - 1)
+            .order('name', { ascending: true })
+          
+          const { data: products, error, count } = await supabaseQuery
+          
+          if (error) {
+            throw new Error(`Database query failed: ${error.message}`)
+          }
+          
+          console.log(`✅ Fetched ${products?.length || 0} products (page ${page}, total: ${count || 0})`)
           
           return NextResponse.json({ 
             success: true, 
-            products: products,
+            products: products || [],
             pagination: {
               page,
               limit,
-              total: parseInt(totalCount),
-              hasMore: products.length === limit
+              total: count || 0,
+              hasMore: (products?.length || 0) === limit
             }
           })
           
