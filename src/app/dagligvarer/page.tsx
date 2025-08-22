@@ -656,7 +656,7 @@ export default function DagligvarerPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
                   <p className="text-gray-600">Vent venligst</p>
                 </div>
-              ) : products.map(product => (
+              ) : filteredProducts.map(product => (
                 <div 
                   key={product.id} 
                   className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
