@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
         // Extract pagination parameters from request
         const url = new URL(request.url)
         const page = parseInt(url.searchParams.get('page') || '1')
-        const limit = parseInt(url.searchParams.get('limit') || '100')
+        const limit = parseInt(url.searchParams.get('limit') || '10000') // Much higher default limit
         const category = url.searchParams.get('category')
         const search = url.searchParams.get('search')
         

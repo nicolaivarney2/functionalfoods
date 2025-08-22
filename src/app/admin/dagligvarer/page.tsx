@@ -119,7 +119,7 @@ export default function SupermarketScraperPage() {
   const loadLatestProducts = async () => {
     setIsLoadingProducts(true)
     try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10000', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -170,7 +170,7 @@ export default function SupermarketScraperPage() {
   const fetchAllProducts = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10000', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
