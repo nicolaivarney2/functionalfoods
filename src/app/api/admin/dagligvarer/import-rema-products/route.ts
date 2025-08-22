@@ -161,8 +161,101 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Starting REMA products import from Python scraper...')
     
     const body = await request.json()
-    const { products } = body
+    const { action, products } = body
     
+    // Initialize Supabase client with correct service role key
+    const supabase = createClient(
+      (process.env as any).NEXT_PUBLIC_SUPABASE_URL!,
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hamF4eWNmamd1bHR3ZHdmZmh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMyNzYwNywiZXhwIjoyMDY5OTAzNjA3fQ.4ZEeQ-CS5OSOIOsoMNGzRdNOpbSvD5OII7wl8LRr7JQ'
+    )
+    
+    // Handle different actions
+    if (action === 'fixExistingProducts') {
+      console.log('🔧 Starting fix of existing products...')
+      
+      // Get all existing products from database
+      const { data: existingProducts, error: fetchError } = await supabase
+        .from('supermarket_products')
+        .select('*')
+        .eq('store', 'REMA 1000')
+      
+      if (fetchError) {
+        return NextResponse.json({ 
+          success: false, 
+          error: `Failed to fetch existing products: ${fetchError.message}` 
+        })
+      }
+      
+      console.log(`🔍 Found ${existingProducts?.length || 0} existing products to fix`)
+      
+      let fixedProducts = 0
+      const errors: string[] = []
+      
+      // Process each existing product
+      for (const product of existingProducts || []) {
+        try {
+          // For existing products, we need to recalculate is_on_sale
+          // Since REMA doesn't provide original_price, we'll use a different approach
+          
+          // Check if this product has a campaign price in price history
+          const { data: priceHistory } = await supabase
+            .from('supermarket_price_history')
+            .select('price, original_price, is_on_sale')
+            .eq('product_external_id', product.external_id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+          
+          // If we have price history, check for price changes
+          let isOnSale = false
+          let originalPrice = product.original_price
+          
+          if (priceHistory && priceHistory.length > 1) {
+            // Look for price changes that indicate sales
+            const recentPrices = priceHistory.map(ph => ph.price)
+            const uniquePrices = Array.from(new Set(recentPrices))
+            
+            if (uniquePrices.length > 1) {
+              // Price has changed - might be a sale
+              const currentPrice = product.price
+              const previousPrice = priceHistory[1]?.price || product.original_price
+              
+              if (currentPrice < previousPrice) {
+                isOnSale = true
+                originalPrice = previousPrice
+              }
+            }
+          }
+          
+          // Update the product with corrected sale information
+          const { error: updateError } = await supabase
+            .from('supermarket_products')
+            .update({
+              is_on_sale: isOnSale,
+              original_price: originalPrice,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', product.id)
+          
+          if (updateError) {
+            errors.push(`Failed to fix ${product.name}: ${updateError.message}`)
+          } else {
+            fixedProducts++
+          }
+          
+        } catch (error) {
+          errors.push(`Error processing ${product.name}: ${error}`)
+        }
+      }
+      
+      return NextResponse.json({
+        success: true,
+        message: `Fixed ${fixedProducts} products`,
+        fixedProducts,
+        errors: errors.length > 0 ? errors : undefined
+      })
+    }
+    
+    // Default action: import products
     if (!products || !Array.isArray(products)) {
       return NextResponse.json(
         { error: 'No products provided or invalid format' },
@@ -171,12 +264,6 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`📦 Importing ${products.length} products from Python scraper...`)
-    
-    // Initialize Supabase client with correct service role key
-    const supabase = createClient(
-      (process.env as any).NEXT_PUBLIC_SUPABASE_URL!,
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hamF4eWNmamd1bHR3ZHdmZmh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMyNzYwNywiZXhwIjoyMDY5OTAzNjA3fQ.4ZEeQ-CS5OSOIOsoMNGzRdNOpbSvD5OII7wl8LRr7JQ'
-    )
     let newProducts = 0
     let updatedProducts = 0
     const errors: string[] = []
@@ -204,7 +291,11 @@ export async function POST(request: NextRequest) {
           description: product.description || product.underline || null,
           category: category,
           subcategory: product.department?.parent?.name || 'Ukategoriseret',
+          // For REMA: price is always the current price (campaign or regular)
           price: product.prices?.[0]?.price || 0,
+          // For REMA: we need to store the "regular" price somewhere
+          // Since REMA doesn't provide original_price, we'll use current price as baseline
+          // and mark is_on_sale based on campaign flag
           original_price: product.prices?.[0]?.price || 0,
           unit: underlineInfo.unit,
           amount: underlineInfo.amount,

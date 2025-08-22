@@ -376,6 +376,46 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  const fixExistingProducts = async () => {
+    setIsLoading(true)
+    setImportResult(null)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fixExistingProducts'
+        })
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setImportResult({
+          success: true,
+          message: `✅ Fix successful! ${result.fixedProducts || 0} products fixed`
+        })
+        // Refresh database stats
+        fetchDatabaseStats()
+        loadLatestProducts()
+      } else {
+        setImportResult({
+          success: false,
+          message: `❌ Fix failed: ${result.error || 'Unknown error'}`
+        })
+      }
+    } catch (error) {
+      console.error('Error fixing existing products:', error)
+      setImportResult({
+        success: false,
+        message: '❌ Fix failed due to network error'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -806,6 +846,15 @@ export default function SupermarketScraperPage() {
                     >
                       <TrendingUp size={16} />
                       {isLoading ? 'Importerer...' : 'Import Alle Produkter'}
+                    </button>
+                    
+                    <button
+                      onClick={() => fixExistingProducts()}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw size={16} />
+                      {isLoading ? 'Fikser...' : 'Fix Eksisterende Produkter'}
                     </button>
                   </div>
                 </div>
