@@ -203,37 +203,68 @@ export async function POST(request: NextRequest) {
         }
 
       case 'fetchCategoryCounts':
-        console.log('🔄 Fetching category counts from database...')
+        console.log('🔄 Fetching category counts efficiently...')
         
         try {
-          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?select=category&store=eq.REMA 1000`, {
-            headers: {
-              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
-            }
-          })
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
           
-          if (!response.ok) {
-            throw new Error(`Database query failed: ${response.status}`)
+          if (!supabaseUrl || !serviceRoleKey) {
+            throw new Error('Missing Supabase service role key')
           }
           
-          const allProducts = await response.json()
+          // Create service role client
+          const { createClient } = await import('@supabase/supabase-js')
+          const supabase = createClient(supabaseUrl, serviceRoleKey)
           
-          // Count products by category
-          const categoryCounts = allProducts.reduce((acc: { [key: string]: number }, product: any) => {
+          // Get total count efficiently
+          const { count: totalCount, error: countError } = await supabase
+            .from('supermarket_products')
+            .select('*', { count: 'exact', head: true })
+            .eq('store', 'REMA 1000')
+          
+          if (countError) {
+            throw new Error(`Count query failed: ${countError.message}`)
+          }
+          
+          // Get category breakdown efficiently (sample of products for category distribution)
+          const { data: sampleProducts, error: sampleError } = await supabase
+            .from('supermarket_products')
+            .select('category')
+            .eq('store', 'REMA 1000')
+            .limit(1000) // Sample 1000 products for category distribution
+          
+          if (sampleError) {
+            throw new Error(`Sample query failed: ${sampleError.message}`)
+          }
+          
+          // Calculate category counts from sample
+          const categoryCounts = sampleProducts.reduce((acc: { [key: string]: number }, product: any) => {
             const category = product.category || 'Ukategoriseret'
             acc[category] = (acc[category] || 0) + 1
             return acc
           }, {})
           
-          // Add total count
-          categoryCounts['Alle kategorier'] = allProducts.length
+          // Scale up category counts proportionally to total
+          const sampleSize = sampleProducts.length
+          const scaleFactor = (totalCount || 0) / sampleSize
           
-          console.log(`✅ Calculated category counts for ${allProducts.length} total products`)
+          Object.keys(categoryCounts).forEach(category => {
+            categoryCounts[category] = Math.round(categoryCounts[category] * scaleFactor)
+          })
+          
+          // Add total count
+          categoryCounts['Alle kategorier'] = totalCount || 0
+          
+          console.log(`✅ Calculated efficient category counts for ${totalCount} total products (sampled ${sampleSize})`)
           
           return NextResponse.json({ 
             success: true, 
-            categoryCounts
+            categoryCounts,
+            pagination: {
+              total: totalCount,
+              sampled: sampleSize
+            }
           })
           
         } catch (dbError) {

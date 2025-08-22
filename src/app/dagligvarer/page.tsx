@@ -99,7 +99,7 @@ export default function DagligvarerPage() {
       // Build query parameters
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '10000', // Get all products at once
+        limit: '50', // Fast loading with pagination
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
         ...(searchQuery ? { search: searchQuery } : {}),
         ...(showOnlyOffers ? { offers: 'true' } : {})
@@ -143,10 +143,11 @@ export default function DagligvarerPage() {
     }
   }
 
-  // Fetch category counts
+  // Fetch category counts efficiently
   const fetchCategoryCounts = async () => {
     try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10000', {
+      // Get total count and category breakdown without fetching all products
+      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=1', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -157,8 +158,16 @@ export default function DagligvarerPage() {
       })
 
       const data = await response.json()
-      if (data.success && data.categoryCounts) {
-        setCategoryCounts(data.categoryCounts)
+      if (data.success) {
+        // Set total count from pagination
+        if (data.pagination?.total) {
+          setTotalProducts(data.pagination.total)
+        }
+        
+        // Set category counts if available
+        if (data.categoryCounts) {
+          setCategoryCounts(data.categoryCounts)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch category counts:', error)
