@@ -202,6 +202,49 @@ export async function POST(request: NextRequest) {
           }, { status: 500 })
         }
 
+      case 'fetchCategoryCounts':
+        console.log('🔄 Fetching category counts from database...')
+        
+        try {
+          const response = await fetch(`${(process.env as any).NEXT_PUBLIC_SUPABASE_URL}/rest/v1/supermarket_products?select=category&store=eq.REMA 1000`, {
+            headers: {
+              'apikey': (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${(process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+            }
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Database query failed: ${response.status}`)
+          }
+          
+          const allProducts = await response.json()
+          
+          // Count products by category
+          const categoryCounts = allProducts.reduce((acc: { [key: string]: number }, product: any) => {
+            const category = product.category || 'Ukategoriseret'
+            acc[category] = (acc[category] || 0) + 1
+            return acc
+          }, {})
+          
+          // Add total count
+          categoryCounts['Alle kategorier'] = allProducts.length
+          
+          console.log(`✅ Calculated category counts for ${allProducts.length} total products`)
+          
+          return NextResponse.json({ 
+            success: true, 
+            categoryCounts
+          })
+          
+        } catch (dbError) {
+          console.error('❌ Category counts query failed:', dbError)
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Failed to fetch category counts from database',
+            details: dbError instanceof Error ? dbError.message : 'Unknown error'
+          }, { status: 500 })
+        }
+
       case 'fetchAllProducts':
         console.log('🔄 Fetching products from database...')
         
@@ -224,6 +267,12 @@ export async function POST(request: NextRequest) {
         
         if (search) {
           query += `&name=ilike.*${search}*`
+        }
+        
+        // Check if we need to filter by offers only
+        const showOffers = url.searchParams.get('offers') === 'true'
+        if (showOffers) {
+          query += `&is_on_sale=eq.true`
         }
         
         // Use our new import API to get products from database

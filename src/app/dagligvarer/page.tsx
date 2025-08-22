@@ -89,6 +89,7 @@ export default function DagligvarerPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [totalProducts, setTotalProducts] = useState(0)
+  const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({})
 
   // Fetch products with pagination
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
@@ -100,7 +101,8 @@ export default function DagligvarerPage() {
         page: page.toString(),
         limit: '100',
         ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
-        ...(searchQuery ? { search: searchQuery } : {})
+        ...(searchQuery ? { search: searchQuery } : {}),
+        ...(showOnlyOffers ? { offers: 'true' } : {})
       })
       
       const response = await fetch(`/api/admin/dagligvarer/test-rema?${params}`, {
@@ -141,15 +143,38 @@ export default function DagligvarerPage() {
     }
   }
 
+  // Fetch category counts
+  const fetchCategoryCounts = async () => {
+    try {
+      const response = await fetch('/api/admin/dagligvarer/test-rema', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'fetchCategoryCounts'
+        })
+      })
+
+      const data = await response.json()
+      if (data.success && data.categoryCounts) {
+        setCategoryCounts(data.categoryCounts)
+      }
+    } catch (error) {
+      console.error('Failed to fetch category counts:', error)
+    }
+  }
+
   // Initial fetch
   useEffect(() => {
     fetchProducts(1, false)
+    fetchCategoryCounts()
   }, [])
 
-  // Refetch when search or category changes
+  // Refetch when search, category, or offers filter changes
   useEffect(() => {
     fetchProducts(1, false)
-  }, [searchQuery, selectedCategories])
+  }, [searchQuery, selectedCategories, showOnlyOffers])
 
   // Infinite scroll - load more products when scrolling
   useEffect(() => {
@@ -208,11 +233,10 @@ export default function DagligvarerPage() {
 
   // Apply local filters that aren't handled by the API
   const filteredProducts = products.filter(product => {
-    const matchesOffers = !showOnlyOffers || product.is_on_sale
     const matchesStores = selectedStores.includes(product.store)
     const matchesFavorites = !showFavorites || product.isFavorite
     
-    return matchesOffers && matchesStores && matchesFavorites
+    return matchesStores && matchesFavorites
   })
 
   // Group products by category if enabled
@@ -354,7 +378,7 @@ export default function DagligvarerPage() {
                     />
                     <span className="text-sm font-medium">Alle kategorier</span>
                   </div>
-                  <span className="text-xs text-gray-500">({products.length})</span>
+                  <span className="text-xs text-gray-500">({categoryCounts['Alle kategorier'] || totalProducts})</span>
                 </button>
               </div>
               
@@ -379,7 +403,7 @@ export default function DagligvarerPage() {
                       <span className="text-xs">{category.icon}</span>
                       <span className="text-xs font-medium">{category.name}</span>
                     </div>
-                    <span className="text-xs text-gray-500">({products.filter(p => p.category === category.name).length})</span>
+                    <span className="text-xs text-gray-500">({categoryCounts[category.name] || products.filter(p => p.category === category.name).length})</span>
                   </button>
                 ))}
               </div>
@@ -467,12 +491,15 @@ export default function DagligvarerPage() {
           <div className="flex-1">
             {/* Product Count */}
             <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
-              </h2>
-              {hasMore && (
-                <p className="text-sm text-gray-500">Scroll ned for at se flere</p>
-              )}
+              <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
+              <div className="text-right">
+                <p className="text-xs text-gray-400">
+                  {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
+                </p>
+                {hasMore && (
+                  <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
+                )}
+              </div>
             </div>
 
             {/* Products Grid */}
