@@ -153,6 +153,14 @@ export default function DagligvarerPage() {
           console.log('🎯 FILTERING FOR OFFERS ONLY - API should return only is_on_sale=true products')
           const rawOffersCount = data.products.filter((p: any) => p.is_on_sale).length
           console.log(`🎯 Raw offers count from API: ${rawOffersCount}/${data.products.length}`)
+          
+          // Debug: Check what categories are returned when filtering for offers
+          const categoriesInOffers = Array.from(new Set(data.products.map((p: any) => p.category)))
+          console.log(`🏷️ Categories in offers response:`, categoriesInOffers)
+          
+          // Debug: Check if all products are actually meat products
+          const meatProductsInOffers = data.products.filter((p: any) => p.category === 'Kød, fisk & fjerkræ')
+          console.log(`🥩 Meat products in offers: ${meatProductsInOffers.length}/${data.products.length}`)
         }
         
         // Check for meat products specifically
@@ -268,6 +276,15 @@ export default function DagligvarerPage() {
           price: p.price,
           original_price: p.original_price
         })))
+        
+        // Debug: Check if sorting actually prioritized offers
+        const offersInFirst5 = sortedProducts.slice(0, 5).filter((p: any) => p.is_on_sale && p.discount_percentage > 0)
+        console.log(`🎯 Offers in first 5 products: ${offersInFirst5.length}`)
+        if (offersInFirst5.length > 0) {
+          console.log('🎯 First 5 products contain offers - sorting worked!')
+        } else {
+          console.log('❌ First 5 products contain NO offers - sorting failed!')
+        }
         
         // Debug: Check offer counting logic
         const debugOffersCount = sortedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
@@ -400,6 +417,13 @@ export default function DagligvarerPage() {
 
   // Dynamic categories from products
   const getDynamicCategories = (products: any[]) => {
+    // Debug: Log what products are being used for category generation
+    console.log(`🏷️ getDynamicCategories called with ${products.length} products`)
+    if (products.length > 0) {
+      console.log(`🏷️ First product category: ${products[0].category}`)
+      console.log(`🏷️ Sample categories:`, products.slice(0, 5).map((p: any) => p.category))
+    }
+    
     const categoryCounts = products.reduce((acc: { [key: string]: number }, product) => {
       const category = product.category || 'Ukategoriseret'
       acc[category] = (acc[category] || 0) + 1
@@ -420,12 +444,15 @@ export default function DagligvarerPage() {
       'Ukategoriseret': '📦'
     }
 
-    return Object.entries(categoryCounts).map(([name, count]) => ({
+    const result = Object.entries(categoryCounts).map(([name, count]) => ({
       id: name.toLowerCase().replace(/\s+/g, '-'),
       name,
       icon: categoryIcons[name] || '📦',
       count
     }))
+    
+    console.log(`🏷️ Generated categories:`, result.map(c => `${c.name} (${c.count})`))
+    return result
   }
 
   // Dynamic stores from products
