@@ -175,9 +175,9 @@ export default function DagligvarerPage() {
           const hasValidPrice = product.price && typeof product.price === 'number'
           const isActuallyOnSale = product.is_on_sale && hasValidOriginalPrice && hasValidPrice
           
-          // Use a small tolerance (0.01 kr) for floating-point comparison
+          // Use a small tolerance (0.005 kr = 0.5 øre) for floating-point comparison
           const priceDifference = hasValidOriginalPrice && hasValidPrice ? product.original_price - product.price : 0
-          const isPriceLower = priceDifference > 0.01
+          const isPriceLower = priceDifference > 0.005
           
           // Calculate discount percentage
           let discountPercentage = 0
