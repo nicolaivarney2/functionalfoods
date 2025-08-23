@@ -350,9 +350,12 @@ export async function POST(request: NextRequest) {
           console.log(`🔍 Total products in database: ${totalCount}`)
           
           // Apply REAL pagination - only fetch the requested page
+          // Always prioritize offers first by ordering by is_on_sale and discount percentage
           const { data: products, error } = await baseQuery
             .range(offset, offset + limit - 1)
-            .order('name', { ascending: true })
+            .order('is_on_sale', { ascending: false }) // Offers first (true before false)
+            .order('price', { ascending: true }) // Then by price (lower prices first)
+            .order('name', { ascending: true }) // Finally by name
           
           if (error) {
             throw new Error(`Database query failed: ${error.message}`)
