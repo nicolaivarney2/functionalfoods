@@ -109,7 +109,6 @@ export default function DagligvarerPage() {
     try {
       // Prevent multiple simultaneous fetches
       if (loading && !append) {
-        console.log('🚫 Already loading, skipping fetch request')
         return
       }
       
@@ -135,8 +134,6 @@ export default function DagligvarerPage() {
         ...(showOnlyOffers ? { offers: 'true' } : {})
       })
       
-      console.log(`🔄 Fetching page ${page} with limit 10...`)
-      
       const response = await fetch(`/api/admin/dagligvarer/test-rema?${params}`, {
         method: 'POST',
         headers: {
@@ -149,13 +146,7 @@ export default function DagligvarerPage() {
 
       const data = await response.json()
       if (data.success && data.products) {
-        console.log(`✅ Got ${data.products.length} products for page ${page}`)
-        
-        // Check if we're filtering for offers
-        if (showOnlyOffers) {
-          const rawOffersCount = data.products.filter((p: any) => p.is_on_sale).length
-          console.log(`🎯 Offers filter: ${rawOffersCount}/${data.products.length} products on sale`)
-        }
+
         
         // Fix false offers - only show as offer if price is actually lower
         const fixedProducts = data.products.map((product: any) => {
@@ -185,11 +176,7 @@ export default function DagligvarerPage() {
           }
         })
         
-        // Check offer status
-        const offersCount = fixedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
-        if (offersCount === 0) {
-          console.log('❌ No offers found in current products')
-        }
+
         
         // Smart sorting: Offers ALWAYS first by discount percentage, then meat category, then others
         const sortedProducts = fixedProducts.sort((a: any, b: any) => {
@@ -216,18 +203,7 @@ export default function DagligvarerPage() {
           return a.name.localeCompare(b.name)
         })
         
-        // Check if sorting actually prioritized offers
-        const offersInFirst5 = sortedProducts.slice(0, 5).filter((p: any) => p.is_on_sale && p.discount_percentage > 0)
-        console.log(`🎯 Sorting result: ${offersInFirst5.length}/5 first products are offers`)
-        
-        // Check for duplicate products
-        const productIds = sortedProducts.map((p: any) => p.id)
-        const uniqueIds = new Set(productIds)
-        if (productIds.length !== uniqueIds.size) {
-          console.log('⚠️ DUPLICATE PRODUCTS DETECTED!')
-          const duplicates = productIds.filter((id: any, index: number) => productIds.indexOf(id) !== index)
-          console.log('⚠️ Duplicate IDs:', duplicates)
-        }
+
         
         // Update offers availability state
         const offersAvailable = sortedProducts.some((p: any) => p.is_on_sale && p.discount_percentage > 0)
@@ -244,8 +220,6 @@ export default function DagligvarerPage() {
         setHasMore(data.pagination?.hasMore || false)
         setTotalProducts(data.pagination?.total || 0)
         setCurrentPage(page)
-        
-        console.log(`📊 Page ${page}: ${data.pagination?.total || 0} total, ${offersAvailable ? 'has offers' : 'no offers'}`)
       } else {
         if (!append) setProducts([])
       }
@@ -328,7 +302,6 @@ export default function DagligvarerPage() {
     // Debounce filter changes to prevent rapid API calls
     const timer = setTimeout(() => {
       if (!loading) {
-        console.log('🔄 Filter changed, refetching products...')
         fetchProducts(1, false)
       }
     }, 300) // Wait 300ms after filter changes
