@@ -160,7 +160,7 @@ export default function SupermarketScraperPage() {
 
   const simulateMeatOffers = async () => {
     try {
-      console.log('🥩 Manually simulating meat offers...')
+      console.log('🎯 Manually fetching real offers...')
       setIsLoading(true)
       
       const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
@@ -169,30 +169,30 @@ export default function SupermarketScraperPage() {
       const data = await response.json()
       
       if (data.success) {
-        console.log('🎯 Meat offers simulated successfully:', data)
+        console.log('🎯 Real offers fetched successfully:', data)
         
         // Show success message
         setTestResult({
           success: true,
-          message: `🥩 Meat offers simulated on ${data.updated} products! ${data.errors?.length || 0} errors.`,
+          message: `🎯 Found ${data.count} real offers in database!`,
           timestamp: new Date().toISOString()
         })
         
         // Refresh the products list to see the changes
         loadLatestProducts()
       } else {
-        console.error('❌ Meat simulation failed:', data)
+        console.error('❌ Real offers fetch failed:', data)
         setTestResult({
           success: false,
-          message: `❌ Meat simulation failed: ${data.error || 'Unknown error'}`,
+          message: `❌ Real offers fetch failed: ${data.error || 'Unknown error'}`,
           timestamp: new Date().toISOString()
         })
       }
     } catch (error) {
-      console.error('Auto meat offers failed:', error)
+      console.error('Real offers fetch failed:', error)
       setTestResult({
         success: false,
-        message: `❌ Meat simulation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        message: `❌ Real offers fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         timestamp: new Date().toISOString()
       })
     } finally {
@@ -684,10 +684,10 @@ export default function SupermarketScraperPage() {
                   <button
                     onClick={simulateMeatOffers}
                     disabled={isLoading}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
                   >
-                    🥩
-                    Simulate Meat Offers
+                    🎯
+                    Check Real Offers
                   </button>
                 </div>
 

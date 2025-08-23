@@ -96,6 +96,10 @@ export default function DagligvarerPage() {
   
   // Track if offers are available in the database
   const [offersAvailableInDB, setOffersAvailableInDB] = useState<number>(0)
+  
+  // Cache for categories to prevent infinite re-renders
+  const [cachedCategories, setCachedCategories] = useState<any[]>([])
+  const [lastCategoryUpdate, setLastCategoryUpdate] = useState<number>(0)
 
   // Fetch products with REAL pagination - only 10 products at a time
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
@@ -138,42 +142,10 @@ export default function DagligvarerPage() {
       if (data.success && data.products) {
         console.log(`✅ Got ${data.products.length} products for page ${page}`)
         
-        // Log raw data from API for debugging
-        console.log('🔍 Raw products from API:', data.products.slice(0, 3).map((p: any) => ({
-          name: p.name,
-          price: p.price,
-          original_price: p.original_price,
-          is_on_sale: p.is_on_sale,
-          category: p.category,
-          id: p.id
-        })))
-        
         // Check if we're filtering for offers
         if (showOnlyOffers) {
-          console.log('🎯 FILTERING FOR OFFERS ONLY - API should return only is_on_sale=true products')
           const rawOffersCount = data.products.filter((p: any) => p.is_on_sale).length
-          console.log(`🎯 Raw offers count from API: ${rawOffersCount}/${data.products.length}`)
-          
-          // Debug: Check what categories are returned when filtering for offers
-          const categoriesInOffers = Array.from(new Set(data.products.map((p: any) => p.category)))
-          console.log(`🏷️ Categories in offers response:`, categoriesInOffers)
-          
-          // Debug: Check if all products are actually meat products
-          const meatProductsInOffers = data.products.filter((p: any) => p.category === 'Kød, fisk & fjerkræ')
-          console.log(`🥩 Meat products in offers: ${meatProductsInOffers.length}/${data.products.length}`)
-        }
-        
-        // Check for meat products specifically
-        const meatProducts = data.products.filter((p: any) => p.category === 'Kød, fisk & fjerkræ')
-        console.log(`🥩 Meat products found: ${meatProducts.length}`)
-        if (meatProducts.length > 0) {
-          console.log('🥩 Sample meat products:', meatProducts.slice(0, 3).map((p: any) => ({
-            name: p.name,
-            price: p.price,
-            original_price: p.original_price,
-            is_on_sale: p.is_on_sale,
-            id: p.id
-          })))
+          console.log(`🎯 Offers filter: ${rawOffersCount}/${data.products.length} products on sale`)
         }
         
         // Fix false offers - only show as offer if price is actually lower
@@ -195,21 +167,7 @@ export default function DagligvarerPage() {
           
           const finalIsOnSale = isActuallyOnSale && isPriceLower
           
-          // Debug logging for each product that claims to be on sale
-          if (product.is_on_sale) {
-            console.log(`🔍 Product "${product.name}" (${product.id}):`, {
-              original_price: product.original_price,
-              price: product.price,
-              priceDifference: priceDifference.toFixed(4),
-              isPriceLower,
-              finalIsOnSale,
-              discountPercentage: `${discountPercentage}%`,
-              category: product.category,
-              hasValidOriginalPrice,
-              hasValidPrice,
-              isActuallyOnSale
-            })
-          }
+          
           
           return {
           ...product,
@@ -218,28 +176,10 @@ export default function DagligvarerPage() {
           }
         })
         
-        // Log offer status for debugging
+        // Check offer status
         const offersCount = fixedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
-        console.log(`🎯 Products with offers: ${offersCount}/${fixedProducts.length}`)
-        if (offersCount > 0) {
-          const offers = fixedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0)
-          console.log('🎯 Sample offers:', offers.slice(0, 3).map((p: any) => ({
-            name: p.name,
-            price: p.price,
-            original_price: p.original_price,
-            is_on_sale: p.is_on_sale,
-            discount_percentage: p.discount_percentage
-          })))
-        } else {
-          console.log('❌ NO OFFERS FOUND! All products have is_on_sale: false or no valid discount')
-          // Show first few products for debugging
-          console.log('🔍 First 3 products:', fixedProducts.slice(0, 3).map((p: any) => ({
-            name: p.name,
-            price: p.price,
-            original_price: p.original_price,
-            is_on_sale: p.is_on_sale,
-            discount_percentage: p.discount_percentage
-          })))
+        if (offersCount === 0) {
+          console.log('❌ No offers found in current products')
         }
         
         // Smart sorting: Offers ALWAYS first by discount percentage, then meat category, then others
@@ -267,35 +207,13 @@ export default function DagligvarerPage() {
           return a.name.localeCompare(b.name)
         })
         
-        // Debug: Log the first few products after sorting
-        console.log('🔄 After sorting - First 5 products:', sortedProducts.slice(0, 5).map((p: any) => ({
-          name: p.name,
-          is_on_sale: p.is_on_sale,
-          discount_percentage: p.discount_percentage,
-          category: p.category,
-          price: p.price,
-          original_price: p.original_price
-        })))
-        
-        // Debug: Check if sorting actually prioritized offers
+        // Check if sorting actually prioritized offers
         const offersInFirst5 = sortedProducts.slice(0, 5).filter((p: any) => p.is_on_sale && p.discount_percentage > 0)
-        console.log(`🎯 Offers in first 5 products: ${offersInFirst5.length}`)
-        if (offersInFirst5.length > 0) {
-          console.log('🎯 First 5 products contain offers - sorting worked!')
-        } else {
-          console.log('❌ First 5 products contain NO offers - sorting failed!')
-        }
+        console.log(`🎯 Sorting result: ${offersInFirst5.length}/5 first products are offers`)
         
-        // Debug: Check offer counting logic
-        const debugOffersCount = sortedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
-        console.log(`🎯 FINAL OFFER COUNT: ${debugOffersCount} offers found`)
-        console.log(`🎯 Products with is_on_sale=true: ${sortedProducts.filter((p: any) => p.is_on_sale).length}`)
-        console.log(`🎯 Products with discount_percentage>0: ${sortedProducts.filter((p: any) => p.discount_percentage > 0).length}`)
-        
-        // Debug: Check for duplicate products
+        // Check for duplicate products
         const productIds = sortedProducts.map((p: any) => p.id)
         const uniqueIds = new Set(productIds)
-        console.log(`🔍 Duplicate check: ${productIds.length} total, ${uniqueIds.size} unique`)
         if (productIds.length !== uniqueIds.size) {
           console.log('⚠️ DUPLICATE PRODUCTS DETECTED!')
           const duplicates = productIds.filter((id: any, index: number) => productIds.indexOf(id) !== index)
@@ -305,7 +223,6 @@ export default function DagligvarerPage() {
         // Update offers availability state
         const offersAvailable = sortedProducts.some((p: any) => p.is_on_sale && p.discount_percentage > 0)
         setHasOffersAvailable(offersAvailable)
-        console.log(`🎯 UPDATED hasOffersAvailable: ${offersAvailable}`)
         
         if (append) {
           setProducts(prev => [...prev, ...sortedProducts])
@@ -319,7 +236,7 @@ export default function DagligvarerPage() {
         setTotalProducts(data.pagination?.total || 0)
         setCurrentPage(page)
         
-        console.log(`📊 Total products: ${data.pagination?.total || 0}, Current page: ${page}, Has more: ${data.pagination?.hasMore || false}`)
+        console.log(`📊 Page ${page}: ${data.pagination?.total || 0} total, ${offersAvailable ? 'has offers' : 'no offers'}`)
       } else {
         if (!append) setProducts([])
       }
@@ -378,13 +295,7 @@ export default function DagligvarerPage() {
       const data = await response.json()
       if (data.success && data.products) {
         const offersCount = data.products.filter((p: any) => p.is_on_sale && p.original_price && p.price < p.original_price).length
-        console.log(`🎯 Database check: ${offersCount} offers available in database`)
         setOffersAvailableInDB(offersCount)
-        
-        // Since offers are shown first but all products are visible
-        if (offersCount > 0) {
-          console.log('💡 Offers will be displayed first, but all products are visible')
-        }
       }
     } catch (error) {
       console.error('Failed to check for offers:', error)
@@ -417,11 +328,10 @@ export default function DagligvarerPage() {
 
   // Dynamic categories from products - but always show all available categories
   const getDynamicCategories = (products: any[]) => {
-    // Debug: Log what products are being used for category generation
-    console.log(`🏷️ getDynamicCategories called with ${products.length} products`)
-    if (products.length > 0) {
-      console.log(`🏷️ First product category: ${products[0].category}`)
-      console.log(`🏷️ Sample categories:`, products.slice(0, 5).map((p: any) => p.category))
+    // Use cached categories if available and recent (less than 5 seconds old)
+    const now = Date.now()
+    if (cachedCategories.length > 0 && (now - lastCategoryUpdate) < 5000) {
+      return cachedCategories
     }
     
     // Instead of using only visible products, get all categories from the database
@@ -475,7 +385,10 @@ export default function DagligvarerPage() {
       count: categoryCountsMap[categoryName] || 0
     }))
     
-    console.log(`🏷️ Generated categories:`, result.map(c => `${c.name} (${c.count})`))
+    // Cache the result and update timestamp
+    setCachedCategories(result)
+    setLastCategoryUpdate(now)
+    
     return result
   }
 
