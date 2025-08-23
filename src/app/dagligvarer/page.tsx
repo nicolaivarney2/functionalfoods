@@ -440,7 +440,7 @@ export default function DagligvarerPage() {
     ]
     
     // Use categoryCounts from state if available, otherwise estimate from visible products
-    const categoryCounts = allCategories.reduce((acc: { [key: string]: number }, categoryName) => {
+    const categoryCountsMap = allCategories.reduce((acc: { [key: string]: number }, categoryName) => {
       if (categoryCounts[categoryName]) {
         // Use the actual count from database
         acc[categoryName] = categoryCounts[categoryName]
@@ -452,7 +452,7 @@ export default function DagligvarerPage() {
     }, {})
     
     // Add "Alle kategorier" with total count
-    categoryCounts['Alle kategorier'] = totalProducts || products.length
+    categoryCountsMap['Alle kategorier'] = totalProducts || products.length
 
     const categoryIcons: { [key: string]: string } = {
       'Frugt & grønt': '🍎',
@@ -472,11 +472,39 @@ export default function DagligvarerPage() {
       id: categoryName.toLowerCase().replace(/\s+/g, '-'),
       name: categoryName,
       icon: categoryIcons[categoryName] || '📦',
-      count: categoryCounts[categoryName] || 0
+      count: categoryCountsMap[categoryName] || 0
     }))
     
     console.log(`🏷️ Generated categories:`, result.map(c => `${c.name} (${c.count})`))
     return result
+  }
+
+  // Helper function to get category counts for display
+  const getCategoryCountsForDisplay = () => {
+    const allCategories = [
+      'Frugt & grønt',
+      'Kolonial', 
+      'Kød, fisk & fjerkræ',
+      'Mejeri',
+      'Brød & kager',
+      'Drikkevarer',
+      'Snacks & slik',
+      'Husholdning & rengøring',
+      'Baby & børn',
+      'Kæledyr'
+    ]
+    
+    const categoryCountsMap = allCategories.reduce((acc: { [key: string]: number }, categoryName) => {
+      if (categoryCounts[categoryName]) {
+        acc[categoryName] = categoryCounts[categoryName]
+      } else {
+        acc[categoryName] = products.filter(p => p.category === categoryName).length
+      }
+      return acc
+    }, {})
+    
+    categoryCountsMap['Alle kategorier'] = totalProducts || products.length
+    return categoryCountsMap
   }
 
   // Dynamic stores from products
@@ -627,7 +655,7 @@ export default function DagligvarerPage() {
                     />
                     <span className="text-sm font-medium">Alle kategorier</span>
                   </div>
-                  <span className="text-xs text-gray-500">({categoryCounts['Alle kategorier'] || totalProducts})</span>
+                  <span className="text-xs text-gray-500">({getCategoryCountsForDisplay()['Alle kategorier'] || totalProducts})</span>
                 </button>
               </div>
               
@@ -652,7 +680,7 @@ export default function DagligvarerPage() {
                       <span className="text-xs">{category.icon}</span>
                       <span className="text-xs font-medium">{category.name}</span>
                     </div>
-                    <span className="text-xs text-gray-500">({categoryCounts[category.name] || products.filter(p => p.category === category.name).length})</span>
+                    <span className="text-xs text-gray-500">({getCategoryCountsForDisplay()[category.name] || products.filter(p => p.category === category.name).length})</span>
                   </button>
                 ))}
               </div>
