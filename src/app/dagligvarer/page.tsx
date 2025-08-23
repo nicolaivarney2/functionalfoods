@@ -97,7 +97,7 @@ export default function DagligvarerPage() {
   // Track if offers are available in the database
   const [offersAvailableInDB, setOffersAvailableInDB] = useState<number>(0)
   
-  // Cache for categories to prevent infinite re-renders
+  // Cache for categories to prevent infinite re-renders - V2
   const [cachedCategories, setCachedCategories] = useState<any[]>([])
   const [lastCategoryUpdate, setLastCategoryUpdate] = useState<number>(0)
 
