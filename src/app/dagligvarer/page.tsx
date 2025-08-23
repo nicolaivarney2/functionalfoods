@@ -144,7 +144,8 @@ export default function DagligvarerPage() {
           price: p.price,
           original_price: p.original_price,
           is_on_sale: p.is_on_sale,
-          category: p.category
+          category: p.category,
+          id: p.id
         })))
         
         // Check if we're filtering for offers
@@ -152,6 +153,19 @@ export default function DagligvarerPage() {
           console.log('🎯 FILTERING FOR OFFERS ONLY - API should return only is_on_sale=true products')
           const rawOffersCount = data.products.filter((p: any) => p.is_on_sale).length
           console.log(`🎯 Raw offers count from API: ${rawOffersCount}/${data.products.length}`)
+        }
+        
+        // Check for meat products specifically
+        const meatProducts = data.products.filter((p: any) => p.category === 'Kød, fisk & fjerkræ')
+        console.log(`🥩 Meat products found: ${meatProducts.length}`)
+        if (meatProducts.length > 0) {
+          console.log('🥩 Sample meat products:', meatProducts.slice(0, 3).map((p: any) => ({
+            name: p.name,
+            price: p.price,
+            original_price: p.original_price,
+            is_on_sale: p.is_on_sale,
+            id: p.id
+          })))
         }
         
         // Fix false offers - only show as offer if price is actually lower
@@ -173,16 +187,19 @@ export default function DagligvarerPage() {
           
           const finalIsOnSale = isActuallyOnSale && isPriceLower
           
-          // Debug logging for each product
+          // Debug logging for each product that claims to be on sale
           if (product.is_on_sale) {
-            console.log(`🔍 Product "${product.name}":`, {
+            console.log(`🔍 Product "${product.name}" (${product.id}):`, {
               original_price: product.original_price,
               price: product.price,
               priceDifference: priceDifference.toFixed(4),
               isPriceLower,
               finalIsOnSale,
               discountPercentage: `${discountPercentage}%`,
-              category: product.category
+              category: product.category,
+              hasValidOriginalPrice,
+              hasValidPrice,
+              isActuallyOnSale
             })
           }
           
@@ -241,6 +258,16 @@ export default function DagligvarerPage() {
           // Third: Sort by name
           return a.name.localeCompare(b.name)
         })
+        
+        // Debug: Log the first few products after sorting
+        console.log('🔄 After sorting - First 5 products:', sortedProducts.slice(0, 5).map((p: any) => ({
+          name: p.name,
+          is_on_sale: p.is_on_sale,
+          discount_percentage: p.discount_percentage,
+          category: p.category,
+          price: p.price,
+          original_price: p.original_price
+        })))
         
         if (append) {
           setProducts(prev => [...prev, ...sortedProducts])
