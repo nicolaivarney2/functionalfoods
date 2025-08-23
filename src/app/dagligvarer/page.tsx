@@ -518,17 +518,7 @@ export default function DagligvarerPage() {
   // Check if there are any offers available in the current product set
   const [hasOffersAvailable, setHasOffersAvailable] = useState(false)
   
-  // Auto-enable offers filter if there are offers available and user hasn't explicitly disabled it
-  useEffect(() => {
-    if (sortedProducts && sortedProducts.length > 0) {
-      const offersAvailable = sortedProducts.some((p: any) => p.is_on_sale && p.discount_percentage > 0)
-      setHasOffersAvailable(offersAvailable)
-      
-      if (offersAvailable && !showOnlyOffers) {
-        console.log('🎯 Auto-detected offers available! Consider enabling "Vis kun tilbud" filter')
-      }
-    }
-  }, [sortedProducts, showOnlyOffers])
+  // Remove the problematic useEffect - we update hasOffersAvailable inside fetchProducts
 
   return (
     <>
