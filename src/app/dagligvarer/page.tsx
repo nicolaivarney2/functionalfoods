@@ -596,31 +596,16 @@ export default function DagligvarerPage() {
               <h3 className="font-semibold text-gray-900 mb-3 text-xs">Yderligere filtre</h3>
               
               <div className="space-y-3">
-                {/* Offers notification - shows when offers are available */}
-                {hasOffersAvailable && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-600">🎯</span>
-                      <span className="text-sm text-green-800">
-                        {products.filter(p => p.is_on_sale && p.discount_percentage > 0).length} tilbud vises først
-                      </span>
-                    </div>
-                    <p className="text-xs text-green-600 mt-1">
-                      Alle produkter vises, men tilbud prioriteres øverst
-                    </p>
-                  </div>
-                )}
-                
-                <label className="flex items-center space-x-2 cursor-pointer">
+                {/* Show only offers checkbox */}
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showOnlyOffers}
                     onChange={(e) => setShowOnlyOffers(e.target.checked)}
-                    className="text-green-600 rounded"
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs">Vis kun tilbud</span>
-                  <span className="ml-auto text-xs text-green-600 font-medium">
-                    ({products.filter(p => p.is_on_sale && p.discount_percentage > 0).length})
+                  <span className="text-sm text-gray-700">
+                    Vis kun tilbud ({products.filter(p => p.is_on_sale && p.discount_percentage > 0).length})
                   </span>
                 </label>
                 
@@ -713,22 +698,6 @@ export default function DagligvarerPage() {
           <div className="flex-1">
             {/* Product Count */}
             <div className="mb-6 flex items-center justify-between">
-              {/* Offers Banner */}
-              {hasOffersAvailable && (
-                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg p-4 mb-4 w-full">
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">🎯</span>
-                    <div>
-                      <h3 className="font-semibold text-green-800">
-                        Tilbud vises først!
-                      </h3>
-                      <p className="text-sm text-green-600">
-                        {products.filter(p => p.is_on_sale && p.discount_percentage > 0).length} tilbud prioriteres øverst af {totalProducts} produkter
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
               
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
