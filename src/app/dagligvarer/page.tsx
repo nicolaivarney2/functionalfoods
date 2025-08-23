@@ -269,6 +269,27 @@ export default function DagligvarerPage() {
           original_price: p.original_price
         })))
         
+        // Debug: Check offer counting logic
+        const debugOffersCount = sortedProducts.filter((p: any) => p.is_on_sale && p.discount_percentage > 0).length
+        console.log(`🎯 FINAL OFFER COUNT: ${debugOffersCount} offers found`)
+        console.log(`🎯 Products with is_on_sale=true: ${sortedProducts.filter((p: any) => p.is_on_sale).length}`)
+        console.log(`🎯 Products with discount_percentage>0: ${sortedProducts.filter((p: any) => p.discount_percentage > 0).length}`)
+        
+        // Debug: Check for duplicate products
+        const productIds = sortedProducts.map((p: any) => p.id)
+        const uniqueIds = new Set(productIds)
+        console.log(`🔍 Duplicate check: ${productIds.length} total, ${uniqueIds.size} unique`)
+        if (productIds.length !== uniqueIds.size) {
+          console.log('⚠️ DUPLICATE PRODUCTS DETECTED!')
+          const duplicates = productIds.filter((id: any, index: number) => productIds.indexOf(id) !== index)
+          console.log('⚠️ Duplicate IDs:', duplicates)
+        }
+        
+        // Update offers availability state
+        const offersAvailable = sortedProducts.some((p: any) => p.is_on_sale && p.discount_percentage > 0)
+        setHasOffersAvailable(offersAvailable)
+        console.log(`🎯 UPDATED hasOffersAvailable: ${offersAvailable}`)
+        
         if (append) {
           setProducts(prev => [...prev, ...sortedProducts])
         } else {
@@ -495,14 +516,19 @@ export default function DagligvarerPage() {
   }
 
   // Check if there are any offers available in the current product set
-  const hasOffersAvailable = products.some(p => p.is_on_sale && p.discount_percentage > 0)
+  const [hasOffersAvailable, setHasOffersAvailable] = useState(false)
   
   // Auto-enable offers filter if there are offers available and user hasn't explicitly disabled it
   useEffect(() => {
-    if (hasOffersAvailable && !showOnlyOffers && products.length > 0) {
-      console.log('🎯 Auto-detected offers available! Consider enabling "Vis kun tilbud" filter')
+    if (sortedProducts && sortedProducts.length > 0) {
+      const offersAvailable = sortedProducts.some((p: any) => p.is_on_sale && p.discount_percentage > 0)
+      setHasOffersAvailable(offersAvailable)
+      
+      if (offersAvailable && !showOnlyOffers) {
+        console.log('🎯 Auto-detected offers available! Consider enabling "Vis kun tilbud" filter')
+      }
     }
-  }, [hasOffersAvailable, showOnlyOffers, products.length])
+  }, [sortedProducts, showOnlyOffers])
 
   return (
     <>
