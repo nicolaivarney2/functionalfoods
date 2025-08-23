@@ -100,10 +100,19 @@ export default function DagligvarerPage() {
   // Cache for categories to prevent infinite re-renders - V2
   const [cachedCategories, setCachedCategories] = useState<any[]>([])
   const [lastCategoryUpdate, setLastCategoryUpdate] = useState<number>(0)
+  
+  // Debounce filter changes to prevent rapid API calls
+  const [filterDebounceTimer, setFilterDebounceTimer] = useState<NodeJS.Timeout | null>(null)
 
   // Fetch products with REAL pagination - only 10 products at a time
   const fetchProducts = async (page: number = 1, append: boolean = false) => {
     try {
+      // Prevent multiple simultaneous fetches
+      if (loading && !append) {
+        console.log('🚫 Already loading, skipping fetch request')
+        return
+      }
+      
       if (!append) setLoading(true)
       
       // Build cache key
@@ -309,10 +318,27 @@ export default function DagligvarerPage() {
     checkForOffers() // Check if there are offers available
   }, [])
 
-  // Refetch when search, category, or offers filter changes
+  // Refetch when search, category, or offers filter changes - BUT prevent infinite loops
   useEffect(() => {
-    fetchProducts(1, false)
-  }, [searchQuery, selectedCategories, showOnlyOffers])
+    // Clear existing timer
+    if (filterDebounceTimer) {
+      clearTimeout(filterDebounceTimer)
+    }
+    
+    // Debounce filter changes to prevent rapid API calls
+    const timer = setTimeout(() => {
+      if (!loading) {
+        console.log('🔄 Filter changed, refetching products...')
+        fetchProducts(1, false)
+      }
+    }, 300) // Wait 300ms after filter changes
+    
+    setFilterDebounceTimer(timer)
+    
+    return () => {
+      if (timer) clearTimeout(timer)
+    }
+  }, [searchQuery, selectedCategories.join(','), showOnlyOffers])
 
   // Infinite scroll - load more products when scrolling
   useEffect(() => {
@@ -385,9 +411,11 @@ export default function DagligvarerPage() {
       count: categoryCountsMap[categoryName] || 0
     }))
     
-    // Cache the result and update timestamp
-    setCachedCategories(result)
-    setLastCategoryUpdate(now)
+    // Cache the result and update timestamp - but only if it's different
+    if (JSON.stringify(cachedCategories) !== JSON.stringify(result)) {
+      setCachedCategories(result)
+      setLastCategoryUpdate(now)
+    }
     
     return result
   }
