@@ -135,9 +135,6 @@ export default function SupermarketScraperPage() {
         setProducts(result.products)
         console.log(`✅ Loaded ${result.products.length} products in admin (fast mode)`)
         
-        // Automatically simulate meat offers after loading products
-        simulateMeatOffers()
-        
         // Debug: Check if any products are already on sale
         const productsOnSale = result.products.filter((p: any) => p.is_on_sale)
         console.log(`🔍 Admin loaded ${productsOnSale.length} products already on sale`)

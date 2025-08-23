@@ -363,25 +363,26 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Fetched ${products?.length || 0} products for page ${page} (offset: ${offset}, limit: ${limit})`)
           
-          // Debug: Log the first few products to see their offer status
-          if (products && products.length > 0) {
-            console.log('🔍 First 3 products from database:', products.slice(0, 3).map((p: any) => ({
-              name: p.name,
-              price: p.price,
-              original_price: p.original_price,
-              is_on_sale: p.is_on_sale,
-              category: p.category
-            })))
+          // Remove duplicates by product name and store
+          let uniqueProducts = products || []
+          if (uniqueProducts.length > 0) {
+            const seen = new Set()
+            uniqueProducts = uniqueProducts.filter((product: any) => {
+              const key = `${product.name}-${product.store}`
+              if (seen.has(key)) {
+                console.log(`🗑️ Removing duplicate: ${product.name}`)
+                return false
+              }
+              seen.add(key)
+              return true
+            })
             
-            if (showOffers) {
-              const offersCount = products.filter((p: any) => p.is_on_sale).length
-              console.log(`🎯 Offers filter active: ${offersCount}/${products.length} products have is_on_sale=true`)
-            }
+            console.log(`✅ After deduplication: ${uniqueProducts.length} unique products`)
           }
           
           return NextResponse.json({ 
             success: true, 
-            products: products || [],
+            products: uniqueProducts || [],
             pagination: {
               page,
               limit,
