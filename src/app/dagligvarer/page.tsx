@@ -90,7 +90,7 @@ export default function DagligvarerPage() {
   const [hasMore, setHasMore] = useState(true)
   const [totalProducts, setTotalProducts] = useState(0)
   const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({})
-  
+
   // Cache for products to avoid refetching
   const [productsCache, setProductsCache] = useState<{[key: string]: any[]}>({})
   
@@ -212,7 +212,7 @@ export default function DagligvarerPage() {
           }
           
           return {
-            ...product,
+          ...product,
             is_on_sale: finalIsOnSale,
             discount_percentage: discountPercentage
           }
@@ -354,7 +354,7 @@ export default function DagligvarerPage() {
         
         // Set category counts if available
         if (data.categoryCounts) {
-          setCategoryCounts(data.categoryCounts)
+        setCategoryCounts(data.categoryCounts)
         }
       }
     } catch (error) {
@@ -415,7 +415,7 @@ export default function DagligvarerPage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [hasMore, loading, currentPage])
 
-  // Dynamic categories from products
+  // Dynamic categories from products - but always show all available categories
   const getDynamicCategories = (products: any[]) => {
     // Debug: Log what products are being used for category generation
     console.log(`🏷️ getDynamicCategories called with ${products.length} products`)
@@ -424,11 +424,35 @@ export default function DagligvarerPage() {
       console.log(`🏷️ Sample categories:`, products.slice(0, 5).map((p: any) => p.category))
     }
     
-    const categoryCounts = products.reduce((acc: { [key: string]: number }, product) => {
-      const category = product.category || 'Ukategoriseret'
-      acc[category] = (acc[category] || 0) + 1
+    // Instead of using only visible products, get all categories from the database
+    // This ensures categories don't disappear when filtering
+    const allCategories = [
+      'Frugt & grønt',
+      'Kolonial', 
+      'Kød, fisk & fjerkræ',
+      'Mejeri',
+      'Brød & kager',
+      'Drikkevarer',
+      'Snacks & slik',
+      'Husholdning & rengøring',
+      'Baby & børn',
+      'Kæledyr'
+    ]
+    
+    // Use categoryCounts from state if available, otherwise estimate from visible products
+    const categoryCounts = allCategories.reduce((acc: { [key: string]: number }, categoryName) => {
+      if (categoryCounts[categoryName]) {
+        // Use the actual count from database
+        acc[categoryName] = categoryCounts[categoryName]
+      } else {
+        // Fallback: count from visible products
+        acc[categoryName] = products.filter(p => p.category === categoryName).length
+      }
       return acc
     }, {})
+    
+    // Add "Alle kategorier" with total count
+    categoryCounts['Alle kategorier'] = totalProducts || products.length
 
     const categoryIcons: { [key: string]: string } = {
       'Frugt & grønt': '🍎',
@@ -444,11 +468,11 @@ export default function DagligvarerPage() {
       'Ukategoriseret': '📦'
     }
 
-    const result = Object.entries(categoryCounts).map(([name, count]) => ({
-      id: name.toLowerCase().replace(/\s+/g, '-'),
-      name,
-      icon: categoryIcons[name] || '📦',
-      count
+    const result = allCategories.map(categoryName => ({
+      id: categoryName.toLowerCase().replace(/\s+/g, '-'),
+      name: categoryName,
+      icon: categoryIcons[categoryName] || '📦',
+      count: categoryCounts[categoryName] || 0
     }))
     
     console.log(`🏷️ Generated categories:`, result.map(c => `${c.name} (${c.count})`))
@@ -743,38 +767,43 @@ export default function DagligvarerPage() {
             <div className="mb-6 flex items-center justify-between">
               
               <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">
-                    {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
-                  </p>
-                  {hasMore && (
-                    <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
-                  )}
+              <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
+              <div className="text-right">
+                <p className="text-xs text-gray-400">
+                  {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
+                </p>
+                {hasMore && (
+                  <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
+                )}
                 </div>
               </div>
             </div>
 
             {/* Products Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {loading ? (
-                <div className="col-span-full text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <Search size={48} className="mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
-                  <p className="text-gray-600">Vent venligst</p>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <Search size={48} className="mx-auto" />
                 </div>
-              ) : groupByDepartment && Object.keys(groupedProducts).length > 0 ? (
-                // Grouped by category display
-                Object.entries(groupedProducts).map(([category, categoryProducts]: [string, any[]]) => (
-                  <div key={category} className="col-span-full">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                      <span className="mr-2">{getDynamicCategories(products).find(c => c.name === category)?.icon || '📦'}</span>
-                      {category} ({categoryProducts.length})
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
-                      {categoryProducts.map(product => (
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
+                <p className="text-gray-600">Vent venligst</p>
+              </div>
+            ) : groupByDepartment ? (
+              // Grouped display by category
+              <div className="space-y-8">
+                {Object.entries(groupedProducts).map(([category, categoryProducts]) => (
+                  <div key={category} className="space-y-4">
+                    {/* Category Header */}
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
+                      <span className="text-sm text-gray-500">
+                        Viser {Math.min(categoryProducts.length, 5)} ud af {categoryProducts.length} produkter
+                      </span>
+                    </div>
+                    
+                    {/* Category Products Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {categoryProducts.slice(0, 5).map(product => (
                         <div 
                           key={product.id} 
                           className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
@@ -810,11 +839,6 @@ export default function DagligvarerPage() {
                                 <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
                               </button>
                             </div>
-                            {product.is_on_sale && (
-                              <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                                TILBUD
-                              </div>
-                            )}
                             {product.is_on_sale && (
                               <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                                 {product.discount_percentage ? `-${product.discount_percentage}%` : 'TILBUD'}
@@ -867,8 +891,8 @@ export default function DagligvarerPage() {
                                 Tilføj
                               </button>
                               <Link href={`/dagligvarer/produkt/${product.id}`}>
-                                <button className="bg-transparent hover:bg-gray-50 text-gray-500 border border-gray-300 py-1.5 px-2 rounded text-xs transition-colors">
-                                  <TrendingUp size={12} />
+                                <button className="bg-gray-100 hover:bg-gray-200 text-gray-600 py-1.5 px-2 rounded text-xs font-medium transition-colors">
+                                  Se mere
                                 </button>
                               </Link>
                             </div>
@@ -876,11 +900,25 @@ export default function DagligvarerPage() {
                         </div>
                       ))}
                     </div>
+                    
+                    {/* See More Button */}
+                    {categoryProducts.length > 5 && (
+                      <div className="text-center">
+                        <button 
+                          onClick={() => toggleCategory(category)}
+                          className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Se {Math.min(10, categoryProducts.length - 5)} mere fra '{category}'
+                        </button>
+                      </div>
+                    )}
                   </div>
-                ))
-              ) : (
-                // Normal grid display
-                productsToDisplay.map(product => (
+                ))}
+              </div>
+            ) : (
+              // Normal grid display
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {productsToDisplay.map(product => (
                   <div 
                     key={product.id} 
                     className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative"
@@ -916,11 +954,6 @@ export default function DagligvarerPage() {
                           <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
                         </button>
                       </div>
-                      {product.is_on_sale && (
-                        <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                          TILBUD
-                        </div>
-                      )}
                       {product.is_on_sale && (
                         <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                           {product.discount_percentage ? `-${product.discount_percentage}%` : 'TILBUD'}
@@ -980,9 +1013,9 @@ export default function DagligvarerPage() {
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* 🚀 FLOATING PRICE HISTORY CARD */}
             {hoveredProduct && (
