@@ -191,13 +191,8 @@ export default function DagligvarerPage() {
           }
         })
         
-        // Remove duplicates by product ID
-        const uniqueProducts = fixedProducts.filter((product: any, index: number, self: any[]) => 
-          index === self.findIndex((p: any) => p.id === product.id)
-        )
-        
-        // Smart sorting: Offers first by discount percentage, then by name
-        const sortedProducts = uniqueProducts.sort((a: any, b: any) => {
+        // ✅ API now handles deduplication, so we can use products directly
+        const sortedProducts = fixedProducts.sort((a: any, b: any) => {
           // First: Offers (is_on_sale = true) - ALWAYS PRIORITY, sorted by discount percentage
           if (a.is_on_sale && a.discount_percentage > 0 && !b.is_on_sale) return -1
           if (!a.is_on_sale && b.is_on_sale && b.discount_percentage > 0) return 1

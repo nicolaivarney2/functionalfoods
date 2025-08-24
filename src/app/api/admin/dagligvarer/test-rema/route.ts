@@ -363,9 +363,21 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Fetched ${products?.length || 0} products for page ${page} (offset: ${offset}, limit: ${limit})`)
           
-          // ✅ No need for duplicate removal here - Supabase handles it
-          const uniqueProducts = products || []
-          console.log(`✅ Fetched ${uniqueProducts.length} products for page ${page}`)
+          // ✅ Remove duplicates by product ID (most reliable way)
+          let uniqueProducts = products || []
+          if (uniqueProducts.length > 0) {
+            const seenIds = new Set()
+            uniqueProducts = uniqueProducts.filter((product: any) => {
+              if (seenIds.has(product.id)) {
+                console.log(`🗑️ Removing duplicate product ID: ${product.id} - ${product.name}`)
+                return false
+              }
+              seenIds.add(product.id)
+              return true
+            })
+            
+            console.log(`✅ After deduplication: ${uniqueProducts.length} unique products`)
+          }
           
           return NextResponse.json({ 
             success: true, 
