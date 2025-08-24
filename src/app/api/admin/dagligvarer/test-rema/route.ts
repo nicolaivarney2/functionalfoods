@@ -282,29 +282,15 @@ export async function POST(request: NextRequest) {
         // Extract pagination parameters from request
         const url = new URL(request.url)
         const page = parseInt(url.searchParams.get('page') || '1')
-        const limit = parseInt(url.searchParams.get('limit') || '10000') // Much higher default limit
+        const limit = parseInt(url.searchParams.get('limit') || '20') // ✅ Reasonable default limit
         const category = url.searchParams.get('category')
         const search = url.searchParams.get('search')
         
         // Calculate offset for pagination
         const offset = (page - 1) * limit
         
-        // Build query with filters
-        let query = `select=*&store=eq.REMA 1000&limit=${limit}&offset=${offset}`
-        
-        if (category && category !== 'all') {
-          query += `&category=eq.${category}`
-        }
-        
-        if (search) {
-          query += `&name=ilike.*${search}*`
-        }
-        
         // Check if we need to filter by offers only
         const showOffers = url.searchParams.get('offers') === 'true'
-        if (showOffers) {
-          query += `&is_on_sale=eq.true`
-        }
         
         // Use service role key with REAL pagination - only fetch requested page
         try {
@@ -337,17 +323,31 @@ export async function POST(request: NextRequest) {
             baseQuery = baseQuery.eq('is_on_sale', true)
           }
           
-          // Get total count first using a separate count query
-          const { count: totalCount, error: countError } = await supabase
+          // Get total count with the SAME filters applied
+          let countQuery = supabase
             .from('supermarket_products')
             .select('*', { count: 'exact', head: true })
             .eq('store', 'REMA 1000')
+          
+          if (category && category !== 'all') {
+            countQuery = countQuery.eq('category', category)
+          }
+          
+          if (search) {
+            countQuery = countQuery.ilike('name', `%${search}%`)
+          }
+          
+          if (showOffers) {
+            countQuery = countQuery.eq('is_on_sale', true)
+          }
+          
+          const { count: totalCount, error: countError } = await countQuery
           
           if (countError) {
             throw new Error(`Count query failed: ${countError.message}`)
           }
           
-          console.log(`🔍 Total products in database: ${totalCount}`)
+          console.log(`🔍 Total filtered products: ${totalCount}`)
           
           // Apply REAL pagination - only fetch the requested page
           // Always prioritize offers first by ordering by is_on_sale and discount percentage
@@ -363,22 +363,9 @@ export async function POST(request: NextRequest) {
           
           console.log(`✅ Fetched ${products?.length || 0} products for page ${page} (offset: ${offset}, limit: ${limit})`)
           
-          // Remove duplicates by product name and store
-          let uniqueProducts = products || []
-          if (uniqueProducts.length > 0) {
-            const seen = new Set()
-            uniqueProducts = uniqueProducts.filter((product: any) => {
-              const key = `${product.name}-${product.store}`
-              if (seen.has(key)) {
-                console.log(`🗑️ Removing duplicate: ${product.name}`)
-                return false
-              }
-              seen.add(key)
-              return true
-            })
-            
-            console.log(`✅ After deduplication: ${uniqueProducts.length} unique products`)
-          }
+          // ✅ No need for duplicate removal here - Supabase handles it
+          const uniqueProducts = products || []
+          console.log(`✅ Fetched ${uniqueProducts.length} products for page ${page}`)
           
           return NextResponse.json({ 
             success: true, 
