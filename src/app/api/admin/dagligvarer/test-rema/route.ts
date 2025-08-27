@@ -100,6 +100,44 @@ export async function POST(request: NextRequest) {
     const scraper = new Rema1000Scraper()
     
     switch (action) {
+      case 'testDirectScrape':
+        if (!productId) {
+          return NextResponse.json(
+            { error: 'Product ID is required' },
+            { status: 400 }
+          )
+        }
+        
+        console.log(`🧪 Testing direct REMA scraping for product ${productId}...`)
+        
+        try {
+          // Use scraper's fetchProduct method directly
+          const scrapedProduct = await scraper.fetchProduct(parseInt(productId))
+          
+          if (scrapedProduct) {
+            console.log(`✅ Successfully scraped: ${scrapedProduct.name}`)
+            return NextResponse.json({ 
+              success: true, 
+              scrapedProduct,
+              message: 'Direct scraping successful'
+            })
+          } else {
+            console.log(`❌ Product ${productId} not found via scraping`)
+            return NextResponse.json({ 
+              success: false, 
+              error: 'Product not found via REMA API'
+            })
+          }
+          
+        } catch (scrapeError) {
+          console.error('❌ Direct scraping failed:', scrapeError)
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Direct scraping failed',
+            details: scrapeError instanceof Error ? scrapeError.message : 'Unknown error'
+          }, { status: 500 })
+        }
+        
       case 'fetchProduct':
         if (!productId) {
           return NextResponse.json(

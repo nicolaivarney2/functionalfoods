@@ -667,23 +667,48 @@ export default function DagligvarerPage() {
               </p>
             </div>
 
-            {/* Products Grid */}
+            {/* Product Grid */}
             {loading && products.length === 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              // Loading skeleton
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Array.from({ length: 20 }, (_, i) => (
                   <ProductSkeleton key={i} />
                 ))}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {products.map(product => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    onToggleFavorite={toggleFavorite}
+            ) : products.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
                     onOpenModal={openProductModal}
+                    onToggleFavorite={toggleFavorite}
                   />
                 ))}
+              </div>
+            ) : (
+              // No products found
+              <div className="text-center py-12">
+                <div className="text-gray-400 mb-4">
+                  <Search size={48} className="mx-auto" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen produkter fundet</h3>
+                <p className="text-gray-600 mb-4">
+                  Prøv at ændre dine filtre eller søgekriterier
+                </p>
+              </div>
+            )}
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => fetchProducts(currentPage + 1, true)}
+                  disabled={loading}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Indlæser...' : 'Indlæs flere produkter'}
+                </button>
               </div>
             )}
           </div>

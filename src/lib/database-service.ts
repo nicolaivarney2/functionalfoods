@@ -1,29 +1,7 @@
 import { createSupabaseClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
-
-// Define SupermarketProduct interface locally since the import doesn't exist
-interface SupermarketProduct {
-  id: string
-  name: string
-  description: string
-  category: string
-  subcategory: string
-  price: number
-  originalPrice: number
-  unit: string
-  unitPrice: number
-  isOnSale: boolean
-  saleEndDate: string | null
-  imageUrl: string | null
-  store: string
-  available: boolean
-  temperatureZone: string | null
-  nutritionInfo: Record<string, string>
-  labels: string[]
-  lastUpdated: string
-  source: string
-}
+import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
   /**
@@ -215,7 +193,7 @@ export class DatabaseService {
    * Get all supermarket products from the database with pagination
    * TEMPORARY: Fetch more products to find offers, then sort and paginate
    */
-  async getSupermarketProducts(page: number = 1, limit: number = 100, categories?: string[], offersOnly?: boolean, search?: string, stores?: string[]): Promise<{products: SupermarketProduct[], total: number, hasMore: boolean}> {
+  async getSupermarketProducts(page: number = 1, limit: number = 100, categories?: string[], offersOnly?: boolean, search?: string, stores?: string[]): Promise<{products: any[], total: number, hasMore: boolean}> {
     try {
       // Use anon client for public API access
       const supabase = createSupabaseClient()
@@ -231,7 +209,7 @@ export class DatabaseService {
       
       // Sort processed products so offers come first
       allProducts.sort((a, b) => {
-        // 🔥 Real offers first
+        // 🔥 Real offers first (including those with original_price === price)
         if (a.is_on_sale && !b.is_on_sale) return -1
         if (!a.is_on_sale && b.is_on_sale) return 1
         // Then by name
@@ -264,7 +242,7 @@ export class DatabaseService {
   /**
    * Simple query method for backward compatibility and offers-only requests
    */
-  private async getProductsWithSimpleQuery(page: number = 1, limit: number = 100, categories?: string[], offersOnly?: boolean, search?: string, stores?: string[]): Promise<{products: SupermarketProduct[], total: number, hasMore: boolean}> {
+  private async getProductsWithSimpleQuery(page: number = 1, limit: number = 100, categories?: string[], offersOnly?: boolean, search?: string, stores?: string[]): Promise<{products: any[], total: number, hasMore: boolean}> {
     const supabase = createSupabaseClient()
     
     let query = supabase
@@ -295,30 +273,33 @@ export class DatabaseService {
       return { products: [], total: 0, hasMore: false }
     }
 
-    // Process products with discount logic
-    const processedProducts = (data || []).map(product => {
-      const price = product.price || 0
-      const originalPrice = product.original_price || 0
-      const isMarkedOnSale = product.is_on_sale || false
-      
-      const hasValidPrices = price > 0 && originalPrice > 0
-      const priceDifference = originalPrice - price
-      const isActualDiscount = priceDifference > 0.01
-      const isRealOffer = isMarkedOnSale && hasValidPrices && isActualDiscount
-      
-      let discountPercentage = 0
-      if (isRealOffer && originalPrice > 0) {
-        discountPercentage = Math.round((priceDifference / originalPrice) * 100)
-      }
-      
-      return {
-        ...product,
-        is_on_sale: isRealOffer,
-        discount_percentage: isRealOffer ? discountPercentage : null,
-        _original_is_on_sale: isMarkedOnSale,
-        _price_difference: priceDifference
-      }
-    })
+          // Process products with discount logic
+      const processedProducts = (data || []).map(product => {
+        const price = product.price || 0
+        const originalPrice = product.original_price || 0
+        const isMarkedOnSale = product.is_on_sale || false
+        
+        const hasValidPrices = price > 0 && originalPrice > 0
+        const priceDifference = originalPrice - price
+        const isActualDiscount = priceDifference > 0.01
+        
+        // 🔥 NEW LOGIC: Show offers even if original_price === price (for now)
+        // This allows products marked as offers to display while we fix their original prices
+        const isRealOffer = isMarkedOnSale && hasValidPrices
+        
+        let discountPercentage = 0
+        if (isRealOffer && originalPrice > 0 && isActualDiscount) {
+          discountPercentage = Math.round((priceDifference / originalPrice) * 100)
+        }
+        
+        return {
+          ...product,
+          is_on_sale: isRealOffer,
+          discount_percentage: isRealOffer ? (isActualDiscount ? discountPercentage : 0) : null,
+          _original_is_on_sale: isMarkedOnSale,
+          _price_difference: priceDifference
+        }
+      })
 
     const total = count || 0
     const hasMore = offset + limit < total
@@ -369,26 +350,38 @@ export class DatabaseService {
    */
   async updateSupermarketProduct(product: SupermarketProduct): Promise<boolean> {
     try {
+      // Convert camelCase interface to snake_case database fields
+      const updateData: any = {
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        subcategory: product.subcategory,
+        price: product.price,
+        original_price: product.originalPrice,
+        unit: product.unit,
+        unit_price: product.unitPrice,
+        is_on_sale: product.isOnSale,
+        sale_end_date: product.saleEndDate,
+        image_url: product.imageUrl,
+        available: product.available,
+        temperature_zone: product.temperatureZone,
+        nutrition_info: product.nutritionInfo,
+        labels: product.labels,
+        last_updated: product.lastUpdated
+      }
+      
+      // Remove undefined fields to avoid database errors
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) {
+          delete updateData[key]
+        }
+      })
+      
+      console.log(`🔧 Updating product ${product.id} with:`, updateData)
+      
       const { error } = await createSupabaseClient()
         .from('supermarket_products')
-        .update({
-          name: product.name,
-          description: product.description,
-          category: product.category,
-          subcategory: product.subcategory,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          unit: product.unit,
-          unitPrice: product.unitPrice,
-          isOnSale: product.isOnSale,
-          saleEndDate: product.saleEndDate,
-          imageUrl: product.imageUrl,
-          available: product.available,
-          temperatureZone: product.temperatureZone,
-          nutritionInfo: product.nutritionInfo,
-          labels: product.labels,
-          lastUpdated: product.lastUpdated
-        })
+        .update(updateData)
         .eq('id', product.id)
 
       if (error) {

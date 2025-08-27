@@ -292,6 +292,34 @@ export async function POST(request: NextRequest) {
     let updatedProducts = 0
     const errors: string[] = []
     
+    // 🔥 NEW: Store the scraped JSON as metadata
+    const scrapedDataMetadata = {
+      timestamp: new Date().toISOString(),
+      store: 'REMA 1000',
+      totalProducts: products.length,
+      source: 'python-scraper',
+      jsonData: JSON.stringify(products, null, 2), // Store the full JSON
+      version: '1.0'
+    }
+    
+    // Store metadata in a separate table or as a special record
+    const { error: metadataError } = await supabase
+      .from('scraping_metadata')
+      .insert({
+        store: 'REMA 1000',
+        timestamp: new Date().toISOString(),
+        data_type: 'full_import',
+        metadata: scrapedDataMetadata,
+        products_count: products.length,
+        status: 'completed'
+      })
+    
+    if (metadataError) {
+      console.log('⚠️ Could not store metadata:', metadataError.message)
+    } else {
+      console.log('✅ Stored scraping metadata successfully')
+    }
+    
     for (const product of products) {
       try {
         console.log(`🔍 Processing product: ${product.name} (ID: ${product.id})`)
@@ -306,9 +334,8 @@ export async function POST(request: NextRequest) {
             const deptId = product.department.id
             const deptName = product.department.name || ''
             
-            // Map department ID to category (CORRECTED mappings)
-            if (deptId === 40) category = "Kød, fisk & fjerkræ"  // Køl - kølede madvarer
-            else if (deptId === 50) category = "Færdigretter & takeaway"
+            // Map department ID to category (same as in scraper)
+            if (deptId === 50) category = "Færdigretter & takeaway"
             else if (deptId === 70) category = "Ost & mejeri"
             else if (deptId === 80) category = "Kolonial"
             else if (deptId === 81) category = "Frugt & grønt"
@@ -320,12 +347,10 @@ export async function POST(request: NextRequest) {
             else if (deptId === 87) category = "Snacks & slik"
             else if (deptId === 88) category = "Husholdning & rengøring"
             else if (deptId === 89) category = "Baby & børn"
-            else if (deptId === 90) category = "Drikkevarer"  // FIXED: Was incorrectly "Kæledyr"
+            else if (deptId === 90) category = "Kæledyr"
             else if (deptId === 100) category = "Husholdning & rengøring"
             else if (deptId === 120) category = "Personlig pleje"
             else if (deptId === 130) category = "Snacks & slik"
-            else if (deptId === 140) category = "Kiosk"
-            else if (deptId === 160) category = "Nemt & hurtigt"
             else category = fallbackCategoryMapping(product.name)
             
             console.log(`✅ Mapped department ${deptId} (${deptName}) to category: ${category}`)
@@ -337,24 +362,60 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Using category for "${product.name}": ${category}`)
         
         // Transform REMA product to our schema
+        // 🔥 FIXED: Use correct REMA price mapping logic
+        const prices = product.prices || []
+        let price = 0
+        let originalPrice = 0
+        let isOnSale = false
+        let saleEndDate = null
+        
+        if (prices.length >= 2) {
+          const campaignPrice = prices[0]  // First price is always campaign
+          const regularPrice = prices[1]   // Second price is always regular
+          
+          // Check if first price is actually a campaign
+          const isFirstPriceCampaign = campaignPrice.is_campaign === true || 
+                                      campaignPrice.is_campaign === 'true' || 
+                                      campaignPrice.is_campaign === 1
+          
+          if (isFirstPriceCampaign) {
+            // ✅ CORRECT MAPPING:
+            price = campaignPrice.price        // 12 kr (tilbudspris)
+            originalPrice = regularPrice.price // 21.95 kr (normalpris)
+            isOnSale = true
+            saleEndDate = campaignPrice.ending_at
+            
+            console.log(`🏷️ CORRECT PRICE MAPPING for ${product.name}:`)
+            console.log(`   Campaign Price (tilbud): ${price} kr`)
+            console.log(`   Regular Price (normal): ${originalPrice} kr`)
+            console.log(`   Is On Sale: ${isOnSale}`)
+          } else {
+            // Fallback: use regular price for both
+            price = regularPrice.price
+            originalPrice = regularPrice.price
+            isOnSale = false
+          }
+        } else {
+          // Single price product
+          price = prices[0]?.price || 0
+          originalPrice = price
+          isOnSale = false
+        }
+        
         const productData = {
           external_id: `python-${product.id}`, // Clear unique prefix
           name: product.name,
           description: product.description || product.underline || null,
           category: category,
           subcategory: product.department?.name || 'Ukategoriseret',
-          // For REMA: price is always the current price (campaign or regular)
-          price: product.prices?.[0]?.price || 0,
-          // For REMA: we need to store the "regular" price somewhere
-          // Since REMA doesn't provide original_price, we'll use current price as baseline
-          // and mark is_on_sale based on campaign flag
-          original_price: product.prices?.[0]?.price || 0,
+          price: price,                    // Current active price (campaign or regular)
+          original_price: originalPrice,   // Original price (before campaign)
           unit: underlineInfo.unit,
           amount: underlineInfo.amount,
           quantity: underlineInfo.quantity,
           unit_price: product.prices?.[0]?.compare_unit_price || 0,
-          is_on_sale: product.prices?.[0]?.is_campaign || false,
-          sale_end_date: product.prices?.[0]?.ending_at || null,
+          is_on_sale: isOnSale,           // Based on campaign status
+          sale_end_date: saleEndDate,     // Campaign end date
           currency: 'DKK',
           store: 'REMA 1000',
           store_url: `https://shop.rema1000.dk/produkt/${product.id}`,
@@ -486,6 +547,12 @@ export async function POST(request: NextRequest) {
         updatedProducts,
         errors
       },
+      metadata: {
+        stored: !metadataError,
+        timestamp: scrapedDataMetadata.timestamp,
+        store: scrapedDataMetadata.store,
+        totalProducts: scrapedDataMetadata.totalProducts
+      },
       timestamp: new Date().toISOString()
     })
     
@@ -502,12 +569,83 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// 🔥 NEW: Download latest scraped JSON data
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = createClient(
+      (process.env as any).NEXT_PUBLIC_SUPABASE_URL!,
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hamF4eWNmamd1bHR3ZHdmZmh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMyNzYwNywiZXhwIjoyMDY5OTAzNjA3fQ.4ZEeQ-CS5OSOIOsoMNGzRdNOpbSvD5OII7wl8LRr7JQ'
+    )
+    
+    const body = await request.json()
+    const { action, metadataId } = body
+    
+    if (action === 'downloadLatestJSON') {
+      // Get the latest scraping metadata
+      const { data: latestMetadata, error: metadataError } = await supabase
+        .from('scraping_metadata')
+        .select('*')
+        .eq('store', 'REMA 1000')
+        .eq('data_type', 'full_import')
+        .order('timestamp', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (metadataError) {
+        return NextResponse.json({ 
+          success: false, 
+          error: 'No scraping metadata found' 
+        })
+      }
+      
+      // Return the JSON data
+      return NextResponse.json({
+        success: true,
+        data: latestMetadata.metadata.jsonData,
+        timestamp: latestMetadata.timestamp,
+        productsCount: latestMetadata.products_count,
+        store: latestMetadata.store
+      })
+    }
+    
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Invalid action' 
+    })
+    
+  } catch (error) {
+    console.error('❌ Error downloading JSON:', error)
+    
+    return NextResponse.json(
+      { 
+        error: 'Failed to download JSON',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    )
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient(
       (process.env as any).NEXT_PUBLIC_SUPABASE_URL!,
-      (process.env as any).NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hamF4eWNmamd1bHR3ZHdmZmh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMyNzYwNywiZXhwIjoyMDY5OTAzNjA3fQ.4ZEeQ-CS5OSOIOsoMNGzRdNOpbSvD5OII7wl8LRr7JQ'
     )
+    
+    // Get latest scraping metadata
+    const { data: latestMetadata, error: metadataError } = await supabase
+      .from('scraping_metadata')
+      .select('*')
+      .eq('store', 'REMA 1000')
+      .eq('data_type', 'full_import')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .single()
+    
+    if (metadataError && metadataError.code !== 'PGRST116') {
+      throw metadataError
+    }
     
     // Get statistics from database
     const { data: products, error: productsError } = await supabase
@@ -542,6 +680,12 @@ export async function GET(request: NextRequest) {
         lastUpdate: lastUpdate ? new Date(lastUpdate).toISOString() : null,
         averagePrice: Math.round(averagePrice * 100) / 100
       },
+      latestScraping: latestMetadata ? {
+        timestamp: latestMetadata.timestamp,
+        productsCount: latestMetadata.products_count,
+        status: latestMetadata.status,
+        metadataId: latestMetadata.id
+      } : null,
       timestamp: new Date().toISOString()
     })
     

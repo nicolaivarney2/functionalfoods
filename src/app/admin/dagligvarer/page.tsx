@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Play, Square, RefreshCw, Database, Settings, AlertCircle, CheckCircle, Clock, Save, TrendingUp, Search } from 'lucide-react'
+import { Play, Square, RefreshCw, Database, Settings, AlertCircle, CheckCircle, Clock, Save, TrendingUp, Search, Upload, Store, Download } from 'lucide-react'
 import Link from 'next/link'
 
 interface ScrapingResult {
@@ -13,33 +13,12 @@ interface ScrapingResult {
   errors: string[]
 }
 
-interface TestResult {
-  success: boolean
-  message: string
-  testProduct?: any
-  scrapingResult?: ScrapingResult
-  timestamp: string
-}
-
 interface DatabaseStats {
   totalProducts: number
   productsOnSale: number
   categories: string[]
   lastUpdate: string | null
   averagePrice: number
-}
-
-interface StorageResult {
-  success: boolean
-  message: string
-  scraping: {
-    totalScraped: number
-    newProducts: number
-    updatedProducts: number
-    errors: string[]
-  }
-  database: DatabaseStats
-  timestamp: string
 }
 
 interface SupermarketProduct {
@@ -66,17 +45,26 @@ interface SupermarketProduct {
 
 export default function SupermarketScraperPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [testResult, setTestResult] = useState<TestResult | null>(null)
-  const [storageResult, setStorageResult] = useState<StorageResult | null>(null)
   const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'running' | 'completed' | 'error'>('idle')
   const [lastScraping, setLastScraping] = useState<string | null>(null)
   const [databaseStats, setDatabaseStats] = useState<DatabaseStats | null>(null)
-  const [products, setProducts] = useState<SupermarketProduct[]>([])
-  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
-  const [isScraping, setIsScraping] = useState(false)
-  const [isTestingDelta, setIsTestingDelta] = useState(false)
+  const [selectedStore, setSelectedStore] = useState<string>('rema1000')
   const [importResult, setImportResult] = useState<{success: boolean, message: string} | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [latestScraping, setLatestScraping] = useState<{
+    timestamp: string
+    productsCount: number
+    status: string
+    metadataId: string
+  } | null>(null)
+  
+  // Store options
+  const storeOptions = [
+    { value: 'rema1000', label: 'REMA 1000', description: 'Dansk dagligvarekæde' },
+    { value: 'netto', label: 'Netto', description: 'Dansk discountkæde (kommer snart)' },
+    { value: 'foetex', label: 'Føtex', description: 'Dansk supermarkeds-kæde (kommer snart)' },
+    { value: 'bilka', label: 'Bilka', description: 'Dansk hypermarkeds-kæde (kommer snart)' }
+  ]
   
   // Batch processing states
   const [isBatchImporting, setIsBatchImporting] = useState(false)
@@ -99,183 +87,104 @@ export default function SupermarketScraperPage() {
 
   // Fetch database statistics on component mount
   useEffect(() => {
-    fetchDatabaseStats()
+    loadDatabaseStats()
     loadLatestProducts()
   }, [])
 
-  const fetchDatabaseStats = async () => {
+  const loadDatabaseStats = async () => {
     try {
-      const response = await fetch('/api/admin/dagligvarer/store-products')
-      const data = await response.json()
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products')
+      const result = await response.json()
       
-      if (data.success) {
-        setDatabaseStats(data.statistics)
+      if (result.success) {
+        setDatabaseStats(result.statistics)
+        setLatestScraping(result.latestScraping)
+        console.log('✅ Database stats loaded:', result.statistics)
+        console.log('✅ Latest scraping info:', result.latestScraping)
+      } else {
+        console.error('❌ Failed to load database stats:', result.error)
       }
     } catch (error) {
-      console.error('Failed to fetch database stats:', error)
+      console.error('Error loading database stats:', error)
+    }
+  }
+  
+  const downloadLatestScrapedJSON = async () => {
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'downloadLatestJSON'
+        })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Create and download the JSON file
+        const blob = new Blob([result.data], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `rema1000-scraped-${new Date(result.timestamp).toISOString().split('T')[0]}.json`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        
+        console.log('✅ JSON downloaded successfully')
+      } else {
+        console.error('❌ Failed to download JSON:', result.error)
+      }
+    } catch (error) {
+      console.error('Error downloading JSON:', error)
     }
   }
 
   const loadLatestProducts = async () => {
-    setIsLoadingProducts(true)
+    setIsLoading(true)
     try {
       // Only load first 50 products for admin display (much faster)
-      const response = await fetch('/api/admin/dagligvarer/test-rema?page=1&limit=50', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'fetchAllProducts'
-        })
-      })
-      
+      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=50')
       const result = await response.json()
       if (result.success && result.products) {
-        setProducts(result.products)
+        // setProducts(result.products) // This state is no longer used
         console.log(`✅ Loaded ${result.products.length} products in admin (fast mode)`)
         
-        // Debug: Check if any products are already on sale
+        // Check if any products are on sale
         const productsOnSale = result.products.filter((p: any) => p.is_on_sale)
-        console.log(`🔍 Admin loaded ${productsOnSale.length} products already on sale`)
-        if (productsOnSale.length > 0) {
-          console.log('🎯 Sample products on sale:', productsOnSale.slice(0, 3).map((p: any) => ({
-            name: p.name,
-            price: p.price,
-            original_price: p.original_price,
-            is_on_sale: p.is_on_sale,
-            category: p.category
-          })))
-        }
+        console.log(`🎯 Admin loaded ${result.products.length} products already on sale`, productsOnSale.slice(0, 3))
+        
+        // Refresh database stats
+        loadDatabaseStats()
       }
     } catch (error) {
       console.error('Failed to load products:', error)
     } finally {
-      setIsLoadingProducts(false)
-    }
-  }
-
-  const simulateMeatOffers = async () => {
-    try {
-      console.log('🎯 Manually fetching real offers...')
-      setIsLoading(true)
-      
-      const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
-        method: 'POST'
-      })
-      const data = await response.json()
-      
-      if (data.success) {
-        console.log('🎯 Real offers fetched successfully:', data)
-        
-        // Show success message
-        setTestResult({
-          success: true,
-          message: `🎯 Found ${data.count} real offers in database!`,
-          timestamp: new Date().toISOString()
-        })
-        
-        // Refresh the products list to see the changes
-        loadLatestProducts()
-      } else {
-        console.error('❌ Real offers fetch failed:', data)
-        setTestResult({
-          success: false,
-          message: `❌ Real offers fetch failed: ${data.error || 'Unknown error'}`,
-          timestamp: new Date().toISOString()
-        })
-      }
-    } catch (error) {
-      console.error('Real offers fetch failed:', error)
-      setTestResult({
-        success: false,
-        message: `❌ Real offers fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        timestamp: new Date().toISOString()
-      })
-    } finally {
       setIsLoading(false)
     }
   }
 
-  const testRemascraper = async () => {
+  const startScraping = async () => {
     setIsLoading(true)
+    setScrapingStatus('running')
     try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema', {
-        method: 'GET'
-      })
-      
-      const result: TestResult = await response.json()
-      setTestResult(result)
-      
-      if (result.success) {
-        console.log('✅ REMA scraper test successful:', result)
-      } else {
-        console.error('❌ REMA scraper test failed:', result)
-      }
-    } catch (error) {
-      console.error('Error testing REMA scraper:', error)
-      setTestResult({
-        success: false,
-        message: 'Test failed due to network error',
-        timestamp: new Date().toISOString()
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchAllProducts = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10000', {
+      const response = await fetch('/api/admin/dagligvarer/store-products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          action: 'fetchAllProducts'
-        })
+        body: JSON.stringify({ store: selectedStore })
       })
-      
       const result = await response.json()
-      console.log('📦 Fetched products:', result)
-      
-      if (result.success) {
-        setTestResult({
-          success: true,
-          message: `Successfully fetched ${result.productsCount} products`,
-          timestamp: new Date().toISOString()
-        })
-        
-        // Update products list if available
-        if (result.products) {
-          setProducts(result.products)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching products:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const storeProductsInDatabase = async () => {
-    setIsLoading(true)
-    setScrapingStatus('running')
-    
-    try {
-      const response = await fetch('/api/admin/dagligvarer/store-products', {
-        method: 'POST'
-      })
-      
-      const result: StorageResult = await response.json()
-      setStorageResult(result)
       
       if (result.success) {
         setScrapingStatus('completed')
         setLastScraping(new Date().toISOString())
         setDatabaseStats(result.database)
-        
         console.log('✅ Products successfully stored:', result)
       } else {
         setScrapingStatus('error')
@@ -287,54 +196,20 @@ export default function SupermarketScraperPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const startNightlyScraping = async () => {
-    setScrapingStatus('running')
-    // This would be implemented with a cron job or scheduled task
-    setTimeout(() => {
-      setScrapingStatus('completed')
-      setLastScraping(new Date().toISOString())
-    }, 3000)
   }
 
   const stopScraping = () => {
     setScrapingStatus('idle')
   }
 
-  const handleScrapeAndStore = async () => {
-    setIsScraping(true)
-    try {
-      const response = await fetch('/api/admin/dagligvarer/store-products', {
-        method: 'POST'
-      })
-      const result: StorageResult = await response.json()
-      setStorageResult(result)
-      if (result.success) {
-        setScrapingStatus('completed')
-        setLastScraping(new Date().toISOString())
-        setDatabaseStats(result.database)
-        console.log('✅ Products successfully stored:', result)
-      } else {
-        setScrapingStatus('error')
-        console.error('❌ Failed to store products:', result)
-      }
-    } catch (error) {
-      console.error('Error storing products:', error)
-      setScrapingStatus('error')
-    } finally {
-      setIsScraping(false)
-    }
-  }
-
   const handleTestDeltaCapabilities = async () => {
-    setIsTestingDelta(true)
+    setIsLoading(true)
     try {
       const response = await fetch('/api/admin/dagligvarer/test-rema', {
         method: 'GET'
       })
-      const result: TestResult = await response.json()
-      setTestResult(result)
+      const result = await response.json()
+      // setTestResult(result) // This state is no longer used
       if (result.success) {
         console.log('✅ REMA delta update test successful:', result)
       } else {
@@ -342,52 +217,54 @@ export default function SupermarketScraperPage() {
       }
     } catch (error) {
       console.error('Error testing REMA delta update:', error)
-      setTestResult({
-        success: false,
-        message: 'Test failed due to network error',
-        timestamp: new Date().toISOString()
-      })
+      // setTestResult({
+      //   success: false,
+      //   message: 'Test failed due to network error',
+      //   timestamp: new Date().toISOString()
+      // })
     } finally {
-      setIsTestingDelta(false)
+      setIsLoading(false)
     }
   }
 
-  const importTestProducts = async () => {
+  const handleFixMissingOriginalPrices = async () => {
     setIsLoading(true)
-    setImportResult(null)
     try {
-      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+      const response = await fetch('/api/admin/dagligvarer/fix-missing-original-prices', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          test: true,
-          limit: 5
-        })
+        body: JSON.stringify({})
       })
       const result = await response.json()
       
       if (result.success) {
-        setImportResult({
-          success: true,
-          message: `✅ Test import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
-        })
-        // Refresh database stats
-        fetchDatabaseStats()
+        // setPriceFixResult({ // This state is no longer used
+        //   success: true,
+        //   message: result.message,
+        //   fixed: result.fixed || []
+        // })
+        console.log('✅ Original prices fixed:', result)
+        
+        // Refresh data after fixing prices
+        loadDatabaseStats()
         loadLatestProducts()
       } else {
-        setImportResult({
-          success: false,
-          message: `❌ Import failed: ${result.error || 'Unknown error'}`
-        })
+        // setPriceFixResult({ // This state is no longer used
+        //   success: false,
+        //   message: result.error || 'Failed to fix original prices',
+        //   fixed: []
+        // })
+        console.error('❌ Failed to fix original prices:', result)
       }
     } catch (error) {
-      console.error('Error importing test products:', error)
-      setImportResult({
-        success: false,
-        message: '❌ Import failed due to network error'
-      })
+      console.error('Error fixing original prices:', error)
+      // setPriceFixResult({ // This state is no longer used
+      //   success: false,
+      //   message: 'Network error while fixing prices',
+      //   fixed: []
+      // })
     } finally {
       setIsLoading(false)
     }
@@ -403,7 +280,8 @@ export default function SupermarketScraperPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          test: false
+          test: false,
+          store: selectedStore
         })
       })
       const result = await response.json()
@@ -414,7 +292,7 @@ export default function SupermarketScraperPage() {
           message: `✅ Full import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
         })
         // Refresh database stats
-        fetchDatabaseStats()
+        loadDatabaseStats()
         loadLatestProducts()
       } else {
         setImportResult({
@@ -424,6 +302,48 @@ export default function SupermarketScraperPage() {
       }
     } catch (error) {
       console.error('Error importing all products:', error)
+      setImportResult({
+        success: false,
+        message: '❌ Import failed due to network error'
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const importTestProducts = async () => {
+    setIsLoading(true)
+    setImportResult(null)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          test: true,
+          limit: 5,
+          store: selectedStore
+        })
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        setImportResult({
+          success: true,
+          message: `✅ Test import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
+        })
+        // Refresh database stats
+        loadDatabaseStats()
+        loadLatestProducts()
+      } else {
+        setImportResult({
+          success: false,
+          message: `❌ Import failed: ${result.error || 'Unknown error'}`
+        })
+      }
+    } catch (error) {
+      console.error('Error importing test products:', error)
       setImportResult({
         success: false,
         message: '❌ Import failed due to network error'
@@ -443,7 +363,8 @@ export default function SupermarketScraperPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          action: 'fixExistingProducts'
+          action: 'fixExistingProducts',
+          store: selectedStore
         })
       })
       const result = await response.json()
@@ -454,7 +375,7 @@ export default function SupermarketScraperPage() {
           message: `✅ Fix successful! ${result.fixedProducts || 0} products fixed`
         })
         // Refresh database stats
-        fetchDatabaseStats()
+        loadDatabaseStats()
         loadLatestProducts()
       } else {
         setImportResult({
@@ -499,7 +420,8 @@ export default function SupermarketScraperPage() {
         body: JSON.stringify({
           products: products,
           batchNumber: batchNumber,
-          batchSize: batchSize
+          batchSize: batchSize,
+          store: selectedStore
         })
       })
       
@@ -622,7 +544,7 @@ export default function SupermarketScraperPage() {
       // Clear file selection
       setSelectedFile(null)
       // Refresh database stats
-      fetchDatabaseStats()
+      loadDatabaseStats()
       loadLatestProducts()
     } catch (error) {
       console.error('Error importing from file:', error)
@@ -651,158 +573,44 @@ export default function SupermarketScraperPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Scraper Testing & Database */}
           <div className="space-y-6">
-            {/* REMA 1000 Scraper Test */}
+            {/* Store Selection */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Database size={20} className="mr-2" />
-                REMA 1000 Scraper Test
+                <Store size={20} className="mr-2" />
+                Vælg Supermarked
+              </h2>
+              <div className="space-y-3">
+                {storeOptions.map((store) => (
+                  <button
+                    key={store.value}
+                    onClick={() => setSelectedStore(store.value)}
+                    className={`w-full px-4 py-2 rounded-lg text-left ${
+                      selectedStore === store.value
+                        ? 'bg-blue-600 text-white font-medium'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span>{store.label}</span>
+                      <span className="text-xs text-gray-500">{store.description}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Scraping Control */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <Play size={20} className="mr-2" />
+                Scraping Kontrol
               </h2>
               
               <div className="space-y-4">
                 <div className="flex gap-3">
                   <button
-                    onClick={testRemascraper}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <Play size={16} />
-                    Test Scraper
-                  </button>
-                  
-                  <button
-                    onClick={fetchAllProducts}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <RefreshCw size={16} />
-                    Fetch Products
-                  </button>
-                  
-                  <button
-                    onClick={simulateMeatOffers}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    🎯
-                    Check Real Offers
-                  </button>
-                </div>
-
-                {/* Test Results */}
-                {testResult && (
-                  <div className={`p-4 rounded-lg border ${
-                    testResult.success 
-                      ? 'border-green-200 bg-green-50' 
-                      : 'border-red-200 bg-red-50'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      {testResult.success ? (
-                        <CheckCircle size={16} className="text-green-600" />
-                      ) : (
-                        <AlertCircle size={16} className="text-red-600" />
-                      )}
-                      <span className={`font-medium ${
-                        testResult.success ? 'text-green-800' : 'text-red-800'
-                      }`}>
-                        {testResult.success ? 'Test Successful' : 'Test Failed'}
-                      </span>
-                    </div>
-                    <p className={`text-sm ${
-                      testResult.success ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {testResult.message}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">
-                      {new Date(testResult.timestamp).toLocaleString()}
-                    </p>
-                  </div>
-                )}
-
-                {/* Loading State */}
-                {isLoading && (
-                  <div className="flex items-center gap-2 text-blue-600">
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Processing...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Database Lagring */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center mb-4">
-                <Database className="h-6 w-6 text-purple-600 mr-2" />
-                <h3 className="text-lg font-semibold text-gray-900">Database Lagring</h3>
-              </div>
-              <div className="space-y-3">
-                <button
-                  onClick={handleScrapeAndStore}
-                  disabled={isScraping}
-                  className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  <Database className="h-5 w-5" />
-                  <span>{isScraping ? 'Scraper...' : 'Scrape & Gem Produkter'}</span>
-                </button>
-                
-                {/* Test Delta Capabilities Button */}
-                <button
-                  onClick={handleTestDeltaCapabilities}
-                  disabled={isTestingDelta}
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  <Search className="h-4 w-4" />
-                  <span>{isTestingDelta ? 'Tester...' : 'Test Delta Update Endpoints'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Scraper Configuration */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <Settings size={20} className="mr-2" />
-                  Konfiguration
-                </h2>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">REMA 1000 Scraper</span>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                    Enabled
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Update Schedule</span>
-                  <span className="text-sm text-gray-900">Every night at 2:00 AM</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Delay Between Requests</span>
-                  <span className="text-sm text-gray-900">1 second</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Max Retries</span>
-                  <span className="text-sm text-gray-900">3 attempts</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column - Scraping Status & Statistics */}
-          <div className="space-y-6">
-            {/* Scraping Control */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <Play size={20} className="mr-2" />
-                  Scraping Kontrol
-                </h2>
-              
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <button
-                    onClick={startNightlyScraping}
-                    disabled={scrapingStatus === 'running'}
+                    onClick={startScraping}
+                    disabled={scrapingStatus === 'running' || isLoading}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
                   >
                     <Play size={16} />
@@ -847,6 +655,41 @@ export default function SupermarketScraperPage() {
               </div>
             </div>
 
+            {/* Scraper Configuration */}
+            <div className="bg-white p-6 rounded-lg shadow-sm">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <Settings size={20} className="mr-2" />
+                Konfiguration
+              </h2>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Selected Store</span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                    {storeOptions.find(s => s.value === selectedStore)?.label}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Update Schedule</span>
+                  <span className="text-sm text-gray-900">Every night at 2:00 AM</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Delay Between Requests</span>
+                  <span className="text-sm text-gray-900">1 second</span>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Max Retries</span>
+                  <span className="text-sm text-gray-900">3 attempts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Import Products */}
+          <div className="space-y-6">
             {/* Import Products */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -882,126 +725,13 @@ export default function SupermarketScraperPage() {
                       disabled={!selectedFile || isLoading}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
                     >
-                      <Database size={16} />
+                      <Upload size={16} />
                       {isLoading ? 'Importerer...' : 'Upload & Import'}
                     </button>
                   </div>
                 </div>
 
-                {/* Quick Import Section */}
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="font-medium text-blue-800 mb-3">⚡ Hurtig Import</h3>
-                  <p className="text-sm text-blue-700 mb-3">
-                    Import fra foruddefinerede data filer
-                  </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <button
-                      onClick={() => importTestProducts()}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <Database size={16} />
-                      {isLoading ? 'Importerer...' : 'Import Test (5 produkter)'}
-                    </button>
-                    
-                    <button
-                      onClick={() => importAllProducts()}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <TrendingUp size={16} />
-                      {isLoading ? 'Importerer...' : 'Import Alle Produkter'}
-                    </button>
-                    
-                    <button
-                      onClick={() => fixExistingProducts()}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <RefreshCw size={16} />
-                      {isLoading ? 'Fikser...' : 'Fix Eksisterende Produkter'}
-                    </button>
-                    
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/admin/dagligvarer/test-rema?limit=5', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'fetchAllProducts' })
-                          })
-                          const data = await response.json()
-                          if (data.success) {
-                            console.log('🔍 Test products from database:', data.products.map((p: any) => ({
-                              name: p.name,
-                              price: p.price,
-                              original_price: p.original_price,
-                              is_on_sale: p.is_on_sale,
-                              // Log ALL fields to see what exists
-                              allFields: Object.keys(p)
-                            })))
-                          }
-                        } catch (error) {
-                          console.error('Test failed:', error)
-                        }
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                    >
-                      🔍 Test Database Fields
-                    </button>
-                    
-                    <button
-                      onClick={async () => {
-                        try {
-                          const response = await fetch('/api/admin/dagligvarer/test-rema?limit=10', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'fetchAllProducts' })
-                          })
-                          const data = await response.json()
-                          if (data.success) {
-                            console.log('💰 Price analysis:', data.products.map((p: any) => ({
-                              name: p.name,
-                              price: p.price,
-                              original_price: p.original_price,
-                              priceCheck: p.price < p.original_price,
-                              difference: p.original_price ? (p.original_price - p.price).toFixed(2) : 'N/A'
-                            })))
-                          }
-                        } catch (error) {
-                          console.error('Price test failed:', error)
-                        }
-                      }}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 mt-2"
-                    >
-                      💰 Check Prices
-                    </button>
-                    
-                    <button
-                      onClick={async () => {
-                        try {
-                          // Simulate offers on meat products
-                          const response = await fetch('/api/admin/dagligvarer/simulate-offers', {
-                            method: 'POST'
-                          })
-                          const data = await response.json()
-                          if (data.success) {
-                            console.log('🎯 Simulated offers:', data)
-                            // Reload products to see changes
-                            loadLatestProducts()
-                          }
-                        } catch (error) {
-                          console.error('Simulate offers failed:', error)
-                        }
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 mt-2"
-                    >
-                      🥩 Simulate Meat Offers
-                    </button>
-                  </div>
-                </div>
-                
+                {/* Import Result */}
                 {importResult && (
                   <div className={`mt-3 p-3 rounded-lg ${
                     importResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
@@ -1073,54 +803,61 @@ export default function SupermarketScraperPage() {
             {/* Database Statistics */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <TrendingUp size={20} className="mr-2" />
+                <Database size={20} className="mr-2" />
                 Database Statistikker
               </h2>
               
               {databaseStats ? (
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Total Products</span>
-                    <span className="text-lg font-semibold text-gray-900">{databaseStats.totalProducts}</span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600">{databaseStats.totalProducts}</div>
+                      <div className="text-sm text-blue-800">Total Produkter</div>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">{databaseStats.productsOnSale}</div>
+                      <div className="text-sm text-green-800">På Tilbud</div>
+                    </div>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Products on Sale</span>
-                    <span className="text-lg font-semibold text-green-600">{databaseStats.productsOnSale}</span>
+                  <div className="text-sm text-gray-600">
+                    <div>Kategorier: {databaseStats.categories.length}</div>
+                    <div>Gns. Pris: {databaseStats.averagePrice} kr</div>
+                    <div>Sidst Opdateret: {databaseStats.lastUpdate ? new Date(databaseStats.lastUpdate).toLocaleString('da-DK') : 'Aldrig'}</div>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Categories</span>
-                    <span className="text-sm text-gray-900">{databaseStats.categories.length}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Average Price</span>
-                    <span className="text-sm text-gray-900">kr {databaseStats.averagePrice}</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Last Update</span>
-                    <span className="text-sm text-gray-900">
-                      {databaseStats.lastUpdate 
-                        ? new Date(databaseStats.lastUpdate).toLocaleString()
-                        : 'Never'
-                      }
-                    </span>
-                  </div>
+                  {/* 🔥 NEW: Latest Scraping Info */}
+                  {latestScraping && (
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <h3 className="font-medium text-yellow-800 mb-2">📊 Seneste Scraping</h3>
+                      <div className="text-sm text-yellow-700 space-y-1">
+                        <div>Tidspunkt: {new Date(latestScraping.timestamp).toLocaleString('da-DK')}</div>
+                        <div>Produkter: {latestScraping.productsCount}</div>
+                        <div>Status: {latestScraping.status}</div>
+                      </div>
+                      
+                      <button
+                        onClick={downloadLatestScrapedJSON}
+                        className="mt-3 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm flex items-center gap-2"
+                      >
+                        <Download size={16} />
+                        Download Seneste JSON
+                      </button>
+                    </div>
+                  )}
                   
                   <button
-                    onClick={fetchDatabaseStats}
+                    onClick={loadDatabaseStats}
                     className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
                   >
-                    Refresh Stats
+                    Refresh
                   </button>
                 </div>
               ) : (
-                <div className="text-center py-4">
+                <div className="text-center py-8">
                   <div className="text-gray-400 mb-2">No data available</div>
                   <button
-                    onClick={fetchDatabaseStats}
+                    onClick={loadDatabaseStats}
                     className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                   >
                     Load Statistics
@@ -1131,10 +868,10 @@ export default function SupermarketScraperPage() {
 
             {/* Next Scheduled Run */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <Clock size={20} className="mr-2" />
-                  Næste Planlagte Kørsel
-                </h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <Clock size={20} className="mr-2" />
+                Næste Planlagte Kørsel
+              </h2>
               
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600 mb-2">
@@ -1151,124 +888,16 @@ export default function SupermarketScraperPage() {
           </div>
         </div>
 
-        {/* Product List Section */}
-        {products.length > 0 && (
-          <div className="mt-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <Database size={20} className="mr-2" />
-                  Scraped Produkter ({products.length})
-                </h2>
-                <button
-                  onClick={loadLatestProducts}
-                  disabled={isLoadingProducts}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  <RefreshCw size={16} className={isLoadingProducts ? 'animate-spin' : ''} />
-                  Refresh
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products.map((product) => (
-                  <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    {/* Product Image */}
-                    {product.image_url && (
-                      <div className="mb-3 flex justify-center">
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name}
-                          className="w-24 h-24 object-cover rounded-lg shadow-sm"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-gray-900 text-sm line-clamp-2">
-                        {product.name}
-                      </h3>
-                      {product.price < product.original_price && (
-                        <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full ml-2 flex-shrink-0">
-                          TILBUD
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Product Info section */}
-                    <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/dagligvarer/produkt/${product.id}`}
-                        className="block hover:bg-gray-100 rounded p-1 -m-1 transition-colors"
-                      >
-                        <h4 className="font-medium text-gray-900 text-sm line-clamp-2 cursor-pointer hover:text-green-600">
-                          {product.name}
-                        </h4>
-                      </Link>
-                      
-                      {/* Price and quantity info */}
-                      <div className="mt-2 space-y-1 text-xs text-gray-600">
-                        <div className="flex justify-between">
-                          <span>Pris:</span>
-                          <span className="text-right font-medium">
-                            {product.price ? `${product.price.toFixed(2)} kr` : 'Ikke tilgængelig'}
-                          </span>
-                        </div>
-                        
-                        {/* Show amount and unit separately if available */}
-                        {product.amount && product.unit && (
-                          <div className="flex justify-between">
-                            <span>Mængde:</span>
-                            <span className="text-right font-medium">
-                              {product.amount} {product.unit}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Show quantity as fallback */}
-                        {product.quantity && !product.amount && (
-                          <div className="flex justify-between">
-                            <span>Mængde:</span>
-                            <span className="text-right font-medium">
-                              {product.quantity}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Show unit price if available */}
-                        {product.unit_price && product.unit_price > 0 && (
-                          <div className="flex justify-between">
-                            <span>Pris pr. {product.unit || 'enhed'}:</span>
-                            <span className="text-right font-medium">
-                              {product.unit_price.toFixed(2)} kr
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {product.description && !product.description.match(/^\d+\s+(GR|ML|L|KG|G|CL|DL)/i) && (
-                      <p className="text-xs text-gray-500 mt-3 line-clamp-2">
-                        {product.description}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Product List Section - Removed for now */}
+        {/* This section will be reimplemented when we have proper product fetching */}
 
         {/* Loading state for products */}
-        {isLoadingProducts && products.length === 0 && (
+        {isLoading && (
           <div className="mt-8">
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <div className="flex items-center justify-center py-8">
                 <RefreshCw size={24} className="animate-spin mr-3" />
-                <span className="text-gray-600">Henter produkter...</span>
+                <span className="text-gray-600">Processing...</span>
               </div>
             </div>
           </div>

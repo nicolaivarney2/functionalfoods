@@ -219,13 +219,80 @@ export class Rema1000Scraper implements SupermarketAPI {
 
   /**
    * Transform REMA API response to our standard format
+   * FIXED: Correctly maps REMA's two-price structure
    */
   private transformRemaProduct(remaProduct: RemaProductResponse['data']): SupermarketProduct {
-    const currentPrice = remaProduct.prices[0] // Get current price
-    const isOnSale = remaProduct.prices.some(p => p.is_campaign || p.is_advertised)
-    const originalPrice = isOnSale && remaProduct.prices.length > 1 
-      ? remaProduct.prices.find(p => !p.is_campaign)?.price 
-      : null
+    const prices = remaProduct.prices
+    
+    // 🔥 FIXED LOGIC: REMA always has 2 prices in specific order
+    // Price[0] = Campaign price (tilbudspris) - is_campaign: true
+    // Price[1] = Regular price (normalpris) - is_campaign: false
+    
+    if (prices.length >= 2) {
+      const campaignPrice = prices[0]  // First price is always campaign
+      const regularPrice = prices[1]   // Second price is always regular
+      
+      // Check if first price is actually a campaign
+      const isFirstPriceCampaign = (campaignPrice as any).is_campaign === true || 
+                                  (campaignPrice as any).is_campaign === 'true' || 
+                                  (campaignPrice as any).is_campaign === 1
+      
+      if (isFirstPriceCampaign) {
+        // ✅ CORRECT MAPPING:
+        const salePrice = campaignPrice.price        // 20 kr (tilbudspris)
+        const originalPrice = regularPrice.price     // 21.95 kr (normalpris)
+        
+        // 🔥 CHECK IF CAMPAIGN HAS ENDED
+        const now = new Date()
+        const campaignEndDate = campaignPrice.ending_at ? new Date(campaignPrice.ending_at) : null
+        
+        let isOnSale = true
+        let finalPrice = salePrice
+        let finalOriginalPrice = originalPrice
+        
+        if (campaignEndDate && now > campaignEndDate) {
+          // 🚨 CAMPAIGN HAS ENDED - use regular price
+          console.log(`⚠️ Campaign ended for ${remaProduct.name}, using regular price`)
+          isOnSale = false
+          finalPrice = regularPrice.price
+          finalOriginalPrice = regularPrice.price
+        }
+        
+        console.log(`🏷️ CORRECT PRICE MAPPING for ${remaProduct.name}:`)
+        console.log(`   Campaign Price (tilbud): ${salePrice} kr`)
+        console.log(`   Regular Price (normal): ${originalPrice} kr`)
+        console.log(`   Campaign End: ${campaignEndDate}`)
+        console.log(`   Is On Sale: ${isOnSale}`)
+        console.log(`   Final Price: ${finalPrice} kr`)
+        
+        return {
+          id: `rema-${remaProduct.id}`,
+          name: remaProduct.name,
+          description: remaProduct.description,
+          category: remaProduct.department.name,
+          subcategory: this.getSubcategory(remaProduct.department.name),
+          price: finalPrice,           // Current active price
+          originalPrice: finalOriginalPrice, // Original price
+          unit: campaignPrice.compare_unit || regularPrice.compare_unit || 'stk',
+          unitPrice: campaignPrice.compare_unit_price || regularPrice.compare_unit_price || 0,
+          isOnSale: isOnSale,        // true/false based on campaign status
+          saleEndDate: campaignPrice.ending_at || null,
+          imageUrl: remaProduct.images[0]?.medium || null,
+          store: this.storeName,
+          available: remaProduct.is_available_in_all_stores,
+          temperatureZone: remaProduct.temperature_zone,
+          nutritionInfo: this.transformNutritionInfo(remaProduct.nutrition_info),
+          labels: remaProduct.labels.map(label => label.name),
+          lastUpdated: new Date().toISOString(),
+          source: 'rema1000'
+        }
+      }
+    }
+    
+    // Fallback for products with only one price or no campaign
+    const singlePrice = prices[0]?.price || 0
+    
+    console.log(`⚠️ Fallback for ${remaProduct.name}: Single price ${singlePrice} kr`)
 
     return {
       id: `rema-${remaProduct.id}`,
@@ -233,12 +300,12 @@ export class Rema1000Scraper implements SupermarketAPI {
       description: remaProduct.description,
       category: remaProduct.department.name,
       subcategory: this.getSubcategory(remaProduct.department.name),
-      price: currentPrice.price,
-      originalPrice: originalPrice || currentPrice.price,
-      unit: currentPrice.compare_unit,
-      unitPrice: currentPrice.compare_unit_price,
-      isOnSale: isOnSale,
-      saleEndDate: remaProduct.prices.find(p => p.is_campaign)?.ending_at || null,
+      price: singlePrice,
+      originalPrice: singlePrice,
+      unit: prices[0]?.compare_unit || 'stk',
+      unitPrice: prices[0]?.compare_unit_price || 0,
+      isOnSale: false,
+      saleEndDate: null,
       imageUrl: remaProduct.images[0]?.medium || null,
       store: this.storeName,
       available: remaProduct.is_available_in_all_stores,
@@ -530,17 +597,25 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
-   * Intelligent batch update - prioritize products that change frequently
+   * Enhanced intelligent batch update - finds missing original prices for existing offers
    */
   private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
-    console.log('🧠 Using intelligent batch update strategy')
+    console.log('🧠 Using enhanced intelligent batch update strategy')
+    console.log('🔍 Special focus: Finding missing original prices for existing offers')
     
-    // Categorize products by update frequency
+    // Find products that need original price correction
+    const needsPriceCorrection = existingProducts.filter(p => 
+      p.isOnSale && p.originalPrice === p.price // These have missing original prices!
+    )
+    
+    console.log(`🎯 Found ${needsPriceCorrection.length} products with missing original prices`)
+    
+    // Categorize products by update frequency and offer potential
     const highPriority = existingProducts.filter(p => 
       p.category === 'Frugt & grønt' || p.category === 'Kød, fisk & fjerkræ'
     )
     const mediumPriority = existingProducts.filter(p => 
-      p.category === 'Mejeri' || p.category === 'Køl'
+      p.category === 'Mejeri' || p.category === 'Køl' || p.category === 'Ost & mejeri'
     )
     const lowPriority = existingProducts.filter(p => 
       p.category === 'Kolonial' || p.category === 'Frost'
@@ -548,31 +623,138 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     console.log(`📊 Update priorities: High: ${highPriority.length}, Medium: ${mediumPriority.length}, Low: ${lowPriority.length}`)
     
-    // Update high priority products more frequently
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
     
-    // Update high priority (every time)
-    for (const product of highPriority) {
-      if (product.source === 'rema1000') {
-        const productId = product.id.replace('rema-', '')
-        const updatedProduct = await this.fetchProduct(parseInt(productId))
-        if (updatedProduct) {
-          updated.push(updatedProduct)
+    // 🎯 PRIORITY 1: Fix products with missing original prices FIRST
+    console.log(`🔧 Fixing ${needsPriceCorrection.length} products with missing original prices...`)
+    for (const existingProduct of needsPriceCorrection.slice(0, 20)) { // Limit to 20 for performance
+      if (existingProduct.source === 'rema1000') {
+        const productId = existingProduct.id.replace('rema-', '')
+        const freshProduct = await this.fetchProduct(parseInt(productId))
+        
+        if (freshProduct) {
+          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          updated.push(enhancedProduct)
+          
+          // Log price corrections
+          if (enhancedProduct.originalPrice !== existingProduct.originalPrice) {
+            console.log(`✅ Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
+          }
         }
-        await this.delay(200)
+        await this.delay(150) // Slightly faster for corrections
       }
     }
     
-    // Update medium priority (every 3rd time)
-    // Update low priority (every 7th time)
+    // 🎯 PRIORITY 2: Enhanced update logic for high priority products
+    const remainingHighPriority = highPriority.filter(p => 
+      !needsPriceCorrection.some(corrected => corrected.id === p.id)
+    ).slice(0, 10) // Limit remaining high priority updates
+    
+    for (const existingProduct of remainingHighPriority) {
+      if (existingProduct.source === 'rema1000') {
+        const productId = existingProduct.id.replace('rema-', '')
+        const freshProduct = await this.fetchProduct(parseInt(productId))
+        
+        if (freshProduct) {
+          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          updated.push(enhancedProduct)
+          
+          // Log offer changes
+          if (enhancedProduct.isOnSale !== existingProduct.isOnSale) {
+            console.log(`🏷️ Offer status changed for ${enhancedProduct.name}: ${existingProduct.isOnSale} → ${enhancedProduct.isOnSale}`)
+          }
+        }
+        await this.delay(200) // Rate limiting
+      }
+    }
+    
+    // Also update some medium priority products for better coverage
+    const mediumSample = mediumPriority.slice(0, Math.min(10, mediumPriority.length))
+    for (const existingProduct of mediumSample) {
+      if (existingProduct.source === 'rema1000') {
+        const productId = existingProduct.id.replace('rema-', '')
+        const freshProduct = await this.fetchProduct(parseInt(productId))
+        
+        if (freshProduct) {
+          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          updated.push(enhancedProduct)
+        }
+        await this.delay(300)
+      }
+    }
+    
+    console.log(`✅ Delta update completed: ${updated.length} products updated`)
     
     return {
       updated,
       new: [],
-      unchanged: existingProducts.filter(p => !highPriority.includes(p)),
+      unchanged: existingProducts.filter(p => !updated.find(u => u.id === p.id)),
       totalChanges: updated.length
     }
+  }
+
+  /**
+   * Enhanced offer logic to properly handle original prices and offers
+   * SPECIAL FOCUS: Fix missing original prices for existing offers
+   */
+  private enhanceProductWithOfferLogic(existingProduct: SupermarketProduct, freshProduct: SupermarketProduct): SupermarketProduct {
+    // Start with fresh product data
+    let enhancedProduct = { ...freshProduct }
+    
+    // 🎯 SPECIAL CASE: Existing offer has missing original price (common after bulk import)
+    const existingHasMissingOriginalPrice = existingProduct.isOnSale && existingProduct.originalPrice === existingProduct.price
+    const freshHasValidOriginalPrice = freshProduct.originalPrice > freshProduct.price
+    
+    if (existingHasMissingOriginalPrice && freshProduct.isOnSale && freshHasValidOriginalPrice) {
+      console.log(`🔧 ${freshProduct.name}: FIXING missing original price! ${existingProduct.originalPrice} → ${freshProduct.originalPrice}`)
+      enhancedProduct.price = freshProduct.price // Keep sale price
+      enhancedProduct.originalPrice = freshProduct.originalPrice // Fix original price from REMA
+      enhancedProduct.isOnSale = true
+      return enhancedProduct
+    }
+    
+    // SCENARIO 1: Product WAS on sale, now is NOT on sale
+    if (existingProduct.isOnSale && !freshProduct.isOnSale) {
+      console.log(`🔄 ${freshProduct.name}: Offer ended, updating to regular price`)
+      // Product is back to regular price
+      enhancedProduct.price = freshProduct.price
+      enhancedProduct.originalPrice = freshProduct.price // Reset original price
+      enhancedProduct.isOnSale = false
+      enhancedProduct.saleEndDate = null
+    }
+    
+    // SCENARIO 2: Product was NOT on sale, now IS on sale  
+    else if (!existingProduct.isOnSale && freshProduct.isOnSale) {
+      console.log(`🔥 ${freshProduct.name}: New offer detected!`)
+      // New offer detected - preserve the old price as original price
+      enhancedProduct.price = freshProduct.price // Sale price
+      enhancedProduct.originalPrice = existingProduct.price // Previous regular price
+      enhancedProduct.isOnSale = true
+    }
+    
+    // SCENARIO 3: Product WAS on sale, still IS on sale
+    else if (existingProduct.isOnSale && freshProduct.isOnSale) {
+      console.log(`🏷️ ${freshProduct.name}: Offer continues`)
+      // Use fresh original price if it's better, otherwise keep existing
+      if (freshProduct.originalPrice > freshProduct.price && freshProduct.originalPrice > existingProduct.originalPrice) {
+        enhancedProduct.originalPrice = freshProduct.originalPrice // Better original price from REMA
+      } else if (existingProduct.originalPrice > freshProduct.price) {
+        enhancedProduct.originalPrice = existingProduct.originalPrice // Keep existing if valid
+      }
+      enhancedProduct.price = freshProduct.price // Updated sale price
+      enhancedProduct.isOnSale = true
+    }
+    
+    // SCENARIO 4: Product was NOT on sale, still NOT on sale
+    else {
+      // Regular price change - just update the price
+      enhancedProduct.price = freshProduct.price
+      enhancedProduct.originalPrice = freshProduct.price
+      enhancedProduct.isOnSale = false
+    }
+    
+    return enhancedProduct
   }
 }
 
