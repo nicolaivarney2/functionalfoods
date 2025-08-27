@@ -69,33 +69,31 @@ export async function POST(request: NextRequest) {
           console.log(`🏷️ ${product.name}: Using Delta Scraper's enhanced logic`)
           
           try {
-            // Use Delta Scraper's intelligent pricing logic
-            const enhancedProduct = await scraper.enhanceProductWithOfferLogic(freshProduct, product)
-            
-            if (enhancedProduct.originalPrice > enhancedProduct.price) {
-              console.log(`   ✅ Delta Scraper found better prices: ${enhancedProduct.price} kr (original: ${enhancedProduct.originalPrice} kr)`)
+            // Simple approach: use fresh product data directly
+            if (freshProduct.price < product.price) {
+              console.log(`   ✅ Fresh data shows better price: ${freshProduct.price} kr (current: ${product.price} kr)`)
               
               await databaseService.updateSupermarketProduct({
                 ...product,
-                price: enhancedProduct.price,
-                originalPrice: enhancedProduct.originalPrice,
+                price: freshProduct.price,
+                originalPrice: product.price, // Use current price as original
                 isOnSale: true,
-                saleEndDate: enhancedProduct.saleEndDate
+                saleEndDate: freshProduct.saleEndDate
               })
               
-              const discount = Math.round((enhancedProduct.originalPrice - enhancedProduct.price) / enhancedProduct.originalPrice * 100)
+              const discount = Math.round((product.price - freshProduct.price) / product.price * 100)
               
               fixed.push({
                 name: product.name,
                 oldPrice: product.price,
                 oldOriginal: product.original_price,
-                newPrice: enhancedProduct.price,
-                newOriginal: enhancedProduct.originalPrice,
+                newPrice: freshProduct.price,
+                newOriginal: product.price,
                 discount: discount,
-                note: "Delta Scraper enhanced pricing"
+                note: "Fresh data pricing"
               })
               
-              console.log(`💾 Updated ${product.name} with Delta Scraper enhanced pricing`)
+              console.log(`💾 Updated ${product.name} with fresh data pricing`)
             } else {
               // Fallback: estimate realistic original price
               console.log(`   🏷️ Estimating realistic original price for ${product.name}`)
