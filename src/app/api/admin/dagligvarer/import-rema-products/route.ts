@@ -298,15 +298,43 @@ export async function POST(request: NextRequest) {
         
         const underlineInfo = parseUnderline(product.underline)
         
-        // Get category with better error handling
-        let category
-        try {
-          category = await categorizeProductWithAI(product)
-          console.log(`✅ AI categorized "${product.name}" as: ${category}`)
-        } catch (aiError) {
-          console.log(`⚠️ AI categorization failed for "${product.name}", using fallback:`, aiError)
-          category = fallbackCategoryMapping(product.name)
+        // Use category from scraper directly (much better than AI!)
+        let category = product.category
+        if (!category || category === 'Ukategoriseret') {
+          // Fallback: try to map department ID to category
+          if (product.department && product.department.id) {
+            const deptId = product.department.id
+            const deptName = product.department.name || ''
+            
+            // Map department ID to category (CORRECTED mappings)
+            if (deptId === 40) category = "Kød, fisk & fjerkræ"  // Køl - kølede madvarer
+            else if (deptId === 50) category = "Færdigretter & takeaway"
+            else if (deptId === 70) category = "Ost & mejeri"
+            else if (deptId === 80) category = "Kolonial"
+            else if (deptId === 81) category = "Frugt & grønt"
+            else if (deptId === 82) category = "Kød, fisk & fjerkræ"
+            else if (deptId === 83) category = "Mejeri"
+            else if (deptId === 84) category = "Frost"
+            else if (deptId === 85) category = "Brød & kager"
+            else if (deptId === 86) category = "Drikkevarer"
+            else if (deptId === 87) category = "Snacks & slik"
+            else if (deptId === 88) category = "Husholdning & rengøring"
+            else if (deptId === 89) category = "Baby & børn"
+            else if (deptId === 90) category = "Drikkevarer"  // FIXED: Was incorrectly "Kæledyr"
+            else if (deptId === 100) category = "Husholdning & rengøring"
+            else if (deptId === 120) category = "Personlig pleje"
+            else if (deptId === 130) category = "Snacks & slik"
+            else if (deptId === 140) category = "Kiosk"
+            else if (deptId === 160) category = "Nemt & hurtigt"
+            else category = fallbackCategoryMapping(product.name)
+            
+            console.log(`✅ Mapped department ${deptId} (${deptName}) to category: ${category}`)
+          } else {
+            category = fallbackCategoryMapping(product.name)
+          }
         }
+        
+        console.log(`✅ Using category for "${product.name}": ${category}`)
         
         // Transform REMA product to our schema
         const productData = {
@@ -314,7 +342,7 @@ export async function POST(request: NextRequest) {
           name: product.name,
           description: product.description || product.underline || null,
           category: category,
-          subcategory: product.department?.parent?.name || 'Ukategoriseret',
+          subcategory: product.department?.name || 'Ukategoriseret',
           // For REMA: price is always the current price (campaign or regular)
           price: product.prices?.[0]?.price || 0,
           // For REMA: we need to store the "regular" price somewhere
@@ -442,6 +470,12 @@ export async function POST(request: NextRequest) {
     }
     
     console.log(`✅ Import completed: ${newProducts} new, ${updatedProducts} updated`)
+    console.log(`📊 Total products processed: ${products.length}`)
+    console.log(`❌ Total errors: ${errors.length}`)
+    
+    if (errors.length > 0) {
+      console.log(`❌ First 10 errors:`, errors.slice(0, 10))
+    }
     
     return NextResponse.json({
       success: true,

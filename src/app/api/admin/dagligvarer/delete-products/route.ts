@@ -16,11 +16,11 @@ export async function DELETE(request: NextRequest) {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hamF4eWNmamd1bHR3ZHdmZmh2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NDMyNzYwNywiZXhwIjoyMDY5OTAzNjA3fQ.4ZEeQ-CS5OSOIOsoMNGzRdNOpbSvD5OII7wl8LRr7JQ'
       )
       
-      // Delete all REMA products
+      // Delete ALL products (not just REMA 1000)
       const { error, count } = await supabase
         .from('supermarket_products')
         .delete()
-        .eq('store', 'REMA 1000')
+        .neq('id', 0) // Delete all products (id > 0)
       
       if (error) {
         console.error('❌ Error deleting all REMA products:', error)

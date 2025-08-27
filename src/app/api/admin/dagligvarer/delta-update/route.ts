@@ -8,9 +8,10 @@ export async function POST(request: NextRequest) {
     
     // Get existing products from database
     const existingProducts = await databaseService.getSupermarketProducts()
-    console.log(`📊 Found ${existingProducts.length} existing products in database`)
     
-    if (existingProducts.length === 0) {
+    console.log(`📊 Found ${existingProducts.products.length} existing products in database`)
+    
+    if (existingProducts.products.length === 0) {
       return NextResponse.json({
         success: false,
         message: 'No existing products found. Run full scrape first.',
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
     const scraper = new Rema1000Scraper()
     
     // Perform smart delta update
-    const deltaResult = await scraper.smartDeltaUpdate(existingProducts)
+    const deltaResult = await scraper.smartDeltaUpdate(existingProducts.products)
     
     console.log(`✅ Delta update completed:`)
     console.log(`   - Updated: ${deltaResult.updated.length}`)
@@ -69,7 +70,9 @@ export async function POST(request: NextRequest) {
       },
       database: {
         updates: databaseUpdates,
-        totalProducts: existingProducts.length + deltaResult.new.length
+        totalProducts: existingProducts.products.length,
+        deltaStatus: 'completed',
+        readyForDelta: existingProducts.products.length > 0
       }
     }
     
@@ -101,9 +104,9 @@ export async function GET(request: NextRequest) {
       message: 'Delta update status',
       timestamp: new Date().toISOString(),
       status: {
-        totalProducts: existingProducts.length,
+        totalProducts: existingProducts.products.length,
         lastUpdate: lastUpdate,
-        readyForDelta: existingProducts.length > 0
+        readyForDelta: existingProducts.products.length > 0
       }
     }
     

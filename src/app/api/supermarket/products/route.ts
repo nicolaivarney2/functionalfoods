@@ -5,14 +5,47 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🛒 Fetching supermarket products...')
     
-    const products = await databaseService.getSupermarketProducts()
+    // Parse query parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '100')
+    const category = searchParams.get('category') || undefined // Legacy support
+    const categories = searchParams.get('categories')?.split(',').filter(Boolean) || undefined
+    const stores = searchParams.get('stores')?.split(',').filter(Boolean) || undefined
+    const offers = searchParams.get('offers') === 'true'
+    const search = searchParams.get('search') || undefined
+    const countsOnly = searchParams.get('counts') === 'true'
     
-    console.log(`✅ Found ${products.length} supermarket products`)
+    console.log(`📋 Query params: page=${page}, limit=${limit}, categories=${categories}, stores=${stores}, offers=${offers}, search=${search}, countsOnly=${countsOnly}`)
+    
+    // If only counts are requested, return optimized count data
+    if (countsOnly) {
+      const counts = await databaseService.getProductCounts()
+      console.log(`✅ Retrieved product counts: total=${counts.total}`)
+      
+      return NextResponse.json({
+        success: true,
+        counts: counts,
+        timestamp: new Date().toISOString()
+      })
+    }
+    
+    // Get products with pagination and filters
+    const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
+    const result = await databaseService.getSupermarketProducts(page, limit, finalCategory, offers, search, stores)
+    
+    console.log(`✅ Found ${result.products.length} supermarket products (total: ${result.total})`)
     
     return NextResponse.json({
       success: true,
-      products,
-      count: products.length,
+      products: result.products,
+      count: result.total,
+      pagination: {
+        page,
+        limit,
+        total: result.total,
+        hasMore: result.hasMore
+      },
       timestamp: new Date().toISOString()
     })
     

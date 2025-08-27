@@ -1,22 +1,47 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Search, Filter, Heart, Plus, TrendingUp, Store, Tag } from 'lucide-react'
-import Link from 'next/link'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Search, Heart, Plus, ChevronDown } from 'lucide-react'
+
+
+// Types
+interface Product {
+  id: string
+  name: string
+  description?: string
+  category?: string
+  price: number
+  original_price?: number
+  unit: string
+  unit_price?: number
+  is_on_sale: boolean
+  discount_percentage?: number
+  image_url?: string
+  store: string
+  amount?: string
+  isFavorite?: boolean
+}
+
+interface ProductCounts {
+  total: number
+  categories: {[key: string]: number}
+  offers: number
+}
 
 // Product Card Component
-const ProductCard = ({ product, onToggleFavorite }: { 
-  product: any, 
-  onToggleFavorite: (id: number) => void 
+const ProductCard = ({ product, onToggleFavorite, onOpenModal }: { 
+  product: Product, 
+  onToggleFavorite: (id: string) => void,
+  onOpenModal: (product: Product) => void
 }) => (
-  <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative">
+  <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative group">
     {/* Product Image */}
-    <div className="relative h-32 bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="relative h-40 bg-white flex items-center justify-center p-3 cursor-pointer" onClick={() => onOpenModal(product)}>
       {product.image_url ? (
         <img 
           src={product.image_url} 
           alt={product.name}
-          className="w-full h-full object-cover"
+          className="max-w-full max-h-full object-contain transition-transform duration-200 group-hover:scale-105"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
@@ -30,64 +55,99 @@ const ProductCard = ({ product, onToggleFavorite }: {
       {/* Favorite Button */}
       <div className="absolute top-3 right-3">
         <button
-          onClick={() => onToggleFavorite(product.id)}
-          className={`p-2 rounded-full shadow-sm ${
-            product.isFavorite 
-              ? 'bg-red-500 text-white' 
-              : 'bg-white text-gray-400 hover:text-red-500 hover:bg-red-50'
-          } transition-all duration-200`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite(product.id);
+          }}
+          className="p-2 rounded-full shadow-sm bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
         >
-          <Heart size={16} fill={product.isFavorite ? 'currentColor' : 'none'} />
+          <Heart size={16} />
         </button>
       </div>
       
-      {/* Discount Badge */}
-      {product.is_on_sale && (
-        <div className="absolute top-3 left-3 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-          {product.discount_percentage ? `-${product.discount_percentage}%` : 'TILBUD'}
-        </div>
-      )}
+      {/* No discount badges on image anymore */}
       
-      {/* Store Badge */}
-      <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm">
+      {/* Store Badge with color coding */}
+      <div className={`absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm border-2 ${
+        product.store === 'Netto' ? 'border-yellow-400' :
+        product.store === 'REMA 1000' ? 'border-blue-900' :
+        product.store === 'Føtex' ? 'border-blue-950' :
+        product.store === 'Bilka' ? 'border-blue-400' :
+        product.store === 'Nemlig' ? 'border-orange-600' :
+        product.store === 'MENY' ? 'border-red-800' :
+        product.store === 'Spar' ? 'border-red-600' :
+        'border-gray-300'
+      }`}>
         {product.store}
-      </div>
-    </div>
+            </div>
+            </div>
 
     {/* Product Info */}
     <div className="p-4">
-      <Link href={`/dagligvarer/produkt/${product.id}`}>
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600 cursor-pointer">
+      <div onClick={() => onOpenModal(product)} className="cursor-pointer">
+        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm leading-tight hover:text-green-600">
           {product.name}
+          {product.amount && (
+            <span className="text-xs text-gray-500 font-normal ml-1">
+              ({product.amount} {product.unit || 'stk'})
+            </span>
+          )}
         </h3>
-      </Link>
-      
-      {/* Quantity and Unit */}
-      <p className="text-xs text-gray-500 mb-2 bg-gray-50 px-2 py-1 rounded-full inline-block">
-        {product.amount} {product.unit || 'stk'}
-      </p>
-      
-      {/* Price */}
-      <div className="flex items-center space-x-2 mb-2">
-        <span className="text-lg font-bold text-gray-900">
-          {product.price?.toFixed(2)} kr
-        </span>
-        {product.is_on_sale && (
-          <>
-            <span className="text-xs text-gray-500 line-through">
-              {product.original_price?.toFixed(2)} kr
-            </span>
-            <span className="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded-full">
-              -{product.discount_percentage}%
-            </span>
-          </>
-        )}
       </div>
       
+      {/* Price Section */}
+      <div className="mb-3">
+        {product.is_on_sale && product.discount_percentage ? (
+          // Product on sale - show both prices with clear indicators
+          <div className="space-y-2">
+            {/* Offer Price with "TILBUD" tag */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-lg font-bold text-red-600">
+                {(product.price || 0).toFixed(2)} kr
+              </span>
+              <span className="bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm animate-pulse">
+                TILBUD
+              </span>
+            </div>
+            
+            {/* Normal Price (crossed out) */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-500 line-through">
+                Normalpris: {(product.original_price || 0).toFixed(2)} kr
+              </span>
+            </div>
+            
+            {/* Savings Information */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                SPAR {product.discount_percentage}%
+        </span>
+              <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full">
+                Besparelse: {((product.original_price || 0) - (product.price || 0)).toFixed(2)} kr
+            </span>
+            </div>
+          </div>
+        ) : (
+          // Normal product - show price and normal price for transparency
+          <div className="space-y-1">
+            <span className="text-lg font-bold text-gray-900">
+              {(product.price || 0).toFixed(2)} kr
+            </span>
+            {product.original_price && (
+              <div className="text-xs text-gray-500">
+                Normalpris: {(product.original_price || 0).toFixed(2)} kr
+              </div>
+            )}
+          </div>
+        )}
+          </div>
+      
       {/* Unit Price */}
+      {product.unit_price && !isNaN(product.unit_price) && (
       <p className="text-xs text-gray-600 mb-3">
-        {product.unit_price?.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
+          {product.unit_price.toFixed(2)} kr/{product.unit === 'stk' ? 'stk' : 'kg'}
       </p>
+      )}
 
       {/* Actions */}
       <div className="flex space-x-2">
@@ -95,292 +155,133 @@ const ProductCard = ({ product, onToggleFavorite }: {
           <Plus size={12} className="inline mr-1" />
           Tilføj
         </button>
-        <Link href={`/dagligvarer/produkt/${product.id}`}>
-          <button className="bg-gray-100 hover:bg-gray-200 text-gray-600 py-1.5 px-2 rounded text-xs font-medium transition-colors">
+        <button 
+          onClick={() => onOpenModal(product)}
+          className="bg-gray-100 hover:bg-gray-200 text-gray-600 py-1.5 px-2 rounded text-xs font-medium transition-colors"
+        >
             Se mere
           </button>
-        </Link>
       </div>
     </div>
   </div>
 )
 
+// Loading Skeleton
+const ProductSkeleton = () => (
+  <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+    <div className="h-40 bg-gray-200 flex items-center justify-center">
+      <div className="w-20 h-20 bg-gray-300 rounded"></div>
+    </div>
+    <div className="p-4">
+      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+      <div className="h-3 bg-gray-200 rounded w-3/4 mb-2"></div>
+      <div className="h-5 bg-gray-200 rounded w-1/2 mb-2"></div>
+      <div className="h-3 bg-gray-200 rounded w-1/4 mb-3"></div>
+      <div className="flex space-x-2">
+        <div className="flex-1 h-7 bg-gray-200 rounded"></div>
+        <div className="h-7 w-16 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    </div>
+  )
 
+// Sort options
+const SORT_OPTIONS = [
+  { value: 'discount', label: 'Højeste rabat' },
+  { value: 'relevance', label: 'Relevans' },
+  { value: 'price_low', label: 'Laveste kilopris' },
+  { value: 'price_high', label: 'Laveste literpris' },
+  { value: 'unit_price', label: 'Laveste stk pris' },
+  { value: 'price_low_to_high', label: 'Pris: Lav til høj' },
+  { value: 'price_high_to_low', label: 'Pris: Høj til lav' },
+  { value: 'name_a_to_z', label: 'Navn: A til Å' },
+  { value: 'name_z_to_a', label: 'Navn: Å til A' }
+]
+
+// Categories - ALL categories from database with appropriate icons
+const CATEGORIES = [
+  { id: 'Frugt & grønt', name: 'Frugt & grønt', icon: '🍎' },
+  { id: 'Brød & kager', name: 'Brød & kager', icon: '🍞' },
+  { id: 'Drikkevarer', name: 'Drikkevarer', icon: '🥤' },
+  { id: 'Færdigretter & takeaway', name: 'Færdigretter & takeaway', icon: '🍱' },
+  { id: 'Husholdning & rengøring', name: 'Husholdning & rengøring', icon: '🧽' },
+  { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
+  { id: 'Kød, fisk & fjerkræ', name: 'Kød, fisk & fjerkræ', icon: '🥩' },
+  { id: 'Kolonial', name: 'Kolonial', icon: '🌾' },
+  { id: 'Mejeri', name: 'Mejeri', icon: '🥛' },
+  { id: 'Nemt & hurtigt', name: 'Nemt & hurtigt', icon: '⚡' },
+  { id: 'Ost & mejeri', name: 'Ost & mejeri', icon: '🧀' },
+  { id: 'Personlig pleje', name: 'Personlig pleje', icon: '🧴' },
+  { id: 'Snacks & slik', name: 'Snacks & slik', icon: '🍿' },
+  { id: 'Ukategoriseret', name: 'Ukategoriseret', icon: '📦' },
+  { id: 'Ukategoriseret (dept 110: Baby og småbørn)', name: 'Baby og småbørn', icon: '👶' }
+]
+
+// Available stores
+const STORES = [
+  { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
+  { id: 'Netto', name: 'Netto', icon: '🟨' },
+  { id: 'Føtex', name: 'Føtex', icon: '🔵' },
+  { id: 'Bilka', name: 'Bilka', icon: '🔷' },
+  { id: 'Nemlig', name: 'Nemlig', icon: '🟠' },
+  { id: 'MENY', name: 'MENY', icon: '🔴' },
+  { id: 'Spar', name: 'Spar', icon: '🔺' }
+]
 
 export default function DagligvarerPage() {
   // State
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(['all'])
-  const [showOnlyOffers, setShowOnlyOffers] = useState(true) // ✅ DEFAULT: Show only offers
-  const [groupByCategory, setGroupByCategory] = useState(true) // ✅ DEFAULT: Group by category
-  const [showFavorites, setShowFavorites] = useState(false)
-  const [products, setProducts] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedStores, setSelectedStores] = useState<string[]>([])
+  const [sortBy, setSortBy] = useState('discount')
+  const [showOnlyOffers, setShowOnlyOffers] = useState(true)
+  const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(false)
+  const [groupByCategory, setGroupByCategory] = useState(false)
+  
+  // Data state
+  const [products, setProducts] = useState<Product[]>([])
+  const [counts, setCounts] = useState<ProductCounts>({ total: 0, categories: {}, offers: 0 })
+  const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [totalProducts, setTotalProducts] = useState(0)
-  const [categoryCounts, setCategoryCounts] = useState<{[key: string]: number}>({})
-
-  // Cache for products to avoid refetching
-  const [productsCache, setProductsCache] = useState<{[key: string]: any[]}>({})
   
-  // Debounce filter changes to prevent rapid API calls
-  const [filterDebounceTimer, setFilterDebounceTimer] = useState<NodeJS.Timeout | null>(null)
+  // UI state
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
+  const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true)
+  const [storeAccordionOpen, setStoreAccordionOpen] = useState(true)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
 
-  // Fetch products with pagination
-  const fetchProducts = async (page: number = 1, append: boolean = false) => {
+  // Refs
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
+  const loadingRef = useRef(false)
+
+  // Fetch product counts
+  const fetchCounts = useCallback(async () => {
     try {
-      if (loading && !append) return
-      
-      if (!append) setLoading(true)
-      
-      // Build cache key
-      const cacheKey = `${selectedCategories.join(',')}-${searchQuery}-${showOnlyOffers}-${page}`
-      
-      // Check cache first (but skip cache for offers to ensure fresh data)
-      if (productsCache[cacheKey] && !append && !showOnlyOffers) {
-        console.log('🚀 Using cached products for:', cacheKey)
-        setProducts(productsCache[cacheKey])
-        setLoading(false)
-        return
-      }
-      
-      // Build query parameters
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20', // Increased to 20 products per page
-        ...(selectedCategories.includes('all') ? {} : { category: selectedCategories[0] }),
-        ...(searchQuery ? { search: searchQuery } : {}),
-        ...(showOnlyOffers ? { offers: 'true' } : {})
-      })
-      
-      const response = await fetch(`/api/admin/dagligvarer/test-rema?${params}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'fetchAllProducts'
-        })
-      })
-
+      const response = await fetch('/api/supermarket/products?counts=true')
       const data = await response.json()
-      if (data.success && data.products) {
-        // Fix false offers - only show as offer if price is actually lower
-        const fixedProducts = data.products.map((product: any) => {
-          const hasValidOriginalPrice = product.original_price && typeof product.original_price === 'number'
-          const hasValidPrice = product.price && typeof product.price === 'number'
-          const isActuallyOnSale = product.is_on_sale && hasValidOriginalPrice && hasValidPrice
-          
-          // Use a small tolerance (0.005 kr = 0.5 øre) for floating-point comparison
-          const priceDifference = hasValidOriginalPrice && hasValidPrice ? product.original_price - product.price : 0
-          const isPriceLower = priceDifference > 0.005
-          
-          // Calculate discount percentage
-          let discountPercentage = 0
-          if (hasValidOriginalPrice && hasValidPrice && isPriceLower) {
-            discountPercentage = Math.round(((product.original_price - product.price) / product.original_price) * 100)
-          }
-          
-          const finalIsOnSale = isActuallyOnSale && isPriceLower
-          
-          return {
-            ...product,
-            is_on_sale: finalIsOnSale,
-            discount_percentage: discountPercentage
-          }
-        })
-        
-        // ✅ API now handles deduplication, so we can use products directly
-        const sortedProducts = fixedProducts.sort((a: any, b: any) => {
-          // First: Offers (is_on_sale = true) - ALWAYS PRIORITY, sorted by discount percentage
-          if (a.is_on_sale && a.discount_percentage > 0 && !b.is_on_sale) return -1
-          if (!a.is_on_sale && b.is_on_sale && b.discount_percentage > 0) return 1
-          
-          // If both are offers, sort by discount percentage (highest first)
-          if (a.is_on_sale && a.discount_percentage > 0 && b.is_on_sale && b.discount_percentage > 0) {
-            const aDiscount = a.discount_percentage || 0
-            const bDiscount = b.discount_percentage || 0
-            if (aDiscount !== bDiscount) {
-              return bDiscount - aDiscount // Highest discount first
-            }
-          }
-          
-          // Then sort by name
-          return a.name.localeCompare(b.name)
-        })
-        
-        if (append) {
-          setProducts(prev => [...prev, ...sortedProducts])
-        } else {
-          setProducts(sortedProducts)
-          // Cache the results
-          setProductsCache(prev => ({ ...prev, [cacheKey]: sortedProducts }))
-        }
-        
-        setHasMore(data.pagination?.hasMore || false)
-        setTotalProducts(data.pagination?.total || 0)
-        setCurrentPage(page)
-      } else {
-        if (!append) setProducts([])
+      if (data.success && data.counts) {
+        setCounts(data.counts)
       }
     } catch (error) {
-      console.error('Failed to fetch products:', error)
-      if (!append) setProducts([])
-    } finally {
-      setLoading(false)
+      console.error('Failed to fetch counts:', error)
     }
-  }
-
-  // Fetch category counts efficiently
-  const fetchCategoryCounts = async () => {
-    try {
-      const response = await fetch('/api/admin/dagligvarer/test-rema?limit=1', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'fetchCategoryCounts'
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        if (data.pagination?.total) {
-          setTotalProducts(data.pagination.total)
-        }
-        
-        if (data.categoryCounts) {
-          setCategoryCounts(data.categoryCounts)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch category counts:', error)
-    }
-  }
-
-  // Initial fetch
-  useEffect(() => {
-    fetchProducts(1, false)
-    fetchCategoryCounts()
   }, [])
 
-  // Refetch when search, category, or offers filter changes
-  useEffect(() => {
-    if (filterDebounceTimer) {
-      clearTimeout(filterDebounceTimer)
-    }
-    
-    const timer = setTimeout(() => {
-      if (!loading) {
-        fetchProducts(1, false)
-      }
-    }, 300)
-    
-    setFilterDebounceTimer(timer)
-    
-    return () => {
-      if (timer) clearTimeout(timer)
-    }
-  }, [searchQuery, selectedCategories, showOnlyOffers])
+  // Modal functions
+  const openProductModal = useCallback((product: Product) => {
+    setSelectedProduct(product)
+    setModalOpen(true)
+  }, [])
 
-  // Infinite scroll
-  useEffect(() => {
-    const handleScroll = () => {
-      if (hasMore && !loading && window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1000) {
-        fetchProducts(currentPage + 1, true)
-      }
-    }
+  const closeProductModal = useCallback(() => {
+    setModalOpen(false)
+    setSelectedProduct(null)
+  }, [])
 
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loading, currentPage])
-
-  // Get categories for display
-  const getCategories = () => {
-    const allCategories = [
-      'Frugt & grønt',
-      'Kolonial', 
-      'Kød, fisk & fjerkræ',
-      'Mejeri',
-      'Brød & kager',
-      'Drikkevarer',
-      'Snacks & slik',
-      'Husholdning & rengøring',
-      'Baby & børn',
-      'Kæledyr'
-    ]
-    
-    const categoryIcons: { [key: string]: string } = {
-      'Frugt & grønt': '🍎',
-      'Kolonial': '🌾',
-      'Kød, fisk & fjerkræ': '🥩',
-      'Mejeri': '🥛',
-      'Brød & kager': '🍞',
-      'Drikkevarer': '🥤',
-      'Snacks & slik': '🍿',
-      'Husholdning & rengøring': '🧽',
-      'Baby & børn': '👶',
-      'Kæledyr': '🐕'
-    }
-
-    return allCategories.map(categoryName => ({
-      id: categoryName.toLowerCase().replace(/\s+/g, '-'),
-      name: categoryName,
-      icon: categoryIcons[categoryName] || '📦',
-      count: categoryCounts[categoryName] || 0
-    }))
-  }
-
-  // Get stores from products
-  const getStores = () => {
-    const storeCounts = products.reduce((acc: { [key: string]: number }, product) => {
-      acc[product.store] = (acc[product.store] || 0) + 1
-      return acc
-    }, {})
-
-    return Object.entries(storeCounts).map(([name, count]) => ({
-      name,
-      count
-    }))
-  }
-
-  // Apply local filters
-  const filteredProducts = products.filter(product => {
-    const matchesFavorites = !showFavorites || product.isFavorite
-    return matchesFavorites
-  })
-
-  // Group products by category if enabled
-  const groupedByCategory = groupByCategory 
-    ? filteredProducts.reduce((groups: { [key: string]: any[] }, product) => {
-        const category = product.category || 'Ukategoriseret'
-        if (!groups[category]) groups[category] = []
-        groups[category].push(product)
-        return groups
-      }, {})
-    : {}
-
-  // Toggle functions
-  const toggleCategory = (categoryName: string) => {
-    if (categoryName === 'all') {
-      setSelectedCategories(['all'])
-    } else {
-      setSelectedCategories(prev => {
-        if (prev.includes('all')) {
-          return [categoryName]
-        }
-        if (prev.includes(categoryName)) {
-          return ['all']
-        } else {
-          return [...prev, categoryName]
-        }
-      })
-    }
-  }
-
-  const toggleFavorite = (productId: number) => {
+  const toggleFavorite = useCallback((productId: string) => {
+    console.log('Toggle favorite for product:', productId)
     setProducts(prev => 
       prev.map(product => 
         product.id === productId 
@@ -388,265 +289,581 @@ export default function DagligvarerPage() {
           : product
       )
     )
+  }, [])
+
+  // Fetch products
+  const fetchProducts = useCallback(async (page: number = 1, append: boolean = false) => {
+    // Prevent concurrent requests
+    if (loadingRef.current) return
+    loadingRef.current = true
+    
+    try {
+      if (!append) setLoading(true)
+      
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '50'
+      })
+
+      // Add filters
+      if (selectedCategories.length > 0) params.append('categories', selectedCategories.join(','))
+      if (selectedStores.length > 0) params.append('stores', selectedStores.join(','))
+      if (searchQuery.trim()) params.append('search', searchQuery.trim())
+      if (showOnlyOffers) params.append('offers', 'true')
+
+      const response = await fetch(`/api/supermarket/products?${params}`)
+      const data = await response.json()
+
+      if (data.success && data.products) {
+        let newProducts = data.products
+
+        // Apply sorting
+        newProducts = sortProducts(newProducts, sortBy)
+        
+        if (append) {
+          // Prevent duplicates when appending
+          setProducts(prev => {
+            const existingIds = new Set(prev.map(p => p.id))
+            const uniqueNewProducts = newProducts.filter((p: Product) => !existingIds.has(p.id))
+            return [...prev, ...uniqueNewProducts]
+          })
+        } else {
+          setProducts(newProducts)
+        }
+        
+        setCurrentPage(page)
+        setHasMore(data.pagination?.hasMore || false)
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error)
+    } finally {
+      setLoading(false)
+      loadingRef.current = false
+    }
+  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, sortBy])
+
+  // Sort products function - ALWAYS prioritize offers first
+  const sortProducts = (products: Product[], sortBy: string): Product[] => {
+    const sorted = [...products]
+    
+    return sorted.sort((a, b) => {
+      // 🔥 ALWAYS show offers first, regardless of sort option
+      if (a.is_on_sale && !b.is_on_sale) return -1
+      if (!a.is_on_sale && b.is_on_sale) return 1
+      
+      // Both are offers OR both are non-offers - apply secondary sorting
+      switch (sortBy) {
+        case 'discount':
+          // If both are on sale, sort by highest discount percentage
+          if (a.is_on_sale && b.is_on_sale && a.discount_percentage && b.discount_percentage) {
+            return b.discount_percentage - a.discount_percentage
+          }
+          // Fall back to name sorting
+          return a.name.localeCompare(b.name)
+        case 'price_low_to_high':
+          return a.price - b.price
+        case 'price_high_to_low':
+          return b.price - a.price
+        case 'name_a_to_z':
+          return a.name.localeCompare(b.name)
+        case 'name_z_to_a':
+          return b.name.localeCompare(a.name)
+        case 'unit_price':
+          return (a.unit_price || 0) - (b.unit_price || 0)
+        default:
+          return a.name.localeCompare(b.name)
+      }
+    })
   }
 
+  // Debounced search
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      setCurrentPage(1)
+      fetchProducts(1, false)
+    }, 300)
+  }
+
+  // Filter change handlers
+  const handleCategoryToggle = (categoryId: string) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(categoryId)) {
+        return prev.filter(id => id !== categoryId)
+      } else {
+        return [...prev, categoryId]
+      }
+    })
+    setCurrentPage(1)
+  }
+
+  const handleStoreToggle = (storeId: string) => {
+    setSelectedStores(prev => {
+      if (prev.includes(storeId)) {
+        return prev.filter(id => id !== storeId)
+      } else {
+        return [...prev, storeId]
+      }
+    })
+    setCurrentPage(1)
+  }
+
+  const handleSortChange = (sort: string) => {
+    setSortBy(sort)
+    setSortDropdownOpen(false)
+    // Re-sort current products
+    setProducts(prev => sortProducts(prev, sort))
+  }
+
+  const handleOffersToggle = () => {
+    setShowOnlyOffers(!showOnlyOffers)
+    setCurrentPage(1)
+  }
+
+  // Re-fetch when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+    fetchProducts(1, false)
+  }, [showOnlyOffers, selectedCategories, selectedStores, fetchProducts])
+
+
+
+  // Reset filters
   const resetFilters = () => {
     setSearchQuery('')
-    setSelectedCategories(['all'])
-    setShowOnlyOffers(true) // ✅ Keep offers enabled by default
-    setGroupByCategory(true) // ✅ Keep category grouping enabled by default
-    setShowFavorites(false)
+    setSelectedCategories([])
+    setSelectedStores([])
+    setSortBy('discount')
+    setShowOnlyOffers(true) // Keep offers active by default
+    setShowOnlyFoodProducts(false)
+    setGroupByCategory(false)
+    setCurrentPage(1)
+    fetchProducts(1, false)
   }
 
-  const refreshProducts = () => {
-    setProductsCache({})
+  // Infinite scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        hasMore && 
+        !loading && 
+        !loadingRef.current &&
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 500
+      ) {
+        fetchProducts(currentPage + 1, true)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [hasMore, loading, currentPage, fetchProducts])
+
+  // Initial load
+  useEffect(() => {
+    fetchCounts()
     fetchProducts(1, false)
-    fetchCategoryCounts()
+  }, [fetchCounts, fetchProducts])
+
+  // Get filter summary text
+  const getFilterSummary = () => {
+    const parts = []
+    if (selectedCategories.length > 0) {
+      if (selectedCategories.length === 1) {
+        const category = CATEGORIES.find(c => c.id === selectedCategories[0])
+        parts.push(category?.name || selectedCategories[0])
+      } else {
+        parts.push(`${selectedCategories.length} kategorier`)
+      }
+    }
+    if (selectedStores.length > 0) {
+      if (selectedStores.length === 1) {
+        const store = STORES.find(s => s.id === selectedStores[0])
+        parts.push(store?.name || selectedStores[0])
+      } else {
+        parts.push(`${selectedStores.length} butikker`)
+      }
+    }
+    return parts.length > 0 ? parts.join(' + ') : 'Alle produkter'
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-green-50 border-b border-green-200">
-        <div className="container mx-auto px-4 py-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Dagligvarer</h1>
-          <p className="text-lg text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dagligvarer</h1>
+          <p className="text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
+          <p className="text-sm text-gray-500 mt-2">
+            {counts.total.toLocaleString()} produkter tilgængelige
+          </p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Sidebar - Filters */}
-          <div className="lg:w-1/5 space-y-6">
-            {/* Search */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+          <div className="w-full lg:w-64 flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtre</h2>
+              
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
                 <input
                   type="text"
                   placeholder="Søg produkter..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
-            </div>
 
-            {/* Categories */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="border-b border-gray-200">
-                <button
-                  onClick={() => toggleCategory('all')}
-                  className={`w-full px-4 py-3 text-left flex items-center justify-between transition-colors ${
-                    selectedCategories.includes('all') 
-                      ? 'bg-green-50 text-green-700 border-r-2 border-green-500' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes('all')}
-                      onChange={() => toggleCategory('all')}
-                      className="text-green-600 rounded cursor-pointer"
-                    />
-                    <span className="text-sm font-medium">Alle kategorier</span>
-                  </div>
-                  <span className="text-xs text-gray-500">({totalProducts})</span>
-                </button>
-              </div>
-              
-              <div className="max-h-48 overflow-y-auto">
-                {getCategories().map(category => (
-                  <button
-                    key={category.id}
-                    onClick={() => toggleCategory(category.name)}
-                    className={`w-full px-3 py-2 text-left flex items-center justify-between transition-colors border-b border-gray-100 last:border-b-0 ${
-                      selectedCategories.includes(category.name) 
-                        ? 'bg-green-50 text-green-700 border-r-2 border-green-500' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedCategories.includes(category.name)}
-                        onChange={() => toggleCategory(category.name)}
-                        className="text-green-600 rounded cursor-pointer"
-                      />
-                      <span className="text-xs">{category.icon}</span>
-                      <span className="text-xs font-medium">{category.name}</span>
-                    </div>
-                    <span className="text-xs text-gray-500">({category.count})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-3 text-xs">Filtre</h3>
-              
-              <div className="space-y-3">
-                {/* Show only offers checkbox */}
+              {/* Quick toggles */}
+              <div className="space-y-3 mb-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showOnlyOffers}
-                    onChange={(e) => setShowOnlyOffers(e.target.checked)}
+                    onChange={handleOffersToggle}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-700">
-                    Vis kun tilbud ({products.filter(p => p.is_on_sale && p.discount_percentage > 0).length})
-                  </span>
+                  <span className="text-sm">Kun tilbudsvarer ({counts.offers})</span>
                 </label>
                 
-                {/* Group by category checkbox */}
-                <label className="flex items-center space-x-2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={groupByCategory}
-                    onChange={(e) => setGroupByCategory(e.target.checked)}
-                    className="text-green-600 rounded"
+                    checked={showOnlyFoodProducts}
+                    onChange={(e) => setShowOnlyFoodProducts(e.target.checked)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-xs">Gruppér efter kategori</span>
-                </label>
-
-                {/* Show favorites checkbox */}
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showFavorites}
-                    onChange={(e) => setShowFavorites(e.target.checked)}
-                    className="text-green-600 rounded"
-                  />
-                  <span className="text-xs">Mine favoritprodukter</span>
-                  <span className="ml-auto text-xs text-gray-500">
-                    ({products.filter(p => p.isFavorite).length})
-                  </span>
+                  <span className="text-sm">Kun fødevarer</span>
                 </label>
               </div>
-            </div>
 
-            {/* Stores */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-              <h3 className="font-semibold text-gray-900 mb-3 text-xs">Butikker</h3>
-              <div className="space-y-2">
-                {getStores().map(store => (
-                  <div key={store.name} className="flex items-center justify-between">
-                    <span className="text-xs">{store.name}</span>
-                    <span className="text-xs text-gray-500">({store.count})</span>
+              {/* Categories Accordion */}
+              <div className="border-t pt-4 mb-4">
+                <button
+                  onClick={() => setCategoryAccordionOpen(!categoryAccordionOpen)}
+                  className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  <span>Kategorier ({selectedCategories.length})</span>
+                  <ChevronDown size={16} className={`transform transition-transform ${categoryAccordionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {categoryAccordionOpen && (
+                  <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+                    {CATEGORIES.map(category => (
+                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategories.includes(category.id)}
+                          onChange={() => handleCategoryToggle(category.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs">{category.icon}</span>
+                        <span className="text-xs flex-1 truncate">{category.name}</span>
+                        <span className="text-xs text-gray-500">
+                          ({counts.categories[category.id] || 0})
+                        </span>
+                      </label>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-2">
+              {/* Stores Accordion */}
+              <div className="border-t pt-4 mb-4">
+                <button
+                  onClick={() => setStoreAccordionOpen(!storeAccordionOpen)}
+                  className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  <span>Butikker ({selectedStores.length})</span>
+                  <ChevronDown size={16} className={`transform transition-transform ${storeAccordionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                
+                {storeAccordionOpen && (
+                  <div className="mt-3 space-y-2">
+                    {STORES.map(store => (
+                      <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedStores.includes(store.id)}
+                          onChange={() => handleStoreToggle(store.id)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-xs">{store.icon}</span>
+                        <span className="text-xs">{store.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Reset button */}
               <button
                 onClick={resetFilters}
-                className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors text-xs"
+                className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-4"
               >
-                Nulstil filtre
-              </button>
-              
-              <button
-                onClick={refreshProducts}
-                className="w-full bg-blue-100 text-blue-700 py-2 px-4 rounded-lg hover:bg-blue-200 transition-colors text-xs"
-              >
-                🔄 Opdater produkter
+                Nulstil alle filtre
               </button>
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Right Content Area */}
           <div className="flex-1">
-            {/* Product Count */}
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <h2 className="text-xl font-semibold text-gray-900">Produkter</h2>
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">
-                    {loading ? 'Henter produkter...' : `${products.length} af ${totalProducts} produkter vist`}
-                  </p>
-                  {hasMore && (
-                    <p className="text-xs text-gray-400">Scroll ned for at se flere</p>
+            {/* Top bar with sort and filter summary */}
+            <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                {/* Filter Summary */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Viser:</span>
+                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                    {getFilterSummary()}
+                  </span>
+                </div>
+
+                {/* Sort */}
+                <div className="relative">
+                  <button
+                    onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+                    className="flex items-center justify-between w-48 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <span className="truncate">
+                      {SORT_OPTIONS.find(opt => opt.value === sortBy)?.label}
+                    </span>
+                    <ChevronDown size={16} className={`transform transition-transform ${sortDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {sortDropdownOpen && (
+                    <div className="absolute top-full right-0 w-48 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                      {SORT_OPTIONS.map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => handleSortChange(option.value)}
+                          className={`w-full px-4 py-2 text-left hover:bg-gray-50 ${sortBy === option.value ? 'bg-blue-50 text-blue-700' : ''}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Products Display */}
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="text-gray-400 mb-4">
-                  <Search size={48} className="mx-auto" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Henter produkter...</h3>
-                <p className="text-gray-600">Vent venligst</p>
-              </div>
-            ) : groupByCategory ? (
-              // ✅ Grouped by category display
-              <div className="space-y-8">
-                {Object.entries(groupedByCategory).map(([category, categoryProducts]) => (
-                  <div key={category} className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <Tag size={20} className="text-gray-600" />
-                      <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
-                      <span className="text-sm text-gray-500">({categoryProducts.length} produkter)</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                      {categoryProducts.map(product => (
-                        <ProductCard 
-                          key={product.id} 
-                          product={product} 
-                          onToggleFavorite={toggleFavorite}
-                        />
-                      ))}
-                    </div>
-                  </div>
+            {/* Results */}
+            <div className="mb-4">
+              <p className="text-gray-600">
+                {loading ? 'Henter produkter...' : `Viser ${products.length} produkter`}
+                {hasMore && !loading && (
+                  <span className="ml-2 text-sm text-gray-500">• Scroll ned for at se flere</span>
+                )}
+              </p>
+            </div>
+
+            {/* Products Grid */}
+            {loading && products.length === 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {Array.from({ length: 20 }, (_, i) => (
+                  <ProductSkeleton key={i} />
                 ))}
               </div>
             ) : (
-              // Normal grid display
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                {filteredProducts.map(product => (
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {products.map(product => (
                   <ProductCard 
                     key={product.id} 
                     product={product} 
                     onToggleFavorite={toggleFavorite}
+                    onOpenModal={openProductModal}
                   />
                 ))}
-              </div>
-            )}
-
-            {/* Loading Indicator for Infinite Scroll */}
-            {hasMore && (
-              <div className="text-center py-8">
-                <div className="flex items-center justify-center gap-2 text-gray-500">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                  <span className="text-sm">Indlæser flere produkter...</span>
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                  Viser {products.length} af {totalProducts} produkter
-                </p>
-              </div>
-            )}
-
-            {/* No Products */}
-            {filteredProducts.length === 0 && products.length > 0 && (
-              <div className="text-center py-12">
-                <div className="text-gray-400 mb-4">
-                  <Search size={48} className="mx-auto" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen produkter fundet</h3>
-                <p className="text-gray-600">Prøv at justere dine filtre eller søge på noget andet</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Loading more indicator */}
+      {hasMore && products.length > 0 && (
+        <div className="container mx-auto px-4">
+          <div className="text-center py-8">
+            <div className="flex items-center justify-center gap-2 text-gray-500">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <span className="text-sm">Indlæser flere produkter...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No results */}
+      {!loading && products.length === 0 && (
+        <div className="container mx-auto px-4">
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <Search size={48} className="mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Ingen produkter fundet</h3>
+            <p className="text-gray-600">Prøv at justere dine filtre eller søge på noget andet</p>
+          </div>
+        </div>
+      )}
+
+      {/* Product Modal */}
+      {modalOpen && selectedProduct && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50" onClick={closeProductModal}>
+          <div className="bg-white rounded-t-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center rounded-t-2xl">
+              <h2 className="text-lg font-semibold text-gray-900">Produktdetaljer</h2>
+              <button 
+                onClick={closeProductModal}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Plus size={20} className="rotate-45 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4">
+              {/* Product Image */}
+              <div className="relative h-56 bg-white rounded-xl mb-4 flex items-center justify-center p-4 border border-gray-100">
+                {selectedProduct.image_url ? (
+                  <img 
+                    src={selectedProduct.image_url} 
+                    alt={selectedProduct.name}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-gray-400 text-sm">Intet billede tilgængeligt</span>
+                  </div>
+                )}
+                
+                {/* Store Badge */}
+                <div className={`absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm border-2 ${
+                  selectedProduct.store === 'Netto' ? 'border-yellow-400' :
+                  selectedProduct.store === 'REMA 1000' ? 'border-blue-900' :
+                  selectedProduct.store === 'Føtex' ? 'border-blue-950' :
+                  selectedProduct.store === 'Bilka' ? 'border-blue-400' :
+                  selectedProduct.store === 'Nemlig' ? 'border-orange-600' :
+                  selectedProduct.store === 'MENY' ? 'border-red-800' :
+                  selectedProduct.store === 'Spar' ? 'border-red-600' :
+                  'border-gray-300'
+                }`}>
+                  {selectedProduct.store}
+                </div>
+              </div>
+
+              {/* Product Details */}
+              <div className="space-y-4">
+                {/* Product Name and Amount */}
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 mb-1">
+                    {selectedProduct.name}
+                  </h1>
+                  {selectedProduct.amount && (
+                    <p className="text-sm text-gray-500">
+                      {selectedProduct.amount} {selectedProduct.unit || 'stk'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Price Section */}
+                <div className="bg-gray-50 rounded-xl p-4">
+                  {selectedProduct.is_on_sale && selectedProduct.discount_percentage ? (
+                    // Product on sale
+                    <div className="space-y-3">
+                      {/* Offer Price with "TILBUD" tag */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-2xl font-bold text-red-600">
+                          {(selectedProduct.price || 0).toFixed(2)} kr
+                        </span>
+                        <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1 rounded-full text-xs font-bold animate-pulse">
+                          TILBUD
+                        </div>
+                      </div>
+                      
+                      {/* Normal Price (crossed out) */}
+                      {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
+                        <div className="text-sm text-gray-500">
+                          <span className="line-through">Normalpris: {selectedProduct.original_price.toFixed(2)} kr</span>
+                        </div>
+                      )}
+                      
+                      {/* Savings badges */}
+                      <div className="flex gap-2 flex-wrap">
+                        <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold">
+                          SPAR {selectedProduct.discount_percentage}%
+                        </div>
+                        {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
+                          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                            Besparelse: {(selectedProduct.original_price - selectedProduct.price).toFixed(2)} kr
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    // Regular product
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {(selectedProduct.price || 0).toFixed(2)} kr
+                      </div>
+                      {selectedProduct.original_price && (
+                        <div className="text-sm text-gray-500">
+                          Normalpris: {selectedProduct.original_price.toFixed(2)} kr
+                        </div>
+                      )}
+                      {selectedProduct.unit_price && !isNaN(selectedProduct.unit_price) && (
+                        <div className="text-sm text-gray-500">
+                          {selectedProduct.unit_price.toFixed(2)} kr/kg
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Product Description/Details */}
+                {selectedProduct.description && (
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-2">Beskrivelse</h3>
+                    <p className="text-gray-700 text-sm">{selectedProduct.description}</p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-4">
+                  <div className="flex gap-3">
+                    <button className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors">
+                      Tilføj til kurv
+                    </button>
+                    <button 
+                      onClick={() => toggleFavorite(selectedProduct.id)}
+                      className="p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      <Heart size={20} className="text-gray-600" />
+                    </button>
+                  </div>
+                  
+                  {/* Price History Link */}
+                  <a 
+                    href={`/dagligvarer/produkt/${selectedProduct.id}`}
+                    className="block w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium text-center transition-colors border border-blue-200"
+                  >
+                    📈 Se pris-historik
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

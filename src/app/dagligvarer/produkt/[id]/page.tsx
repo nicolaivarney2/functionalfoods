@@ -31,6 +31,7 @@ interface Product {
   source: string
   last_updated: string
   metadata: any
+  discount_percentage?: number
 }
 
 // 🚀 STATE-OF-THE-ART PRICE CHART COMPONENT
@@ -282,6 +283,8 @@ export default function ProductPage() {
   const [priceHistory, setPriceHistory] = useState<any[]>([])
   const [priceLoading, setPriceLoading] = useState(false)
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
+  const [similarProducts, setSimilarProducts] = useState<Product[]>([])
+  const [similarLoading, setSimilarLoading] = useState(false)
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -301,8 +304,9 @@ export default function ProductPage() {
         const data = await response.json()
         if (data.success && data.product) {
           setProduct(data.product)
-          // Also fetch price history
+          // Also fetch price history and similar products
           fetchPriceHistory(params.id as string)
+          fetchSimilarProducts(data.product.name, data.product.store)
         } else {
           setError('Produkt ikke fundet')
         }
@@ -341,6 +345,27 @@ export default function ProductPage() {
       console.error('Error fetching price history:', err)
     } finally {
       setPriceLoading(false)
+    }
+  }
+
+  const fetchSimilarProducts = async (productName: string, excludeStore: string) => {
+    try {
+      setSimilarLoading(true)
+      const params = new URLSearchParams({
+        name: productName,
+        excludeStore: excludeStore
+      })
+      
+      const response = await fetch(`/api/supermarket/similar-products?${params}`)
+      const data = await response.json()
+      
+      if (data.success && data.products) {
+        setSimilarProducts(data.products)
+      }
+    } catch (err) {
+      console.error('Error fetching similar products:', err)
+    } finally {
+      setSimilarLoading(false)
     }
   }
 
@@ -491,12 +516,96 @@ export default function ProductPage() {
                   </div>
                 )}
 
-                {product.store && (
-                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Butik:</span>
-                    <span className="font-medium">{product.store}</span>
+                {/* Show all stores with this product */}
+                <div className="py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Butik med varen:</span>
+                  <div className="mt-2 space-y-2">
+                    {/* Current store */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded border-2 ${
+                          product.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
+                          product.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
+                          product.store === 'Føtex' ? 'border-blue-950 bg-blue-100' :
+                          product.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
+                          product.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
+                          product.store === 'MENY' ? 'border-red-800 bg-red-100' :
+                          product.store === 'Spar' ? 'border-red-600 bg-red-100' :
+                          'border-gray-300 bg-gray-100'
+                        }`}></div>
+                        <span className="font-medium">{product.store} (denne side)</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg">
+                          {product.is_on_sale ? (
+                            <span className="text-red-600">{(product.price || 0).toFixed(2)} kr</span>
+                          ) : (
+                            <span>{(product.price || 0).toFixed(2)} kr</span>
+                          )}
+                        </div>
+                        {product.is_on_sale && product.discount_percentage && (
+                          <div className="text-xs text-green-600 font-semibold">
+                            SPAR {product.discount_percentage}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Similar products from other stores */}
+                    {similarLoading ? (
+                      <div className="text-sm text-gray-500">Indlæser andre butikker...</div>
+                    ) : (
+                      similarProducts.map((similarProduct) => (
+                        <div key={similarProduct.id} className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded border-2 ${
+                              similarProduct.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
+                              similarProduct.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
+                              similarProduct.store === 'Føtex' ? 'border-blue-950 bg-blue-100' :
+                              similarProduct.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
+                              similarProduct.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
+                              similarProduct.store === 'MENY' ? 'border-red-800 bg-red-100' :
+                              similarProduct.store === 'Spar' ? 'border-red-600 bg-red-100' :
+                              'border-gray-300 bg-gray-100'
+                            }`}></div>
+                            {similarProduct.store_url ? (
+                              <a 
+                                href={similarProduct.store_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {similarProduct.store}
+                              </a>
+                            ) : (
+                              <span className="font-medium">{similarProduct.store}</span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold text-lg">
+                              {similarProduct.is_on_sale ? (
+                                <span className="text-red-600">{(similarProduct.price || 0).toFixed(2)} kr</span>
+                              ) : (
+                                <span>{(similarProduct.price || 0).toFixed(2)} kr</span>
+                              )}
+                            </div>
+                            {similarProduct.is_on_sale && similarProduct.discount_percentage && (
+                              <div className="text-xs text-green-600 font-semibold">
+                                SPAR {similarProduct.discount_percentage}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    {!similarLoading && similarProducts.length === 0 && (
+                      <div className="text-sm text-gray-500">
+                        Produktet blev ikke fundet i andre butikker
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {product.available !== undefined && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
