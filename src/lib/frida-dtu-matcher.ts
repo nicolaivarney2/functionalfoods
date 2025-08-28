@@ -283,11 +283,11 @@ export class FridaDTUMatcher {
     const manualMatch = await this.getManualMatch(ingredientName)
     if (manualMatch) {
       console.log(`🎯 Using manual match for "${ingredientName}" → "${manualMatch.name}"`)
-      const nutrition = await this.getFridaIngredientNutrition(manualMatch.id) // Assuming 'id' is the frida_ingredient_id
-      if (nutrition) {
-        this.ingredientCache.set(ingredientName, nutrition)
+      // Use the nutritionalInfo directly from manual match
+      if (manualMatch.nutritionalInfo) {
+        this.ingredientCache.set(ingredientName, manualMatch.nutritionalInfo)
         return {
-          nutrition,
+          nutrition: manualMatch.nutritionalInfo,
           match: manualMatch.name,
           score: 1.0 // Manual matches get perfect score
         }
@@ -320,7 +320,6 @@ export class FridaDTUMatcher {
    * Process all ingredients in a recipe and calculate total nutrition
    */
   public async calculateRecipeNutrition(ingredients: Array<{ name: string, amount: number, unit: string }>): Promise<NutritionalInfo> {
-    const supabase = supabase
     const totalNutrition: NutritionalInfo = {
       calories: 0,
       protein: 0,
