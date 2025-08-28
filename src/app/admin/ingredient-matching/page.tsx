@@ -76,8 +76,12 @@ export default function IngredientMatchingPage() {
       
       // Debug logging for Frida data
       console.log('📊 Loaded Frida ingredients:', fridaData.length)
+      console.log('🔍 API endpoint used: /api/frida-ingredients')
+      console.log('🔍 First few ingredients:', fridaData.slice(0, 5).map((ing: any) => ({ id: ing.id, name: ing.name, source: ing.source })))
+      
       const smørIngredients = fridaData.filter((ing: any) => ing.name.toLowerCase().includes('smør'))
       console.log('🔍 Found smør ingredients:', smørIngredients.map((ing: any) => ing.name))
+      console.log('🔍 Total smør ingredients found:', smørIngredients.length)
       
       // Load existing matches from database
       const existingMatchesResponse = await fetch('/api/ingredient-matches')
@@ -606,7 +610,15 @@ function FridaIngredientSelector({
     }
     
     return matches
-  }).slice(0, searchTerm.length >= 2 ? 200 : 100) // Show more results when user is searching
+  }) // Removed slice limit to show all results
+  
+  // Debug logging for search results
+  if (searchTerm.toLowerCase() === 'smør') {
+    console.log('🔍 Search term: "smør"')
+    console.log('🔍 Total fridaIngredients:', fridaIngredients.length)
+    console.log('🔍 Filtered results count:', filteredIngredients.length)
+    console.log('🔍 All smør results:', filteredIngredients.filter(ing => ing.name.toLowerCase().includes('smør')).map(ing => ing.name))
+  }
 
   return (
     <div className="relative">
