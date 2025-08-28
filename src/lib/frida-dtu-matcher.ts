@@ -167,7 +167,6 @@ export class FridaDTUMatcher {
    * Find best match for ingredient in Frida database
    */
   private async findBestMatch(ingredientName: string): Promise<{ foodId: number, name: string, score: number } | null> {
-    const supabase = supabase
     const foods = await this.searchFoods(ingredientName)
     let bestMatch = null
     let bestScore = 0
@@ -195,7 +194,6 @@ export class FridaDTUMatcher {
    */
   private async getNutritionalValues(foodId: number): Promise<FridaNutritionValue[]> {
     try {
-      const supabase = supabase
       const { data, error } = await supabase
         .from('frida_nutrition_values')
         .select('food_id, parameter_id, parameter_name_da, parameter_name_en, value, sort_key')
@@ -218,7 +216,6 @@ export class FridaDTUMatcher {
    * Get nutritional info for a specific food ID from Supabase
    */
   private async getNutritionalInfo(foodId: number): Promise<NutritionalInfo | null> {
-    const supabase = supabase
     const nutritionValues = await this.getNutritionalValues(foodId)
     
     if (nutritionValues.length === 0) return null
