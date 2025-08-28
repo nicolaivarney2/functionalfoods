@@ -57,10 +57,19 @@ export async function POST(request: Request) {
       )
     }
     
+    // Convert camelCase to snake_case for database
+    const convertedMatches = matches.map(match => ({
+      recipe_ingredient_id: match.recipeIngredientId,
+      frida_ingredient_id: match.fridaIngredientId,
+      confidence: match.confidence || 100,
+      is_manual: match.isManual || false,
+      match_type: match.matchType || 'auto'
+    }))
+    
     // Insert matches into database
     const { data, error } = await supabase
       .from('ingredient_matches')
-      .insert(matches)
+      .insert(convertedMatches)
       .select()
     
     if (error) {
