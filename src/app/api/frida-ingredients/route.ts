@@ -19,10 +19,12 @@ export async function GET() {
     const supabase = createSupabaseClient()
     
     // Get all Frida ingredients from the frida_foods table (which has the complete Frida database)
+    // Use a high limit to get all data, or implement pagination if needed
     const { data: fridaIngredients, error } = await supabase
       .from('frida_foods')
       .select('food_id, food_name_da, food_name_en')
       .order('food_name_da')
+      .limit(10000) // Increase limit to get more than 1000 rows
     
     if (error) {
       console.error('Error fetching Frida ingredients:', error)
@@ -33,6 +35,8 @@ export async function GET() {
     }
     
     console.log(`📊 Found ${fridaIngredients?.length || 0} Frida ingredients from frida_foods table`)
+    console.log(`🔍 Supabase limit applied: 10000 rows`)
+    console.log(`🔍 First few ingredients:`, fridaIngredients?.slice(0, 3).map(item => ({ id: item.food_id, name: item.food_name_da })))
     
     // Transform data to match the expected FridaIngredient interface
     const transformedIngredients = (fridaIngredients || []).map(item => ({
