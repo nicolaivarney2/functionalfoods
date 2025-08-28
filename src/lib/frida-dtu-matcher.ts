@@ -105,11 +105,12 @@ export class FridaDTUMatcher {
 
       const normalizedTerm = this.normalizeIngredientName(searchTerm)
       
-      // Use full-text search for better Danish language support
+      // Search in frida_ingredients table where source = 'frida_dtu'
       const { data, error } = await supabase
-        .from('frida_foods')
-        .select('food_id, food_name_da, food_name_en')
-        .or(`food_name_da.ilike.%${normalizedTerm}%,food_name_en.ilike.%${normalizedTerm}%`)
+        .from('frida_ingredients')
+        .select('id, name, category')
+        .eq('source', 'frida_dtu')
+        .or(`name.ilike.%${normalizedTerm}%`)
         .limit(10)
       
       if (error) {
@@ -117,7 +118,12 @@ export class FridaDTUMatcher {
         return []
       }
       
-      return data || []
+      // Transform data to match FridaFood interface
+      return (data || []).map(item => ({
+        food_id: parseInt(item.id.replace('frida-', '')),
+        food_name_da: item.name,
+        food_name_en: item.name // Use Danish name for both since we only have Danish
+      }))
     } catch (error) {
       console.error('❌ Failed to search foods:', error)
       return []
