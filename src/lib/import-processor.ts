@@ -1,5 +1,5 @@
+import { RawRecipeData, convertKetolivToRawRecipeData, importRecipesWithImages, importRecipesInBatches, BatchImportOptions } from './recipe-import'
 import { Recipe } from '@/types/recipe'
-import { RawRecipeData, convertKetolivToRawRecipeData, importRecipesWithImages } from './recipe-import'
 import { IngredientTag, IngredientCategory, NutritionalInfo as IngredientNutritionalInfo } from './ingredient-system/types'
 import { FridaDTUMatcher } from './frida-dtu-matcher'
 import { RecipeCalculator } from './recipe-calculator'
@@ -29,41 +29,119 @@ export class ImportProcessor {
   /**
    * Process complete import of recipes with automatic ingredient tagging, nutritional calculation, and image fetching
    */
-  async processImport(rawData: any[]): Promise<ImportResult> {
+  async processImport(
+    rawRecipeData: any[],
+    options: BatchImportOptions = {}
+  ): Promise<{
+    recipes: Recipe[]
+    ingredients: IngredientTag[]
+    stats: {
+      totalRecipes: number
+      totalIngredients: number
+      processedIngredients: number
+      recipesWithNutrition: number
+      processingTime: number
+      imagesFetched: number
+      batchStats?: {
+        totalBatches: number
+        successfulBatches: number
+        failedBatches: number
+        progress: number
+      }
+    }
+  }> {
     const startTime = Date.now()
     
-    console.log('🚀 Starting comprehensive recipe import...')
-    console.log(`📊 Processing ${rawData.length} recipes`)
-
-    // Detect if this is Ketoliv format and convert if needed
-    let rawRecipeData: RawRecipeData[]
-    if (rawData.length > 0 && rawData[0].ingredients_flat) {
-      console.log('🔍 Detected Ketoliv format, converting...')
-      rawRecipeData = convertKetolivToRawRecipeData(rawData)
+    // Detect if this is Ketoliv format and convert
+    let normalizedRaw: RawRecipeData[]
+    if (rawRecipeData[0]?.ingredients_flat) {
+      console.log('🔄 Detected Ketoliv format, converting...')
+      normalizedRaw = convertKetolivToRawRecipeData(rawRecipeData)
     } else {
-      console.log('🔍 Using standard format')
-      rawRecipeData = rawData as RawRecipeData[]
+      console.log('🔄 Using raw recipe format...')
+      normalizedRaw = rawRecipeData.map((r: any) => {
+        // normalize imageUrl from various possible fields
+        const imageUrl = r.imageUrl || r.image_url || r.image?.url || r.image?.src || r.image
+        return {
+          ...r,
+          imageUrl: imageUrl || '/images/recipe-placeholder.jpg'
+        }
+      })
     }
 
-    // Step 1: Normalize & import recipes (do NOT fetch images on client)
-    console.log('📝 Step 1: Importing recipes (no client fetch)...')
-    const normalizedRaw: RawRecipeData[] = rawRecipeData.map((r: any) => {
-      // normalize imageUrl from various possible fields
-      const imageUrl = r.imageUrl || r.image_url || r.image?.url || r.image?.src || r.image
-      return {
-        ...r,
-        imageUrl: imageUrl || '/images/recipe-placeholder.jpg'
+    // Step 1: Import recipes with images using batch processing
+    console.log('🖼️ Step 1: Importing recipes with images using batch processing...')
+    
+    const batchResult = await importRecipesInBatches(normalizedRaw, {
+      batchSize: options.batchSize || 5,
+      delayBetweenBatches: options.delayBetweenBatches || 1000,
+      onProgress: (progress, currentBatch, totalBatches) => {
+        console.log(`📊 Progress: ${progress}% (Batch ${currentBatch}/${totalBatches})`)
+      },
+      onBatchComplete: (batchNumber, successCount, errorCount) => {
+        console.log(`✅ Batch ${batchNumber} complete: ${successCount} successful, ${errorCount} errors`)
       }
     })
-    // Step 1: Import recipes with images
-    console.log('🖼️ Step 1: Importing recipes with images...')
-    const importedRecipes = await importRecipesWithImages(normalizedRaw)
-    
+
+    // Get successfully imported recipes
+    const importedRecipes = normalizedRaw.filter(recipe => 
+      !batchResult.errors.some(error => error.recipeTitle === recipe.title)
+    ).map(recipe => {
+      // Convert to Recipe format (simplified conversion)
+      return {
+        id: recipe.id || '',
+        title: recipe.title,
+        slug: this.generateSlug(recipe.title),
+        description: recipe.description,
+        shortDescription: recipe.shortDescription,
+        preparationTime: recipe.preparationTime,
+        cookingTime: recipe.cookingTime,
+        totalTime: recipe.preparationTime + recipe.cookingTime,
+        calories: recipe.calories,
+        protein: recipe.protein,
+        carbs: recipe.carbs,
+        fat: recipe.fat,
+        fiber: recipe.fiber,
+        metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
+        metaDescription: this.generateMetaDescription(recipe),
+        keywords: this.generateKeywords(recipe),
+        mainCategory: recipe.mainCategory,
+        subCategories: recipe.subCategories || [],
+        dietaryCategories: recipe.dietaryCategories || [],
+        ingredients: recipe.ingredients?.map((ingredient: any, i: number) => ({
+          id: `${recipe.id || 'temp'}-${i + 1}`,
+          name: ingredient.name,
+          amount: ingredient.amount,
+          unit: ingredient.unit,
+          notes: ingredient.notes,
+        })) || [],
+        instructions: recipe.instructions?.map((step: any, i: number) => ({
+          id: `${recipe.id || 'temp'}-${i + 1}`,
+          stepNumber: step.stepNumber,
+          instruction: step.instruction,
+          time: step.time,
+          tips: step.tips,
+        })) || [],
+        imageUrl: recipe.imageUrl,
+        imageAlt: recipe.imageAlt,
+        servings: recipe.servings,
+        difficulty: recipe.difficulty,
+        author: recipe.author,
+        publishedAt: new Date(recipe.publishedAt),
+        updatedAt: new Date(recipe.publishedAt),
+        rating: recipe.rating,
+        reviewCount: recipe.reviewCount,
+        prepTimeISO: `PT${recipe.preparationTime}M`,
+        cookTimeISO: `PT${recipe.cookingTime}M`,
+        totalTimeISO: `PT${recipe.preparationTime + recipe.cookingTime}M`,
+      } as Recipe
+    })
+
     // Count successfully fetched images
     const imagesFetched = importedRecipes.filter(recipe => 
       recipe.imageUrl && !recipe.imageUrl.includes('recipe-placeholder.jpg')
     ).length
-    
+
     // Step 2: Calculate nutritional values using Frida DTU for all recipes
     console.log('🧮 Step 2: Calculating nutritional values using Frida DTU...')
     const recipesWithNutrition = await Promise.all(importedRecipes.map(async recipe => {
@@ -102,7 +180,7 @@ export class ImportProcessor {
     // Add slugs to recipes
     const recipesWithSlugs = recipesWithNutrition.map(recipe => ({
       ...recipe,
-      slug: recipe.slug || toSlug(recipe.title)
+      slug: recipe.slug || this.generateSlug(recipe.title)
     }))
 
     const processedIngredients: IngredientTag[] = Array.from(uniqueIngredients).map(name => ({
@@ -127,11 +205,18 @@ export class ImportProcessor {
       processedIngredients: processedIngredients.filter(ing => ing.nutritionalInfo).length,
       recipesWithNutrition: recipesWithNutrition.filter(recipe => (recipe.calories || 0) > 0).length,
       processingTime,
-      imagesFetched
+      imagesFetched,
+      batchStats: {
+        totalBatches: Math.ceil(normalizedRaw.length / (options.batchSize || 5)),
+        successfulBatches: batchResult.processedBatches,
+        failedBatches: batchResult.errors.length > 0 ? 1 : 0,
+        progress: batchResult.progress
+      }
     }
 
     console.log('✅ Import completed successfully!')
     console.log(`📈 Stats:`, stats)
+    console.log(`📦 Batch Stats:`, stats.batchStats)
 
     return {
       recipes: recipesWithSlugs,
@@ -240,5 +325,23 @@ export class ImportProcessor {
     // This method is not currently used in the import flow
     // and the ingredientService calls were causing async/await issues
     console.log(`📋 Importing ${ingredients.length} ingredients (method not implemented)`)
+  }
+
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/[æøå]/g, (m) => ({ 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }[m] as string))
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim()
+  }
+
+  private generateMetaDescription(recipe: any): string {
+    return `${recipe.shortDescription || recipe.description || recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'}`
+  }
+
+  private generateKeywords(recipe: any): string[] {
+    return [recipe.title, ...(recipe.subCategories || []), ...(recipe.dietaryCategories || [])]
   }
 } 

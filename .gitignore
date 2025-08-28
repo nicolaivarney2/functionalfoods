@@ -28,6 +28,9 @@ yarn-error.log*
 # Local env files
 .env*.local
 
+# OpenAI config (contains API keys)
+.openai-config.json
+
 # Vercel
 .vercel
 

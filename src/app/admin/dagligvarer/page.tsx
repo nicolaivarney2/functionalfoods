@@ -108,7 +108,7 @@ export default function SupermarketScraperPage() {
       console.error('Error loading database stats:', error)
     }
   }
-  
+
   const downloadLatestScrapedJSON = async () => {
     try {
       const response = await fetch('/api/admin/dagligvarer/import-rema-products', {
@@ -178,7 +178,7 @@ export default function SupermarketScraperPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ store: selectedStore })
-      })
+        })
       const result = await response.json()
       
       if (result.success) {
@@ -581,7 +581,7 @@ export default function SupermarketScraperPage() {
               </h2>
               <div className="space-y-3">
                 {storeOptions.map((store) => (
-                  <button
+                <button
                     key={store.value}
                     onClick={() => setSelectedStore(store.value)}
                     className={`w-full px-4 py-2 rounded-lg text-left ${
@@ -594,17 +594,17 @@ export default function SupermarketScraperPage() {
                       <span>{store.label}</span>
                       <span className="text-xs text-gray-500">{store.description}</span>
                     </div>
-                  </button>
+                </button>
                 ))}
               </div>
             </div>
 
             {/* Scraping Control */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Play size={20} className="mr-2" />
-                Scraping Kontrol
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Play size={20} className="mr-2" />
+                  Scraping Kontrol
+                </h2>
               
               <div className="space-y-4">
                 <div className="flex gap-3">
@@ -813,7 +813,7 @@ export default function SupermarketScraperPage() {
                     <div className="text-center p-3 bg-blue-50 rounded-lg">
                       <div className="text-2xl font-bold text-blue-600">{databaseStats.totalProducts}</div>
                       <div className="text-sm text-blue-800">Total Produkter</div>
-                    </div>
+                  </div>
                     <div className="text-center p-3 bg-green-50 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">{databaseStats.productsOnSale}</div>
                       <div className="text-sm text-green-800">På Tilbud</div>
@@ -834,8 +834,8 @@ export default function SupermarketScraperPage() {
                         <div>Tidspunkt: {new Date(latestScraping.timestamp).toLocaleString('da-DK')}</div>
                         <div>Produkter: {latestScraping.productsCount}</div>
                         <div>Status: {latestScraping.status}</div>
-                      </div>
-                      
+                  </div>
+                  
                       <button
                         onClick={downloadLatestScrapedJSON}
                         className="mt-3 px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm flex items-center gap-2"
@@ -843,7 +843,7 @@ export default function SupermarketScraperPage() {
                         <Download size={16} />
                         Download Seneste JSON
                       </button>
-                    </div>
+                  </div>
                   )}
                   
                   <button
@@ -868,10 +868,10 @@ export default function SupermarketScraperPage() {
 
             {/* Next Scheduled Run */}
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Clock size={20} className="mr-2" />
-                Næste Planlagte Kørsel
-              </h2>
+                              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Clock size={20} className="mr-2" />
+                  Næste Planlagte Kørsel
+                </h2>
               
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600 mb-2">
