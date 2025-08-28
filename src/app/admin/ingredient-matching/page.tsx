@@ -74,6 +74,11 @@ export default function IngredientMatchingPage() {
       const fridaData = await fridaResponse.json()
       setFridaIngredients(fridaData)
       
+      // Debug logging for Frida data
+      console.log('📊 Loaded Frida ingredients:', fridaData.length)
+      const smørIngredients = fridaData.filter((ing: any) => ing.name.toLowerCase().includes('smør'))
+      console.log('🔍 Found smør ingredients:', smørIngredients.map((ing: any) => ing.name))
+      
       // Load existing matches from database
       const existingMatchesResponse = await fetch('/api/ingredient-matches')
       const existingMatches = await existingMatchesResponse.json()
@@ -590,9 +595,18 @@ function FridaIngredientSelector({
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredIngredients = fridaIngredients.filter(ingredient =>
-    ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ).slice(0, searchTerm.length >= 2 ? 200 : 100) // Show more results when user is searching
+  const filteredIngredients = fridaIngredients.filter(ingredient => {
+    const ingredientName = ingredient.name.toLowerCase()
+    const searchLower = searchTerm.toLowerCase()
+    const matches = ingredientName.includes(searchLower)
+    
+    // Debug logging for smør søgning
+    if (searchLower === 'smør' && ingredientName.includes('smør')) {
+      console.log('🔍 Found smør match:', ingredient.name, 'matches:', matches)
+    }
+    
+    return matches
+  }).slice(0, searchTerm.length >= 2 ? 200 : 100) // Show more results when user is searching
 
   return (
     <div className="relative">
