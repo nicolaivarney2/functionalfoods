@@ -28,8 +28,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Note: ingredient_matches table doesn't have recipe_id, so we'll use direct matching
-    // Initialize nutrition calculator
+    // Initialize nutrition calculator and Supabase client
     const matcher = new FridaDTUMatcher()
+    const supabase = createSupabaseClient()
     
     let totalCalories = 0
     let totalProtein = 0
