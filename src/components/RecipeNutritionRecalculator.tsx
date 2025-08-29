@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 interface Props {
-  recipeId: number
+  recipeId: string | number
   recipeName: string
 }
 
