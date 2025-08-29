@@ -129,7 +129,7 @@ function generateAIMealPlan(
     score += 10
     
     // Offer-based scoring
-    const offerIngredients = recipe.ingredients.filter(ing => 
+    const offerIngredients = recipe.ingredients.filter((ing: string) => 
       offers.some(offer => offer.item.toLowerCase().includes(ing.toLowerCase()))
     )
     score += offerIngredients.length * 15 // Bonus for offer ingredients
