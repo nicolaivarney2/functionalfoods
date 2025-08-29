@@ -124,12 +124,12 @@ export async function POST(request: NextRequest) {
         // Store micro nutrients as JSONB
         vitamins: perPortionVitamins,
         minerals: perPortionMinerals,
-        // Store total nutrition (for reference)
-        totalCalories: Math.round(totalCalories),
-        totalProtein: Math.round(totalProtein * 10) / 10,
-        totalCarbs: Math.round(totalCarbs * 10) / 10,
-        totalFat: Math.round(totalFat * 10) / 10,
-        totalFiber: Math.round(totalFiber * 10) / 10,
+        // Store total nutrition (for reference) - use snake_case
+        total_calories: Math.round(totalCalories),
+        total_protein: Math.round(totalProtein * 10) / 10,
+        total_carbs: Math.round(totalCarbs * 10) / 10,
+        total_fat: Math.round(totalFat * 10) / 10,
+        total_fiber: Math.round(totalFiber * 10) / 10,
         updatedAt: new Date().toISOString()
       })
       .eq('id', recipeId)
