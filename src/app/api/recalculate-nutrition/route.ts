@@ -27,21 +27,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get ingredient matches for this recipe
-    const supabase = createSupabaseClient()
-    const { data: ingredientMatches, error: matchesError } = await supabase
-      .from('ingredient_matches')
-      .select('*')
-      .eq('recipe_id', recipeId)
-
-    if (matchesError) {
-      console.error('Error fetching ingredient matches:', matchesError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch ingredient matches', details: matchesError.message },
-        { status: 500 }
-      )
-    }
-
+    // Note: ingredient_matches table doesn't have recipe_id, so we'll use direct matching
     // Initialize nutrition calculator
     const matcher = new FridaDTUMatcher()
     
@@ -55,54 +41,26 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 Processing ${totalIngredients} ingredients for recipe: ${recipe.title}`)
 
-    // Calculate nutrition for each ingredient
+    // Calculate nutrition for each ingredient using direct matching
     for (const ingredient of recipe.ingredients || []) {
       try {
-        // Try to find a match in ingredient_matches first
-        const match = ingredientMatches?.find(m => 
-          m.ingredient_name?.toLowerCase() === ingredient.name?.toLowerCase()
-        )
-
-        if (match && match.frida_ingredient_id) {
-          // Use the matched Frida ingredient - try to get nutrition from the match
-          // Since getFridaIngredientNutrition is private, we'll use matchIngredient instead
-          const result = await matcher.matchIngredient(ingredient.name)
+        // Use the matcher to find nutrition data for each ingredient
+        const result = await matcher.matchIngredient(ingredient.name)
+        
+        if (result.nutrition) {
+          const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
+          const scaleFactor = grams / 100
           
-          if (result.nutrition) {
-            // Convert ingredient amount to grams and calculate nutrition
-            const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
-            const scaleFactor = grams / 100
-            
-            totalCalories += result.nutrition.calories * scaleFactor
-            totalProtein += result.nutrition.protein * scaleFactor
-            totalCarbs += result.nutrition.carbs * scaleFactor
-            totalFat += result.nutrition.fat * scaleFactor
-            totalFiber += result.nutrition.fiber * scaleFactor
-            
-            matchedIngredients++
-            console.log(`✅ Matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
-          } else {
-            console.log(`⚠️ No nutrition data for matched ingredient: ${ingredient.name}`)
-          }
+          totalCalories += result.nutrition.calories * scaleFactor
+          totalProtein += result.nutrition.protein * scaleFactor
+          totalCarbs += result.nutrition.carbs * scaleFactor
+          totalFat += result.nutrition.fat * scaleFactor
+          totalFiber += result.nutrition.fiber * scaleFactor
+          
+          matchedIngredients++
+          console.log(`✅ Matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
         } else {
-          // Try to find a match using the matcher
-          const result = await matcher.matchIngredient(ingredient.name)
-          
-          if (result.nutrition) {
-            const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
-            const scaleFactor = grams / 100
-            
-            totalCalories += result.nutrition.calories * scaleFactor
-            totalProtein += result.nutrition.protein * scaleFactor
-            totalCarbs += result.nutrition.carbs * scaleFactor
-            totalFat += result.nutrition.fat * scaleFactor
-            totalFiber += result.nutrition.fiber * scaleFactor
-            
-            matchedIngredients++
-            console.log(`✅ Auto-matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
-          } else {
-            console.log(`❌ No match found for: ${ingredient.name}`)
-          }
+          console.log(`❌ No match found for: ${ingredient.name}`)
         }
       } catch (error) {
         console.error(`Error processing ingredient ${ingredient.name}:`, error)
