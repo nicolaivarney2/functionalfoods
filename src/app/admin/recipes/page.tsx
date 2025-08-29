@@ -4,6 +4,7 @@ import AdminLayout from '@/components/AdminLayout'
 import { useState, useEffect } from 'react'
 import { Recipe } from '@/types/recipe'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import { 
   Target, 
   Image, 
@@ -497,9 +498,19 @@ export default function AdminRecipesPage() {
                                     href={`/opskrift/${recipe.slug}`}
                                     target="_blank"
                                     className="text-blue-600 hover:text-blue-900"
+                                    title="Se opskrift"
                                   >
                                     <Eye className="h-4 w-4" />
                                   </a>
+                                  
+                                  {/* Nutrition Recalculator */}
+                                  <div className="inline-block">
+                                    <RecipeNutritionRecalculator 
+                                      recipeId={recipe.id} 
+                                      recipeName={recipe.title}
+                                    />
+                                  </div>
+                                  
                                   <button
                                     onClick={() => deleteRecipe(recipe.slug, recipe.title)}
                                     className="text-red-600 hover:text-red-900"

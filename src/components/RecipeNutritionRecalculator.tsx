@@ -47,23 +47,19 @@ export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Pr
   }
 
   return (
-    <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">Admin Tools</h4>
+    <div className="inline-block">
       <button
         onClick={handleRecalculate}
         disabled={isRecalculating}
-        className={`px-3 py-2 text-sm rounded transition-colors ${
+        className={`px-2 py-1 text-xs rounded transition-colors ${
           isRecalculating
             ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-green-600 text-white hover:bg-green-700'
         }`}
+        title="Recalculate nutrition based on ingredient matches"
       >
-        {isRecalculating ? '⏳ Recalculating...' : '🔄 Recalculate Nutrition'}
+        {isRecalculating ? '⏳' : '🔄'}
       </button>
-      
-      <p className="text-xs text-gray-500 mt-2">
-        Use this after updating ingredient matches to refresh nutrition data without re-importing.
-      </p>
     </div>
   )
 }
