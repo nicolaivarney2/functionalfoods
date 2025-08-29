@@ -37,10 +37,13 @@ export async function POST(request: NextRequest) {
     let totalCarbs = 0
     let totalFat = 0
     let totalFiber = 0
+    let totalVitamins: Record<string, number> = {}
+    let totalMinerals: Record<string, number> = {}
     let matchedIngredients = 0
     let totalIngredients = recipe.ingredients?.length || 0
 
     console.log(`📊 Processing ${totalIngredients} ingredients for recipe: ${recipe.title}`)
+    console.log(`🍽️ Recipe serves: ${recipe.servings || 'unknown'} portions`)
 
     // Calculate nutrition for each ingredient using direct matching
     for (const ingredient of recipe.ingredients || []) {
@@ -52,11 +55,25 @@ export async function POST(request: NextRequest) {
           const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
           const scaleFactor = grams / 100
           
+          // Macro nutrients (per 100g basis, scaled by actual amount)
           totalCalories += result.nutrition.calories * scaleFactor
           totalProtein += result.nutrition.protein * scaleFactor
           totalCarbs += result.nutrition.carbs * scaleFactor
           totalFat += result.nutrition.fat * scaleFactor
           totalFiber += result.nutrition.fiber * scaleFactor
+          
+          // Micro nutrients (vitamins and minerals)
+          if (result.nutrition.vitamins) {
+            for (const [vitamin, value] of Object.entries(result.nutrition.vitamins)) {
+              totalVitamins[vitamin] = (totalVitamins[vitamin] || 0) + value * scaleFactor
+            }
+          }
+          
+          if (result.nutrition.minerals) {
+            for (const [mineral, value] of Object.entries(result.nutrition.minerals)) {
+              totalMinerals[mineral] = (totalMinerals[mineral] || 0) + value * scaleFactor
+            }
+          }
           
           matchedIngredients++
           console.log(`✅ Matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
@@ -68,27 +85,51 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Round nutrition values
-    const nutrition = {
-      calories: Math.round(totalCalories),
-      protein: Math.round(totalProtein * 10) / 10,
-      carbs: Math.round(totalCarbs * 10) / 10,
-      fat: Math.round(totalFat * 10) / 10,
-      fiber: Math.round(totalFiber * 10) / 10
+    // Calculate per portion nutrition
+    const servings = recipe.servings || 1
+    const perPortionNutrition = {
+      calories: Math.round(totalCalories / servings),
+      protein: Math.round((totalProtein / servings) * 10) / 10,
+      carbs: Math.round((totalCarbs / servings) * 10) / 10,
+      fat: Math.round((totalFat / servings) * 10) / 10,
+      fiber: Math.round((totalFiber / servings) * 10) / 10
     }
 
-    console.log(`📊 Final nutrition totals:`, nutrition)
+    // Calculate per portion micro nutrients
+    const perPortionVitamins: Record<string, number> = {}
+    const perPortionMinerals: Record<string, number> = {}
+    
+    for (const [vitamin, value] of Object.entries(totalVitamins)) {
+      perPortionVitamins[vitamin] = Math.round((value / servings) * 100) / 100
+    }
+    
+    for (const [mineral, value] of Object.entries(totalMinerals)) {
+      perPortionMinerals[mineral] = Math.round((value / servings) * 100) / 100
+    }
+
+    console.log(`📊 Final nutrition totals (per portion):`, perPortionNutrition)
+    console.log(`🧪 Vitamins (per portion):`, perPortionVitamins)
+    console.log(`⚡ Minerals (per portion):`, perPortionMinerals)
     console.log(`✅ Matched ${matchedIngredients}/${totalIngredients} ingredients`)
 
-    // Update the recipe in the database
+    // Update the recipe in the database with both total and per-portion nutrition
     const { error: updateError } = await supabase
       .from('recipes')
       .update({
-        calories: nutrition.calories,
-        protein: nutrition.protein,
-        carbs: nutrition.carbs,
-        fat: nutrition.fat,
-        fiber: nutrition.fiber,
+        calories: perPortionNutrition.calories,
+        protein: perPortionNutrition.protein,
+        carbs: perPortionNutrition.carbs,
+        fat: perPortionNutrition.fat,
+        fiber: perPortionNutrition.fiber,
+        // Store micro nutrients as JSONB
+        vitamins: perPortionVitamins,
+        minerals: perPortionMinerals,
+        // Store total nutrition (for reference)
+        totalCalories: Math.round(totalCalories),
+        totalProtein: Math.round(totalProtein * 10) / 10,
+        totalCarbs: Math.round(totalCarbs * 10) / 10,
+        totalFat: Math.round(totalFat * 10) / 10,
+        totalFiber: Math.round(totalFiber * 10) / 10,
         updatedAt: new Date().toISOString()
       })
       .eq('id', recipeId)
@@ -110,7 +151,10 @@ export async function POST(request: NextRequest) {
       message: `Nutrition recalculated successfully for "${recipe.title}"`,
       matchedIngredients,
       totalIngredients,
-      nutrition
+      servings,
+      nutrition: perPortionNutrition,
+      vitamins: perPortionVitamins,
+      minerals: perPortionMinerals
     })
 
   } catch (error) {

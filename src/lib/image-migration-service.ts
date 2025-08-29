@@ -36,8 +36,17 @@ export class ImageMigrationService {
 
       result.totalRecipes = recipes?.length || 0
       console.log(`📊 Found ${result.totalRecipes} recipes with Ketoliv images`)
+      
+      // Log some examples
+      if (recipes && recipes.length > 0) {
+        console.log('🔍 Sample Ketoliv URLs:')
+        recipes.slice(0, 3).forEach(recipe => {
+          console.log(`  - ${recipe.title}: ${recipe.imageUrl}`)
+        })
+      }
 
       if (!recipes || recipes.length === 0) {
+        console.log('✅ No Ketoliv images found - migration not needed')
         result.success = true
         return result
       }
@@ -115,18 +124,37 @@ export class ImageMigrationService {
     lastMigration?: string
   }> {
     try {
-      const { data: recipes } = await this.supabase
+      console.log('🔍 Checking image migration status...')
+      
+      const { data: recipes, error } = await this.supabase
         .from('recipes')
-        .select('id')
+        .select('id, title, imageUrl')
         .not('imageUrl', 'is', null)
         .like('imageUrl', '%ketoliv.dk%')
 
+      if (error) {
+        console.error('❌ Error checking migration status:', error)
+        return { hasKetolivImages: false, totalRecipes: 0 }
+      }
+
+      const hasKetolivImages = (recipes?.length || 0) > 0
+      const totalRecipes = recipes?.length || 0
+      
+      console.log(`🔍 Migration status: ${hasKetolivImages ? 'Has Ketoliv images' : 'No Ketoliv images'} (${totalRecipes} total)`)
+      
+      if (hasKetolivImages) {
+        console.log('🔍 Sample Ketoliv URLs:')
+        recipes?.slice(0, 3).forEach(recipe => {
+          console.log(`  - ${recipe.title}: ${recipe.imageUrl}`)
+        })
+      }
+
       return {
-        hasKetolivImages: (recipes?.length || 0) > 0,
-        totalRecipes: recipes?.length || 0
+        hasKetolivImages,
+        totalRecipes
       }
     } catch (error) {
-      console.error('Failed to get migration status:', error)
+      console.error('❌ Failed to check migration status:', error)
       return { hasKetolivImages: false, totalRecipes: 0 }
     }
   }

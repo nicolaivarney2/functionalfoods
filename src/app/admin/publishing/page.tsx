@@ -4,6 +4,7 @@ import AdminLayout from '@/components/AdminLayout'
 import { useState, useEffect } from 'react'
 import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
+import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save } from 'lucide-react'
 
@@ -760,6 +761,18 @@ export default function AdminPublishingPage() {
                         </svg>
                         Gå til opskrift
                       </a>
+                    </div>
+
+                    {/* Nutrition Recalculator */}
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Ernæring</h4>
+                      <p className="text-xs text-yellow-700 mb-3">
+                        Genberegn mikro og makro ernæring baseret på ingredienser
+                      </p>
+                      <RecipeNutritionRecalculator 
+                        recipeId={selectedRecipe.id} 
+                        recipeName={selectedRecipe.title}
+                      />
                     </div>
                   </div>
 
