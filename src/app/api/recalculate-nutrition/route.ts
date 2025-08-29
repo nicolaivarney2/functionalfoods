@@ -48,12 +48,23 @@ export async function POST(request: NextRequest) {
     // Calculate nutrition for each ingredient using direct matching
     for (const ingredient of recipe.ingredients || []) {
       try {
+        console.log(`🔍 Processing ingredient: ${ingredient.name} (${ingredient.amount} ${ingredient.unit})`)
+        
         // Use the matcher to find nutrition data for each ingredient
         const result = await matcher.matchIngredient(ingredient.name)
+        
+        console.log(`🔍 Match result for ${ingredient.name}:`, {
+          hasNutrition: !!result.nutrition,
+          match: result.match,
+          score: result.score,
+          nutrition: result.nutrition
+        })
         
         if (result.nutrition) {
           const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
           const scaleFactor = grams / 100
+          
+          console.log(`⚖️ Conversion: ${ingredient.amount} ${ingredient.unit} = ${grams}g (scale factor: ${scaleFactor})`)
           
           // Macro nutrients (per 100g basis, scaled by actual amount)
           totalCalories += result.nutrition.calories * scaleFactor
@@ -77,6 +88,7 @@ export async function POST(request: NextRequest) {
           
           matchedIngredients++
           console.log(`✅ Matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
+          console.log(`📊 Running totals: ${Math.round(totalCalories)} kcal, ${Math.round(totalProtein * 10) / 10}g protein`)
         } else {
           console.log(`❌ No match found for: ${ingredient.name}`)
         }
@@ -113,29 +125,33 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Matched ${matchedIngredients}/${totalIngredients} ingredients`)
 
     // Update the recipe in the database with both total and per-portion nutrition
+    const updateData = {
+      calories: perPortionNutrition.calories,
+      protein: perPortionNutrition.protein,
+      carbs: perPortionNutrition.carbs,
+      fat: perPortionNutrition.fat,
+      fiber: perPortionNutrition.fiber,
+      // Store micro nutrients as JSONB
+      vitamins: perPortionVitamins,
+      minerals: perPortionMinerals,
+      // Store total nutrition (for reference) - use snake_case
+      total_calories: Math.round(totalCalories),
+      total_protein: Math.round(totalProtein * 10) / 10,
+      total_carbs: Math.round(totalCarbs * 10) / 10,
+      total_fat: Math.round(totalFat * 10) / 10,
+      total_fiber: Math.round(totalFiber * 10) / 10,
+      updatedAt: new Date().toISOString()
+    }
+    
+    console.log(`💾 Updating database with:`, updateData)
+    
     const { error: updateError } = await supabase
       .from('recipes')
-      .update({
-        calories: perPortionNutrition.calories,
-        protein: perPortionNutrition.protein,
-        carbs: perPortionNutrition.carbs,
-        fat: perPortionNutrition.fat,
-        fiber: perPortionNutrition.fiber,
-        // Store micro nutrients as JSONB
-        vitamins: perPortionVitamins,
-        minerals: perPortionMinerals,
-        // Store total nutrition (for reference) - use snake_case
-        total_calories: Math.round(totalCalories),
-        total_protein: Math.round(totalProtein * 10) / 10,
-        total_carbs: Math.round(totalCarbs * 10) / 10,
-        total_fat: Math.round(totalFat * 10) / 10,
-        total_fiber: Math.round(totalFiber * 10) / 10,
-        updatedAt: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', recipeId)
 
     if (updateError) {
-      console.error('Error updating recipe nutrition:', updateError)
+      console.error('❌ Error updating recipe nutrition:', updateError)
       return NextResponse.json(
         { 
           success: false, 
@@ -144,6 +160,21 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       )
+    }
+
+    console.log(`✅ Database update successful for recipe: ${recipe.title}`)
+    
+    // Verify the update by fetching the recipe again
+    const { data: updatedRecipe, error: fetchError } = await supabase
+      .from('recipes')
+      .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
+      .eq('id', recipeId)
+      .single()
+    
+    if (fetchError) {
+      console.error('❌ Error fetching updated recipe:', fetchError)
+    } else {
+      console.log(`🔍 Verification - Updated recipe data:`, updatedRecipe)
     }
 
     return NextResponse.json({
@@ -180,9 +211,9 @@ function convertToGrams(amount: number, unit: string): number {
     stk: 80,
     st: 80,
     stykke: 80,
-    spsk: 15,
-    tesk: 5,
-    tsk: 5,
+    spsk: 13,  // 1 spsk = 13g (mere præcis dansk mål)
+    tesk: 4,   // 1 tsk = 4g (mere præcis dansk mål)
+    tsk: 4,    // 1 tsk = 4g (mere præcis dansk mål)
     dl: 100,
     l: 1000,
     ml: 1,

@@ -424,9 +424,9 @@ export class FridaDTUMatcher {
         'stk': 80,
         'st': 80, // alias often seen in imported data
         'stykke': 80,
-        'spsk': 15, // Tablespoon
-        'tesk': 5,  // Teaspoon (common misspelling)
-        'tsk': 5,   // Teaspoon
+        'spsk': 13, // Tablespoon (mere præcis dansk mål)
+        'tesk': 4,  // Teaspoon (mere præcis dansk mål)
+        'tsk': 4,   // Teaspoon (mere præcis dansk mål)
         'dl': 100,  // Deciliter
         'l': 1000,  // Liter
         'ml': 1     // Milliliter

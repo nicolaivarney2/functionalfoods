@@ -202,9 +202,9 @@ function convertToGrams(amount: number, unit: string): number {
     stk: 80,
     st: 80,
     stykke: 80,
-    spsk: 15,
-    tesk: 5,
-    tsk: 5,
+    spsk: 13,  // 1 spsk = 13g (mere præcis dansk mål)
+    tesk: 4,   // 1 tsk = 4g (mere præcis dansk mål)
+    tsk: 4,    // 1 tsk = 4g (mere præcis dansk mål)
     dl: 100,
     l: 1000,
     ml: 1,
