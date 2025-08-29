@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 import { ingredientMatcher } from '@/lib/ingredient-matcher'
+import { createSupabaseClient } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
@@ -143,6 +144,75 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Download and store images for all recipes
+    console.log('🖼️ Starting automatic image download for all recipes...')
+    let imagesDownloaded = 0
+    let imagesFailed = 0
+    
+    try {
+      const supabase = createSupabaseClient()
+      
+      for (const recipe of recipes) {
+        if (recipe.imageUrl && recipe.imageUrl.includes('ketoliv.dk')) {
+          console.log(`📥 Downloading image for: ${recipe.title}`)
+          
+          try {
+            // Call the image processing API
+            const imageResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/images/process`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                imageUrl: recipe.imageUrl,
+                recipeSlug: recipe.slug
+              })
+            })
+            
+            if (imageResponse.ok) {
+              const imageResult = await imageResponse.json()
+              if (imageResult.success && imageResult.storageUrl) {
+                // Update recipe in database with new image URL
+                const { error: updateError } = await supabase
+                  .from('recipes')
+                  .update({ imageUrl: imageResult.storageUrl })
+                  .eq('slug', recipe.slug)
+                
+                if (updateError) {
+                  console.error(`❌ Failed to update recipe image URL for ${recipe.title}:`, updateError)
+                  imagesFailed++
+                } else {
+                  console.log(`✅ Image downloaded and recipe updated: ${recipe.title}`)
+                  imagesDownloaded++
+                }
+              } else {
+                console.error(`❌ Image processing failed for ${recipe.title}:`, imageResult.error)
+                imagesFailed++
+              }
+            } else {
+              console.error(`❌ Image API call failed for ${recipe.title}:`, imageResponse.status)
+              imagesFailed++
+            }
+            
+            // Add small delay to avoid overwhelming the API
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+          } catch (imageError) {
+            console.error(`❌ Error downloading image for ${recipe.title}:`, imageError)
+            imagesFailed++
+          }
+        } else {
+          console.log(`⏭️ Skipping image download for ${recipe.title} (no Ketoliv URL)`)
+        }
+      }
+      
+      console.log(`🖼️ Image download completed: ${imagesDownloaded} successful, ${imagesFailed} failed`)
+      
+    } catch (imageError) {
+      console.error('💥 Error during image download process:', imageError)
+      // Don't fail the entire import if image download fails
+    }
+
     // Get updated database stats
     console.log('📊 Getting database stats...')
     const dbStats = await databaseService.getDatabaseStats()
@@ -150,10 +220,12 @@ export async function POST(request: NextRequest) {
 
     const response = {
       success: true,
-      message: `Successfully saved ${recipes.length} recipes and ${newIngredients.length} new ingredients (${skippedCount} duplicates skipped)`,
+      message: `Successfully saved ${recipes.length} recipes and ${newIngredients.length} new ingredients (${skippedCount} duplicates skipped). Images: ${imagesDownloaded} downloaded, ${imagesFailed} failed.`,
       recipeCount: recipes.length,
       ingredientCount: newIngredients.length,
       duplicatesSkipped: skippedCount,
+      imagesDownloaded,
+      imagesFailed,
       dbStats
     }
 

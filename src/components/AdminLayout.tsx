@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { useImageMigration } from '@/hooks/useImageMigration'
 import { 
   BookOpen, 
   Calendar, 
@@ -91,6 +92,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
   const { isAdmin, checking } = useAdminAuth()
   const router = useRouter()
+  
+  // Automatic image migration hook
+  const { isMigrating, migrationResult } = useImageMigration()
 
   // Centralized auth check for all admin pages
   useEffect(() => {
@@ -202,6 +206,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <h2 className="text-lg font-medium text-gray-900">
                 {adminNavItems.find(item => item.href === pathname)?.name || 'Admin'}
               </h2>
+              
+              {/* Image migration status */}
+              {isMigrating && (
+                <div className="ml-4 flex items-center text-sm text-blue-600">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Migrerer billeder...
+                </div>
+              )}
+              
+              {migrationResult && !isMigrating && (
+                <div className="ml-4 flex items-center text-sm text-green-600">
+                  ✅ {migrationResult.migratedImages} billeder migreret
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               <Link

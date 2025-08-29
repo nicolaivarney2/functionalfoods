@@ -36,7 +36,7 @@ export class FridaDTUMatcher {
   /**
    * Get manually confirmed match from ingredient_matches table
    */
-  private async getManualMatch(ingredientName: string): Promise<{ name: string, category: string, nutritionalInfo: any } | null> {
+  private async getManualMatch(ingredientName: string): Promise<{ name: string, category: string, nutritionalInfo: NutritionalInfo | null } | null> {
     try {
       console.log(`🔍 Looking for manual match for: ${ingredientName}`)
       
@@ -54,10 +54,22 @@ export class FridaDTUMatcher {
       }
       
       console.log(`✅ Manual match found: ${data.name}`)
+      
+      // Create proper NutritionalInfo object from direct fields
+      const nutritionalInfo: NutritionalInfo = {
+        calories: data.calories || 0,
+        protein: data.protein || 0,
+        carbs: data.carbs || 0,
+        fat: data.fat || 0,
+        fiber: data.fiber || 0,
+        vitamins: data.vitamins || {},
+        minerals: data.minerals || {}
+      }
+      
       return {
         name: data.name,
         category: data.category,
-        nutritionalInfo: data.nutritional_info
+        nutritionalInfo
       }
     } catch (error) {
       console.error(`❌ Error getting manual match for ${ingredientName}:`, error)
@@ -102,28 +114,34 @@ export class FridaDTUMatcher {
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
     try {
-
+      console.log(`🔍 Searching for: "${searchTerm}" in frida_ingredients`)
+      
       const normalizedTerm = this.normalizeIngredientName(searchTerm)
       
-      // Search in frida_ingredients table where source = 'frida_dtu'
+      // Search in frida_ingredients table - removed source filter since all have source = 'frida_dtu'
       const { data, error } = await supabase
         .from('frida_ingredients')
         .select('id, name, category')
-        .eq('source', 'frida_dtu')
-        .or(`name.ilike.%${normalizedTerm}%`)
-        .limit(10)
+        .ilike('name', `%${normalizedTerm}%`)
+        .limit(20) // Increased limit for better matching
       
       if (error) {
         console.error('❌ Error searching foods:', error)
         return []
       }
       
+      console.log(`🔍 Found ${data?.length || 0} matches for "${searchTerm}"`)
+      
       // Transform data to match FridaFood interface
-      return (data || []).map(item => ({
+      const results = (data || []).map(item => ({
         food_id: parseInt(item.id.replace('frida-', '')),
         food_name_da: item.name,
         food_name_en: item.name // Use Danish name for both since we only have Danish
       }))
+      
+      console.log(`🔍 Transformed results:`, results.slice(0, 3)) // Log first 3 for debugging
+      
+      return results
     } catch (error) {
       console.error('❌ Failed to search foods:', error)
       return []
@@ -173,7 +191,11 @@ export class FridaDTUMatcher {
    * Find best match for ingredient in Frida database
    */
   private async findBestMatch(ingredientName: string): Promise<{ foodId: number, name: string, score: number } | null> {
+    console.log(`🎯 Finding best match for: "${ingredientName}"`)
+    
     const foods = await this.searchFoods(ingredientName)
+    console.log(`🎯 searchFoods returned ${foods.length} foods`)
+    
     let bestMatch = null
     let bestScore = 0
 
@@ -182,6 +204,8 @@ export class FridaDTUMatcher {
       const scoreEn = this.calculateSimilarity(ingredientName, food.food_name_en || '')
       const score = Math.max(scoreDa, scoreEn)
       
+      console.log(`🎯 "${food.food_name_da}" - score: ${score.toFixed(3)}`)
+      
       if (score > bestScore && score > 0.3) { // Minimum threshold
         bestScore = score
         bestMatch = { 
@@ -189,7 +213,14 @@ export class FridaDTUMatcher {
           name: food.food_name_da, 
           score 
         }
+        console.log(`🎯 New best match: "${food.food_name_da}" (score: ${score.toFixed(3)})`)
       }
+    }
+
+    if (bestMatch) {
+      console.log(`🎯 Final best match: "${bestMatch.name}" (score: ${bestMatch.score.toFixed(3)})`)
+    } else {
+      console.log(`🎯 No match found for "${ingredientName}" (best score was ${bestScore.toFixed(3)})`)
     }
 
     return bestMatch
@@ -410,4 +441,4 @@ export class FridaDTUMatcher {
       return 1.0
     }
   }
-} 
+}
