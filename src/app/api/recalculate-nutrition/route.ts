@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Get ingredient matches for this recipe
-    const { data: ingredientMatches, error: matchesError } = await databaseService.supabase
+    const supabase = createSupabaseClient()
+    const { data: ingredientMatches, error: matchesError } = await supabase
       .from('ingredient_matches')
       .select('*')
       .eq('recipe_id', recipeId)
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
     console.log(`✅ Matched ${matchedIngredients}/${totalIngredients} ingredients`)
 
     // Update the recipe in the database
-    const { error: updateError } = await databaseService.supabase
+    const { error: updateError } = await supabase
       .from('recipes')
       .update({
         calories: nutrition.calories,
