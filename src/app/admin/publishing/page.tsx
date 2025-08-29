@@ -35,7 +35,7 @@ export default function AdminPublishingPage() {
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('draft')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
@@ -565,13 +565,22 @@ export default function AdminPublishingPage() {
                                      recipe.status === 'scheduled' ? 'Planlagt' : 'Kladde'}
                           </p>
                         </div>
-                        {recipe.personalTips && (
-                          <div className="ml-2">
+                        <div className="ml-2 flex items-center gap-2">
+                          {recipe.personalTips && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               💡 Tips
                             </span>
-                          </div>
-                        )}
+                          )}
+                          {/* Nutrition recalculation for drafts */}
+                          {recipe.status === 'draft' && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <RecipeNutritionRecalculator
+                                recipeId={recipe.id}
+                                recipeName={recipe.title}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}

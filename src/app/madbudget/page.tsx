@@ -26,6 +26,16 @@ const mockBasicItems = [
   { id: 8, name: 'Pasta', category: 'Kolonial', isOwned: true }
 ]
 
+// Mock data for basisvarer (family standard items)
+const mockBasisvarer = [
+  { id: 1, name: 'Bananer', category: 'Frugt og grønt' },
+  { id: 2, name: 'Æbler', category: 'Frugt og grønt' },
+  { id: 3, name: 'Havregryn', category: 'Morgenmad' },
+  { id: 4, name: 'Skyr', category: 'Mejeri' },
+  { id: 5, name: 'Brød', category: 'Bageri' },
+  { id: 6, name: 'Mælk', category: 'Mejeri' }
+]
+
 // Enhanced mock recipes with images and detailed ingredients
 const mockRecipes = [
   {
@@ -182,14 +192,27 @@ export default function MadbudgetPage() {
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
   const [basicItems, setBasicItems] = useState(mockBasicItems)
+  const [basisvarer, setBasisvarer] = useState(mockBasisvarer)
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [basicItemsOpen, setBasicItemsOpen] = useState(true)
+  const [basisvarerOpen, setBasisvarerOpen] = useState(true)
+  const [familyProfileOpen, setFamilyProfileOpen] = useState(true)
+  const [savingsOpen, setSavingsOpen] = useState(true)
+  const [basisvarerModalOpen, setBasisvarerModalOpen] = useState(false)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
+  
+  // Mock family ID for now - later this will come from auth
+  const mockFamilyId = 'mock-family-123'
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
   const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
   const [showCostSavings, setShowCostSavings] = useState(true)
+  
+  // Load basisvarer on component mount
+  useEffect(() => {
+    fetchBasisvarer()
+  }, [])
 
   // Calculate ingredient overlap and cost savings
   const calculateIngredientOverlap = (recipe: any, selectedDay: DayKey, selectedMeal: MealType) => {
@@ -257,6 +280,159 @@ export default function MadbudgetPage() {
           : item
       )
     )
+  }
+
+  // API functions for basisvarer
+  const fetchBasisvarer = async () => {
+    try {
+      const response = await fetch(`/api/basisvarer?familyId=${mockFamilyId}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        setBasisvarer(data.data.map((item: any) => ({
+          id: item.id,
+          name: item.item_name,
+          category: item.category
+        })))
+      }
+    } catch (error) {
+      console.error('Error fetching basisvarer:', error)
+    }
+  }
+
+  const addBasisvarer = async (item: any) => {
+    try {
+      const response = await fetch('/api/basisvarer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          familyId: mockFamilyId,
+          itemName: item.name,
+          category: item.category
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Refresh the list
+        await fetchBasisvarer()
+        setBasisvarerModalOpen(false)
+      }
+    } catch (error) {
+      console.error('Error adding basisvare:', error)
+    }
+  }
+
+  const removeBasisvarer = async (itemId: number) => {
+    try {
+      const response = await fetch(`/api/basisvarer?id=${itemId}`, {
+        method: 'DELETE'
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Refresh the list
+        await fetchBasisvarer()
+      }
+    } catch (error) {
+      console.error('Error removing basisvare:', error)
+    }
+  }
+
+  // Generate AI meal plan
+  const generateAIMealPlan = async () => {
+    try {
+      console.log('🚀 Starting AI meal plan generation...')
+      
+      const response = await fetch('/api/generate-meal-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          familyProfile,
+          selectedStores: familyProfile.selectedStores,
+          preferences: {
+            maxBudget: 800, // Default budget - can be made configurable
+            dietaryRestrictions: []
+          }
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        const mealPlan = data.data
+        
+        console.log('✅ AI meal plan generated:', mealPlan)
+        
+        // Show results in a nice format
+        const message = `🎯 AI Madplan Genereret!\n\n` +
+          `💰 Total kostpris: ${mealPlan.totalCost} kr\n` +
+          `💸 Total besparelse: ${mealPlan.totalSavings} kr\n` +
+          `🛒 Indkøbsliste: ${mealPlan.shoppingList.length} varer\n` +
+          `🏪 Tilbud brugt: ${mealPlan.offersUsed.length} stk\n\n` +
+          `📅 7-dages madplan klar!\n` +
+          `🍽️ ${Object.keys(mealPlan.weekPlan).length} dage med 3 måltider hver`
+        
+        alert(message)
+        
+        // TODO: Display the meal plan in a modal or new section
+        // For now, just log it to console
+        console.log('📋 Full meal plan:', mealPlan.weekPlan)
+        console.log('🛒 Shopping list:', mealPlan.shoppingList)
+        
+      } else {
+        alert(`❌ Fejl: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Error generating AI meal plan:', error)
+      alert(`❌ Netværksfejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    }
+  }
+
+  // Generate complete shopping list (basisvarer + meal plan)
+  const generateCompleteShoppingList = () => {
+    const mealPlanIngredients = Object.values(mealPlan).flatMap(day => 
+      Object.values(day).flatMap(meal => 
+        meal ? meal.ingredients : []
+      )
+    ).filter(Boolean)
+
+    // Merge basisvarer with meal plan ingredients
+    const completeList = [
+      ...basisvarer.map(item => ({
+        name: item.name,
+        category: item.category,
+        source: 'basisvare',
+        quantity: 1,
+        unit: 'stk'
+      })),
+      ...mealPlanIngredients.map(ing => ({
+        name: ing.name,
+        category: 'Madplan',
+        source: 'meal-plan',
+        quantity: ing.amount,
+        unit: ing.unit
+      }))
+    ]
+
+    // Group by name and sum quantities
+    const groupedList = completeList.reduce((acc, item) => {
+      const key = item.name.toLowerCase()
+      if (acc[key]) {
+        acc[key].quantity += item.quantity
+      } else {
+        acc[key] = { ...item }
+      }
+      return acc
+    }, {} as Record<string, any>)
+
+    return Object.values(groupedList)
   }
 
   const addRecipeToMeal = (recipe: any) => {
@@ -343,36 +519,101 @@ export default function MadbudgetPage() {
           {/* Left Column - Family Profile & Basic Items */}
           <div className="space-y-6">
             {/* Family Profile Summary */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <Users size={20} className="mr-2" />
-                Familieprofil
-              </h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Voksne:</span>
-                  <span className="font-medium">{familyProfile.adults}</span>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setFamilyProfileOpen(!familyProfileOpen)}
+                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <Users size={20} className="mr-2" />
+                  Familieprofil
+                </h2>
+                <ChevronDown 
+                  size={20} 
+                  className={`text-gray-500 transition-transform ${familyProfileOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              {familyProfileOpen && (
+                <div className="px-6 pb-6 border-t border-gray-100">
+                  <div className="space-y-3 pt-4">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Voksne:</span>
+                      <span className="font-medium">{familyProfile.adults}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Børn:</span>
+                      <span className="font-medium">
+                        {familyProfile.children} ({familyProfile.childrenAges?.join(', ') || 'Ingen alder valgt'})
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Økologi prioriteret:</span>
+                      <span className="font-medium">{familyProfile.prioritizeOrganic ? 'Ja' : 'Nej'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Butikker:</span>
+                      <span className="font-medium">
+                        {familyProfile.selectedStores.map((storeId, index) => {
+                          const store = mockStores.find(s => s.id === storeId)
+                          return store?.name
+                        }).filter(Boolean).join(', ')}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Børn:</span>
-                  <span className="font-medium">
-                    {familyProfile.children} ({familyProfile.childrenAges?.join(', ') || 'Ingen alder valgt'})
-                  </span>
+              )}
+            </div>
+
+            {/* Basisvarer - Family Standard Items */}
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setBasisvarerOpen(!basisvarerOpen)}
+                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <h2 className="text-xl font-semibold text-gray-900">Basisvarer</h2>
+                <ChevronDown 
+                  size={20} 
+                  className={`text-gray-500 transition-transform ${basisvarerOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              {basisvarerOpen && (
+                <div className="px-6 pb-6 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-3 pt-4">
+                    <p className="text-gray-600 text-sm">Standardvarer som altid købes til madplanen</p>
+                    <button
+                      onClick={() => setBasisvarerModalOpen(true)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center"
+                    >
+                      <Plus size={16} className="mr-1" />
+                      Tilføj vare
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {basisvarer.map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm text-gray-700">{item.name}</span>
+                          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                            {item.category}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeBasisvarer(item.id)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {basisvarer.length === 0 && (
+                      <p className="text-gray-500 text-sm italic">Ingen basisvarer tilføjet endnu</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Økologi prioriteret:</span>
-                  <span className="font-medium">{familyProfile.prioritizeOrganic ? 'Ja' : 'Nej'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Butikker:</span>
-                  <span className="font-medium">
-                    {familyProfile.selectedStores.map((storeId, index) => {
-                      const store = mockStores.find(s => s.id === storeId)
-                      return store?.name
-                    }).filter(Boolean).join(', ')}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Basic Items */}
@@ -381,7 +622,7 @@ export default function MadbudgetPage() {
                 onClick={() => setBasicItemsOpen(!basicItemsOpen)}
                 className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
-                <h2 className="text-xl font-semibold text-gray-900">Basisvarer</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Varer du måske har</h2>
                 <ChevronDown 
                   size={20} 
                   className={`text-gray-500 transition-transform ${basicItemsOpen ? 'rotate-180' : ''}`} 
@@ -390,7 +631,7 @@ export default function MadbudgetPage() {
               
               {basicItemsOpen && (
                 <div className="px-6 pb-6 border-t border-gray-100">
-                  <p className="text-gray-600 text-sm mb-4">Kryds af hvad du allerede har</p>
+                  <p className="text-gray-600 text-sm mb-4 pt-4">Kryds af hvad du allerede har</p>
                   <div className="space-y-2">
                     {basicItems.map(item => (
                       <label key={item.id} className="flex items-center space-x-3 cursor-pointer">
@@ -414,22 +655,36 @@ export default function MadbudgetPage() {
             </div>
 
             {/* Savings Summary */}
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <TrendingUp size={20} className="mr-2" />
-                Besparelser
-              </h2>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-green-600 mb-2">
-                  {calculateSavings().totalSavings.toFixed(2)} kr
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <button
+                onClick={() => setSavingsOpen(!savingsOpen)}
+                className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <TrendingUp size={20} className="mr-2" />
+                  Besparelser
+                </h2>
+                <ChevronDown 
+                  size={20} 
+                  className={`text-gray-500 transition-transform ${savingsOpen ? 'rotate-180' : ''}`} 
+                />
+              </button>
+              
+              {savingsOpen && (
+                <div className="px-6 pb-6 border-t border-gray-100">
+                  <div className="text-center pt-4">
+                    <div className="text-3xl font-bold text-green-600 mb-2">
+                      {calculateSavings().totalSavings.toFixed(2)} kr
+                    </div>
+                    <div className="text-lg text-gray-600 mb-4">
+                      {calculateSavings().percentageSavings}% besparelse
+                    </div>
+                    <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors">
+                      Se detaljeret oversigt
+                    </button>
+                  </div>
                 </div>
-                <div className="text-lg text-gray-600 mb-4">
-                  {calculateSavings().percentageSavings}% besparelse
-                </div>
-                <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors">
-                  Se detaljeret oversigt
-                </button>
-              </div>
+              )}
             </div>
           </div>
 
@@ -607,6 +862,27 @@ export default function MadbudgetPage() {
               <div className="text-center py-8 text-gray-500">
                 <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
                 <p>Din indkøbsliste vil blive genereret når du har planlagt din madplan</p>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="space-y-3 mt-6">
+                <button 
+                  onClick={generateAIMealPlan}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg text-lg font-semibold transition-colors"
+                >
+                  🍽️ Lav AI madplan
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    const completeList = generateCompleteShoppingList()
+                    console.log('Complete shopping list:', completeList)
+                    alert(`Indkøbsliste genereret!\n\nTotal varer: ${completeList.length}\n\nBasisvarer: ${basisvarer.length}\nMadplan varer: ${completeList.length - basisvarer.length}`)
+                  }}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                >
+                  📋 Vis samlet indkøbsliste
+                </button>
               </div>
             </div>
           </div>
@@ -1007,6 +1283,56 @@ export default function MadbudgetPage() {
               >
                 Gem indstillinger
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Basisvarer Modal */}
+      {basisvarerModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Tilføj til basisvarer</h2>
+              <button
+                onClick={() => setBasisvarerModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <p className="text-gray-600 text-sm mb-4">
+              Vælg varer som altid skal købes til madplanen
+            </p>
+
+            {/* Mock grocery items - later this will come from actual grocery data */}
+            <div className="space-y-3">
+              {[
+                { name: 'Bananer', category: 'Frugt og grønt', price: '12.50 kr/kg' },
+                { name: 'Æbler', category: 'Frugt og grønt', price: '15.00 kr/kg' },
+                { name: 'Havregryn', category: 'Morgenmad', price: '8.50 kr/kg' },
+                { name: 'Skyr', category: 'Mejeri', price: '18.00 kr/l' },
+                { name: 'Brød', category: 'Bageri', price: '22.00 kr/stk' },
+                { name: 'Mælk', category: 'Mejeri', price: '12.50 kr/l' },
+                { name: 'Yoghurt', category: 'Mejeri', price: '15.00 kr/l' },
+                { name: 'Ost', category: 'Mejeri', price: '45.00 kr/kg' },
+                { name: 'Kød', category: 'Kød og fisk', price: '85.00 kr/kg' },
+                { name: 'Fisk', category: 'Kød og fisk', price: '120.00 kr/kg' }
+              ].map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{item.name}</div>
+                    <div className="text-sm text-gray-500">{item.category} • {item.price}</div>
+                  </div>
+                  <button
+                    onClick={() => addBasisvarer(item)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                  >
+                    Tilføj
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

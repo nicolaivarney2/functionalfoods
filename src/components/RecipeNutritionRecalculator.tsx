@@ -5,9 +5,10 @@ import { useState } from 'react'
 interface Props {
   recipeId: string | number
   recipeName: string
+  onNutritionUpdated?: (nutrition: any) => void
 }
 
-export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Props) {
+export default function RecipeNutritionRecalculator({ recipeId, recipeName, onNutritionUpdated }: Props) {
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   const handleRecalculate = async () => {
@@ -31,10 +32,17 @@ export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Pr
       const data = await response.json()
       
       if (data.success) {
-        alert(`✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g`)
+        const message = `✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g`
         
-        // Reload page to show updated nutrition
-        window.location.reload()
+        alert(message)
+        
+        // Call callback if provided to update parent component
+        if (onNutritionUpdated && data.nutrition) {
+          onNutritionUpdated(data.nutrition)
+        }
+        
+        // No page reload - just show success message
+        console.log('✅ Nutrition updated successfully, no page reload needed')
       } else {
         alert(`❌ Error: ${data.error}\n\nDetails: ${data.details || 'Unknown error'}`)
       }
