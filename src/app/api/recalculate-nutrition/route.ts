@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         carbs: nutrition.carbs,
         fat: nutrition.fat,
         fiber: nutrition.fiber,
-        updated_at: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       })
       .eq('id', recipeId)
 
