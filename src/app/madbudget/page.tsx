@@ -343,57 +343,7 @@ export default function MadbudgetPage() {
     }
   }
 
-  // Generate AI meal plan
-  const generateAIMealPlan = async () => {
-    try {
-      console.log('🚀 Starting AI meal plan generation...')
-      
-      const response = await fetch('/api/generate-meal-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          familyProfile,
-          selectedStores: familyProfile.selectedStores,
-          preferences: {
-            maxBudget: 800, // Default budget - can be made configurable
-            dietaryRestrictions: []
-          }
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        const mealPlan = data.data
-        
-        console.log('✅ AI meal plan generated:', mealPlan)
-        
-        // Show results in a nice format
-        const message = `🎯 AI Madplan Genereret!\n\n` +
-          `💰 Total kostpris: ${mealPlan.totalCost} kr\n` +
-          `💸 Total besparelse: ${mealPlan.totalSavings} kr\n` +
-          `🛒 Indkøbsliste: ${mealPlan.shoppingList.length} varer\n` +
-          `🏪 Tilbud brugt: ${mealPlan.offersUsed.length} stk\n\n` +
-          `📅 7-dages madplan klar!\n` +
-          `🍽️ ${Object.keys(mealPlan.weekPlan).length} dage med 3 måltider hver`
-        
-        alert(message)
-        
-        // TODO: Display the meal plan in a modal or new section
-        // For now, just log it to console
-        console.log('📋 Full meal plan:', mealPlan.weekPlan)
-        console.log('🛒 Shopping list:', mealPlan.shoppingList)
-        
-      } else {
-        alert(`❌ Fejl: ${data.error}`)
-      }
-    } catch (error) {
-      console.error('Error generating AI meal plan:', error)
-      alert(`❌ Netværksfejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
-    }
-  }
+
 
   // Generate complete shopping list (basisvarer + meal plan)
   const generateCompleteShoppingList = () => {
@@ -462,9 +412,88 @@ export default function MadbudgetPage() {
     setShowRecipeDetail(true)
   }
 
-  const generateMealPlan = () => {
-    // AI-generated meal plan logic will go here
-    console.log('Generating AI meal plan...')
+  const generateMealPlan = async () => {
+    try {
+      console.log('🚀 Starting AI meal plan generation...')
+      
+      const response = await fetch('/api/generate-meal-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          familyProfile,
+          selectedStores: familyProfile.selectedStores,
+          preferences: {
+            maxBudget: 800, // Default budget - can be made configurable
+            dietaryRestrictions: []
+          }
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        const aiMealPlan = data.data
+        
+        console.log('✅ AI meal plan generated:', aiMealPlan)
+        
+        // Convert AI meal plan to our existing mealPlan state format
+        const newMealPlan = { ...mealPlan }
+        
+        Object.entries(aiMealPlan.weekPlan).forEach(([day, dayMeals]: [string, any]) => {
+          Object.entries(dayMeals).forEach(([mealType, recipe]: [string, any]) => {
+            if (recipe) {
+              // Convert AI recipe to our meal plan format
+              const mealKey = mealType as MealType
+              const dayKey = day as DayKey
+              
+              newMealPlan[dayKey][mealKey] = {
+                id: recipe.id,
+                title: recipe.title,
+                image: recipe.image || '/images/recipes/placeholder.jpg',
+                ingredients: recipe.ingredients.map((ing: string) => ({
+                  name: ing,
+                  amount: '1',
+                  unit: 'stk',
+                  price: 0 // Will be calculated from offers
+                })),
+                totalPrice: recipe.basePrice,
+                savings: 0, // Will be calculated from offers
+                store: 'AI Generated',
+                mealType: recipe.mealType,
+                prepTime: recipe.prepTime,
+                servings: recipe.servings,
+                category: recipe.category,
+                dietaryTags: []
+              }
+            }
+          })
+        })
+        
+        // Update the meal plan state
+        setMealPlan(newMealPlan)
+        
+        // Show success message
+        const message = `🎯 AI Madplan Genereret!\n\n` +
+          `💰 Total kostpris: ${aiMealPlan.totalCost} kr\n` +
+          `💸 Total besparelse: ${aiMealPlan.totalSavings} kr\n` +
+          `🛒 Indkøbsliste: ${aiMealPlan.shoppingList.length} varer\n` +
+          `🏪 Tilbud brugt: ${aiMealPlan.offersUsed.length} stk\n\n` +
+          `📅 7-dages madplan klar!\n` +
+          `🍽️ ${Object.keys(aiMealPlan.weekPlan).length} dage med 3 måltider hver`
+        
+        alert(message)
+        
+        console.log('📋 Full meal plan updated:', newMealPlan)
+        
+      } else {
+        alert(`❌ Fejl: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Error generating AI meal plan:', error)
+      alert(`❌ Netværksfejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    }
   }
 
   const calculateSavings = () => {
@@ -866,13 +895,6 @@ export default function MadbudgetPage() {
               
               {/* Action Buttons */}
               <div className="space-y-3 mt-6">
-                <button 
-                  onClick={generateAIMealPlan}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg text-lg font-semibold transition-colors"
-                >
-                  🍽️ Lav AI madplan
-                </button>
-                
                 <button 
                   onClick={() => {
                     const completeList = generateCompleteShoppingList()
