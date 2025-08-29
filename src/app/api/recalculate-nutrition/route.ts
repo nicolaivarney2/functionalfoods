@@ -64,22 +64,23 @@ export async function POST(request: NextRequest) {
         )
 
         if (match && match.frida_ingredient_id) {
-          // Use the matched Frida ingredient
-          const fridaNutrition = await matcher.getFridaIngredientNutrition(match.frida_ingredient_id)
+          // Use the matched Frida ingredient - try to get nutrition from the match
+          // Since getFridaIngredientNutrition is private, we'll use matchIngredient instead
+          const result = await matcher.matchIngredient(ingredient.name)
           
-          if (fridaNutrition) {
+          if (result.nutrition) {
             // Convert ingredient amount to grams and calculate nutrition
             const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
             const scaleFactor = grams / 100
             
-            totalCalories += fridaNutrition.calories * scaleFactor
-            totalProtein += fridaNutrition.protein * scaleFactor
-            totalCarbs += fridaNutrition.carbs * scaleFactor
-            totalFat += fridaNutrition.fat * scaleFactor
-            totalFiber += fridaNutrition.fiber * scaleFactor
+            totalCalories += result.nutrition.calories * scaleFactor
+            totalProtein += result.nutrition.protein * scaleFactor
+            totalCarbs += result.nutrition.carbs * scaleFactor
+            totalFat += result.nutrition.fat * scaleFactor
+            totalFiber += result.nutrition.fiber * scaleFactor
             
             matchedIngredients++
-            console.log(`✅ Matched: ${ingredient.name} -> ${fridaNutrition.name} (${grams}g)`)
+            console.log(`✅ Matched: ${ingredient.name} -> ${result.match} (${grams}g)`)
           } else {
             console.log(`⚠️ No nutrition data for matched ingredient: ${ingredient.name}`)
           }
