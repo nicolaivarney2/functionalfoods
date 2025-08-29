@@ -5,23 +5,24 @@ import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
   /**
-   * Get all recipes from database (published only) - for frontend use
+   * Get published recipes from database (for frontend use)
    */
   async getRecipes(): Promise<Recipe[]> {
     const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
+      .eq('status', 'published') // Only show published recipes to frontend
       .order('updatedAt', { ascending: false })
     
     if (error) {
-      console.error('Error fetching recipes:', error)
+      console.error('Error fetching published recipes:', error)
       return []
     }
     
-    console.log(`🔍 Raw database data: ${data?.length || 0} recipes found`)
+    console.log(`🔍 Raw database data: ${data?.length || 0} published recipes found`)
     if (data && data.length > 0) {
-      console.log('📋 First raw recipe from DB:', {
+      console.log('📋 First published recipe from DB:', {
         id: data[0].id,
         title: data[0].title,
         imageUrl: data[0].imageUrl,
@@ -32,7 +33,7 @@ export class DatabaseService {
     }
     
     // Database already uses camelCase, no transformation needed
-    console.log(`✅ Returning ${data?.length || 0} recipes directly from database`)
+    console.log(`✅ Returning ${data?.length || 0} published recipes to frontend`)
     return data || []
   }
 

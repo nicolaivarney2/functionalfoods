@@ -14,6 +14,7 @@ import AboutFunctionalFoods from './AboutFunctionalFoods'
 import FloatingRecipeNavigation from './FloatingRecipeNavigation'
 import RatingModal from './RatingModal'
 import SupermarketProducts from './SupermarketProducts'
+import RecipeNutritionRecalculator from './RecipeNutritionRecalculator'
 
 interface RecipePageClientProps {
   recipe: Recipe
@@ -97,6 +98,16 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
             recipeSlug={recipe.slug}
             recipeTitle={recipe.title}
             onTipsUpdate={() => {}} // No editing for personal tips
+          />
+        </div>
+      </section>
+
+      {/* Admin Tools - Nutrition Recalculator */}
+      <section className="bg-white py-8">
+        <div className="container">
+          <RecipeNutritionRecalculator 
+            recipeId={recipe.id} 
+            recipeName={recipe.title} 
           />
         </div>
       </section>
