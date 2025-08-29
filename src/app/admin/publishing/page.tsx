@@ -408,6 +408,35 @@ export default function AdminPublishingPage() {
     return recipe.status === statusFilter
   })
 
+  const handleBulkNutritionRecalculation = async () => {
+    if (!confirm('⚠️ ADVARSEL: Denne handling vil genberegne mikro og makro ernæring for ALLE opskrifter på én gang. Dette kan tage flere minutter. Er du sikker på at du vil fortsætte?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch('/api/recalculate-nutrition-bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke genberegne masse ernæring');
+      }
+
+      const data = await response.json();
+      alert(`✅ Masse ernæring opdateret!\n\n${data.results.success} opskrifter opdateret\n${data.results.errors} fejl\n\nSe console for detaljer.`);
+      loadRecipes(); // Refresh recipes to show updated nutrition
+    } catch (error) {
+      console.error('❌ Error bulk nutrition recalculation:', error);
+      alert(`❌ Fejl ved masse ernæring opdatering: ${error instanceof Error ? error.message : 'Ukendt fejl'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (checking) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -489,6 +518,20 @@ export default function AdminPublishingPage() {
               }`}
             >
               Udgivne ({recipes.filter(r => r.status === 'published').length})
+            </button>
+          </div>
+          
+          {/* Bulk Nutrition Recalculation */}
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Masse Opdatering af Ernæring</h4>
+            <p className="text-xs text-yellow-700 mb-3">
+              Genberegn mikro og makro ernæring på ALLE opskrifter på én gang
+            </p>
+            <button
+              onClick={handleBulkNutritionRecalculation}
+              className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm hover:bg-yellow-700"
+            >
+              🔄 Masse Opdater Ernæring (Alle {recipes.length} Opskrifter)
             </button>
           </div>
         </div>
