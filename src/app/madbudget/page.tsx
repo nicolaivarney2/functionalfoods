@@ -645,10 +645,11 @@ export default function MadbudgetPage() {
     const shuffledRecipes = [...suitableRecipes].sort(() => Math.random() - 0.5)
     let recipeIndex = 0
     
-    days.forEach(day => {
-      mealTypes.forEach(mealType => {
-        // Only add meals that are selected
-        if (selectedMeals[mealType]) {
+    // For each meal type that is selected, fill ALL days
+    mealTypes.forEach(mealType => {
+      if (selectedMeals[mealType]) {
+        // Fill all 7 days with this meal type
+        days.forEach(day => {
           if (recipeIndex < shuffledRecipes.length) {
             const recipe = shuffledRecipes[recipeIndex]
             
@@ -668,12 +669,35 @@ export default function MadbudgetPage() {
             }
             
             recipeIndex++
+          } else {
+            // If we run out of recipes, start over from the beginning
+            recipeIndex = 0
+            const recipe = shuffledRecipes[recipeIndex]
+            
+            newMealPlan[day][mealType] = {
+              id: recipe.id,
+              title: recipe.title,
+              image: recipe.image,
+              ingredients: recipe.ingredients,
+              totalPrice: recipe.totalPrice,
+              savings: recipe.savings,
+              store: recipe.store,
+              mealType: recipe.mealType,
+              prepTime: recipe.prepTime,
+              servings: recipe.servings,
+              category: recipe.category,
+              dietaryTags: recipe.dietaryTags
+            }
+            
+            recipeIndex++
           }
-        } else {
-          // Clear meal if not selected
+        })
+      } else {
+        // Clear all days for this meal type if not selected
+        days.forEach(day => {
           newMealPlan[day][mealType] = null
-        }
-      })
+        })
+      }
     })
     
     return newMealPlan
@@ -1195,6 +1219,45 @@ export default function MadbudgetPage() {
                 <X size={24} />
               </button>
             </div>
+
+            {/* Remove Recipe Button - Only show if there's an existing recipe */}
+            {selectedMealSlot && (() => {
+              const [day, meal] = selectedMealSlot.split('-')
+              const existingRecipe = mealPlan[day as DayKey]?.[meal as MealType]
+              
+              if (existingRecipe) {
+                return (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-lg font-medium text-red-800 mb-1">Nuværende opskrift</h4>
+                        <p className="text-red-600">{existingRecipe.title}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          // Remove the recipe from this meal slot
+                          const [dayKey, mealKey] = selectedMealSlot.split('-') as [DayKey, MealType]
+                          const newMealPlan = { ...mealPlan }
+                          newMealPlan[dayKey][mealKey] = null
+                          setMealPlan(newMealPlan)
+                          
+                          // Close the modal
+                          setShowRecipeSelector(false)
+                          
+                          // Show success message
+                          alert('✅ Opskrift fjernet fra madplanen!')
+                        }}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                      >
+                        <X size={16} />
+                        Fjern opskrift
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
 
             {/* Search and Filters */}
             <div className="mb-6 space-y-4">
