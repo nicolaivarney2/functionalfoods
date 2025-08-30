@@ -209,190 +209,13 @@ export default function MadbudgetPage() {
   const [showShoppingList, setShowShoppingList] = useState(false)
   const [shoppingList, setShoppingList] = useState<any[]>([])
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
+  const [realRecipes, setRealRecipes] = useState<any[]>([])
+  const [isLoadingRecipes, setIsLoadingRecipes] = useState(true)
   
   // Mock family ID for now - later this will come from auth
   const mockFamilyId = 'mock-family-123'
 
-  // Mock recipes for AI meal plan generation
-  const mockRecipes = [
-    {
-      id: '1',
-      title: 'Havregrød med bær',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Havregryn', amount: '100', unit: 'g', price: 8.50 },
-        { name: 'Mælk', amount: '400', unit: 'ml', price: 5.00 },
-        { name: 'Bær', amount: '200', unit: 'g', price: 12.00 }
-      ],
-      totalPrice: 25,
-      savings: 5,
-      store: 'Netto',
-      mealType: 'breakfast',
-      prepTime: 15,
-      servings: 4,
-      category: 'Morgenmad',
-      dietaryTags: ['Vegetar']
-    },
-    {
-      id: '2',
-      title: 'Kyllingesalat',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Kyllingebryst', amount: '300', unit: 'g', price: 25.00 },
-        { name: 'Salat', amount: '100', unit: 'g', price: 8.00 },
-        { name: 'Tomat', amount: '150', unit: 'g', price: 12.00 }
-      ],
-      totalPrice: 45,
-      savings: 8,
-      store: 'Føtex',
-      mealType: 'lunch',
-      prepTime: 20,
-      servings: 2,
-      category: 'Salat',
-      dietaryTags: ['Protein']
-    },
-    {
-      id: '3',
-      title: 'Laks med grøntsager',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Laks', amount: '400', unit: 'g', price: 60.00 },
-        { name: 'Broccoli', amount: '300', unit: 'g', price: 15.00 },
-        { name: 'Ris', amount: '200', unit: 'g', price: 10.00 }
-      ],
-      totalPrice: 85,
-      savings: 12,
-      store: 'Bilka',
-      mealType: 'dinner',
-      prepTime: 30,
-      servings: 4,
-      category: 'Fisk',
-      dietaryTags: ['Omega-3']
-    },
-    {
-      id: '4',
-      title: 'Skyr med nødder',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Skyr', amount: '500', unit: 'g', price: 25.00 },
-        { name: 'Hasselnødder', amount: '50', unit: 'g', price: 10.00 }
-      ],
-      totalPrice: 35,
-      savings: 3,
-      store: 'Netto',
-      mealType: 'breakfast',
-      prepTime: 5,
-      servings: 2,
-      category: 'Morgenmad',
-      dietaryTags: ['Protein']
-    },
-    {
-      id: '5',
-      title: 'Pasta carbonara',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Pasta', amount: '400', unit: 'g', price: 15.00 },
-        { name: 'Bacon', amount: '200', unit: 'g', price: 25.00 },
-        { name: 'Æg', amount: '4', unit: 'stk', price: 15.00 }
-      ],
-      totalPrice: 55,
-      savings: 7,
-      store: 'Føtex',
-      mealType: 'dinner',
-      prepTime: 25,
-      servings: 4,
-      category: 'Pasta',
-      dietaryTags: ['Klassisk']
-    },
-    {
-      id: '6',
-      title: 'Quinoa salat',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Quinoa', amount: '200', unit: 'g', price: 20.00 },
-        { name: 'Avocado', amount: '2', unit: 'stk', price: 20.00 }
-      ],
-      totalPrice: 40,
-      savings: 6,
-      store: 'Bilka',
-      mealType: 'lunch',
-      prepTime: 15,
-      servings: 3,
-      category: 'Salat',
-      dietaryTags: ['Vegetar', 'Glutenfri']
-    },
-    {
-      id: '7',
-      title: 'Omelet med grøntsager',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Æg', amount: '6', unit: 'stk', price: 22.50 },
-        { name: 'Spinat', amount: '100', unit: 'g', price: 7.50 }
-      ],
-      totalPrice: 30,
-      savings: 4,
-      store: 'Netto',
-      mealType: 'breakfast',
-      prepTime: 12,
-      servings: 2,
-      category: 'Morgenmad',
-      dietaryTags: ['Protein']
-    },
-    {
-      id: '8',
-      title: 'Kødsovs med pasta',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Hakket oksekød', amount: '500', unit: 'g', price: 40.00 },
-        { name: 'Løg', amount: '200', unit: 'g', price: 5.00 },
-        { name: 'Pasta', amount: '400', unit: 'g', price: 20.00 }
-      ],
-      totalPrice: 65,
-      savings: 9,
-      store: 'Føtex',
-      mealType: 'dinner',
-      prepTime: 35,
-      servings: 6,
-      category: 'Kød',
-      dietaryTags: ['Klassisk']
-    },
-    {
-      id: '9',
-      title: 'Smoothie bowl',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Banan', amount: '2', unit: 'stk', price: 8.00 },
-        { name: 'Bær', amount: '150', unit: 'g', price: 12.00 },
-        { name: 'Yoghurt', amount: '300', unit: 'g', price: 8.00 }
-      ],
-      totalPrice: 28,
-      savings: 3,
-      store: 'Bilka',
-      mealType: 'breakfast',
-      prepTime: 8,
-      servings: 2,
-      category: 'Morgenmad',
-      dietaryTags: ['Vegetar']
-    },
-    {
-      id: '10',
-      title: 'Kylling wok',
-      image: '/images/recipes/placeholder.jpg',
-      ingredients: [
-        { name: 'Kyllingebryst', amount: '400', unit: 'g', price: 32.00 },
-        { name: 'Broccoli', amount: '300', unit: 'g', price: 15.00 },
-        { name: 'Ris', amount: '200', unit: 'g', price: 3.00 }
-      ],
-      totalPrice: 50,
-      savings: 8,
-      store: 'Netto',
-      mealType: 'dinner',
-      prepTime: 22,
-      servings: 4,
-      category: 'Wok',
-      dietaryTags: ['Asiatisk']
-    }
-  ]
+    // Real recipes loaded from database
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
@@ -402,6 +225,7 @@ export default function MadbudgetPage() {
   // Load basisvarer on component mount
   useEffect(() => {
     fetchBasisvarer()
+    fetchRealRecipes()
   }, [])
 
   // Calculate ingredient overlap and cost savings
@@ -435,13 +259,13 @@ export default function MadbudgetPage() {
 
   // Get filtered recipes based on search, category, and cost savings
   const getFilteredRecipes = () => {
-    let filtered = mockRecipes
+    let filtered = realRecipes
 
     // Filter by search query
     if (recipeSearchQuery) {
       filtered = filtered.filter(recipe => 
         recipe.title.toLowerCase().includes(recipeSearchQuery.toLowerCase()) ||
-        recipe.ingredients.some(ing => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
+        recipe.ingredients.some((ing: any) => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
       )
     }
 
@@ -668,6 +492,42 @@ export default function MadbudgetPage() {
     return 'Valgt butik'
   }
 
+  // Fetch real recipes from database
+  const fetchRealRecipes = async () => {
+    try {
+      setIsLoadingRecipes(true)
+      const response = await fetch('/api/recipes')
+      const data = await response.json()
+      
+      if (data.success) {
+        // Transform recipes to match our expected format
+        const transformedRecipes = data.recipes.map((recipe: any) => ({
+          id: recipe.id,
+          title: recipe.title,
+          image: recipe.image_url || '/images/recipes/placeholder.jpg',
+          ingredients: recipe.ingredients || [],
+          totalPrice: 0, // Will be calculated from offers later
+          savings: 0, // Will be calculated from offers later
+          store: 'Database',
+          mealType: 'dinner', // Default, will be categorized later
+          prepTime: recipe.prep_time || 30,
+          servings: recipe.servings || 4,
+          category: recipe.category || 'Generelt',
+          dietaryTags: recipe.dietary_tags || []
+        }))
+        
+        setRealRecipes(transformedRecipes)
+        console.log('✅ Loaded', transformedRecipes.length, 'real recipes')
+      } else {
+        console.error('❌ Failed to fetch recipes:', data.error)
+      }
+    } catch (error) {
+      console.error('❌ Error fetching recipes:', error)
+    } finally {
+      setIsLoadingRecipes(false)
+    }
+  }
+
   const addRecipeToMeal = (recipe: any) => {
     if (selectedMealSlot) {
       const [day, meal] = selectedMealSlot.split('-') as [DayKey, MealType]
@@ -757,7 +617,7 @@ export default function MadbudgetPage() {
 
   // Get recipes suitable for family size
   const getRecipesForFamilySize = (familySize: number) => {
-    return mockRecipes.filter(recipe => {
+    return realRecipes.filter(recipe => {
       // Recipe should have enough servings for the family
       return recipe.servings >= familySize
     })
@@ -1206,15 +1066,83 @@ export default function MadbudgetPage() {
               
               {/* Action Buttons */}
               <div className="space-y-3 mt-6">
-                <button 
-                  onClick={() => {
-                    generateCompleteShoppingList()
-                  }}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-                >
-                  📋 Vis samlet indkøbsliste
-                </button>
+
               </div>
+
+              {/* Indkøbsliste direkte på siden */}
+              {shoppingList.length > 0 && (
+                <div className="mt-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">📋 Indkøbsliste</h3>
+                    <button
+                      onClick={() => setShoppingList([])}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Ryd liste
+                    </button>
+                  </div>
+                  
+                  {/* Tilbudsinfo */}
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">
+                      Indkøbslisten er designet til tilbud i <span className="font-medium">{getPrimaryStore()}</span>, 
+                      hvor du sparer <span className="font-medium text-green-600">{calculateTotalSavings()} kr</span>
+                    </p>
+                  </div>
+
+                  {/* Kategoriserede varer */}
+                  <div className="space-y-4">
+                    {shoppingList.map((categoryGroup, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="bg-gray-100 px-4 py-2">
+                          <h4 className="font-medium text-gray-900">{categoryGroup.category}</h4>
+                        </div>
+                        <div className="divide-y divide-gray-200">
+                          {categoryGroup.items.map((item: any, itemIndex: number) => {
+                            const itemId = `${categoryGroup.category}-${itemIndex}`
+                            const isChecked = checkedItems.has(itemId)
+                            
+                            return (
+                              <div 
+                                key={itemId}
+                                className={`px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${
+                                  isChecked ? 'bg-gray-50' : ''
+                                }`}
+                                onClick={() => toggleItemChecked(itemId)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleItemChecked(itemId)}
+                                      className="text-blue-600 rounded h-4 w-4"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                      {item.name}
+                                    </span>
+                                    {item.amount && item.unit && (
+                                      <span className="text-sm text-gray-500">
+                                        {item.amount} {item.unit}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {item.totalPrice && (
+                                    <span className="text-sm font-medium text-gray-700">
+                                      {item.totalPrice} kr
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1319,7 +1247,7 @@ export default function MadbudgetPage() {
                     <div className="mb-4">
                       <p className="text-sm text-gray-600 mb-2">Ingredienser:</p>
                       <div className="flex flex-wrap gap-1">
-                        {recipe.ingredients.slice(0, 4).map((ingredient, index) => (
+                        {recipe.ingredients.slice(0, 4).map((ingredient: any, index: number) => (
                           <span
                             key={index}
                             className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
