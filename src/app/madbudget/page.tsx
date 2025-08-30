@@ -213,7 +213,7 @@ export default function MadbudgetPage() {
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true)
   
   // Mock family ID for now - later this will come from auth
-  const mockFamilyId = 'mock-family-123'
+  const mockFamilyId = '550e8400-e29b-41d4-a716-446655440000'
 
     // Real recipes loaded from database
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
@@ -496,10 +496,19 @@ export default function MadbudgetPage() {
   const fetchRealRecipes = async () => {
     try {
       setIsLoadingRecipes(true)
-      const response = await fetch('/api/recipes')
-      const data = await response.json()
+      console.log('🔍 Fetching recipes from /api/recipes...')
       
-      if (data.success) {
+      const response = await fetch('/api/recipes')
+      console.log('📡 Response status:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('📦 Response data:', data)
+      
+      if (data.success && data.recipes) {
         // Transform recipes to match our expected format
         const transformedRecipes = data.recipes.map((recipe: any) => ({
           id: recipe.id,
@@ -518,11 +527,14 @@ export default function MadbudgetPage() {
         
         setRealRecipes(transformedRecipes)
         console.log('✅ Loaded', transformedRecipes.length, 'real recipes')
+        console.log('📋 Sample recipe:', transformedRecipes[0])
       } else {
-        console.error('❌ Failed to fetch recipes:', data.error)
+        console.error('❌ Failed to fetch recipes:', data.error || 'Unknown error')
+        console.error('❌ Response data:', data)
       }
     } catch (error) {
       console.error('❌ Error fetching recipes:', error)
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error')
     } finally {
       setIsLoadingRecipes(false)
     }
@@ -896,12 +908,21 @@ export default function MadbudgetPage() {
                   <Calendar size={20} className="mr-2" />
                   Ugeplanlægger
                 </h2>
-                <button
-                  onClick={generateMealPlan}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Generer AI madplan
-                </button>
+                <div className="flex items-center space-x-4">
+                  {isLoadingRecipes && (
+                    <div className="text-sm text-gray-500 flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      Indlæser opskrifter...
+                    </div>
+                  )}
+                  <button
+                    onClick={generateMealPlan}
+                    disabled={isLoadingRecipes || realRecipes.length === 0}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {isLoadingRecipes ? 'Indlæser...' : realRecipes.length === 0 ? 'Ingen opskrifter' : 'Generer AI madplan'}
+                  </button>
+                </div>
               </div>
 
               {/* Desktop: 7 Days Grid */}
@@ -1068,6 +1089,19 @@ export default function MadbudgetPage() {
               <div className="space-y-3 mt-6">
 
               </div>
+
+              {/* Debug info for opskrifter */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Info:</h4>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>Loading: {isLoadingRecipes ? 'Ja' : 'Nej'}</div>
+                    <div>Recipes loaded: {realRecipes.length}</div>
+                    <div>Family size: {calculateFamilySize()}</div>
+                    <div>Suitable recipes: {getRecipesForFamilySize(calculateFamilySize()).length}</div>
+                  </div>
+                </div>
+              )}
 
               {/* Indkøbsliste direkte på siden */}
               {shoppingList.length > 0 && (

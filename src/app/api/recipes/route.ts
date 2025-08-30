@@ -9,11 +9,11 @@ export async function GET() {
     console.log('🍽️ GET /api/recipes called')
     const recipes = await databaseService.getRecipes()
     console.log(`✅ Returning ${recipes.length} recipes`)
-    return NextResponse.json(recipes)
+    return NextResponse.json({ success: true, recipes })
   } catch (error) {
     console.error('❌ Error fetching recipes:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch recipes', details: error instanceof Error ? error.message : 'Unknown error' },
+      { success: false, error: 'Failed to fetch recipes', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
