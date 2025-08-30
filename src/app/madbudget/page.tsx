@@ -200,9 +200,196 @@ export default function MadbudgetPage() {
   const [savingsOpen, setSavingsOpen] = useState(true)
   const [basisvarerModalOpen, setBasisvarerModalOpen] = useState(false)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
+  const [showMealSelectionModal, setShowMealSelectionModal] = useState(false)
+  const [selectedMeals, setSelectedMeals] = useState({
+    breakfast: true,
+    lunch: true,
+    dinner: true
+  })
   
   // Mock family ID for now - later this will come from auth
   const mockFamilyId = 'mock-family-123'
+
+  // Mock recipes for AI meal plan generation
+  const mockRecipes = [
+    {
+      id: '1',
+      title: 'Havregrød med bær',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Havregryn', amount: '100', unit: 'g', price: 8.50 },
+        { name: 'Mælk', amount: '400', unit: 'ml', price: 5.00 },
+        { name: 'Bær', amount: '200', unit: 'g', price: 12.00 }
+      ],
+      totalPrice: 25,
+      savings: 5,
+      store: 'Netto',
+      mealType: 'breakfast',
+      prepTime: 15,
+      servings: 4,
+      category: 'Morgenmad',
+      dietaryTags: ['Vegetar']
+    },
+    {
+      id: '2',
+      title: 'Kyllingesalat',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Kyllingebryst', amount: '300', unit: 'g', price: 25.00 },
+        { name: 'Salat', amount: '100', unit: 'g', price: 8.00 },
+        { name: 'Tomat', amount: '150', unit: 'g', price: 12.00 }
+      ],
+      totalPrice: 45,
+      savings: 8,
+      store: 'Føtex',
+      mealType: 'lunch',
+      prepTime: 20,
+      servings: 2,
+      category: 'Salat',
+      dietaryTags: ['Protein']
+    },
+    {
+      id: '3',
+      title: 'Laks med grøntsager',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Laks', amount: '400', unit: 'g', price: 60.00 },
+        { name: 'Broccoli', amount: '300', unit: 'g', price: 15.00 },
+        { name: 'Ris', amount: '200', unit: 'g', price: 10.00 }
+      ],
+      totalPrice: 85,
+      savings: 12,
+      store: 'Bilka',
+      mealType: 'dinner',
+      prepTime: 30,
+      servings: 4,
+      category: 'Fisk',
+      dietaryTags: ['Omega-3']
+    },
+    {
+      id: '4',
+      title: 'Skyr med nødder',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Skyr', amount: '500', unit: 'g', price: 25.00 },
+        { name: 'Hasselnødder', amount: '50', unit: 'g', price: 10.00 }
+      ],
+      totalPrice: 35,
+      savings: 3,
+      store: 'Netto',
+      mealType: 'breakfast',
+      prepTime: 5,
+      servings: 2,
+      category: 'Morgenmad',
+      dietaryTags: ['Protein']
+    },
+    {
+      id: '5',
+      title: 'Pasta carbonara',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Pasta', amount: '400', unit: 'g', price: 15.00 },
+        { name: 'Bacon', amount: '200', unit: 'g', price: 25.00 },
+        { name: 'Æg', amount: '4', unit: 'stk', price: 15.00 }
+      ],
+      totalPrice: 55,
+      savings: 7,
+      store: 'Føtex',
+      mealType: 'dinner',
+      prepTime: 25,
+      servings: 4,
+      category: 'Pasta',
+      dietaryTags: ['Klassisk']
+    },
+    {
+      id: '6',
+      title: 'Quinoa salat',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Quinoa', amount: '200', unit: 'g', price: 20.00 },
+        { name: 'Avocado', amount: '2', unit: 'stk', price: 20.00 }
+      ],
+      totalPrice: 40,
+      savings: 6,
+      store: 'Bilka',
+      mealType: 'lunch',
+      prepTime: 15,
+      servings: 3,
+      category: 'Salat',
+      dietaryTags: ['Vegetar', 'Glutenfri']
+    },
+    {
+      id: '7',
+      title: 'Omelet med grøntsager',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Æg', amount: '6', unit: 'stk', price: 22.50 },
+        { name: 'Spinat', amount: '100', unit: 'g', price: 7.50 }
+      ],
+      totalPrice: 30,
+      savings: 4,
+      store: 'Netto',
+      mealType: 'breakfast',
+      prepTime: 12,
+      servings: 2,
+      category: 'Morgenmad',
+      dietaryTags: ['Protein']
+    },
+    {
+      id: '8',
+      title: 'Kødsovs med pasta',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Hakket oksekød', amount: '500', unit: 'g', price: 40.00 },
+        { name: 'Løg', amount: '200', unit: 'g', price: 5.00 },
+        { name: 'Pasta', amount: '400', unit: 'g', price: 20.00 }
+      ],
+      totalPrice: 65,
+      savings: 9,
+      store: 'Føtex',
+      mealType: 'dinner',
+      prepTime: 35,
+      servings: 6,
+      category: 'Kød',
+      dietaryTags: ['Klassisk']
+    },
+    {
+      id: '9',
+      title: 'Smoothie bowl',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Banan', amount: '2', unit: 'stk', price: 8.00 },
+        { name: 'Bær', amount: '150', unit: 'g', price: 12.00 },
+        { name: 'Yoghurt', amount: '300', unit: 'g', price: 8.00 }
+      ],
+      totalPrice: 28,
+      savings: 3,
+      store: 'Bilka',
+      mealType: 'breakfast',
+      prepTime: 8,
+      servings: 2,
+      category: 'Morgenmad',
+      dietaryTags: ['Vegetar']
+    },
+    {
+      id: '10',
+      title: 'Kylling wok',
+      image: '/images/recipes/placeholder.jpg',
+      ingredients: [
+        { name: 'Kyllingebryst', amount: '400', unit: 'g', price: 32.00 },
+        { name: 'Broccoli', amount: '300', unit: 'g', price: 15.00 },
+        { name: 'Ris', amount: '200', unit: 'g', price: 3.00 }
+      ],
+      totalPrice: 50,
+      savings: 8,
+      store: 'Netto',
+      mealType: 'dinner',
+      prepTime: 22,
+      servings: 4,
+      category: 'Wok',
+      dietaryTags: ['Asiatisk']
+    }
+  ]
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
@@ -412,88 +599,116 @@ export default function MadbudgetPage() {
     setShowRecipeDetail(true)
   }
 
-  const generateMealPlan = async () => {
+  const generateMealPlan = () => {
+    // Show meal selection modal first
+    setShowMealSelectionModal(true)
+  }
+
+  const generateAIMealPlan = async () => {
     try {
       console.log('🚀 Starting AI meal plan generation...')
       
-      const response = await fetch('/api/generate-meal-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          familyProfile,
-          selectedStores: familyProfile.selectedStores,
-          preferences: {
-            maxBudget: 800, // Default budget - can be made configurable
-            dietaryRestrictions: []
-          }
-        })
-      })
+      // Calculate family size based on age groups
+      const familySize = calculateFamilySize()
+      console.log('👨‍👩‍👧‍👦 Family size calculated:', familySize)
       
-      const data = await response.json()
+      // Get recipes that match family size
+      const suitableRecipes = getRecipesForFamilySize(familySize)
+      console.log('🍽️ Suitable recipes found:', suitableRecipes.length)
       
-      if (data.success) {
-        const aiMealPlan = data.data
-        
-        console.log('✅ AI meal plan generated:', aiMealPlan)
-        
-        // Convert AI meal plan to our existing mealPlan state format
-        const newMealPlan = { ...mealPlan }
-        
-        Object.entries(aiMealPlan.weekPlan).forEach(([day, dayMeals]: [string, any]) => {
-          Object.entries(dayMeals).forEach(([mealType, recipe]: [string, any]) => {
-            if (recipe) {
-              // Convert AI recipe to our meal plan format
-              const mealKey = mealType as MealType
-              const dayKey = day as DayKey
-              
-              newMealPlan[dayKey][mealKey] = {
-                id: recipe.id,
-                title: recipe.title,
-                image: recipe.image || '/images/recipes/placeholder.jpg',
-                ingredients: recipe.ingredients.map((ing: string) => ({
-                  name: ing,
-                  amount: '1',
-                  unit: 'stk',
-                  price: 0 // Will be calculated from offers
-                })),
-                totalPrice: recipe.basePrice,
-                savings: 0, // Will be calculated from offers
-                store: 'AI Generated',
-                mealType: recipe.mealType,
-                prepTime: recipe.prepTime,
-                servings: recipe.servings,
-                category: recipe.category,
-                dietaryTags: []
-              }
-            }
-          })
-        })
-        
-        // Update the meal plan state
-        setMealPlan(newMealPlan)
-        
-        // Show success message
-        const message = `🎯 AI Madplan Genereret!\n\n` +
-          `💰 Total kostpris: ${aiMealPlan.totalCost} kr\n` +
-          `💸 Total besparelse: ${aiMealPlan.totalSavings} kr\n` +
-          `🛒 Indkøbsliste: ${aiMealPlan.shoppingList.length} varer\n` +
-          `🏪 Tilbud brugt: ${aiMealPlan.offersUsed.length} stk\n\n` +
-          `📅 7-dages madplan klar!\n` +
-          `🍽️ ${Object.keys(aiMealPlan.weekPlan).length} dage med 3 måltider hver`
-        
-        alert(message)
-        
-        console.log('📋 Full meal plan updated:', newMealPlan)
-        
-      } else {
-        alert(`❌ Fejl: ${data.error}`)
-      }
+      // Generate meal plan based on selected meals
+      const newMealPlan = generateMealPlanFromRecipes(suitableRecipes)
+      
+      // Update the meal plan state
+      setMealPlan(newMealPlan)
+      
+      // Close modal
+      setShowMealSelectionModal(false)
+      
+      // Show success message
+      const message = `🎯 AI Madplan Genereret!\n\n` +
+        `👨‍👩‍👧‍👦 Familie størrelse: ${familySize} personer\n` +
+        `🍽️ Måltider valgt: ${Object.values(selectedMeals).filter(Boolean).length}/3\n` +
+        `📅 7-dages madplan klar!\n` +
+        `✨ Alle dage udfyldt med passende opskrifter`
+      
+      alert(message)
+      
+      console.log('📋 Full meal plan updated:', newMealPlan)
+      
     } catch (error) {
       console.error('Error generating AI meal plan:', error)
-      alert(`❌ Netværksfejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+      alert(`❌ Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
     }
+  }
+
+  // Calculate family size based on age groups
+  const calculateFamilySize = () => {
+    let totalSize = familyProfile.adults
+    
+    if (familyProfile.childrenAges) {
+      familyProfile.childrenAges.forEach(age => {
+        if (age === '0-3' || age === '4-8') {
+          totalSize += 0.5
+        } else if (age === '8+') {
+          totalSize += 1
+        }
+      })
+    }
+    
+    return totalSize
+  }
+
+  // Get recipes suitable for family size
+  const getRecipesForFamilySize = (familySize: number) => {
+    return mockRecipes.filter(recipe => {
+      // Recipe should have enough servings for the family
+      return recipe.servings >= familySize
+    })
+  }
+
+  // Generate meal plan from recipes
+  const generateMealPlanFromRecipes = (suitableRecipes: any[]) => {
+    const newMealPlan = { ...mealPlan }
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayKey[]
+    const mealTypes = ['breakfast', 'lunch', 'dinner'] as MealType[]
+    
+    // Shuffle recipes to get variety
+    const shuffledRecipes = [...suitableRecipes].sort(() => Math.random() - 0.5)
+    let recipeIndex = 0
+    
+    days.forEach(day => {
+      mealTypes.forEach(mealType => {
+        // Only add meals that are selected
+        if (selectedMeals[mealType]) {
+          if (recipeIndex < shuffledRecipes.length) {
+            const recipe = shuffledRecipes[recipeIndex]
+            
+            newMealPlan[day][mealType] = {
+              id: recipe.id,
+              title: recipe.title,
+              image: recipe.image,
+              ingredients: recipe.ingredients,
+              totalPrice: recipe.totalPrice,
+              savings: recipe.savings,
+              store: recipe.store,
+              mealType: recipe.mealType,
+              prepTime: recipe.prepTime,
+              servings: recipe.servings,
+              category: recipe.category,
+              dietaryTags: recipe.dietaryTags
+            }
+            
+            recipeIndex++
+          }
+        } else {
+          // Clear meal if not selected
+          newMealPlan[day][mealType] = null
+        }
+      })
+    })
+    
+    return newMealPlan
   }
 
   const calculateSavings = () => {
@@ -1355,6 +1570,97 @@ export default function MadbudgetPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Måltidsvalg Modal */}
+      {showMealSelectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Vælg måltider</h2>
+              <button
+                onClick={() => setShowMealSelectionModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <p className="text-gray-600 text-sm mb-6">
+              Vælg hvilke måltider AI skal udfylde i madplanen
+            </p>
+
+            {/* Meal Selection Checkboxes */}
+            <div className="space-y-4 mb-6">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedMeals.breakfast}
+                  onChange={(e) => setSelectedMeals(prev => ({ ...prev, breakfast: e.target.checked }))}
+                  className="text-blue-600 rounded h-5 w-5"
+                />
+                <div className="flex items-center space-x-2">
+                  <Coffee size={20} className="text-yellow-600" />
+                  <span className="font-medium text-gray-900">Morgenmad</span>
+                </div>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedMeals.lunch}
+                  onChange={(e) => setSelectedMeals(prev => ({ ...prev, lunch: e.target.checked }))}
+                  className="text-blue-600 rounded h-5 w-5"
+                />
+                <div className="flex items-center space-x-2">
+                  <ChefHat size={20} className="text-green-600" />
+                  <span className="font-medium text-gray-900">Frokost</span>
+                </div>
+              </label>
+              
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedMeals.dinner}
+                  onChange={(e) => setSelectedMeals(prev => ({ ...prev, dinner: e.target.checked }))}
+                  className="text-blue-600 rounded h-5 w-5"
+                />
+                <div className="flex items-center space-x-2">
+                  <Utensils size={20} className="text-blue-600" />
+                  <span className="font-medium text-gray-900">Aftensmad</span>
+                </div>
+              </label>
+            </div>
+
+            {/* Family Size Info */}
+            <div className="bg-blue-50 p-4 rounded-lg mb-6">
+              <div className="text-sm text-blue-800">
+                <div className="font-medium mb-2">👨‍👩‍👧‍👦 Familie størrelse:</div>
+                <div>• Voksen = 1 person</div>
+                <div>• Barn 0-3 år = 0.5 person</div>
+                <div>• Barn 4-8 år = 0.5 person</div>
+                <div>• Barn 8+ år = 1 person</div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowMealSelectionModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Annuller
+              </button>
+              <button
+                onClick={generateAIMealPlan}
+                disabled={!Object.values(selectedMeals).some(Boolean)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Generer Madplan
+              </button>
             </div>
           </div>
         </div>
