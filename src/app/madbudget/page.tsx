@@ -206,6 +206,9 @@ export default function MadbudgetPage() {
     lunch: true,
     dinner: true
   })
+  const [showShoppingList, setShowShoppingList] = useState(false)
+  const [shoppingList, setShoppingList] = useState<any[]>([])
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
   
   // Mock family ID for now - later this will come from auth
   const mockFamilyId = 'mock-family-123'
@@ -497,7 +500,7 @@ export default function MadbudgetPage() {
         body: JSON.stringify({
           familyId: mockFamilyId,
           itemName: item.name,
-          category: item.category
+          category: categorizeIngredient(item.name)
         })
       })
       
@@ -534,42 +537,135 @@ export default function MadbudgetPage() {
 
   // Generate complete shopping list (basisvarer + meal plan)
   const generateCompleteShoppingList = () => {
-    const mealPlanIngredients = Object.values(mealPlan).flatMap(day => 
-      Object.values(day).flatMap(meal => 
-        meal ? meal.ingredients : []
-      )
-    ).filter(Boolean)
+    const mealPlanIngredients = generateShoppingListFromMealPlan()
+    const combinedList = [...basisvarer, ...mealPlanIngredients]
+    
+    // Group by category and sort
+    const categorizedList = groupIngredientsByCategory(combinedList)
+    
+    setShoppingList(categorizedList)
+    setShowShoppingList(true)
+  }
 
-    // Merge basisvarer with meal plan ingredients
-    const completeList = [
-      ...basisvarer.map(item => ({
-        name: item.name,
-        category: item.category,
-        source: 'basisvare',
-        quantity: 1,
-        unit: 'stk'
-      })),
-      ...mealPlanIngredients.map(ing => ({
-        name: ing.name,
-        category: 'Madplan',
-        source: 'meal-plan',
-        quantity: ing.amount,
-        unit: ing.unit
-      }))
-    ]
+  // Generate shopping list from meal plan
+  const generateShoppingListFromMealPlan = () => {
+    const ingredients: any[] = []
+    
+    Object.values(mealPlan).forEach(day => {
+      Object.values(day).forEach(meal => {
+        if (meal && meal.ingredients) {
+          meal.ingredients.forEach((ing: any) => {
+            // Check if ingredient already exists
+            const existingIndex = ingredients.findIndex(item => 
+              item.name.toLowerCase() === ing.name.toLowerCase()
+            )
+            
+            if (existingIndex >= 0) {
+              // Combine amounts
+              const existing = ingredients[existingIndex]
+              const newAmount = parseFloat(existing.amount) + parseFloat(ing.amount)
+              ingredients[existingIndex] = {
+                ...existing,
+                amount: newAmount.toString(),
+                totalPrice: (existing.totalPrice || 0) + (ing.price || 0)
+              }
+            } else {
+              ingredients.push({
+                ...ing,
+                totalPrice: ing.price || 0,
+                category: categorizeIngredient(ing.name)
+              })
+            }
+          })
+        }
+      })
+    })
+    
+    return ingredients
+  }
 
-    // Group by name and sum quantities
-    const groupedList = completeList.reduce((acc, item) => {
-      const key = item.name.toLowerCase()
-      if (acc[key]) {
-        acc[key].quantity += item.quantity
-      } else {
-        acc[key] = { ...item }
+  // Categorize ingredient based on name
+  const categorizeIngredient = (ingredientName: string): string => {
+    const name = ingredientName.toLowerCase()
+    
+    if (name.includes('mælk') || name.includes('yoghurt') || name.includes('ost') || 
+        name.includes('fløde') || name.includes('smør') || name.includes('skyr')) {
+      return 'Mejeri'
+    } else if (name.includes('banan') || name.includes('æble') || name.includes('bær') || 
+               name.includes('tomat') || name.includes('agurk') || name.includes('salat') ||
+               name.includes('broccoli') || name.includes('spinat')) {
+      return 'Frugt & Grønt'
+    } else if (name.includes('kød') || name.includes('kylling') || name.includes('laks') || 
+               name.includes('fisk') || name.includes('bacon')) {
+      return 'Kød & Fisk'
+    } else if (name.includes('pasta') || name.includes('ris') || name.includes('quinoa') ||
+               name.includes('havregryn') || name.includes('brød')) {
+      return 'Kolonial'
+    } else if (name.includes('æg') || name.includes('honning') || name.includes('nødder')) {
+      return 'Diverse'
+    } else {
+      return 'Andet'
+    }
+  }
+
+  // Group ingredients by category
+  const groupIngredientsByCategory = (ingredients: any[]) => {
+    const grouped: { [key: string]: any[] } = {}
+    
+    ingredients.forEach(ingredient => {
+      const category = ingredient.category || 'Andet'
+      if (!grouped[category]) {
+        grouped[category] = []
       }
-      return acc
-    }, {} as Record<string, any>)
+      grouped[category].push(ingredient)
+    })
+    
+    // Sort categories and items within categories
+    const sortedCategories = Object.keys(grouped).sort()
+    const result: any[] = []
+    
+    sortedCategories.forEach(category => {
+      const sortedItems = grouped[category].sort((a, b) => a.name.localeCompare(b.name))
+      result.push({ category, items: sortedItems })
+    })
+    
+    return result
+  }
 
-    return Object.values(groupedList)
+  // Toggle item checked status
+  const toggleItemChecked = (itemId: string) => {
+    setCheckedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId)
+      } else {
+        newSet.add(itemId)
+      }
+      return newSet
+    })
+  }
+
+  // Calculate total savings from meal plan
+  const calculateTotalSavings = () => {
+    let total = 0
+    Object.values(mealPlan).forEach(day => {
+      Object.values(day).forEach(meal => {
+        if (meal && meal.savings) {
+          total += meal.savings
+        }
+      })
+    })
+    return total
+  }
+
+  // Get primary store from family profile
+  const getPrimaryStore = () => {
+    if (familyProfile.selectedStores.length > 0) {
+      const storeId = familyProfile.selectedStores[0]
+      const store = mockStores.find(s => s.id === storeId)
+      return store?.name || 'Valgt butik'
+    }
+    return 'Valgt butik'
   }
 
   const addRecipeToMeal = (recipe: any) => {
@@ -1112,9 +1208,7 @@ export default function MadbudgetPage() {
               <div className="space-y-3 mt-6">
                 <button 
                   onClick={() => {
-                    const completeList = generateCompleteShoppingList()
-                    console.log('Complete shopping list:', completeList)
-                    alert(`Indkøbsliste genereret!\n\nTotal varer: ${completeList.length}\n\nBasisvarer: ${basisvarer.length}\nMadplan varer: ${completeList.length - basisvarer.length}`)
+                    generateCompleteShoppingList()
                   }}
                   className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
                 >
@@ -1660,6 +1754,93 @@ export default function MadbudgetPage() {
                 className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
               >
                 Generer Madplan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Indkøbsliste Modal */}
+      {showShoppingList && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Indkøbsliste</h2>
+              <button
+                onClick={() => setShowShoppingList(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            {/* Tilbudsinfo */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">
+                Indkøbslisten er designet til tilbud i <span className="font-medium">{getPrimaryStore()}</span>, 
+                hvor du sparer <span className="font-medium text-green-600">{calculateTotalSavings()} kr</span>
+              </p>
+            </div>
+
+            {/* Kategoriserede varer */}
+            <div className="space-y-6">
+              {shoppingList.map((categoryGroup, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-100 px-4 py-3">
+                    <h3 className="font-semibold text-gray-900">{categoryGroup.category}</h3>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {categoryGroup.items.map((item: any, itemIndex: number) => {
+                      const itemId = `${categoryGroup.category}-${itemIndex}`
+                      const isChecked = checkedItems.has(itemId)
+                      
+                      return (
+                        <div 
+                          key={itemId}
+                          className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
+                            isChecked ? 'bg-gray-50' : ''
+                          }`}
+                          onClick={() => toggleItemChecked(itemId)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleItemChecked(itemId)}
+                                className="text-blue-600 rounded h-4 w-4"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span className={`${isChecked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                                {item.name}
+                              </span>
+                              {item.amount && item.unit && (
+                                <span className="text-sm text-gray-500">
+                                  {item.amount} {item.unit}
+                                </span>
+                              )}
+                            </div>
+                            {item.totalPrice && (
+                              <span className="text-sm font-medium text-gray-700">
+                                {item.totalPrice} kr
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
+              <button
+                onClick={() => setShowShoppingList(false)}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Luk
               </button>
             </div>
           </div>
