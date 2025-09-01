@@ -603,8 +603,12 @@ export class Rema1000Scraper implements SupermarketAPI {
     console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
     console.log('🔧 TEST: This method is being called!')
     
-    // Filter to only REMA products
-    const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
+    // Filter to only REMA products (handle different source formats)
+    const remaProducts = existingProducts.filter(p => 
+      p.source === 'rema1000' || 
+      p.source === 'rema1000-python-scraper' ||
+      p.source?.includes('rema')
+    )
     console.log(`📊 Found ${remaProducts.length} REMA products to check`)
     
     // Debug: Check what sources we actually have
