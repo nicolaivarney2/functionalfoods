@@ -349,6 +349,40 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
+   * Extract numeric REMA product ID from various database fields
+   * Supports formats like "rema-12345", "python-12345", image/store URLs with embedded IDs
+   */
+  private extractRemaNumericId(product: any): number | null {
+    const candidates: Array<string | number | undefined | null> = [
+      product?.external_id,
+      product?.store_url,
+      product?.image_url,
+      product?.id
+    ]
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return candidate
+      }
+      if (typeof candidate === 'string') {
+        // Try simple hyphen pattern first (e.g., "python-510315" or "rema-91251")
+        const hyphenIdx = candidate.lastIndexOf('-')
+        const tail = hyphenIdx >= 0 ? candidate.slice(hyphenIdx + 1) : candidate
+        let match: RegExpMatchArray | null = tail.match(/\d{3,}/)
+
+        // Try known URL patterns if needed
+        if (!match) match = candidate.match(/\/produkt\/(\d{3,})/)
+        if (!match) match = candidate.match(/\/(\d{3,})\//)
+
+        const numStr = match?.[1] || match?.[0]
+        const n = numStr ? parseInt(numStr, 10) : NaN
+        if (!Number.isNaN(n)) return n
+      }
+    }
+    return null
+  }
+
+  /**
    * Update prices for existing products
    */
   async updatePrices(existingProducts: SupermarketProduct[]): Promise<SupermarketProduct[]> {
@@ -652,35 +686,45 @@ export class Rema1000Scraper implements SupermarketAPI {
       // Process each product in the batch
       for (let i = 0; i < batch.length; i++) {
         const existingProduct = batch[i]
-        // Use external_id which contains the REMA product ID (e.g., "rema-123")
-        const productId = String(existingProduct.external_id || existingProduct.id).replace('rema-', '')
+        // Derive numeric REMA product id robustly from DB fields
+        const numericId = this.extractRemaNumericId(existingProduct)
+        if (batchStart === 0 && i < 3) {
+          console.log(`   Derived Numeric ID:`, numericId)
+        }
+        if (numericId == null) {
+          // Cannot derive id – skip as unchanged
+          unchanged.push(existingProduct)
+          continue
+        }
         
         // Enhanced debugging for first few products
         if (batchStart === 0 && i < 3) {
           console.log(`🔍 DEBUG PRODUCT ${i + 1}: ${existingProduct.name}`)
           console.log(`   Database ID: ${existingProduct.id}, External ID: ${existingProduct.external_id}`)
-          console.log(`   Extracted Product ID: ${productId}`)
+          console.log(`   Extracted Product ID: ${numericId}`)
           console.log(`   Database: price=${existingProduct.price}, isOnSale=${existingProduct.is_on_sale}, originalPrice=${existingProduct.original_price}`)
         }
         
         try {
-          const freshProduct = await this.fetchProduct(parseInt(productId))
+          const freshProduct = await this.fetchProduct(numericId)
           
           // Debug: Log first few products to see what's happening
           if (batchStart === 0 && i < 3) {
             if (freshProduct) {
               console.log(`   Fresh API: price=${freshProduct.price}, isOnSale=${freshProduct.isOnSale}, originalPrice=${freshProduct.originalPrice}`)
-              console.log(`   Changes: price=${freshProduct.price !== existingProduct.price}, offer=${freshProduct.isOnSale !== existingProduct.isOnSale}, original=${freshProduct.originalPrice !== existingProduct.originalPrice}`)
+              console.log(`   Changes: price=${freshProduct.price !== existingProduct.price}, offer=${freshProduct.isOnSale !== (existingProduct.is_on_sale ?? existingProduct.isOnSale)}, original=${freshProduct.originalPrice !== (existingProduct.original_price ?? existingProduct.originalPrice)}`)
             } else {
               console.log(`   Fresh API: null (not found)`)
             }
           }
         
         if (freshProduct) {
-             // Check if there are any changes - use correct database field names
+             // Check if there are any changes - normalize DB snake_case vs camelCase
+             const dbIsOnSale = (existingProduct as any).is_on_sale ?? existingProduct.isOnSale
+             const dbOriginalPrice = (existingProduct as any).original_price ?? existingProduct.originalPrice
              const hasPriceChange = freshProduct.price !== existingProduct.price
-             const hasOfferChange = freshProduct.isOnSale !== existingProduct.is_on_sale
-             const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.original_price
+             const hasOfferChange = freshProduct.isOnSale !== dbIsOnSale
+             const hasOriginalPriceChange = freshProduct.originalPrice !== dbOriginalPrice
              
              if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
           const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
