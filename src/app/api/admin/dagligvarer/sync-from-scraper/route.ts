@@ -127,11 +127,15 @@ export async function POST(req: NextRequest) {
 
     const byExternalId = new Map<string, any>()
     const byNumericId = new Map<string, any>()
+    const byNameStore = new Map<string, any>()
+    const normalizeName = (n: any) => String(n || '').trim().toLowerCase().replace(/\s+/g, ' ')
     for (const p of existing) {
       const ext = p.external_id || null
       if (ext) byExternalId.set(String(ext), p)
       const num = extractNumericId(p.external_id) || extractNumericId(p.store_url) || extractNumericId(p.image_url) || extractNumericId(p.id)
       if (num) byNumericId.set(num, p)
+      const key = `${normalizeName(p.name)}|${(p.store || '').toLowerCase()}`
+      if (!byNameStore.has(key)) byNameStore.set(key, p)
     }
 
     let updated = 0
@@ -177,6 +181,10 @@ export async function POST(req: NextRequest) {
           db = byNumericId.get(numScraped)
         }
       }
+      if (!db) {
+        const key = `${normalizeName(item.name)}|${String(item.store || 'REMA 1000').toLowerCase()}`
+        db = byNameStore.get(key)
+      }
 
       if (!db) {
         // Optional: create minimal new product (skip for now to avoid schema mismatches)
@@ -189,28 +197,31 @@ export async function POST(req: NextRequest) {
       const diffSaleEnd = (db.sale_end_date || null) !== (sale_end_date || null)
 
       if (diffPrice || diffOffer || diffOriginal || diffSaleEnd) {
-        const toUpdate: Partial<SupermarketProduct> = {
-          id: db.id,
-          name: db.name,
-          description: db.description,
-          category: db.category,
-          subcategory: db.subcategory,
-          price,
-          originalPrice: original_price,
-          unit: db.unit,
-          unitPrice: db.unit_price,
-          isOnSale: is_on_sale,
-          saleEndDate: sale_end_date,
-          imageUrl: db.image_url,
-          store: db.store,
-          available: db.available,
-          temperatureZone: db.temperature_zone,
-          nutritionInfo: db.nutrition_info || {},
-          labels: Array.isArray(db.labels) ? db.labels : [],
-          lastUpdated: new Date().toISOString(),
-          source: db.source
+        // Update directly with service client and append price history
+        const supabase = createSupabaseServiceClient()
+        const { error: updateError } = await supabase
+          .from('supermarket_products')
+          .update({
+            price,
+            original_price,
+            is_on_sale,
+            sale_end_date,
+            last_updated: new Date().toISOString()
+          })
+          .eq('external_id', db.external_id)
+        if (updateError) {
+          console.error('❌ Update failed for', db.external_id, updateError.message)
+        } else {
+          const { error: histErr } = await supabase
+            .from('supermarket_price_history')
+            .insert({
+              product_external_id: db.external_id,
+              price,
+              original_price,
+              timestamp: new Date().toISOString()
+            })
+          if (histErr) console.warn('⚠️ Price history insert failed for', db.external_id, histErr.message)
         }
-        await databaseService.updateSupermarketProduct(toUpdate as SupermarketProduct)
         updated++
         if (changedSamples.length < 5) changedSamples.push({ id: externalId, name: db.name, from: { price: db.price, original_price: db.original_price, is_on_sale: db.is_on_sale, sale_end_date: db.sale_end_date }, to: { price, original_price, is_on_sale, sale_end_date } })
       }
