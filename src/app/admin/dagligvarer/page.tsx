@@ -93,7 +93,7 @@ export default function SupermarketScraperPage() {
 
   const loadDatabaseStats = async () => {
     try {
-      const response = await fetch('/api/admin/dagligvarer/import-rema-products')
+      const response = await fetch('/api/admin/dagligvarer/import-rema-products?t=' + Date.now())
       const result = await response.json()
       
       if (result.success) {
@@ -234,7 +234,7 @@ export default function SupermarketScraperPage() {
     alert('🔄 Starting Delta Update...\n\nThis will check ALL ~3770 REMA products for changes.\nExpected time: 6-10 minutes.\n\nCheck the browser console for progress updates.')
     
     try {
-      const response = await fetch('/api/admin/dagligvarer/delta-update', {
+      const response = await fetch('/api/admin/dagligvarer/delta-update?t=' + Date.now(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
