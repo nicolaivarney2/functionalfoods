@@ -630,10 +630,20 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
-    const batchSize = 100
+    const batchSize = 10 // Smaller batches for Vercel timeout
     
-    // Process in batches of 100
+    // Process in small batches for Vercel timeout (10 seconds)
+    const startTime = Date.now()
+    const maxTime = 8000 // Stop after 8 seconds to avoid timeout
+    let processedCount = 0
+    
     for (let batchStart = 0; batchStart < storeProducts.length; batchStart += batchSize) {
+      // Check if we're running out of time
+      if (Date.now() - startTime > maxTime) {
+        console.log(`⏰ Time limit reached (${maxTime}ms). Stopping delta update.`)
+        processedCount = batchStart
+        break
+      }
       const batchEnd = Math.min(batchStart + batchSize, storeProducts.length)
       const batch = storeProducts.slice(batchStart, batchEnd)
       
@@ -686,7 +696,7 @@ export class Rema1000Scraper implements SupermarketAPI {
            }
           
           // Small delay between requests
-          await this.delay(50)
+          await this.delay(100)
           
         } catch (error) {
           console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
@@ -695,22 +705,27 @@ export class Rema1000Scraper implements SupermarketAPI {
         }
       }
       
+      processedCount = batchEnd
       console.log(`✅ Batch ${Math.floor(batchStart / batchSize) + 1} completed: ${updated.length} total updates so far`)
       
-      // Longer delay between batches
+      // Shorter delay between batches for Vercel
       if (batchEnd < storeProducts.length) {
-        console.log(`⏳ Waiting 2 seconds before next batch...`)
-        await this.delay(2000)
+        console.log(`⏳ Waiting 500ms before next batch...`)
+        await this.delay(500)
       }
     }
     
-    console.log(`🎉 All batches completed! Total updates: ${updated.length} out of ${storeProducts.length} products`)
+    // processedCount is already set in the loop
+    console.log(`🎉 Delta update completed! Processed ${processedCount} out of ${storeProducts.length} products`)
+    console.log(`📊 Total updates: ${updated.length}, unchanged: ${unchanged.length}`)
     
     return {
       updated,
       new: [],
       unchanged: existingProducts.filter(p => !updated.find(u => u.id === p.id)),
-      totalChanges: updated.length
+      totalChanges: updated.length,
+      processedCount,
+      totalCount: storeProducts.length
     }
   }
 
