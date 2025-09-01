@@ -647,17 +647,17 @@ export class Rema1000Scraper implements SupermarketAPI {
                console.log(`   Fresh: null (not found)`)
              }
            }
-           
-           if (freshProduct) {
+        
+        if (freshProduct) {
              // Check if there are any changes
              const hasPriceChange = freshProduct.price !== existingProduct.price
              const hasOfferChange = freshProduct.isOnSale !== existingProduct.isOnSale
              const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.originalPrice
              
              if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
-               const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-               updated.push(enhancedProduct)
-               
+          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          updated.push(enhancedProduct)
+          
                // Log changes
                if (hasOfferChange) {
                  console.log(`🏷️ Offer change: ${existingProduct.name} - ${existingProduct.isOnSale} → ${freshProduct.isOnSale}`)
