@@ -227,6 +227,37 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  const handleDeltaUpdate = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/delta-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      })
+      const result = await response.json()
+      
+      if (result.success) {
+        console.log('✅ Delta update successful:', result)
+        alert(`Delta update completed!\nUpdated: ${result.delta.updated}\nNew: ${result.delta.new}\nUnchanged: ${result.delta.unchanged}`)
+        
+        // Refresh data after delta update
+        loadDatabaseStats()
+        loadLatestProducts()
+      } else {
+        console.error('❌ Delta update failed:', result)
+        alert(`Delta update failed: ${result.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error running delta update:', error)
+      alert('Network error while running delta update')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleFixMissingOriginalPrices = async () => {
     setIsLoading(true)
     try {
@@ -607,7 +638,7 @@ export default function SupermarketScraperPage() {
                 </h2>
               
               <div className="space-y-4">
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <button
                     onClick={startScraping}
                     disabled={scrapingStatus === 'running' || isLoading}
@@ -624,6 +655,15 @@ export default function SupermarketScraperPage() {
                   >
                     <Square size={16} />
                     Stop Scraping
+                  </button>
+
+                  <button
+                    onClick={handleDeltaUpdate}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    Delta Update
                   </button>
                 </div>
 
@@ -684,6 +724,21 @@ export default function SupermarketScraperPage() {
                   <span className="text-gray-600">Max Retries</span>
                   <span className="text-sm text-gray-900">3 attempts</span>
                 </div>
+              </div>
+
+              {/* Delta Update Info */}
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="font-medium text-blue-800 mb-2">🔄 Delta Update</h3>
+                <p className="text-sm text-blue-700 mb-2">
+                  Delta update tjekker kun for ændringer i eksisterende produkter og nye produkter. 
+                  Dette er meget hurtigere end en fuld import.
+                </p>
+                <ul className="text-xs text-blue-600 space-y-1">
+                  <li>• Opdaterer priser og tilbud på eksisterende produkter</li>
+                  <li>• Finder nye produkter</li>
+                  <li>• Fixer manglende original priser på tilbud</li>
+                  <li>• Fokuserer på produkter med høj sandsynlighed for tilbud</li>
+                </ul>
               </div>
             </div>
           </div>
