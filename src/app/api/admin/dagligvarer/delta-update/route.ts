@@ -6,8 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🔄 Starting delta update process...')
     
-    // Get existing products from database
-    const existingProducts = await databaseService.getSupermarketProducts()
+    // Get ALL existing products from database for delta update
+    const existingProducts = await databaseService.getAllSupermarketProductsForDelta()
     
     console.log(`📊 Found ${existingProducts.products.length} existing products in database`)
     
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('📊 Getting delta update status...')
     
-    const existingProducts = await databaseService.getSupermarketProducts()
+    const existingProducts = await databaseService.getAllSupermarketProductsForDelta()
     
     // Get last update info (you might want to store this in a separate table)
     const lastUpdate = new Date().toISOString()

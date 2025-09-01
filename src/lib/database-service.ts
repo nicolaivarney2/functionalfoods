@@ -191,6 +191,65 @@ export class DatabaseService {
   }
 
   /**
+   * Get ALL supermarket products for delta updates (no pagination limits)
+   */
+  async getAllSupermarketProductsForDelta(): Promise<{products: any[], total: number}> {
+    try {
+      const supabase = createSupabaseClient()
+      
+      // Get ALL products without pagination for delta updates
+      const { data, error, count } = await supabase
+        .from('supermarket_products')
+        .select('*', { count: 'exact' })
+        .order('name', { ascending: true })
+      
+      if (error) {
+        console.error('Error fetching all supermarket products for delta:', error)
+        return { products: [], total: 0 }
+      }
+
+      // Process products with discount logic
+      const processedProducts = (data || []).map(product => {
+        const price = product.price || 0
+        const originalPrice = product.original_price || 0
+        const isMarkedOnSale = product.is_on_sale || false
+        
+        const hasValidPrices = price > 0 && originalPrice > 0
+        const priceDifference = originalPrice - price
+        const isActualDiscount = priceDifference > 0.01
+        
+        // Show offers even if original_price === price (for now)
+        const isRealOffer = isMarkedOnSale && hasValidPrices
+        
+        let discountPercentage = 0
+        if (isRealOffer && originalPrice > 0 && isActualDiscount) {
+          discountPercentage = Math.round((priceDifference / originalPrice) * 100)
+        }
+        
+        return {
+          ...product,
+          is_on_sale: isRealOffer,
+          discount_percentage: isRealOffer ? (isActualDiscount ? discountPercentage : 0) : null,
+          _original_is_on_sale: isMarkedOnSale, // Keep original flag for debugging
+          _has_valid_prices: hasValidPrices,
+          _price_difference: priceDifference,
+          _is_actual_discount: isActualDiscount
+        }
+      })
+      
+      console.log(`🔍 Delta service: Found ${processedProducts.length} total products in database`)
+      
+      return { 
+        products: processedProducts, 
+        total: count || 0
+      }
+    } catch (error) {
+      console.error('Error in getAllSupermarketProductsForDelta:', error)
+      return { products: [], total: 0 }
+    }
+  }
+
+  /**
    * Get all supermarket products from the database with pagination
    * TEMPORARY: Fetch more products to find offers, then sort and paginate
    */
