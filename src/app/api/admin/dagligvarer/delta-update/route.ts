@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
     const scraper = new Rema1000Scraper()
     
     // Perform intelligent batch update directly (skip smart delta investigation)
+    console.log('🔄 Starting delta update with intelligentBatchUpdate...')
     const deltaResult = await scraper.intelligentBatchUpdate(existingProducts.products)
+    console.log('✅ intelligentBatchUpdate completed:', deltaResult)
     
     console.log(`✅ Delta update completed:`)
     console.log(`   - Updated: ${deltaResult.updated.length}`)
@@ -73,6 +75,12 @@ export async function POST(request: NextRequest) {
         totalProducts: existingProducts.products.length,
         deltaStatus: 'completed',
         readyForDelta: existingProducts.products.length > 0
+      },
+      debug: {
+        methodUsed: 'intelligentBatchUpdate',
+        totalProductsFound: existingProducts.products.length,
+        remaProductsFound: existingProducts.products.filter(p => p.source === 'rema1000').length,
+        sourcesFound: Array.from(new Set(existingProducts.products.map(p => p.source)))
       }
     }
     
