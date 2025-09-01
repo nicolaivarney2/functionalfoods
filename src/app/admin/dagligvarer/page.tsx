@@ -262,6 +262,64 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  const handleSyncFromScraperLatest = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/sync-from-scraper', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(latestScraping?.metadataId ? { metadataId: latestScraping.metadataId } : {})
+      })
+      const result = await response.json()
+      if (result.success) {
+        console.log('✅ DB-diff sync successful:', result)
+        alert(`🎉 DB-diff sync completed!\n\nOpdaterede: ${result.changes?.updated ?? 0}\nIndsat nye: ${result.changes?.inserted ?? 0}\nKilde: ${result.source ? JSON.stringify(result.source) : 'ukendt'}`)
+        loadDatabaseStats()
+        loadLatestProducts()
+      } else {
+        console.error('❌ DB-diff sync failed:', result)
+        alert(`❌ DB-diff sync failed: ${result.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error running DB-diff sync:', error)
+      alert('❌ Network error while running DB-diff sync')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSyncFromUrl = async () => {
+    const url = prompt('Indsæt URL til fuld scraped JSON (https://...)')
+    if (!url) return
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/sync-from-scraper', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url })
+      })
+      const result = await response.json()
+      if (result.success) {
+        console.log('✅ DB-diff sync (URL) successful:', result)
+        alert(`🎉 DB-diff sync (URL) completed!\n\nOpdaterede: ${result.changes?.updated ?? 0}\nIndsat nye: ${result.changes?.inserted ?? 0}`)
+        loadDatabaseStats()
+        loadLatestProducts()
+      } else {
+        console.error('❌ DB-diff sync (URL) failed:', result)
+        alert(`❌ DB-diff sync (URL) failed: ${result.message || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error running DB-diff sync (URL):', error)
+      alert('❌ Network error while running DB-diff sync (URL)')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleFixMissingOriginalPrices = async () => {
     setIsLoading(true)
     try {
@@ -668,6 +726,24 @@ export default function SupermarketScraperPage() {
                   >
                     <RefreshCw size={16} />
                     Delta Update
+                  </button>
+
+                  <button
+                    onClick={handleSyncFromScraperLatest}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    DB Diff Sync (Seneste)
+                  </button>
+
+                  <button
+                    onClick={handleSyncFromUrl}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    DB Diff Sync (URL)
                   </button>
                 </div>
 
