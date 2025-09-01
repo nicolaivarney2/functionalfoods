@@ -599,7 +599,7 @@ export class Rema1000Scraper implements SupermarketAPI {
   /**
    * Simple batch update - checks REMA products in batches of 100
    */
-  private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
+  async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
     console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
     console.log('🔧 TEST: This method is being called!')
     

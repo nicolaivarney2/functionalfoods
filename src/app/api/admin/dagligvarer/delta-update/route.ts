@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     // Initialize scraper
     const scraper = new Rema1000Scraper()
     
-    // Perform smart delta update
-    const deltaResult = await scraper.smartDeltaUpdate(existingProducts.products)
+    // Perform intelligent batch update directly (skip smart delta investigation)
+    const deltaResult = await scraper.intelligentBatchUpdate(existingProducts.products)
     
     console.log(`✅ Delta update completed:`)
     console.log(`   - Updated: ${deltaResult.updated.length}`)
