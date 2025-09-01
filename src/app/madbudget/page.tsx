@@ -761,9 +761,9 @@ export default function MadbudgetPage() {
                 className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <Users size={20} className="mr-2" />
-                  Familieprofil
-                </h2>
+                <Users size={20} className="mr-2" />
+                Familieprofil
+              </h2>
                 <ChevronDown 
                   size={20} 
                   className={`text-gray-500 transition-transform ${familyProfileOpen ? 'rotate-180' : ''}`} 
@@ -773,30 +773,30 @@ export default function MadbudgetPage() {
               {familyProfileOpen && (
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="space-y-3 pt-4">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Voksne:</span>
-                      <span className="font-medium">{familyProfile.adults}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Børn:</span>
-                      <span className="font-medium">
-                        {familyProfile.children} ({familyProfile.childrenAges?.join(', ') || 'Ingen alder valgt'})
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Økologi prioriteret:</span>
-                      <span className="font-medium">{familyProfile.prioritizeOrganic ? 'Ja' : 'Nej'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Butikker:</span>
-                      <span className="font-medium">
-                        {familyProfile.selectedStores.map((storeId, index) => {
-                          const store = mockStores.find(s => s.id === storeId)
-                          return store?.name
-                        }).filter(Boolean).join(', ')}
-                      </span>
-                    </div>
-                  </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Voksne:</span>
+                  <span className="font-medium">{familyProfile.adults}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Børn:</span>
+                  <span className="font-medium">
+                    {familyProfile.children} ({familyProfile.childrenAges?.join(', ') || 'Ingen alder valgt'})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Økologi prioriteret:</span>
+                  <span className="font-medium">{familyProfile.prioritizeOrganic ? 'Ja' : 'Nej'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Butikker:</span>
+                  <span className="font-medium">
+                    {familyProfile.selectedStores.map((storeId, index) => {
+                      const store = mockStores.find(s => s.id === storeId)
+                      return store?.name
+                    }).filter(Boolean).join(', ')}
+                  </span>
+                </div>
+              </div>
                 </div>
               )}
             </div>
@@ -897,9 +897,9 @@ export default function MadbudgetPage() {
                 className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
               >
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <TrendingUp size={20} className="mr-2" />
-                  Besparelser
-                </h2>
+                <TrendingUp size={20} className="mr-2" />
+                Besparelser
+              </h2>
                 <ChevronDown 
                   size={20} 
                   className={`text-gray-500 transition-transform ${savingsOpen ? 'rotate-180' : ''}`} 
@@ -909,16 +909,16 @@ export default function MadbudgetPage() {
               {savingsOpen && (
                 <div className="px-6 pb-6 border-t border-gray-100">
                   <div className="text-center pt-4">
-                    <div className="text-3xl font-bold text-green-600 mb-2">
-                      {calculateSavings().totalSavings.toFixed(2)} kr
-                    </div>
-                    <div className="text-lg text-gray-600 mb-4">
-                      {calculateSavings().percentageSavings}% besparelse
-                    </div>
-                    <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors">
-                      Se detaljeret oversigt
-                    </button>
-                  </div>
+                <div className="text-3xl font-bold text-green-600 mb-2">
+                  {calculateSavings().totalSavings.toFixed(2)} kr
+                </div>
+                <div className="text-lg text-gray-600 mb-4">
+                  {calculateSavings().percentageSavings}% besparelse
+                </div>
+                <button className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors">
+                  Se detaljeret oversigt
+                </button>
+              </div>
                 </div>
               )}
             </div>
@@ -939,13 +939,13 @@ export default function MadbudgetPage() {
                       Indlæser opskrifter...
                     </div>
                   )}
-                  <button
-                    onClick={generateMealPlan}
+                <button
+                  onClick={generateMealPlan}
                     disabled={isLoadingRecipes || realRecipes.length === 0}
                     className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                  >
+                >
                     {isLoadingRecipes ? 'Indlæser...' : realRecipes.length === 0 ? 'Ingen opskrifter' : 'Generer AI madplan'}
-                  </button>
+                </button>
                 </div>
               </div>
 
@@ -1112,7 +1112,7 @@ export default function MadbudgetPage() {
               {/* Action Buttons */}
               <div className="space-y-3 mt-6">
 
-              </div>
+            </div>
 
               {/* Debug info for opskrifter */}
               {process.env.NODE_ENV === 'development' && (

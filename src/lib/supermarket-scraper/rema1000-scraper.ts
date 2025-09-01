@@ -607,6 +607,16 @@ export class Rema1000Scraper implements SupermarketAPI {
     const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
     console.log(`🎯 Found ${remaProducts.length} REMA products to check`)
     
+    // Debug: Check what sources we actually have
+    const sources = Array.from(new Set(existingProducts.map(p => p.source)))
+    console.log(`🔍 Available sources in database:`, sources)
+    console.log(`📊 Total products: ${existingProducts.length}, REMA products: ${remaProducts.length}`)
+    
+    if (remaProducts.length === 0) {
+      console.log(`⚠️ WARNING: No REMA products found! Check if products have correct source field.`)
+      console.log(`🔍 Sample product sources:`, existingProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, source: p.source })))
+    }
+    
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
     
@@ -635,6 +645,10 @@ export class Rema1000Scraper implements SupermarketAPI {
             console.log(`🔧 Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
           }
         } else {
+          // Product not found or error - log for debugging
+          if (i < 5) { // Only log first 5 for debugging
+            console.log(`❌ Product not found or error for ID ${productId} (${existingProduct.name})`)
+          }
           unchanged.push(existingProduct)
         }
         
