@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
         remaProductsFound: existingProducts.products.filter(p => 
           p.source === 'rema1000' || 
           p.source === 'rema1000-python-scraper' ||
+          p.source?.includes('rema1000') ||
           p.source?.includes('rema')
         ).length,
         sourcesFound: Array.from(new Set(existingProducts.products.map(p => p.source))),

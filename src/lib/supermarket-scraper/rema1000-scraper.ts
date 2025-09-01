@@ -603,21 +603,27 @@ export class Rema1000Scraper implements SupermarketAPI {
     console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
     console.log('🔧 TEST: This method is being called!')
     
-    // Filter to only REMA products (handle different source formats)
-    const remaProducts = existingProducts.filter(p => 
+    // Filter to only REMA products (since we only have REMA data for now)
+    const storeProducts = existingProducts.filter(p => 
       p.source === 'rema1000' || 
       p.source === 'rema1000-python-scraper' ||
+      p.source?.includes('rema1000') ||
       p.source?.includes('rema')
     )
-    console.log(`📊 Found ${remaProducts.length} REMA products to check`)
+    console.log(`📊 Found ${storeProducts.length} store products to check`)
+    
+    // Log what sources we found for debugging
+    const allSources = Array.from(new Set(existingProducts.map(p => p.source)))
+    console.log(`🔍 All sources in database:`, allSources)
+    console.log(`🎯 REMA sources found:`, allSources.filter(s => s?.includes('rema')))
     
     // Debug: Check what sources we actually have
     const sources = Array.from(new Set(existingProducts.map(p => p.source)))
     console.log(`🔍 Available sources in database:`, sources)
-    console.log(`📊 Total products: ${existingProducts.length}, REMA products: ${remaProducts.length}`)
+    console.log(`📊 Total products: ${existingProducts.length}, store products: ${storeProducts.length}`)
     
-    if (remaProducts.length === 0) {
-      console.log(`⚠️ No REMA products found! Check source field.`)
+    if (storeProducts.length === 0) {
+      console.log(`⚠️ No store products found! Check source field.`)
       console.log(`🔍 Sample product sources:`, existingProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, source: p.source })))
       return { updated: [], new: [], unchanged: existingProducts, totalChanges: 0 }
     }
@@ -627,9 +633,9 @@ export class Rema1000Scraper implements SupermarketAPI {
     const batchSize = 100
     
     // Process in batches of 100
-    for (let batchStart = 0; batchStart < remaProducts.length; batchStart += batchSize) {
-      const batchEnd = Math.min(batchStart + batchSize, remaProducts.length)
-      const batch = remaProducts.slice(batchStart, batchEnd)
+    for (let batchStart = 0; batchStart < storeProducts.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, storeProducts.length)
+      const batch = storeProducts.slice(batchStart, batchEnd)
       
       console.log(`📦 Processing batch ${Math.floor(batchStart / batchSize) + 1}: products ${batchStart + 1}-${batchEnd}`)
       
@@ -692,13 +698,13 @@ export class Rema1000Scraper implements SupermarketAPI {
       console.log(`✅ Batch ${Math.floor(batchStart / batchSize) + 1} completed: ${updated.length} total updates so far`)
       
       // Longer delay between batches
-      if (batchEnd < remaProducts.length) {
+      if (batchEnd < storeProducts.length) {
         console.log(`⏳ Waiting 2 seconds before next batch...`)
         await this.delay(2000)
       }
     }
     
-    console.log(`🎉 All batches completed! Total updates: ${updated.length}`)
+    console.log(`🎉 All batches completed! Total updates: ${updated.length} out of ${storeProducts.length} products`)
     
     return {
       updated,
