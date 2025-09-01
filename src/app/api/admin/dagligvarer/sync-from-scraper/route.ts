@@ -128,15 +128,39 @@ export async function POST(req: NextRequest) {
     let inserted = 0
     const changedSamples: Array<{ id: string; name: string; from: any; to: any }> = []
 
+    // Helper to extract price info from Python scraper structure
+    const extractPricing = (it: any): { price: number; original_price: number; is_on_sale: boolean; sale_end_date: string | null } => {
+      let price = Number(it.price ?? it.current_price ?? it.unit_price ?? 0)
+      let original_price = Number(it.original_price ?? it.regular_price ?? price)
+      let is_on_sale = Boolean(it.is_on_sale ?? (original_price > price))
+      let sale_end_date: string | null = it.sale_end_date ?? it.ending_at ?? null
+
+      // Python scraper format: prices[0]=campaign, prices[1]=regular when on sale
+      if (Array.isArray(it.prices) && it.prices.length >= 1) {
+        const p0 = it.prices[0]
+        const p1 = it.prices.length > 1 ? it.prices[1] : undefined
+        const isCampaign = p0?.is_campaign === true || p0?.is_campaign === 'true' || p0?.is_campaign === 1
+        if (isCampaign && p1) {
+          price = Number(p0.price) || 0
+          original_price = Number(p1.price) || price
+          is_on_sale = true
+          sale_end_date = p0.ending_at || sale_end_date
+        } else if (p0 && !isCampaign) {
+          price = Number(p0.price) || 0
+          original_price = Number(p0.price) || price
+          is_on_sale = false
+        }
+      }
+
+      return { price, original_price, is_on_sale, sale_end_date }
+    }
+
     for (const item of scrapedList) {
       const externalId = item.external_id ?? toExternalId(item)
       if (!externalId) continue
 
       const db = byExternalId.get(externalId)
-      const price = Number(item.price ?? item.current_price ?? item.unit_price ?? 0)
-      const original_price = Number(item.original_price ?? item.regular_price ?? price)
-      const is_on_sale = Boolean(item.is_on_sale ?? (original_price > price))
-      const sale_end_date = item.sale_end_date ?? item.ending_at ?? null
+      const { price, original_price, is_on_sale, sale_end_date } = extractPricing(item)
 
       if (!db) {
         // Optional: create minimal new product (skip for now to avoid schema mismatches)
