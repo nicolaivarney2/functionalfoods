@@ -597,77 +597,86 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
-   * Enhanced intelligent batch update - checks ALL REMA products for changes
+   * Simple batch update - checks REMA products in batches of 100
    */
   private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
-    console.log('🧠 Using enhanced intelligent batch update strategy')
-    console.log(`🔍 Checking ALL ${existingProducts.length} REMA products for changes`)
+    console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
     
     // Filter to only REMA products
     const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
-    console.log(`🎯 Found ${remaProducts.length} REMA products to check`)
-    
-    // Debug: Check what sources we actually have
-    const sources = Array.from(new Set(existingProducts.map(p => p.source)))
-    console.log(`🔍 Available sources in database:`, sources)
-    console.log(`📊 Total products: ${existingProducts.length}, REMA products: ${remaProducts.length}`)
+    console.log(`📊 Found ${remaProducts.length} REMA products to check`)
     
     if (remaProducts.length === 0) {
-      console.log(`⚠️ WARNING: No REMA products found! Check if products have correct source field.`)
-      console.log(`🔍 Sample product sources:`, existingProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, source: p.source })))
+      console.log(`⚠️ No REMA products found! Check source field.`)
+      return { updated: [], new: [], unchanged: existingProducts, totalChanges: 0 }
     }
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
+    const batchSize = 100
     
-    // Check ALL REMA products for changes
-    console.log(`🔄 Starting full REMA product check...`)
-    
-    for (let i = 0; i < remaProducts.length; i++) {
-      const existingProduct = remaProducts[i]
-      const productId = existingProduct.id.replace('rema-', '')
+    // Process in batches of 100
+    for (let batchStart = 0; batchStart < remaProducts.length; batchStart += batchSize) {
+      const batchEnd = Math.min(batchStart + batchSize, remaProducts.length)
+      const batch = remaProducts.slice(batchStart, batchEnd)
       
-      try {
-        const freshProduct = await this.fetchProduct(parseInt(productId))
+      console.log(`📦 Processing batch ${Math.floor(batchStart / batchSize) + 1}: products ${batchStart + 1}-${batchEnd}`)
+      
+      // Process each product in the batch
+      for (let i = 0; i < batch.length; i++) {
+        const existingProduct = batch[i]
+        const productId = existingProduct.id.replace('rema-', '')
         
-        if (freshProduct) {
-          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-          updated.push(enhancedProduct)
+        try {
+          const freshProduct = await this.fetchProduct(parseInt(productId))
           
-          // Log significant changes
-          if (enhancedProduct.isOnSale !== existingProduct.isOnSale) {
-            console.log(`🏷️ Offer status changed for ${enhancedProduct.name}: ${existingProduct.isOnSale} → ${enhancedProduct.isOnSale}`)
+          if (freshProduct) {
+            // Check if there are any changes
+            const hasPriceChange = freshProduct.price !== existingProduct.price
+            const hasOfferChange = freshProduct.isOnSale !== existingProduct.isOnSale
+            const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.originalPrice
+            
+            if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
+              const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+              updated.push(enhancedProduct)
+              
+              // Log changes
+              if (hasOfferChange) {
+                console.log(`🏷️ Offer change: ${existingProduct.name} - ${existingProduct.isOnSale} → ${freshProduct.isOnSale}`)
+              }
+              if (hasPriceChange) {
+                console.log(`💰 Price change: ${existingProduct.name} - ${existingProduct.price} → ${freshProduct.price}`)
+              }
+              if (hasOriginalPriceChange && existingProduct.isOnSale) {
+                console.log(`🔧 Original price fix: ${existingProduct.name} - ${existingProduct.originalPrice} → ${freshProduct.originalPrice}`)
+              }
+            } else {
+              unchanged.push(existingProduct)
+            }
+          } else {
+            unchanged.push(existingProduct)
           }
-          if (enhancedProduct.price !== existingProduct.price) {
-            console.log(`💰 Price changed for ${enhancedProduct.name}: ${existingProduct.price} → ${enhancedProduct.price}`)
-          }
-          if (enhancedProduct.originalPrice !== existingProduct.originalPrice && existingProduct.isOnSale) {
-            console.log(`🔧 Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
-          }
-        } else {
-          // Product not found or error - log for debugging
-          if (i < 5) { // Only log first 5 for debugging
-            console.log(`❌ Product not found or error for ID ${productId} (${existingProduct.name})`)
-          }
+          
+          // Small delay between requests
+          await this.delay(50)
+          
+        } catch (error) {
+          console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
           unchanged.push(existingProduct)
+          await this.delay(100)
         }
-        
-        // Progress logging every 100 products
-        if ((i + 1) % 100 === 0) {
-          console.log(`📊 Progress: ${i + 1}/${remaProducts.length} products checked (${updated.length} updated)`)
-        }
-        
-        // Rate limiting - faster for bulk updates
-        await this.delay(100) // Reduced delay for faster processing
-        
-      } catch (error) {
-        console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
-        unchanged.push(existingProduct)
-        await this.delay(200) // Slightly longer delay on error
+      }
+      
+      console.log(`✅ Batch ${Math.floor(batchStart / batchSize) + 1} completed: ${updated.length} total updates so far`)
+      
+      // Longer delay between batches
+      if (batchEnd < remaProducts.length) {
+        console.log(`⏳ Waiting 2 seconds before next batch...`)
+        await this.delay(2000)
       }
     }
     
-    console.log(`✅ Full REMA check completed: ${updated.length} products updated out of ${remaProducts.length} total`)
+    console.log(`🎉 All batches completed! Total updates: ${updated.length}`)
     
     return {
       updated,
