@@ -652,27 +652,35 @@ export class Rema1000Scraper implements SupermarketAPI {
       // Process each product in the batch
       for (let i = 0; i < batch.length; i++) {
         const existingProduct = batch[i]
-        const productId = String(existingProduct.id).replace('rema-', '')
+        // Use external_id which contains the REMA product ID (e.g., "rema-123")
+        const productId = String(existingProduct.external_id || existingProduct.id).replace('rema-', '')
         
-                 try {
-           const freshProduct = await this.fetchProduct(parseInt(productId))
-           
-           // Debug: Log first few products to see what's happening
-           if (batchStart === 0 && i < 3) {
-             console.log(`🔍 Debug product ${i + 1}: ${existingProduct.name}`)
-             console.log(`   Existing: price=${existingProduct.price}, isOnSale=${existingProduct.isOnSale}, originalPrice=${existingProduct.originalPrice}`)
-             if (freshProduct) {
-               console.log(`   Fresh: price=${freshProduct.price}, isOnSale=${freshProduct.isOnSale}, originalPrice=${freshProduct.originalPrice}`)
-             } else {
-               console.log(`   Fresh: null (not found)`)
-             }
-           }
+        // Enhanced debugging for first few products
+        if (batchStart === 0 && i < 3) {
+          console.log(`🔍 DEBUG PRODUCT ${i + 1}: ${existingProduct.name}`)
+          console.log(`   Database ID: ${existingProduct.id}, External ID: ${existingProduct.external_id}`)
+          console.log(`   Extracted Product ID: ${productId}`)
+          console.log(`   Database: price=${existingProduct.price}, isOnSale=${existingProduct.is_on_sale}, originalPrice=${existingProduct.original_price}`)
+        }
+        
+        try {
+          const freshProduct = await this.fetchProduct(parseInt(productId))
+          
+          // Debug: Log first few products to see what's happening
+          if (batchStart === 0 && i < 3) {
+            if (freshProduct) {
+              console.log(`   Fresh API: price=${freshProduct.price}, isOnSale=${freshProduct.isOnSale}, originalPrice=${freshProduct.originalPrice}`)
+              console.log(`   Changes: price=${freshProduct.price !== existingProduct.price}, offer=${freshProduct.isOnSale !== existingProduct.isOnSale}, original=${freshProduct.originalPrice !== existingProduct.originalPrice}`)
+            } else {
+              console.log(`   Fresh API: null (not found)`)
+            }
+          }
         
         if (freshProduct) {
-             // Check if there are any changes
+             // Check if there are any changes - use correct database field names
              const hasPriceChange = freshProduct.price !== existingProduct.price
-             const hasOfferChange = freshProduct.isOnSale !== existingProduct.isOnSale
-             const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.originalPrice
+             const hasOfferChange = freshProduct.isOnSale !== existingProduct.is_on_sale
+             const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.original_price
              
              if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
           const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
