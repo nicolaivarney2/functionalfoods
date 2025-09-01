@@ -647,7 +647,16 @@ export async function GET(request: NextRequest) {
       throw metadataError
     }
     
-    // Get statistics from database - use source field to match delta update logic
+    // First: get exact total count without fetching rows (avoids 1000-row cap)
+    const { count: totalCount, error: countError } = await supabase
+      .from('supermarket_products')
+      .select('*', { count: 'exact', head: true })
+      .or('source.eq.rema1000,source.eq.rema1000-python-scraper,source.ilike.%rema%')
+    if (countError) {
+      throw countError
+    }
+
+    // Then: fetch a sample set for category/avg calculations (regular select is capped by PostgREST)
     const { data: products, error: productsError } = await supabase
       .from('supermarket_products')
       .select('*')
@@ -658,7 +667,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Calculate statistics
-    const totalProducts = products?.length || 0
+    const totalProducts = totalCount || 0
     const productsOnSale = products?.filter((p: any) => p.is_on_sale).length || 0
     const categories = products?.reduce((acc: string[], p: any) => {
       if (p.category && !acc.includes(p.category)) {
