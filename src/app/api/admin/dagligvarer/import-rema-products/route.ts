@@ -647,11 +647,11 @@ export async function GET(request: NextRequest) {
       throw metadataError
     }
     
-    // Get statistics from database
+    // Get statistics from database - use source field to match delta update logic
     const { data: products, error: productsError } = await supabase
       .from('supermarket_products')
       .select('*')
-      .eq('store', 'REMA 1000')
+      .or('source.eq.rema1000,source.eq.rema1000-python-scraper,source.ilike.%rema%')
     
     if (productsError) {
       throw productsError
