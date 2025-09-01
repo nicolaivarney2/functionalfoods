@@ -601,6 +601,7 @@ export class Rema1000Scraper implements SupermarketAPI {
    */
   private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
     console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
+    console.log('🔧 TEST: This method is being called!')
     
     // Filter to only REMA products
     const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
