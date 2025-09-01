@@ -597,94 +597,63 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
-   * Enhanced intelligent batch update - finds missing original prices for existing offers
+   * Enhanced intelligent batch update - checks ALL REMA products for changes
    */
   private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
     console.log('🧠 Using enhanced intelligent batch update strategy')
-    console.log('🔍 Special focus: Finding missing original prices for existing offers')
+    console.log(`🔍 Checking ALL ${existingProducts.length} REMA products for changes`)
     
-    // Find products that need original price correction
-    const needsPriceCorrection = existingProducts.filter(p => 
-      p.isOnSale && p.originalPrice === p.price // These have missing original prices!
-    )
-    
-    console.log(`🎯 Found ${needsPriceCorrection.length} products with missing original prices`)
-    
-    // Categorize products by update frequency and offer potential
-    const highPriority = existingProducts.filter(p => 
-      p.category === 'Frugt & grønt' || p.category === 'Kød, fisk & fjerkræ'
-    )
-    const mediumPriority = existingProducts.filter(p => 
-      p.category === 'Mejeri' || p.category === 'Køl' || p.category === 'Ost & mejeri'
-    )
-    const lowPriority = existingProducts.filter(p => 
-      p.category === 'Kolonial' || p.category === 'Frost'
-    )
-    
-    console.log(`📊 Update priorities: High: ${highPriority.length}, Medium: ${mediumPriority.length}, Low: ${lowPriority.length}`)
+    // Filter to only REMA products
+    const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
+    console.log(`🎯 Found ${remaProducts.length} REMA products to check`)
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
     
-    // 🎯 PRIORITY 1: Fix products with missing original prices FIRST
-    console.log(`🔧 Fixing ${needsPriceCorrection.length} products with missing original prices...`)
-    for (const existingProduct of needsPriceCorrection.slice(0, 20)) { // Limit to 20 for performance
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
+    // Check ALL REMA products for changes
+    console.log(`🔄 Starting full REMA product check...`)
+    
+    for (let i = 0; i < remaProducts.length; i++) {
+      const existingProduct = remaProducts[i]
+      const productId = existingProduct.id.replace('rema-', '')
+      
+      try {
         const freshProduct = await this.fetchProduct(parseInt(productId))
         
         if (freshProduct) {
           const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
           updated.push(enhancedProduct)
           
-          // Log price corrections
-          if (enhancedProduct.originalPrice !== existingProduct.originalPrice) {
-            console.log(`✅ Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
-          }
-        }
-        await this.delay(150) // Slightly faster for corrections
-      }
-    }
-    
-    // 🎯 PRIORITY 2: Enhanced update logic for high priority products
-    const remainingHighPriority = highPriority.filter(p => 
-      !needsPriceCorrection.some(corrected => corrected.id === p.id)
-    ).slice(0, 10) // Limit remaining high priority updates
-    
-    for (const existingProduct of remainingHighPriority) {
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
-        const freshProduct = await this.fetchProduct(parseInt(productId))
-        
-        if (freshProduct) {
-          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-          updated.push(enhancedProduct)
-          
-          // Log offer changes
+          // Log significant changes
           if (enhancedProduct.isOnSale !== existingProduct.isOnSale) {
             console.log(`🏷️ Offer status changed for ${enhancedProduct.name}: ${existingProduct.isOnSale} → ${enhancedProduct.isOnSale}`)
           }
+          if (enhancedProduct.price !== existingProduct.price) {
+            console.log(`💰 Price changed for ${enhancedProduct.name}: ${existingProduct.price} → ${enhancedProduct.price}`)
+          }
+          if (enhancedProduct.originalPrice !== existingProduct.originalPrice && existingProduct.isOnSale) {
+            console.log(`🔧 Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
+          }
+        } else {
+          unchanged.push(existingProduct)
         }
-        await this.delay(200) // Rate limiting
-      }
-    }
-    
-    // Also update some medium priority products for better coverage
-    const mediumSample = mediumPriority.slice(0, Math.min(10, mediumPriority.length))
-    for (const existingProduct of mediumSample) {
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
-        const freshProduct = await this.fetchProduct(parseInt(productId))
         
-        if (freshProduct) {
-          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-          updated.push(enhancedProduct)
+        // Progress logging every 100 products
+        if ((i + 1) % 100 === 0) {
+          console.log(`📊 Progress: ${i + 1}/${remaProducts.length} products checked (${updated.length} updated)`)
         }
-        await this.delay(300)
+        
+        // Rate limiting - faster for bulk updates
+        await this.delay(100) // Reduced delay for faster processing
+        
+      } catch (error) {
+        console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
+        unchanged.push(existingProduct)
+        await this.delay(200) // Slightly longer delay on error
       }
     }
     
-    console.log(`✅ Delta update completed: ${updated.length} products updated`)
+    console.log(`✅ Full REMA check completed: ${updated.length} products updated out of ${remaProducts.length} total`)
     
     return {
       updated,

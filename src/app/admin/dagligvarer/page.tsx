@@ -229,6 +229,10 @@ export default function SupermarketScraperPage() {
 
   const handleDeltaUpdate = async () => {
     setIsLoading(true)
+    
+    // Show initial message
+    alert('🔄 Starting Delta Update...\n\nThis will check ALL ~3770 REMA products for changes.\nExpected time: 6-10 minutes.\n\nCheck the browser console for progress updates.')
+    
     try {
       const response = await fetch('/api/admin/dagligvarer/delta-update', {
         method: 'POST',
@@ -241,18 +245,18 @@ export default function SupermarketScraperPage() {
       
       if (result.success) {
         console.log('✅ Delta update successful:', result)
-        alert(`Delta update completed!\nUpdated: ${result.delta.updated}\nNew: ${result.delta.new}\nUnchanged: ${result.delta.unchanged}`)
+        alert(`🎉 Delta update completed!\n\n📊 Results:\n• Updated: ${result.delta.updated} products\n• New: ${result.delta.new} products\n• Unchanged: ${result.delta.unchanged} products\n• Total checked: ${result.delta.updated + result.delta.unchanged} products\n\nCheck the console for detailed change logs.`)
         
         // Refresh data after delta update
         loadDatabaseStats()
         loadLatestProducts()
       } else {
         console.error('❌ Delta update failed:', result)
-        alert(`Delta update failed: ${result.message || 'Unknown error'}`)
+        alert(`❌ Delta update failed:\n${result.message || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error running delta update:', error)
-      alert('Network error while running delta update')
+      alert('❌ Network error while running delta update')
     } finally {
       setIsLoading(false)
     }
@@ -730,15 +734,19 @@ export default function SupermarketScraperPage() {
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h3 className="font-medium text-blue-800 mb-2">🔄 Delta Update</h3>
                 <p className="text-sm text-blue-700 mb-2">
-                  Delta update tjekker kun for ændringer i eksisterende produkter og nye produkter. 
-                  Dette er meget hurtigere end en fuld import.
+                  Delta update tjekker ALLE REMA produkter for ændringer i priser og tilbud. 
+                  Dette er hurtigere end en fuld import men tager stadig nogle minutter.
                 </p>
                 <ul className="text-xs text-blue-600 space-y-1">
+                  <li>• Tjekker alle ~3770 REMA produkter for ændringer</li>
                   <li>• Opdaterer priser og tilbud på eksisterende produkter</li>
                   <li>• Finder nye produkter</li>
                   <li>• Fixer manglende original priser på tilbud</li>
-                  <li>• Fokuserer på produkter med høj sandsynlighed for tilbud</li>
+                  <li>• Viser progress hver 100. produkt</li>
                 </ul>
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                  ⏱️ Forventet tid: 6-10 minutter for alle produkter
+                </div>
               </div>
             </div>
           </div>
