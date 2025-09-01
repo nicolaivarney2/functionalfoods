@@ -606,8 +606,14 @@ export class Rema1000Scraper implements SupermarketAPI {
     const remaProducts = existingProducts.filter(p => p.source === 'rema1000')
     console.log(`📊 Found ${remaProducts.length} REMA products to check`)
     
+    // Debug: Check what sources we actually have
+    const sources = Array.from(new Set(existingProducts.map(p => p.source)))
+    console.log(`🔍 Available sources in database:`, sources)
+    console.log(`📊 Total products: ${existingProducts.length}, REMA products: ${remaProducts.length}`)
+    
     if (remaProducts.length === 0) {
       console.log(`⚠️ No REMA products found! Check source field.`)
+      console.log(`🔍 Sample product sources:`, existingProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, source: p.source })))
       return { updated: [], new: [], unchanged: existingProducts, totalChanges: 0 }
     }
     
@@ -627,35 +633,46 @@ export class Rema1000Scraper implements SupermarketAPI {
         const existingProduct = batch[i]
         const productId = existingProduct.id.replace('rema-', '')
         
-        try {
-          const freshProduct = await this.fetchProduct(parseInt(productId))
-          
-          if (freshProduct) {
-            // Check if there are any changes
-            const hasPriceChange = freshProduct.price !== existingProduct.price
-            const hasOfferChange = freshProduct.isOnSale !== existingProduct.isOnSale
-            const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.originalPrice
-            
-            if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
-              const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-              updated.push(enhancedProduct)
-              
-              // Log changes
-              if (hasOfferChange) {
-                console.log(`🏷️ Offer change: ${existingProduct.name} - ${existingProduct.isOnSale} → ${freshProduct.isOnSale}`)
-              }
-              if (hasPriceChange) {
-                console.log(`💰 Price change: ${existingProduct.name} - ${existingProduct.price} → ${freshProduct.price}`)
-              }
-              if (hasOriginalPriceChange && existingProduct.isOnSale) {
-                console.log(`🔧 Original price fix: ${existingProduct.name} - ${existingProduct.originalPrice} → ${freshProduct.originalPrice}`)
-              }
-            } else {
-              unchanged.push(existingProduct)
-            }
-          } else {
-            unchanged.push(existingProduct)
-          }
+                 try {
+           const freshProduct = await this.fetchProduct(parseInt(productId))
+           
+           // Debug: Log first few products to see what's happening
+           if (batchStart === 0 && i < 3) {
+             console.log(`🔍 Debug product ${i + 1}: ${existingProduct.name}`)
+             console.log(`   Existing: price=${existingProduct.price}, isOnSale=${existingProduct.isOnSale}, originalPrice=${existingProduct.originalPrice}`)
+             if (freshProduct) {
+               console.log(`   Fresh: price=${freshProduct.price}, isOnSale=${freshProduct.isOnSale}, originalPrice=${freshProduct.originalPrice}`)
+             } else {
+               console.log(`   Fresh: null (not found)`)
+             }
+           }
+           
+           if (freshProduct) {
+             // Check if there are any changes
+             const hasPriceChange = freshProduct.price !== existingProduct.price
+             const hasOfferChange = freshProduct.isOnSale !== existingProduct.isOnSale
+             const hasOriginalPriceChange = freshProduct.originalPrice !== existingProduct.originalPrice
+             
+             if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
+               const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+               updated.push(enhancedProduct)
+               
+               // Log changes
+               if (hasOfferChange) {
+                 console.log(`🏷️ Offer change: ${existingProduct.name} - ${existingProduct.isOnSale} → ${freshProduct.isOnSale}`)
+               }
+               if (hasPriceChange) {
+                 console.log(`💰 Price change: ${existingProduct.name} - ${existingProduct.price} → ${freshProduct.price}`)
+               }
+               if (hasOriginalPriceChange && existingProduct.isOnSale) {
+                 console.log(`🔧 Original price fix: ${existingProduct.name} - ${existingProduct.originalPrice} → ${freshProduct.originalPrice}`)
+               }
+             } else {
+               unchanged.push(existingProduct)
+             }
+           } else {
+             unchanged.push(existingProduct)
+           }
           
           // Small delay between requests
           await this.delay(50)
