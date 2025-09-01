@@ -31,6 +31,13 @@ function toExternalId(item: any): string | null {
   return null
 }
 
+function extractNumericId(candidate: any): string | null {
+  if (candidate == null) return null
+  const s = String(candidate)
+  const m = s.match(/(\d{3,})/)
+  return m?.[1] || null
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Allow dynamic sources: explicit URL, metadataId, latest metadata, or local file fallback
@@ -119,9 +126,12 @@ export async function POST(req: NextRequest) {
     const { products: existing, total } = await databaseService.getAllSupermarketProductsForDelta()
 
     const byExternalId = new Map<string, any>()
+    const byNumericId = new Map<string, any>()
     for (const p of existing) {
       const ext = p.external_id || null
       if (ext) byExternalId.set(String(ext), p)
+      const num = extractNumericId(p.external_id) || extractNumericId(p.store_url) || extractNumericId(p.image_url) || extractNumericId(p.id)
+      if (num) byNumericId.set(num, p)
     }
 
     let updated = 0
@@ -159,8 +169,14 @@ export async function POST(req: NextRequest) {
       const externalId = item.external_id ?? toExternalId(item)
       if (!externalId) continue
 
-      const db = byExternalId.get(externalId)
+      let db = byExternalId.get(externalId)
       const { price, original_price, is_on_sale, sale_end_date } = extractPricing(item)
+      if (!db) {
+        const numScraped = extractNumericId(item.external_id) || extractNumericId(item.store_url) || extractNumericId(item.image_url) || extractNumericId(item.id)
+        if (numScraped) {
+          db = byNumericId.get(numScraped)
+        }
+      }
 
       if (!db) {
         // Optional: create minimal new product (skip for now to avoid schema mismatches)
