@@ -1,7 +1,7 @@
 // Core interfaces for supermarket scraping system
 
 export interface SupermarketProduct {
-  id: string
+  id: string | number
   name: string
   description: string
   category: string

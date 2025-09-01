@@ -356,7 +356,7 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     for (const product of existingProducts) {
       if (product.source === 'rema1000') {
-        const productId = product.id.replace('rema-', '')
+        const productId = String(product.id).replace('rema-', '')
         const updatedProduct = await this.fetchProduct(parseInt(productId))
         
         if (updatedProduct) {
@@ -552,7 +552,7 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     for (const product of existingProducts) {
       if (product.source === 'rema1000') {
-        const productId = product.id.replace('rema-', '')
+        const productId = String(product.id).replace('rema-', '')
         const lastModified = new Date(product.lastUpdated).toUTCString()
         
         try {
@@ -642,7 +642,7 @@ export class Rema1000Scraper implements SupermarketAPI {
       // Process each product in the batch
       for (let i = 0; i < batch.length; i++) {
         const existingProduct = batch[i]
-        const productId = existingProduct.id.replace('rema-', '')
+        const productId = String(existingProduct.id).replace('rema-', '')
         
                  try {
            const freshProduct = await this.fetchProduct(parseInt(productId))
