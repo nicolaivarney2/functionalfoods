@@ -191,57 +191,81 @@ export class DatabaseService {
   }
 
   /**
-   * Get ALL supermarket products for delta updates (no pagination limits)
+   * Get ALL supermarket products for delta updates (with pagination to handle Supabase 1000 row limit)
    */
   async getAllSupermarketProductsForDelta(): Promise<{products: any[], total: number}> {
     try {
       const supabase = createSupabaseClient()
+      const allProducts: any[] = []
+      let offset = 0
+      const limit = 1000 // Supabase max per query
+      let hasMore = true
       
-      // Get ALL products without pagination for delta updates
-      const { data, error, count } = await supabase
-        .from('supermarket_products')
-        .select('*', { count: 'exact' })
-        .order('name', { ascending: true })
+      console.log(`🔄 Delta service: Starting paginated fetch of ALL products...`)
       
-      if (error) {
-        console.error('Error fetching all supermarket products for delta:', error)
-        return { products: [], total: 0 }
+      // Fetch all products in batches of 1000
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from('supermarket_products')
+          .select('*', { count: 'exact' })
+          .order('name', { ascending: true })
+          .range(offset, offset + limit - 1)
+        
+        if (error) {
+          console.error(`Error fetching supermarket products batch (offset ${offset}):`, error)
+          break
+        }
+        
+        if (!data || data.length === 0) {
+          hasMore = false
+          break
+        }
+        
+        // Process products with discount logic
+        const processedProducts = data.map(product => {
+          const price = product.price || 0
+          const originalPrice = product.original_price || 0
+          const isMarkedOnSale = product.is_on_sale || false
+          
+          const hasValidPrices = price > 0 && originalPrice > 0
+          const priceDifference = originalPrice - price
+          const isActualDiscount = priceDifference > 0.01
+          
+          // Show offers even if original_price === price (for now)
+          const isRealOffer = isMarkedOnSale && hasValidPrices
+          
+          let discountPercentage = 0
+          if (isRealOffer && originalPrice > 0 && isActualDiscount) {
+            discountPercentage = Math.round((priceDifference / originalPrice) * 100)
+          }
+          
+          return {
+            ...product,
+            is_on_sale: isRealOffer,
+            discount_percentage: isRealOffer ? (isActualDiscount ? discountPercentage : 0) : null,
+            _original_is_on_sale: isMarkedOnSale, // Keep original flag for debugging
+            _has_valid_prices: hasValidPrices,
+            _price_difference: priceDifference,
+            _is_actual_discount: isActualDiscount
+          }
+        })
+        
+        allProducts.push(...processedProducts)
+        offset += limit
+        
+        console.log(`📊 Delta service: Fetched batch ${Math.floor(offset / limit)}: ${data.length} products (total so far: ${allProducts.length})`)
+        
+        // Check if we've reached the end
+        if (data.length < limit) {
+          hasMore = false
+        }
       }
-
-      // Process products with discount logic
-      const processedProducts = (data || []).map(product => {
-        const price = product.price || 0
-        const originalPrice = product.original_price || 0
-        const isMarkedOnSale = product.is_on_sale || false
-        
-        const hasValidPrices = price > 0 && originalPrice > 0
-        const priceDifference = originalPrice - price
-        const isActualDiscount = priceDifference > 0.01
-        
-        // Show offers even if original_price === price (for now)
-        const isRealOffer = isMarkedOnSale && hasValidPrices
-        
-        let discountPercentage = 0
-        if (isRealOffer && originalPrice > 0 && isActualDiscount) {
-          discountPercentage = Math.round((priceDifference / originalPrice) * 100)
-        }
-        
-        return {
-          ...product,
-          is_on_sale: isRealOffer,
-          discount_percentage: isRealOffer ? (isActualDiscount ? discountPercentage : 0) : null,
-          _original_is_on_sale: isMarkedOnSale, // Keep original flag for debugging
-          _has_valid_prices: hasValidPrices,
-          _price_difference: priceDifference,
-          _is_actual_discount: isActualDiscount
-        }
-      })
       
-      console.log(`🔍 Delta service: Found ${processedProducts.length} total products in database`)
+      console.log(`🔍 Delta service: Completed! Found ${allProducts.length} total products in database`)
       
       return { 
-        products: processedProducts, 
-        total: count || 0
+        products: allProducts, 
+        total: allProducts.length
       }
     } catch (error) {
       console.error('Error in getAllSupermarketProductsForDelta:', error)
