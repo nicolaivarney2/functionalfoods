@@ -80,7 +80,8 @@ export async function POST(request: NextRequest) {
         methodUsed: 'intelligentBatchUpdate',
         totalProductsFound: existingProducts.products.length,
         remaProductsFound: existingProducts.products.filter(p => p.source === 'rema1000').length,
-        sourcesFound: Array.from(new Set(existingProducts.products.map(p => p.source)))
+        sourcesFound: Array.from(new Set(existingProducts.products.map(p => p.source))),
+        sampleProducts: existingProducts.products.slice(0, 3).map(p => ({ id: p.id, name: p.name, source: p.source }))
       }
     }
     
