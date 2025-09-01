@@ -113,7 +113,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       return isFinite(num) ? num : 0
     }
     // Convert ingredients
-    const ingredients = recipe.ingredients_flat
+    const ingredients = (recipe.ingredients_flat || [])
       .filter(ing => ing.type === 'ingredient')
       .map(ing => ({
         name: ing.name,
@@ -123,7 +123,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       }))
 
     // Convert instructions
-    const instructions = recipe.instructions_flat
+    const instructions = (recipe.instructions_flat || [])
       .filter(inst => inst.type === 'instruction')
       .map((inst, index) => ({
         stepNumber: index + 1,
@@ -133,7 +133,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       }))
 
     // Determine main category from course tags
-    const mainCategory = recipe.tags.course?.[0] || 'Hovedret'
+    const mainCategory = (recipe.tags.course && recipe.tags.course.length > 0) ? recipe.tags.course[0] : 'Hovedret'
 
     // Calculate total time
     const prepTime = parseInt(String(recipe.prep_time).replace(',', '.')) || 0
@@ -248,12 +248,12 @@ export async function importRecipesWithImages(rawData: RawRecipeData[]): Promise
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0]} opskrift | Functional Foods`,
+      metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: generateMetaDescription(recipe),
       keywords: generateKeywords(recipe),
       mainCategory: recipe.mainCategory,
       subCategories: recipe.subCategories,
-      dietaryCategories: recipe.dietaryCategories,
+      dietaryCategories: recipe.dietaryCategories || [],
       ingredients: recipe.ingredients.map((ingredient, i) => ({
         id: `${id}-${i + 1}`,
         name: ingredient.name,
@@ -306,12 +306,12 @@ export function importRecipes(rawData: RawRecipeData[]): Recipe[] {
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0]} opskrift | Functional Foods`,
+      metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: generateMetaDescription(recipe),
       keywords: generateKeywords(recipe),
       mainCategory: recipe.mainCategory,
       subCategories: recipe.subCategories,
-      dietaryCategories: recipe.dietaryCategories,
+      dietaryCategories: recipe.dietaryCategories || [],
       ingredients: recipe.ingredients.map((ingredient, i) => ({
         id: `${id}-${i + 1}`,
         name: ingredient.name,
@@ -526,20 +526,20 @@ function generateSlug(title: string): string {
 }
 
 function generateMetaDescription(recipe: RawRecipeData): string {
-  const dietary = recipe.dietaryCategories[0]
+  const dietary = recipe.dietaryCategories?.[0] || 'Opskrift'
   return `${recipe.shortDescription} ${dietary} opskrift til vægttab og en sund livsstil.`
 }
 
 function generateKeywords(recipe: RawRecipeData): string[] {
   const baseKeywords = [
     recipe.mainCategory.toLowerCase(),
-    ...recipe.dietaryCategories.map(cat => cat.toLowerCase()),
+    ...(recipe.dietaryCategories || []).map(cat => cat.toLowerCase()),
     'vægttab',
     'sunde opskrifter'
   ]
   
   // Add ingredient keywords
-  const ingredientKeywords = recipe.ingredients
+  const ingredientKeywords = (recipe.ingredients || [])
     .slice(0, 3)
     .map(ing => ing.name.toLowerCase())
   

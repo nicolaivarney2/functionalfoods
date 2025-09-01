@@ -49,11 +49,15 @@ export default async function CategoryPage({ params }: PageProps) {
 
   // Get all recipes from database and filter by category
   const allRecipes = await databaseService.getRecipes()
-  const categoryRecipes = allRecipes.filter(recipe => 
-    recipe.dietaryCategories?.some(cat => 
+  const categoryRecipes = allRecipes.filter(recipe => {
+    // Ensure dietaryCategories exists and is an array before filtering
+    if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
+      return false
+    }
+    return recipe.dietaryCategories.some(cat => 
       cat.toLowerCase() === category.name.toLowerCase()
     )
-  )
+  })
 
   // Generate structured data for SEO
   const categoryStructuredData = {

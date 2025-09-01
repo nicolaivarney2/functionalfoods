@@ -203,26 +203,42 @@ export default function RecipeOverviewPage() {
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(recipe =>
-        recipe.title.toLowerCase().includes(query) ||
-        (recipe.description?.toLowerCase().includes(query) || false) ||
-        recipe.ingredients?.some(ingredient =>
-          ingredient.name.toLowerCase().includes(query)
-        ) || false
-      )
+      filtered = filtered.filter(recipe => {
+        // Check title
+        if (recipe.title.toLowerCase().includes(query)) {
+          return true
+        }
+        // Check description
+        if (recipe.description?.toLowerCase().includes(query)) {
+          return true
+        }
+        // Check ingredients (ensure it's an array)
+        if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+          if (recipe.ingredients.some(ingredient =>
+            ingredient.name.toLowerCase().includes(query)
+          )) {
+            return true
+          }
+        }
+        return false
+      })
       console.log(`🔍 After search filter: ${filtered.length} recipes`)
     }
 
     // Apply dietary filter
     if (selectedDietary !== 'all') {
-      filtered = filtered.filter(recipe =>
-        recipe.dietaryCategories?.some(cat => {
+      filtered = filtered.filter(recipe => {
+        // Ensure dietaryCategories exists and is an array before filtering
+        if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
+          return false
+        }
+        return recipe.dietaryCategories.some(cat => {
           // Normalize category names by removing brackets for comparison
           const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
           const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
           return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
-        }) || false
-      )
+        })
+      })
       console.log(`🥗 After dietary filter: ${filtered.length} recipes`)
     }
 

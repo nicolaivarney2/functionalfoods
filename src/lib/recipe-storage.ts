@@ -26,24 +26,40 @@ export async function getRecipeBySlug(slug: string): Promise<Recipe | undefined>
 // Get recipes by category
 export async function getRecipesByCategory(category: string): Promise<Recipe[]> {
   const recipes = await getAllRecipes()
-  return recipes.filter(recipe =>
-    recipe.dietaryCategories.some(dietaryCategory =>
+  return recipes.filter(recipe => {
+    // Ensure dietaryCategories exists and is an array before filtering
+    if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
+      return false
+    }
+    return recipe.dietaryCategories.some(dietaryCategory =>
       dietaryCategory.toLowerCase() === category.toLowerCase()
     )
-  )
+  })
 }
 
 // Search recipes
 export async function searchRecipes(query: string): Promise<Recipe[]> {
   const recipes = await getAllRecipes()
   const searchTerm = query.toLowerCase()
-  return recipes.filter(recipe =>
-    recipe.title.toLowerCase().includes(searchTerm) ||
-    recipe.description.toLowerCase().includes(searchTerm) ||
-    recipe.ingredients.some(ingredient =>
-      ingredient.name.toLowerCase().includes(searchTerm)
-    )
-  )
+  return recipes.filter(recipe => {
+    // Check title
+    if (recipe.title.toLowerCase().includes(searchTerm)) {
+      return true
+    }
+    // Check description
+    if (recipe.description?.toLowerCase().includes(searchTerm)) {
+      return true
+    }
+    // Check ingredients (ensure it's an array)
+    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+      if (recipe.ingredients.some(ingredient =>
+        ingredient.name.toLowerCase().includes(searchTerm)
+      )) {
+        return true
+      }
+    }
+    return false
+  })
 }
 
 // Database-based functions - no longer need localStorage or importedRecipes

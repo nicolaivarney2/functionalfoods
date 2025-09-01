@@ -128,7 +128,7 @@ export function generateRecipeCollectionStructuredData(category: string, recipes
           "description": recipe.shortDescription,
           "recipeCategory": recipe.mainCategory,
           "recipeCuisine": "Danish",
-          "suitableForDiet": recipe.dietaryCategories.map(cat => {
+          "suitableForDiet": (recipe.dietaryCategories && Array.isArray(recipe.dietaryCategories)) ? recipe.dietaryCategories.map(cat => {
             const dietMap: { [key: string]: string } = {
               'Keto': 'https://schema.org/LowCarbDiet',
               'LCHF': 'https://schema.org/LowCarbDiet',
@@ -139,7 +139,7 @@ export function generateRecipeCollectionStructuredData(category: string, recipes
               'SENSE': 'https://schema.org/GlutenFreeDiet'
             }
             return dietMap[cat] || 'https://schema.org/GlutenFreeDiet'
-          })
+          }) : []
         }
       }))
     },
