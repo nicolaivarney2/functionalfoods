@@ -3,9 +3,10 @@ import { rema1000Scraper, Rema1000Scraper } from '@/lib/supermarket-scraper/rema
 import { databaseService } from '@/lib/database-service'
 import { createSupabaseClient } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
+export const dynamic = 'force-dynamic'
+
+async function handleUpdate(productId?: string | number, externalId?: string) {
   try {
-    const { productId, externalId } = await request.json()
 
     // Accept either a numeric REMA ID or a full external_id
     let numericId: number | null = null
@@ -97,6 +98,22 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
   }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { productId, externalId } = await request.json()
+    return await handleUpdate(productId, externalId)
+  } catch (e) {
+    return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 })
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url)
+  const productId = url.searchParams.get('productId') || undefined
+  const externalId = url.searchParams.get('externalId') || undefined
+  return await handleUpdate(productId, externalId)
 }
 
 
