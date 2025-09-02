@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
+import { POST as SyncFromScraper } from '../sync-from-scraper/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,16 +23,11 @@ export async function POST(request: NextRequest) {
     
     // NEW: Use DB-diff sync (latest scraped JSON) for reliable updates within serverless limits
     console.log('🔄 Starting delta update via DB-diff sync-from-scraper...')
-    const reqUrl = new URL(request.url)
-    const base = `${reqUrl.protocol}//${reqUrl.host}`
-    const syncRes = await fetch(`${base}/api/admin/dagligvarer/sync-from-scraper`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    })
+    const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }) as any
+    const syncRes = await SyncFromScraper(internalReq)
     const syncJson = await syncRes.json().catch(() => null)
-    if (!syncRes.ok || !syncJson?.success) {
-      return NextResponse.json({ success: false, message: 'Delta via DB-diff sync failed', error: syncJson?.error || `HTTP ${syncRes.status}` }, { status: 500 })
+    if (!syncJson?.success) {
+      return NextResponse.json({ success: false, message: 'Delta via DB-diff sync failed', error: syncJson?.error || 'unknown' }, { status: 500 })
     }
 
     const updated = syncJson?.changes?.updated ?? 0
