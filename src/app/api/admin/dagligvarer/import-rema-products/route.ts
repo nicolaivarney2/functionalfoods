@@ -292,14 +292,41 @@ export async function POST(request: NextRequest) {
     let updatedProducts = 0
     const errors: string[] = []
     
-    // 🔥 NEW: Store the scraped JSON as metadata
-    const scrapedDataMetadata = {
+    // 🔥 NEW: Store the scraped JSON as metadata (and upload a copy to Storage for a stable URL)
+    const scrapedDataMetadata: any = {
       timestamp: new Date().toISOString(),
       store: 'REMA 1000',
       totalProducts: products.length,
       source: 'python-scraper',
-      jsonData: JSON.stringify(products, null, 2), // Store the full JSON
+      jsonData: JSON.stringify(products, null, 2), // Store the full JSON inline as fallback
       version: '1.0'
+    }
+
+    // Try to upload JSON to Supabase Storage for a persistent public URL
+    try {
+      const bucket = 'scraper-data'
+      // Overwrite one stable file per store to avoid storage growth
+      const filePath = `rema/latest.json`
+      const uploadRes = await supabase
+        .storage
+        .from(bucket)
+        .upload(filePath, scrapedDataMetadata.jsonData, {
+          contentType: 'application/json',
+          upsert: true
+        })
+      if (!uploadRes.error) {
+        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filePath)
+        if (pub?.publicUrl) {
+          scrapedDataMetadata.jsonUrl = pub.publicUrl
+          // Remove inline JSON to keep DB lean when we have a URL
+          delete scrapedDataMetadata.jsonData
+          console.log('✅ Uploaded JSON to storage and set jsonUrl:', pub.publicUrl)
+        }
+      } else {
+        console.warn('⚠️ Storage upload failed:', uploadRes.error.message)
+      }
+    } catch (e) {
+      console.warn('⚠️ Storage upload threw error (continuing with inline jsonData):', e instanceof Error ? e.message : e)
     }
     
     // Store metadata in a separate table or as a special record
