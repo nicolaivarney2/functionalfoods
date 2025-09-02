@@ -633,8 +633,8 @@ export class Rema1000Scraper implements SupermarketAPI {
   /**
    * Simple batch update - checks REMA products in batches of 100
    */
-  async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
-    console.log('🔄 Starting simple batch update - checking REMA products in batches of 100')
+  async intelligentBatchUpdate(existingProducts: SupermarketProduct[], opts?: { batchSize?: number; maxTimeMs?: number; delayMs?: number }): Promise<any> {
+    console.log('🔄 Starting simple batch update - checking REMA products (paged)')
     console.log('🔧 TEST: This method is being called!')
     
     // Filter to only REMA products (since we only have REMA data for now)
@@ -664,11 +664,11 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
-    const batchSize = 10 // Smaller batches for Vercel timeout
+    const batchSize = opts?.batchSize ?? 10 // Smaller batches by default
     
     // Process in small batches for Vercel timeout (10 seconds)
     const startTime = Date.now()
-    const maxTime = 8000 // Stop after 8 seconds to avoid timeout
+    const maxTime = opts?.maxTimeMs ?? 8000 // Stop early by default; can be overridden
     let processedCount = 0
     
     for (let batchStart = 0; batchStart < storeProducts.length; batchStart += batchSize) {
@@ -748,7 +748,7 @@ export class Rema1000Scraper implements SupermarketAPI {
            }
           
           // Small delay between requests
-          await this.delay(100)
+          await this.delay(opts?.delayMs ?? 100)
           
         } catch (error) {
           console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
@@ -762,8 +762,8 @@ export class Rema1000Scraper implements SupermarketAPI {
       
       // Shorter delay between batches for Vercel
       if (batchEnd < storeProducts.length) {
-        console.log(`⏳ Waiting 500ms before next batch...`)
-        await this.delay(500)
+        console.log(`⏳ Waiting ${Math.min(500, opts?.delayMs ? opts.delayMs * 5 : 500)}ms before next batch...`)
+        await this.delay(Math.min(500, opts?.delayMs ? opts.delayMs * 5 : 500))
       }
     }
     

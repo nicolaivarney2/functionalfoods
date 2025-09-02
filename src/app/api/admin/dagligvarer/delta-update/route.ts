@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     
     // Perform intelligent batch update directly (skip smart delta investigation)
     console.log('🔄 Starting delta update with intelligentBatchUpdate...')
-    const deltaResult = await scraper.intelligentBatchUpdate(existingProducts.products)
+    const deltaResult = await scraper.intelligentBatchUpdate(existingProducts.products, { batchSize: 10, maxTimeMs: 9000, delayMs: 80 })
     console.log('✅ intelligentBatchUpdate completed:', deltaResult)
     
     console.log(`✅ Delta update completed:`)
