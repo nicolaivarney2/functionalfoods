@@ -23,7 +23,9 @@ export async function POST(request: NextRequest) {
     
     // NEW: Use DB-diff sync (latest scraped JSON) for reliable updates within serverless limits
     console.log('🔄 Starting delta update via DB-diff sync-from-scraper...')
-    const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }) as any
+    const publicBase = (process.env as any).NEXT_PUBLIC_SUPABASE_URL as string | undefined
+    const storageUrl = publicBase ? `${publicBase}/storage/v1/object/public/scraper-data/rema/latest.json` : undefined
+    const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(storageUrl ? { url: storageUrl } : {}) }) as any
     const syncRes = await SyncFromScraper(internalReq)
     const syncJson = await syncRes.json().catch(() => null)
     if (!syncJson?.success) {
