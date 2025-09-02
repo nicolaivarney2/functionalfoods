@@ -208,7 +208,8 @@ export class DatabaseService {
         const { data, error, count } = await supabase
           .from('supermarket_products')
           .select('*', { count: 'exact' })
-          .order('name', { ascending: true })
+          // Process oldest-updated products first so likely-changed items are checked earlier
+          .order('updated_at', { ascending: true })
           .range(offset, offset + limit - 1)
         
         if (error) {

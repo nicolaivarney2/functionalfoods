@@ -663,11 +663,11 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
-    const batchSize = opts?.batchSize ?? 10 // Smaller batches by default
+    const batchSize = opts?.batchSize ?? 25 // More aggressive default to hit changed items
     
     // Process in small batches for Vercel timeout (10 seconds)
     const startTime = Date.now()
-    const maxTime = opts?.maxTimeMs ?? 8000 // Stop early by default; can be overridden
+    const maxTime = opts?.maxTimeMs ?? 9000 // Slightly longer within Vercel limit
     let processedCount = 0
     
     for (let batchStart = 0; batchStart < storeProducts.length; batchStart += batchSize) {
