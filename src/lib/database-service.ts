@@ -461,12 +461,21 @@ export class DatabaseService {
         }
       })
       
-      console.log(`🔧 Updating product ${product.id} with:`, updateData)
+      const supabase = createSupabaseClient()
+      const externalId: string | undefined = (product as any).external_id
+      const identifier = externalId || String(product.id)
+
+      console.log(`🔧 Updating product using ${externalId ? 'external_id' : 'id'}=${identifier} with:`, updateData)
       
-      const { error } = await createSupabaseClient()
+      let query = supabase
         .from('supermarket_products')
         .update(updateData)
-        .eq('id', product.id)
+      if (externalId) {
+        query = query.eq('external_id', externalId)
+      } else {
+        query = query.eq('id', product.id)
+      }
+      const { error } = await query
 
       if (error) {
         console.error('Error updating supermarket product:', error)

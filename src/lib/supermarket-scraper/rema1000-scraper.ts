@@ -361,9 +361,8 @@ export class Rema1000Scraper implements SupermarketAPI {
     ]
 
     for (const candidate of candidates) {
-      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        return candidate
-      }
+      // IMPORTANT: Never use the database numeric primary key as a REMA product id
+      // Only parse from strings we know may contain the external REMA id
       if (typeof candidate === 'string') {
         // Try simple hyphen pattern first (e.g., "python-510315" or "rema-91251")
         const hyphenIdx = candidate.lastIndexOf('-')
@@ -728,6 +727,8 @@ export class Rema1000Scraper implements SupermarketAPI {
              
              if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
           const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          // Preserve existing external_id for DB update matching
+          ;(enhancedProduct as any).external_id = (existingProduct as any).external_id || (enhancedProduct as any).external_id
           updated.push(enhancedProduct)
           
                // Log changes
