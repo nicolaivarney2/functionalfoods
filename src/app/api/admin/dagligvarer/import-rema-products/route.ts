@@ -305,6 +305,19 @@ export async function POST(request: NextRequest) {
     // Try to upload JSON to Supabase Storage for a persistent public URL
     try {
       const bucket = 'scraper-data'
+      // Ensure bucket exists and is public
+      try {
+        // Try to create; ignore conflict errors if it already exists
+        const createRes = await supabase.storage.createBucket(bucket, { public: true })
+        if (createRes.error && !String(createRes.error.message || '').toLowerCase().includes('already exists')) {
+          console.warn('⚠️ Bucket creation failed:', createRes.error.message)
+        } else if (!createRes.error) {
+          console.log('✅ Created storage bucket:', bucket)
+        }
+      } catch (e) {
+        console.warn('⚠️ Bucket creation threw error (may already exist):', e instanceof Error ? e.message : e)
+      }
+
       // Overwrite one stable file per store to avoid storage growth
       const filePath = `rema/latest.json`
       const uploadRes = await supabase
