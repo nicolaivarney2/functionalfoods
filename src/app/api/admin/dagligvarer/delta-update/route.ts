@@ -25,11 +25,20 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Starting delta update via DB-diff sync-from-scraper...')
     const publicBase = (process.env as any).NEXT_PUBLIC_SUPABASE_URL as string | undefined
     const storageUrl = publicBase ? `${publicBase}/storage/v1/object/public/scraper-data/rema/latest.json` : undefined
-    const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(storageUrl ? { url: storageUrl } : {}) }) as any
-    const syncRes = await SyncFromScraper(internalReq)
-    const syncJson = await syncRes.json().catch(() => null)
-    if (!syncJson?.success) {
-      return NextResponse.json({ success: false, message: 'Delta via DB-diff sync failed', error: syncJson?.error || 'unknown' }, { status: 500 })
+    // Try latest.json first; if it fails, fall back to default metadata-based sync
+    let syncJson: any = null
+    try {
+      const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(storageUrl ? { url: storageUrl } : {}) }) as any
+      const syncRes = await SyncFromScraper(internalReq)
+      syncJson = await syncRes.json().catch(() => null)
+      if (!syncJson?.success) throw new Error(syncJson?.error || 'latest.json failed')
+    } catch (e) {
+      const fallbackReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }) as any
+      const fbRes = await SyncFromScraper(fallbackReq)
+      syncJson = await fbRes.json().catch(() => null)
+      if (!syncJson?.success) {
+        return NextResponse.json({ success: false, message: 'Delta via DB-diff sync failed', error: syncJson?.error || 'unknown' }, { status: 500 })
+      }
     }
 
     const updated = syncJson?.changes?.updated ?? 0
