@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 import { databaseService } from '@/lib/database-service'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,78 +20,47 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
     
-    // Initialize scraper
-    const scraper = new Rema1000Scraper()
-    
-    // Perform intelligent batch update directly (skip smart delta investigation)
-    console.log('🔄 Starting delta update with intelligentBatchUpdate...')
-    const deltaResult = await scraper.intelligentBatchUpdate(existingProducts.products, { batchSize: 25, maxTimeMs: 9500, delayMs: 60 })
-    console.log('✅ intelligentBatchUpdate completed:', deltaResult)
-    
-    console.log(`✅ Delta update completed:`)
-    console.log(`   - Updated: ${deltaResult.updated.length}`)
-    console.log(`   - New: ${deltaResult.new.length}`)
-    console.log(`   - Unchanged: ${deltaResult.unchanged.length}`)
-    console.log(`   - Total changes: ${deltaResult.totalChanges}`)
-    
-    // Update database with changes
-    let databaseUpdates = 0
-    
-    if (deltaResult.updated.length > 0) {
-      // Update existing products
-      for (const product of deltaResult.updated) {
-        try {
-          await databaseService.updateSupermarketProduct(product)
-          databaseUpdates++
-        } catch (error) {
-          console.log(`⚠️ Failed to update product ${product.id}:`, error)
-        }
-      }
+    // NEW: Use DB-diff sync (latest scraped JSON) for reliable updates within serverless limits
+    console.log('🔄 Starting delta update via DB-diff sync-from-scraper...')
+    const reqUrl = new URL(request.url)
+    const base = `${reqUrl.protocol}//${reqUrl.host}`
+    const syncRes = await fetch(`${base}/api/admin/dagligvarer/sync-from-scraper`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    })
+    const syncJson = await syncRes.json().catch(() => null)
+    if (!syncRes.ok || !syncJson?.success) {
+      return NextResponse.json({ success: false, message: 'Delta via DB-diff sync failed', error: syncJson?.error || `HTTP ${syncRes.status}` }, { status: 500 })
     }
-    
-    if (deltaResult.new.length > 0) {
-      // Add new products
-      for (const product of deltaResult.new) {
-        try {
-          await databaseService.addSupermarketProduct(product)
-          databaseUpdates++
-        } catch (error) {
-          console.log(`⚠️ Failed to add product ${product.id}:`, error)
-        }
-      }
-    }
-    
+
+    const updated = syncJson?.changes?.updated ?? 0
+    const inserted = syncJson?.changes?.inserted ?? 0
     const result = {
       success: true,
-      message: 'Delta update completed successfully',
+      message: 'Delta update (DB-diff) completed successfully',
       timestamp: new Date().toISOString(),
       delta: {
-        updated: deltaResult.updated.length,
-        new: deltaResult.new.length,
-        unchanged: deltaResult.unchanged.length,
-        totalChanges: deltaResult.totalChanges
+        updated,
+        new: inserted,
+        unchanged: Math.max(existingProducts.products.length - updated, 0),
+        totalChanges: updated + inserted
       },
       database: {
-        updates: databaseUpdates,
+        updates: updated + inserted,
         totalProducts: existingProducts.products.length,
         deltaStatus: 'completed',
         readyForDelta: existingProducts.products.length > 0
       },
       debug: {
-        methodUsed: 'intelligentBatchUpdate',
-        totalProductsFound: existingProducts.products.length,
-        remaProductsFound: existingProducts.products.filter(p => 
-          p.source === 'rema1000' || 
-          p.source === 'rema1000-python-scraper' ||
-          p.source?.includes('rema1000') ||
-          p.source?.includes('rema')
-        ).length,
-        sourcesFound: Array.from(new Set(existingProducts.products.map(p => p.source))),
-        sampleProducts: existingProducts.products.slice(0, 3).map(p => ({ id: p.id, name: p.name, source: p.source }))
+        methodUsed: 'sync-from-scraper',
+        totals: syncJson?.totals,
+        source: syncJson?.source,
+        samples: syncJson?.changes?.samples || []
       }
     }
-    
-    console.log('🎉 Delta update process completed:', result)
+
+    console.log('🎉 Delta (DB-diff) process completed:', result)
     return NextResponse.json(result)
     
   } catch (error) {
