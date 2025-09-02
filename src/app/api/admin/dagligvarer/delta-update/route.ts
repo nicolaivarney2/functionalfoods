@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
     // Try latest.json first; if it fails, fall back to default metadata-based sync
     let syncJson: any = null
     try {
-      const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(storageUrl ? { url: storageUrl } : {}) }) as any
+      // Prefer storage download via service client (no public URL dependency)
+      const internalReq = new Request('http://internal/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ forceLatestStorage: true }) }) as any
       const syncRes = await SyncFromScraper(internalReq)
       syncJson = await syncRes.json().catch(() => null)
       if (!syncJson?.success) throw new Error(syncJson?.error || 'latest.json failed')

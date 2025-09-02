@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
     const inputUrl: string | undefined = body?.url
     const metadataId: string | number | undefined = body?.metadataId
     const store: string = body?.store || 'REMA 1000'
+    const forceLatestStorage: boolean = Boolean(body?.forceLatestStorage)
 
     const loadFromUrl = async (url: string): Promise<any[]> => {
       const res = await fetch(url, { cache: 'no-store' })
@@ -55,6 +56,17 @@ export async function POST(req: NextRequest) {
 
     const loadFromMetadata = async (): Promise<{ list: any[]; source: any }> => {
       const supabase = createSupabaseServiceClient()
+      // Force reading the latest.json directly from Storage when requested
+      if (forceLatestStorage) {
+        const dl = await supabase.storage.from('scraper-data').download('rema/latest.json')
+        if (dl.data) {
+          const text = await dl.data.text()
+          const json = JSON.parse(text)
+          const list = Array.isArray(json) ? json : (json?.products ?? [])
+          return { list, source: { type: 'storageLatestJson' } }
+        }
+        // If download failed, continue with normal metadata resolution
+      }
       if (metadataId) {
         const { data, error } = await supabase
           .from('scraping_metadata')
