@@ -74,10 +74,10 @@ export async function GET(req: NextRequest) {
         
         testResults.endpoints.push(result)
         
-      } catch (error) {
+      } catch (error: any) {
         testResults.endpoints.push({
           endpoint,
-          error: error.message,
+          error: error?.message || 'Unknown error',
           status: 'failed'
         })
       }
@@ -106,8 +106,8 @@ export async function GET(req: NextRequest) {
           preview: html.substring(0, 1000)
         }
       }
-    } catch (error) {
-      testResults.mainPage = { error: error.message }
+    } catch (error: any) {
+      testResults.mainPage = { error: error?.message || 'Unknown error' }
     }
     
     console.log('✅ Endpoint testing completed')
