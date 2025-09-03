@@ -66,7 +66,7 @@ function transformProduct(productData: any): any {
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
-  const maxTimeMs = 9000 // 9 seconds for Vercel timeout (safe margin)
+  const maxTimeMs = 9500 // 9.5 seconds for Vercel timeout (safe margin)
   
   try {
     console.log('🚀 Starting REMA 1000 full scrape with existing scraper...')
@@ -95,7 +95,11 @@ export async function POST(req: NextRequest) {
     const departments = departmentsData.data || []
     console.log(`📂 Found ${departments.length} departments`)
     
-    for (const department of departments) {
+    // Limit to first 3 departments for quick scrape (to avoid timeout)
+    const limitedDepartments = departments.slice(0, 3)
+    console.log(`🔍 Limiting to first ${limitedDepartments.length} departments to avoid timeout`)
+    
+    for (const department of limitedDepartments) {
       // Check timeout before starting each department
       if (Date.now() - startTime > maxTimeMs) {
         console.log(`⏰ Timeout reached, stopping at department ${department.name}`)
