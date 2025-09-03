@@ -177,7 +177,8 @@ export async function POST(req: NextRequest) {
                 image_url: product.image_url,
                 available: product.available,
                 last_updated: product.last_updated,
-                source: product.source
+                source: product.source,
+                store: product.store
               })
               .select('id')
               .single()
