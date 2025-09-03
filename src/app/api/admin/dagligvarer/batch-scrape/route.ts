@@ -44,7 +44,7 @@ function transformProduct(productData: any): any {
     }
 
     return {
-      external_id: `rema-${externalId}`,
+      external_id: `python-${externalId}`, // Use same format as existing products
       name: product.name || 'Unknown Product',
       description: product.declaration || product.description || null,
       category: product.department?.name || 'Uncategorized',
