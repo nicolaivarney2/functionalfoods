@@ -5,6 +5,44 @@ import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function transformProduct(productData: any): any {
+  try {
+    // Handle REMA's API structure: { data: { ... } }
+    const product = productData.data || productData
+    
+    if (!product.id && !product.name) {
+      return null
+    }
+
+    const externalId = String(product.id)
+    const currentPrice = product.prices?.[0]?.price || 0
+    const originalPrice = product.prices?.[0]?.price || currentPrice
+    const onSale = product.prices?.[0]?.is_campaign || false
+
+    return {
+      external_id: `rema-${externalId}`,
+      name: product.name || 'Unknown Product',
+      description: product.declaration || product.description || null,
+      category: product.department?.name || 'Uncategorized',
+      price: currentPrice || null,
+      original_price: originalPrice || null,
+      isOnSale: onSale,
+      imageUrl: product.images?.[0]?.large || product.images?.[0]?.medium || null,
+      available: product.is_available_in_all_stores !== false,
+      lastUpdated: new Date().toISOString(),
+      source: 'rema1000',
+      // Additional REMA-specific fields
+      underline: product.underline || null,
+      nutrition_info: product.nutrition_info || null,
+      compare_unit_price: product.prices?.[0]?.compare_unit_price || null,
+      compare_unit: product.prices?.[0]?.compare_unit || null
+    }
+  } catch (error) {
+    console.error('Transform error:', error)
+    return null
+  }
+}
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
   const maxTimeMs = 25000 // 25 seconds for Vercel timeout
