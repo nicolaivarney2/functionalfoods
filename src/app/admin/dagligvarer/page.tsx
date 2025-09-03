@@ -341,6 +341,34 @@ export default function AdminDagligvarerPage() {
                 onClick={async () => {
                   try {
                     setIsLoading(true)
+                    const response = await fetch('/api/admin/dagligvarer/debug-zyte', {
+                      method: 'POST'
+                    })
+                    const result = await response.json()
+                    console.log('🔍 Zyte debug results:', result)
+                    
+                    if (result.success) {
+                      alert(`✅ Zyte debug completed!\n\nCheck console for detailed results.\n\nFound ${result.results?.length || 0} test results.`)
+                    } else {
+                      alert(`❌ Zyte debug failed: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('Zyte debug failed:', error)
+                    alert('Zyte debug failed - check console')
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm"
+              >
+                Debug Zyte API
+              </button>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    setIsLoading(true)
                     const response = await fetch('/api/admin/dagligvarer/simple-rema-scraper', {
                       method: 'POST'
                     })
