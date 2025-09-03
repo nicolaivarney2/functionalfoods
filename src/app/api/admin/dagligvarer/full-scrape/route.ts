@@ -66,7 +66,7 @@ function transformProduct(productData: any): any {
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
-  const maxTimeMs = 8000 // 8 seconds for Vercel timeout (safe margin)
+  const maxTimeMs = 9000 // 9 seconds for Vercel timeout (safe margin)
   
   try {
     console.log('🚀 Starting REMA 1000 full scrape with existing scraper...')
@@ -146,6 +146,19 @@ export async function POST(req: NextRequest) {
     
     console.log(`📦 Discovered ${discoveredProducts.length} products`)
     
+    // Check if we're already close to timeout
+    if (Date.now() - startTime > maxTimeMs - 2000) {
+      console.log(`⏰ Already close to timeout, skipping database processing`)
+      return NextResponse.json({
+        success: true,
+        message: 'Scrape completed but skipped database processing due to timeout',
+        productsFound: discoveredProducts.length,
+        productsAdded: 0,
+        productsUpdated: 0,
+        executionTime: Date.now() - startTime
+      })
+    }
+    
     if (discoveredProducts.length === 0) {
       return NextResponse.json({
         success: false,
@@ -158,7 +171,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Process products in batches to avoid timeout
-    const batchSize = 50
+    const batchSize = 20 // Smaller batches for faster processing
     let productsAdded = 0
     let productsUpdated = 0
     let processedCount = 0
@@ -208,6 +221,7 @@ export async function POST(req: NextRequest) {
           
           if (upsertError) {
             console.error(`❌ Failed to upsert product ${product.external_id}:`, upsertError)
+            console.error(`❌ Product data:`, JSON.stringify(product, null, 2))
           } else {
             if (existingProduct) {
               // Product existed before - this was an update
