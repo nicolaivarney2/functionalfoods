@@ -78,7 +78,7 @@ async function discoverREMAEndpoints(): Promise<string[]> {
       }
     }
     
-    return [...new Set(endpoints)] // Remove duplicates
+    return Array.from(new Set(endpoints)) // Remove duplicates
   } catch (error) {
     console.error('Failed to discover endpoints:', error)
     return []
