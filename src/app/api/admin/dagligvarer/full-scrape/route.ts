@@ -23,9 +23,25 @@ export async function POST(req: NextRequest) {
     
     console.log(`📊 Current products in DB: ${currentCount || 0}`)
     
-    // Discover products using the existing scraper
-    console.log('🔍 Discovering products...')
-    const discoveredProducts = await scraper.discoverProducts()
+    // Test with known working product IDs first
+    console.log('🔍 Testing with known product IDs...')
+    const knownProductIds = [60112, 61508, 304020, 440065, 410873] // From your examples
+    const discoveredProducts = []
+    
+    for (const productId of knownProductIds) {
+      try {
+        console.log(`🔍 Fetching product ${productId}...`)
+        const product = await scraper.fetchProduct(productId)
+        if (product) {
+          discoveredProducts.push(product)
+          console.log(`✅ Found product: ${product.name}`)
+        }
+      } catch (error) {
+        console.log(`❌ Failed to fetch product ${productId}:`, error)
+      }
+    }
+    
+    console.log(`📦 Found ${discoveredProducts.length} products from known IDs`)
     
     console.log(`📦 Discovered ${discoveredProducts.length} products`)
     
