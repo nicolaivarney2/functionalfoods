@@ -152,13 +152,15 @@ export async function POST(req: NextRequest) {
             }
             
             // Add price history
-            await databaseService.addPriceHistory({
-              id: existingProduct.id,
-              price: freshProduct.price,
-              originalPrice: freshProduct.original_price,
-              isOnSale: freshProduct.is_on_sale,
-              timestamp: new Date().toISOString()
-            })
+            await supabase
+              .from('supermarket_price_history')
+              .insert({
+                product_id: existingProduct.id,
+                price: freshProduct.price,
+                original_price: freshProduct.original_price,
+                is_on_sale: freshProduct.is_on_sale,
+                timestamp: new Date().toISOString()
+              })
             
             console.log(`✅ Updated ${existingProduct.name}: ${existingProduct.price} → ${freshProduct.price} (sale: ${existingProduct.is_on_sale} → ${freshProduct.is_on_sale})`)
             return { status: 'updated', product: existingProduct, freshProduct }
