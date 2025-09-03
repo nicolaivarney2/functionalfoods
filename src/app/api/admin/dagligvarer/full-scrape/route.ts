@@ -120,6 +120,13 @@ export async function POST(req: NextRequest) {
       
       for (const product of batch) {
         try {
+          // Check if product already exists BEFORE upsert
+          const { data: existingProduct } = await supabase
+            .from('supermarket_products')
+            .select('id, price')
+            .eq('external_id', product.external_id)
+            .single()
+          
           // Use upsert to insert or update product
           const { data: upsertedProduct, error: upsertError } = await supabase
             .from('supermarket_products')
@@ -145,11 +152,12 @@ export async function POST(req: NextRequest) {
           if (upsertError) {
             console.error(`❌ Failed to upsert product ${product.external_id}:`, upsertError)
           } else {
-            // Check if this was an insert or update by checking if price changed
-            if (upsertedProduct.price !== product.price) {
+            if (existingProduct) {
+              // Product existed before - this was an update
               productsUpdated++
               console.log(`🔄 Updated product: ${product.name}`)
             } else {
+              // Product didn't exist before - this was an insert
               productsAdded++
               console.log(`➕ Added product: ${product.name}`)
             }
