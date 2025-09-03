@@ -66,10 +66,14 @@ export async function POST(req: NextRequest) {
     const discoveredProducts = []
     
     // Get all departments first
+    console.log('🔍 Fetching departments...')
     const departmentsResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments')
-    const departmentsData = await departmentsResponse.json()
-    const departments = departmentsData.data || []
+    console.log('📡 Departments response status:', departmentsResponse.status)
     
+    const departmentsData = await departmentsResponse.json()
+    console.log('📊 Departments data:', JSON.stringify(departmentsData).substring(0, 500) + '...')
+    
+    const departments = departmentsData.data || []
     console.log(`📂 Found ${departments.length} departments`)
     
     for (const department of departments) {
@@ -81,8 +85,13 @@ export async function POST(req: NextRequest) {
       while (hasMorePages && Date.now() - startTime < maxTimeMs) {
         try {
           const url = `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=${page}&limit=50`
+          console.log(`📡 Fetching: ${url}`)
           const response = await fetch(url)
+          console.log(`📡 Response status: ${response.status}`)
+          
           const data = await response.json()
+          console.log(`📊 Response data keys:`, Object.keys(data))
+          console.log(`📦 Products in response:`, data.data?.length || 0)
           
           if (data.data && data.data.length > 0) {
             // Transform products to our format
