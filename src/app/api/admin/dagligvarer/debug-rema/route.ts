@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
           }
         })
         
-        const result = {
+        const result: any = {
           endpoint,
           status: response.status,
           statusText: response.statusText,
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
               result.responseType = 'text'
               result.responsePreview = text.substring(0, 500)
             }
-          } catch (parseError) {
+          } catch (parseError: any) {
             result.parseError = parseError.message
           }
         }
