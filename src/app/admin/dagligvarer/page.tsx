@@ -369,6 +369,38 @@ export default function AdminDagligvarerPage() {
                 onClick={async () => {
                   try {
                     setIsLoading(true)
+                    const response = await fetch('/api/admin/dagligvarer/test-zyte-playground', {
+                      method: 'POST'
+                    })
+                    const result = await response.json()
+                    console.log('🧪 Zyte playground results:', result)
+                    
+                    if (result.success) {
+                      const summary = result.summary
+                      alert(`✅ Zyte Playground Test Completed!\n\n` +
+                            `Tests: ${summary.successfulTests}/${summary.totalTests} successful\n` +
+                            `Products Found: ${summary.totalProductsFound}\n\n` +
+                            `Check console for detailed results!`)
+                    } else {
+                      alert(`❌ Zyte playground test failed: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('Zyte playground test failed:', error)
+                    alert('Zyte playground test failed - check console')
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+              >
+                Test Zyte Playground
+              </button>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    setIsLoading(true)
                     const response = await fetch('/api/admin/dagligvarer/simple-rema-scraper', {
                       method: 'POST'
                     })
