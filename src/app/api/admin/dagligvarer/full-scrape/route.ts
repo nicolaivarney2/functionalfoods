@@ -23,25 +23,57 @@ export async function POST(req: NextRequest) {
     
     console.log(`📊 Current products in DB: ${currentCount || 0}`)
     
-    // Test with known working product IDs first
-    console.log('🔍 Testing with known product IDs...')
-    const knownProductIds = [60112, 61508, 304020, 440065, 410873] // From your examples
+    // Get all products from all departments
+    console.log('🔍 Fetching all products from all departments...')
     const discoveredProducts = []
     
-    for (const productId of knownProductIds) {
-      try {
-        console.log(`🔍 Fetching product ${productId}...`)
-        const product = await scraper.fetchProduct(productId)
-        if (product) {
-          discoveredProducts.push(product)
-          console.log(`✅ Found product: ${product.name}`)
+    // Get all departments first
+    const departmentsResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments')
+    const departmentsData = await departmentsResponse.json()
+    const departments = departmentsData.data || []
+    
+    console.log(`📂 Found ${departments.length} departments`)
+    
+    for (const department of departments) {
+      console.log(`🔍 Fetching products from ${department.name} (ID: ${department.id})...`)
+      
+      let page = 1
+      let hasMorePages = true
+      
+      while (hasMorePages && Date.now() - startTime < maxTimeMs) {
+        try {
+          const url = `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=${page}&limit=50`
+          const response = await fetch(url)
+          const data = await response.json()
+          
+          if (data.data && data.data.length > 0) {
+            // Transform products to our format
+            for (const productData of data.data) {
+              const transformedProduct = transformProduct(productData)
+              if (transformedProduct) {
+                discoveredProducts.push(transformedProduct)
+              }
+            }
+            
+            console.log(`📦 Page ${page}: Found ${data.data.length} products (Total: ${discoveredProducts.length})`)
+            
+            // Check if there are more pages
+            const pagination = data.meta?.pagination
+            hasMorePages = pagination && page < pagination.last_page
+            page++
+          } else {
+            hasMorePages = false
+          }
+        } catch (error) {
+          console.log(`❌ Error fetching page ${page} from ${department.name}:`, error)
+          hasMorePages = false
         }
-      } catch (error) {
-        console.log(`❌ Failed to fetch product ${productId}:`, error)
       }
+      
+      console.log(`✅ Completed ${department.name}: ${discoveredProducts.length} total products`)
     }
     
-    console.log(`📦 Found ${discoveredProducts.length} products from known IDs`)
+    console.log(`📦 Total products found: ${discoveredProducts.length}`)
     
     console.log(`📦 Discovered ${discoveredProducts.length} products`)
     
