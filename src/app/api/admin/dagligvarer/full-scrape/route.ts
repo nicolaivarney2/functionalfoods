@@ -140,7 +140,8 @@ export async function POST(req: NextRequest) {
                 is_on_sale: product.is_on_sale,
                 image_url: product.image_url,
                 available: product.available,
-                last_updated: product.last_updated
+                last_updated: product.last_updated,
+                store: product.store
               })
               .eq('external_id', product.external_id)
             
