@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     
     const totalProducts = products?.length || 0
     const productsOnSale = products?.filter(p => p.is_on_sale).length || 0
-    const categories = [...new Set(products?.map(p => p.category).filter(Boolean))] || []
+    const categories = products ? [...new Set(products.map(p => p.category).filter(Boolean))] : []
     const averagePrice = products?.length > 0 
       ? products.reduce((sum, p) => sum + (p.price || 0), 0) / products.length 
       : 0
