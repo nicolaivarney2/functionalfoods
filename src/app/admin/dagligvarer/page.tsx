@@ -274,9 +274,9 @@ export default function AdminDagligvarerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Full Scrape */}
             <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-2">Fuld Scraping (Zyte-powered)</h3>
+              <h3 className="text-lg font-semibold mb-2">Fuld Scraping</h3>
               <p className="text-sm text-gray-600 mb-4">
-                🚀 Bruger Zyte API til at omgå anti-bot beskyttelse. Scraper alle produkter fra butikken.
+                🚀 Scraper alle produkter fra REMA 1000's API. 
                 Opdaterer eksisterende produkter og tilføjer nye. Bevarer prishistorik.
               </p>
               
@@ -294,9 +294,9 @@ export default function AdminDagligvarerPage() {
 
             {/* Price Scrape */}
             <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-2">Pris/Tilbud Scraping (Zyte-powered)</h3>
+              <h3 className="text-lg font-semibold mb-2">Pris/Tilbud Scraping</h3>
               <p className="text-sm text-gray-600 mb-4">
-                💰 Bruger Zyte API til at tjekke priser og tilbud på eksisterende produkter. 
+                💰 Tjekker priser og tilbud på eksisterende produkter. 
                 Hurtig opdatering af tilbudsinfo. Bevarer al anden data.
               </p>
               

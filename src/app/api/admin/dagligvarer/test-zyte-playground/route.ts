@@ -44,12 +44,12 @@ export async function POST(req: NextRequest) {
     
     const testResults = []
 
-    // Test 1: Try automatic product extraction from main page
-    console.log('🔍 Test 1: Automatic product extraction from main page')
+    // Test 1: Try REMA's real API endpoint
+    console.log('🔍 Test 1: REMA API v3 products endpoint')
     try {
       const productPayload = {
-        url: 'https://shop.rema1000.dk/',
-        productList: true,
+        url: 'https://api.digital.rema1000.dk/api/v3/products?page=1&limit=50',
+        httpResponseBody: true,
         geolocation: 'DK'
       }
 
