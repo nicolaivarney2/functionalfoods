@@ -223,6 +223,31 @@ export default function SupermarketScraperPage() {
     }
   }
 
+  const handleSimpleDelta = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/admin/dagligvarer/simple-delta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      const result = await response.json()
+      if (result.success) {
+        console.log('✅ Simple delta completed:', result)
+        alert(`🎉 Simple delta completed!\n\nUpdated: ${result.results?.updated ?? 0}\nUnchanged: ${result.results?.unchanged ?? 0}\nErrors: ${result.results?.errors ?? 0}`)
+        loadDatabaseStats()
+        loadLatestProducts()
+      } else {
+        console.error('❌ Simple delta failed:', result)
+        alert(`❌ Simple delta failed: ${result.message || 'Unknown error'}`)
+      }
+    } catch (e) {
+      console.error('Error running simple delta:', e)
+      alert('❌ Network error while running simple delta')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const stopScraping = () => {
     setScrapingStatus('idle')
   }
@@ -760,6 +785,15 @@ export default function SupermarketScraperPage() {
                       Delta Update
                     </button>
                   )}
+
+                  <button
+                    onClick={handleSimpleDelta}
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <RefreshCw size={16} />
+                    Simple Delta Update
+                  </button>
 
                   <button
                     onClick={handleFullScrapeOverwrite}
