@@ -111,12 +111,16 @@ export default function AdminDagligvarerPage() {
     if (isLoading) return
     setIsLoading(true)
     
-    // Get departments first
+    // Get departments first via our API
     let departments = []
     try {
-      const deptResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments')
+      const deptResponse = await fetch('/api/admin/dagligvarer/departments')
       const deptData = await deptResponse.json()
-      departments = deptData.data || []
+      if (deptData.success) {
+        departments = deptData.departments || []
+      } else {
+        throw new Error(deptData.message || 'Failed to fetch departments')
+      }
     } catch (error) {
       console.error('Failed to fetch departments:', error)
       alert('❌ Failed to fetch departments')
