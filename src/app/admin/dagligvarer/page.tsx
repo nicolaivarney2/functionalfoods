@@ -29,6 +29,8 @@ export default function AdminDagligvarerPage() {
   const [fullScrapeProgress, setFullScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [priceScrapeProgress, setPriceScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [replaceAll, setReplaceAll] = useState(false)
 
   const shops = [
     { id: 'rema1000', name: 'REMA 1000', status: 'active' },
@@ -272,10 +274,10 @@ export default function AdminDagligvarerPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Full Scrape */}
             <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-2">Fuld Scraping (Månedlig)</h3>
+              <h3 className="text-lg font-semibold mb-2">Fuld Scraping (Zyte-powered)</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Scraper alle produkter fra butikken. Opdaterer eksisterende produkter og tilføjer nye.
-                Bevarer prishistorik.
+                🚀 Bruger Zyte API til at omgå anti-bot beskyttelse. Scraper alle produkter fra butikken.
+                Opdaterer eksisterende produkter og tilføjer nye. Bevarer prishistorik.
               </p>
               
               <button
@@ -292,10 +294,10 @@ export default function AdminDagligvarerPage() {
 
             {/* Price Scrape */}
             <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-2">Pris/Tilbud Scraping (Ugentlig)</h3>
+              <h3 className="text-lg font-semibold mb-2">Pris/Tilbud Scraping (Zyte-powered)</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Tjekker kun priser og tilbud på eksisterende produkter. Hurtig opdatering af tilbudsinfo.
-                Bevarer al anden data.
+                💰 Bruger Zyte API til at tjekke priser og tilbud på eksisterende produkter. 
+                Hurtig opdatering af tilbudsinfo. Bevarer al anden data.
               </p>
               
               <button
@@ -368,12 +370,13 @@ export default function AdminDagligvarerPage() {
 
           {/* Information */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">ℹ️ Information</h4>
+            <h4 className="font-medium text-blue-900 mb-2">🚀 Zyte API Integration</h4>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• <strong>Fuld Scraping:</strong> Brug månedligt for at opdatere hele produktkataloget</li>
-              <li>• <strong>Pris Scraping:</strong> Brug ugentligt for at holde priser og tilbud opdateret</li>
-              <li>• Alle scrapers arbejder i batches for at undgå timeout</li>
+              <li>• <strong>Fuld Scraping:</strong> Bruger Zyte til at omgå anti-bot beskyttelse og scrape alle produkter</li>
+              <li>• <strong>Pris Scraping:</strong> Zyte-baseret prisopdatering på eksisterende produkter</li>
+              <li>• <strong>Konfiguration:</strong> Tilføj ZYTE_API_KEY til environment variables</li>
               <li>• Prishistorik bevares altid - ingen data går tabt</li>
+              <li>• Automatisk endpoint discovery og fejlhåndtering</li>
             </ul>
           </div>
         </div>

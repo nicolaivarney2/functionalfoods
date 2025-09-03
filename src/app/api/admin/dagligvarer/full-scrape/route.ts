@@ -4,182 +4,238 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// REMA 1000 GraphQL/API helpers - updated based on their actual structure
-async function fetchRemaCategories(): Promise<string[]> {
-  try {
-    // Try to get categories from their main API
-    const response = await fetch('https://shop.rema1000.dk/api/categories', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://shop.rema1000.dk/'
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      return data.categories?.map((cat: any) => cat.slug || cat.id) || []
-    }
-    
-    // Fallback to known categories
-    return [
-      'frugt-groent',
-      'koed-fisk-fjerkrae', 
-      'mejeri-aegger',
-      'broed-kager',
-      'kolonial',
-      'drikkevarer',
-      'snacks-slik',
-      'husholdning-rengoring',
-      'personlig-pleje',
-      'fryse-koel'
-    ]
-  } catch (error) {
-    console.error('Failed to fetch categories:', error)
-    return [
-      'frugt-groent',
-      'koed-fisk-fjerkrae', 
-      'mejeri-aegger',
-      'broed-kager',
-      'kolonial',
-      'drikkevarer'
-    ]
-  }
+// Zyte API configuration
+const ZYTE_API_KEY = process.env.ZYTE_API_KEY
+const ZYTE_API_URL = 'https://api.zyte.com/v1/extract'
+
+if (!ZYTE_API_KEY) {
+  console.error('❌ ZYTE_API_KEY environment variable is required')
 }
 
-async function fetchRemaProductsByCategory(category: string, page: number = 1): Promise<any[]> {
-  try {
-    // Try their GraphQL endpoint first
-    const graphqlResponse = await fetch('https://shop.rema1000.dk/api/graphql', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://shop.rema1000.dk/'
-      },
-      body: JSON.stringify({
-        query: `
-          query GetProducts($category: String!, $page: Int!, $limit: Int!) {
-            products(category: $category, page: $page, limit: $limit) {
-              items {
-                id
-                name
-                description
-                price {
-                  value
-                  currency
-                }
-                originalPrice {
-                  value
-                  currency
-                }
-                category {
-                  name
-                  slug
-                }
-                subcategory {
-                  name
-                  slug
-                }
-                unit
-                amount
-                quantity
-                unitPrice
-                imageUrl
-                available
-                labels
-              }
-              total
-              hasMore
-            }
-          }
-        `,
-        variables: {
-          category,
-          page,
-          limit: 100
-        }
-      })
-    })
-
-    if (graphqlResponse.ok) {
-      const graphqlData = await graphqlResponse.json()
-      return graphqlData.data?.products?.items || []
-    }
-
-    // Fallback to REST API
-    const restResponse = await fetch(`https://shop.rema1000.dk/api/products?category=${category}&page=${page}&limit=100`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://shop.rema1000.dk/'
-      }
-    })
-
-    if (restResponse.ok) {
-      const restData = await restResponse.json()
-      return restData.products || restData.items || []
-    }
-
-    return []
-  } catch (error) {
-    console.error(`Error fetching products for category ${category}:`, error)
-    return []
+// Zyte API helper functions
+async function zyteRequest(payload: any): Promise<any> {
+  if (!ZYTE_API_KEY) {
+    throw new Error('Zyte API key not configured')
   }
+
+  const response = await fetch(ZYTE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${Buffer.from(`${ZYTE_API_KEY}:`).toString('base64')}`,
+      'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip, deflate, br'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    throw new Error(`Zyte API error: ${response.status} ${response.statusText}`)
+  }
+
+  return response.json()
 }
 
-async function fetchRemaProduct(productId: number): Promise<any> {
+function decodeBase64Response(body: string): any {
   try {
-    const response = await fetch(`https://shop.rema1000.dk/api/products/${productId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Referer': 'https://shop.rema1000.dk/'
-      }
-    })
-    
-    if (!response.ok) return null
-    return await response.json()
+    const decoded = Buffer.from(body, 'base64').toString('utf-8')
+    return JSON.parse(decoded)
   } catch (error) {
+    console.error('Failed to decode Zyte response:', error)
     return null
   }
 }
 
-function transformRemaProduct(apiData: any): any {
-  if (!apiData?.product) return null
+async function discoverREMAEndpoints(): Promise<string[]> {
+  console.log('🔍 Discovering REMA API endpoints via Zyte...')
   
-  const product = apiData.product
-  const price = product.price?.value || 0
-  const originalPrice = product.originalPrice?.value || price
-  const isOnSale = product.price?.value < product.originalPrice?.value
+  const payload = {
+    url: 'https://shop.rema1000.dk/',
+    geolocation: 'DK',
+    networkCapture: [
+      {
+        filterType: 'url',
+        matchType: 'contains', 
+        value: 'api',
+        httpResponseBody: true
+      }
+    ],
+    actions: [
+      { action: 'waitForResponse', url: { matchType: 'contains', value: 'api' } },
+      { action: 'scrollBottom' },
+      { action: 'wait', seconds: 2 }
+    ]
+  }
+
+  try {
+    const result = await zyteRequest(payload)
+    const endpoints: string[] = []
+    
+    for (const capture of result.networkCapture || []) {
+      const url = capture.url
+      if (url && url.includes('api')) {
+        endpoints.push(url)
+        console.log(`✅ Found API endpoint: ${url}`)
+      }
+    }
+    
+    return [...new Set(endpoints)] // Remove duplicates
+  } catch (error) {
+    console.error('Failed to discover endpoints:', error)
+    return []
+  }
+}
+
+async function fetchJSONViaZyte(url: string): Promise<any> {
+  const payload = {
+    url,
+    httpResponseBody: true,
+    geolocation: 'DK'
+  }
+
+  try {
+    const result = await zyteRequest(payload)
+    if (result.httpResponseBody) {
+      return decodeBase64Response(result.httpResponseBody)
+    }
+  } catch (error) {
+    console.error(`Failed to fetch ${url} via Zyte:`, error)
+  }
   
-  return {
-    external_id: `python-${product.id}`,
-    name: product.name || '',
-    description: product.description || null,
-    category: product.category?.name || null,
-    subcategory: product.subcategory?.name || null,
-    price: price,
-    original_price: originalPrice,
-    is_on_sale: isOnSale,
-    unit: product.unit || null,
-    amount: product.amount || null,
-    quantity: product.quantity || null,
-    unit_price: product.unitPrice || null,
-    currency: 'DKK',
-    store: 'REMA 1000',
-    store_url: `https://shop.rema1000.dk/produkt/${product.id}`,
-    image_url: product.imageUrl || null,
-    available: product.available !== false,
-    last_updated: new Date().toISOString(),
-    source: 'rema1000'
+  return null
+}
+
+async function findWorkingProductsEndpoint(): Promise<string | null> {
+  console.log('🎯 Testing product endpoints via Zyte...')
+  
+  const testPatterns = [
+    'https://shop.rema1000.dk/api/products',
+    'https://shop.rema1000.dk/api/v1/products', 
+    'https://shop.rema1000.dk/api/v2/products',
+    'https://shop.rema1000.dk/webapi/products',
+    'https://shop.rema1000.dk/api/products?page=1&limit=50'
+  ]
+
+  for (const url of testPatterns) {
+    console.log(`🔍 Testing: ${url}`)
+    const data = await fetchJSONViaZyte(url)
+    
+    if (data) {
+      // Check if this looks like product data
+      let products = []
+      if (Array.isArray(data)) {
+        products = data
+      } else if (data.products) {
+        products = data.products
+      } else if (data.items) {
+        products = data.items
+      } else if (data.data) {
+        products = data.data
+      }
+
+      if (products.length > 0) {
+        const firstItem = products[0]
+        if (firstItem.id || firstItem.name || firstItem.price) {
+          console.log(`✅ Found working products endpoint: ${url}`)
+          return url
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+async function scrapeProductsPaginated(baseUrl: string, maxProducts: number = 1000): Promise<any[]> {
+  console.log(`🛒 Scraping products from: ${baseUrl}`)
+  
+  const allProducts: any[] = []
+  let page = 1
+  const maxPages = Math.ceil(maxProducts / 50)
+
+  while (page <= maxPages && allProducts.length < maxProducts) {
+    const url = baseUrl.includes('?') 
+      ? `${baseUrl}&page=${page}&limit=50`
+      : `${baseUrl}?page=${page}&limit=50`
+    
+    console.log(`📄 Fetching page ${page}...`)
+    const data = await fetchJSONViaZyte(url)
+    
+    if (!data) {
+      console.log(`❌ No data for page ${page}, stopping`)
+      break
+    }
+
+    // Extract products from response
+    let products = []
+    if (Array.isArray(data)) {
+      products = data
+    } else if (data.products) {
+      products = data.products
+    } else if (data.items) {
+      products = data.items
+    } else if (data.data) {
+      products = data.data
+    }
+
+    if (products.length === 0) {
+      console.log(`📄 No products on page ${page}, stopping`)
+      break
+    }
+
+    allProducts.push(...products)
+    console.log(`📄 Page ${page}: ${products.length} products (Total: ${allProducts.length})`)
+
+    // Stop if we got fewer products than expected (end of data)
+    if (products.length < 50) {
+      console.log(`📄 Got ${products.length} products (< 50), assuming end of data`)
+      break
+    }
+
+    page++
+    
+    // Small delay between requests
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+
+  return allProducts
+}
+
+function transformProduct(productData: any): any {
+  try {
+    const product = productData.product || productData
+    
+    if (!product.id && !product.productId && !product.name) {
+      return null
+    }
+
+    const externalId = String(product.id || product.productId || Math.random())
+    const currentPrice = parseFloat(product.price?.value || product.price || product.currentPrice || 0)
+    const originalPrice = parseFloat(product.originalPrice?.value || product.originalPrice || product.listPrice || currentPrice)
+    const onSale = currentPrice < originalPrice
+
+    return {
+      external_id: `rema-${externalId}`,
+      name: product.name || product.title || 'Unknown Product',
+      description: product.description || null,
+      category: product.category?.name || product.category || 'Uncategorized',
+      price: currentPrice || null,
+      original_price: originalPrice || null,
+      on_sale: onSale,
+      brand: product.brand || product.manufacturer || null,
+      image_url: product.imageUrl || product.image || null,
+      available: product.available !== false,
+      last_updated: new Date().toISOString(),
+      source: 'rema1000'
+    }
+  } catch (error) {
+    console.error('Transform error:', error)
+    return null
   }
 }
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
-  const maxTimeMs = 9000 // 9 seconds to stay under Vercel's 10s limit
+  const maxTimeMs = 25000 // 25 seconds for Zyte requests
   
   try {
     const body = await req.json()
@@ -191,140 +247,130 @@ export async function POST(req: NextRequest) {
         message: `Shop ${shop} not implemented yet`
       }, { status: 400 })
     }
+
+    if (!ZYTE_API_KEY) {
+      return NextResponse.json({
+        success: false,
+        message: 'Zyte API key not configured. Please add ZYTE_API_KEY to environment variables.'
+      }, { status: 500 })
+    }
     
-    console.log('🚀 Starting full scrape for', shop)
+    console.log('🚀 Starting Zyte-powered full scrape for', shop)
     
     const supabase = createSupabaseServiceClient()
     
-    // Get categories from REMA
-    console.log('🔍 Fetching categories...')
-    const categories = await fetchRemaCategories()
-    console.log(`📂 Found ${categories.length} categories:`, categories)
+    // Step 1: Discover API endpoints
+    const discoveredEndpoints = await discoverREMAEndpoints()
+    console.log(`📡 Discovered ${discoveredEndpoints.length} endpoints`)
+
+    // Step 2: Find working products endpoint
+    const productsEndpoint = await findWorkingProductsEndpoint()
     
+    if (!productsEndpoint) {
+      return NextResponse.json({
+        success: false,
+        message: 'No working products endpoint found via Zyte API',
+        discoveredEndpoints
+      }, { status: 500 })
+    }
+
+    // Step 3: Scrape products
+    const maxProducts = Math.floor((maxTimeMs - (Date.now() - startTime)) / 1000) * 10 // Estimate based on remaining time
+    const allProducts = await scrapeProductsPaginated(productsEndpoint, maxProducts)
+    
+    console.log(`📦 Scraped ${allProducts.length} total products`)
+
+    // Step 4: Process and save products
     let processed = 0
     let updated = 0
     let inserted = 0
     let errors = 0
-    const allProducts: any[] = []
-    
-    // Scrape products by category
-    for (const category of categories) {
-      // Check time limit
-      if (Date.now() - startTime > maxTimeMs * 0.8) {
-        console.log(`⏰ Time limit reached after ${processed} products. Stopping to avoid timeout.`)
+
+    for (const productData of allProducts) {
+      if (Date.now() - startTime > maxTimeMs * 0.9) {
+        console.log(`⏰ Time limit reached. Processed ${processed} of ${allProducts.length} products`)
         break
       }
-      
-      console.log(`🛒 Scraping category: ${category}`)
-      
+
       try {
-        let page = 1
-        let hasMore = true
-        
-        while (hasMore && Date.now() - startTime < maxTimeMs * 0.8) {
-          const categoryProducts = await fetchRemaProductsByCategory(category, page)
-          
-          if (categoryProducts.length === 0) {
-            hasMore = false
-            break
-          }
-          
-          console.log(`📦 Found ${categoryProducts.length} products in ${category} (page ${page})`)
-          allProducts.push(...categoryProducts)
-          
-          // Process this batch of products
-          for (const productData of categoryProducts) {
-            if (Date.now() - startTime > maxTimeMs * 0.8) break
-            
-            try {
-              const transformedProduct = transformRemaProduct({ product: productData })
-              if (!transformedProduct) {
-                errors++
-                continue
-              }
-              
-              // Check if product exists
-              const { data: existingProduct } = await supabase
-                .from('supermarket_products')
-                .select('id, price, original_price, is_on_sale')
-                .eq('external_id', transformedProduct.external_id)
-                .single()
-              
-              if (existingProduct) {
-                // Update existing product
-                const { error: updateError } = await supabase
-                  .from('supermarket_products')
-                  .update(transformedProduct)
-                  .eq('id', existingProduct.id)
-                
-                if (updateError) throw updateError
-                
-                // Add price history if price changed
-                if (existingProduct.price !== transformedProduct.price || 
-                    existingProduct.is_on_sale !== transformedProduct.is_on_sale) {
-                  await supabase
-                    .from('supermarket_price_history')
-                    .insert({
-                      product_id: existingProduct.id,
-                      price: transformedProduct.price,
-                      original_price: transformedProduct.original_price,
-                      is_on_sale: transformedProduct.is_on_sale,
-                      timestamp: transformedProduct.last_updated
-                    })
-                }
-                
-                updated++
-              } else {
-                // Insert new product
-                const { data: newProduct, error: insertError } = await supabase
-                  .from('supermarket_products')
-                  .insert(transformedProduct)
-                  .select('id')
-                  .single()
-                
-                if (insertError) throw insertError
-                
-                // Add initial price history
-                await supabase
-                  .from('supermarket_price_history')
-                  .insert({
-                    product_id: newProduct.id,
-                    price: transformedProduct.price,
-                    original_price: transformedProduct.original_price,
-                    is_on_sale: transformedProduct.is_on_sale,
-                    timestamp: transformedProduct.last_updated
-                  })
-                
-                inserted++
-              }
-              
-              processed++
-              
-            } catch (error) {
-              console.error(`Error processing product:`, error)
-              errors++
-            }
-          }
-          
-          page++
-          
-          // Small delay between pages
-          await new Promise(resolve => setTimeout(resolve, 50))
+        const transformedProduct = transformProduct(productData)
+        if (!transformedProduct) {
+          errors++
+          continue
         }
-        
+
+        // Check if product exists
+        const { data: existingProduct } = await supabase
+          .from('supermarket_products')
+          .select('id, price, on_sale')
+          .eq('external_id', transformedProduct.external_id)
+          .single()
+
+        if (existingProduct) {
+          // Update existing product
+          const { error: updateError } = await supabase
+            .from('supermarket_products')
+            .update(transformedProduct)
+            .eq('id', existingProduct.id)
+
+          if (updateError) throw updateError
+
+          // Add price history if price changed
+          if (existingProduct.price !== transformedProduct.price || 
+              existingProduct.on_sale !== transformedProduct.on_sale) {
+            await supabase
+              .from('supermarket_price_history')
+              .insert({
+                product_id: existingProduct.id,
+                price: transformedProduct.price,
+                original_price: transformedProduct.original_price,
+                on_sale: transformedProduct.on_sale,
+                recorded_at: new Date().toISOString()
+              })
+          }
+
+          updated++
+        } else {
+          // Insert new product
+          const { data: newProduct, error: insertError } = await supabase
+            .from('supermarket_products')
+            .insert(transformedProduct)
+            .select('id')
+            .single()
+
+          if (insertError) throw insertError
+
+          // Add initial price history
+          if (transformedProduct.price !== null) {
+            await supabase
+              .from('supermarket_price_history')
+              .insert({
+                product_id: newProduct.id,
+                price: transformedProduct.price,
+                original_price: transformedProduct.original_price,
+                on_sale: transformedProduct.on_sale,
+                recorded_at: new Date().toISOString()
+              })
+          }
+
+          inserted++
+        }
+
+        processed++
+
       } catch (error) {
-        console.error(`Error scraping category ${category}:`, error)
+        console.error('Error processing product:', error)
         errors++
       }
     }
     
     const timeElapsed = Date.now() - startTime
     
-    console.log(`✅ Full scrape completed: ${processed} processed, ${updated} updated, ${inserted} new, ${errors} errors`)
+    console.log(`✅ Zyte scrape completed: ${processed} processed, ${updated} updated, ${inserted} new, ${errors} errors`)
     
     return NextResponse.json({
       success: true,
-      message: 'Full scrape completed',
+      message: 'Zyte-powered full scrape completed',
       shop,
       timeElapsed,
       stats: {
@@ -334,18 +380,18 @@ export async function POST(req: NextRequest) {
         inserted,
         errors
       },
-      categories: {
-        scanned: categories.length,
-        completed: categories.length
+      zyte: {
+        discoveredEndpoints: discoveredEndpoints.length,
+        productsEndpoint
       }
     })
     
-  } catch (error) {
-    console.error('❌ Full scrape failed:', error)
+  } catch (error: any) {
+    console.error('❌ Zyte scrape failed:', error)
     return NextResponse.json({
       success: false,
-      message: 'Full scrape failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Zyte scrape failed',
+      error: error?.message || 'Unknown error'
     }, { status: 500 })
   }
 }
