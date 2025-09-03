@@ -90,13 +90,18 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now()
     
     for (let i = 0; i < productsToCheck.length; i += batchSize) {
-      // Check if we're running out of time
-      if (Date.now() - startTime > maxTimeMs) {
+      const batch = productsToCheck.slice(i, i + batchSize)
+      
+      // Check if we're running out of time, but be smart about it
+      const timeElapsed = Date.now() - startTime
+      const remainingProducts = productsToCheck.length - i
+      
+      // If we have less than 2 batches left, process them regardless of time
+      // This prevents stopping with just a few products remaining
+      if (timeElapsed > maxTimeMs && remainingProducts > batchSize * 2) {
         console.log(`⏰ Time limit reached after ${i} products. Stopping to avoid timeout.`)
         break
       }
-      
-      const batch = productsToCheck.slice(i, i + batchSize)
       
       console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(productsToCheck.length/batchSize)} (products ${i + 1}-${Math.min(i + batchSize, productsToCheck.length)})`)
       
