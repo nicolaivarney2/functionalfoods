@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
           const productId = existingProduct.external_id.replace('rema-', '')
           
           // Get updated product data from REMA API
-          const updatedProduct = await scraper.getProductById(parseInt(productId))
+          const updatedProduct = await scraper.fetchProduct(parseInt(productId))
           
           if (updatedProduct) {
             const oldPrice = existingProduct.price
