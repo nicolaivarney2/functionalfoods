@@ -729,14 +729,17 @@ export default function SupermarketScraperPage() {
               
               <div className="space-y-4">
                 <div className="flex gap-3 flex-wrap">
-                  <button
-                    onClick={startScraping}
-                    disabled={scrapingStatus === 'running' || isLoading}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <Play size={16} />
-                    Quick Scrape (sample)
-                  </button>
+                  {/* Quick Scrape removed */}
+                  {false && (
+                    <button
+                      onClick={startScraping}
+                      disabled={scrapingStatus === 'running' || isLoading}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Play size={16} />
+                      Quick Scrape (sample)
+                    </button>
+                  )}
                   
                   <button
                     onClick={stopScraping}
@@ -747,14 +750,17 @@ export default function SupermarketScraperPage() {
                     Stop Scraping
                   </button>
 
-                  <button
-                    onClick={handleDeltaUpdate}
-                    disabled={isLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    <RefreshCw size={16} />
-                    Delta Update
-                  </button>
+                  {/* Delta Update removed */}
+                  {false && (
+                    <button
+                      onClick={handleDeltaUpdate}
+                      disabled={isLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw size={16} />
+                      Delta Update
+                    </button>
+                  )}
 
                   <button
                     onClick={handleFullScrapeOverwrite}
