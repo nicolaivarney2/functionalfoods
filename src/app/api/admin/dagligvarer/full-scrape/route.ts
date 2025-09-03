@@ -120,86 +120,50 @@ export async function POST(req: NextRequest) {
       
       for (const product of batch) {
         try {
-          // Check if product already exists
-          const { data: existingProduct } = await supabase
+          // Use upsert to insert or update product
+          const { data: upsertedProduct, error: upsertError } = await supabase
             .from('supermarket_products')
-            .select('id, price, original_price')
-            .eq('external_id', product.external_id)
+            .upsert({
+              external_id: product.external_id,
+              name: product.name,
+              description: product.description,
+              category: product.category,
+              price: product.price,
+              original_price: product.original_price,
+              is_on_sale: product.is_on_sale,
+              image_url: product.image_url,
+              available: product.available,
+              last_updated: product.last_updated,
+              source: product.source,
+              store: product.store
+            }, {
+              onConflict: 'external_id'
+            })
+            .select('id, price')
             .single()
           
-          if (existingProduct) {
-            // Update existing product
-            const { error: updateError } = await supabase
-              .from('supermarket_products')
-              .update({
-                name: product.name,
-                description: product.description,
-                category: product.category,
-                price: product.price,
-                original_price: product.original_price,
-                is_on_sale: product.is_on_sale,
-                image_url: product.image_url,
-                available: product.available,
-                last_updated: product.last_updated,
-                store: product.store
-              })
-              .eq('external_id', product.external_id)
-            
-            if (updateError) {
-              console.error(`❌ Failed to update product ${product.external_id}:`, updateError)
-            } else {
-              productsUpdated++
-              
-              // Add price history if price changed
-              if (existingProduct.price !== product.price) {
-                await supabase
-                  .from('supermarket_price_history')
-                  .insert({
-                    product_id: existingProduct.id,
-                    price: product.price,
-                    original_price: product.original_price,
-                    is_on_sale: product.isOnSale,
-                    recorded_at: new Date().toISOString()
-                  })
-              }
-            }
+          if (upsertError) {
+            console.error(`❌ Failed to upsert product ${product.external_id}:`, upsertError)
           } else {
-            // Insert new product
-            const { data: newProduct, error: insertError } = await supabase
-              .from('supermarket_products')
-              .insert({
-                external_id: product.external_id,
-                name: product.name,
-                description: product.description,
-                category: product.category,
-                price: product.price,
-                original_price: product.original_price,
-                is_on_sale: product.is_on_sale,
-                image_url: product.image_url,
-                available: product.available,
-                last_updated: product.last_updated,
-                source: product.source,
-                store: product.store
-              })
-              .select('id')
-              .single()
-            
-            if (insertError) {
-              console.error(`❌ Failed to insert product ${product.external_id}:`, insertError)
+            // Check if this was an insert or update by checking if price changed
+            if (upsertedProduct.price !== product.price) {
+              productsUpdated++
+              console.log(`🔄 Updated product: ${product.name}`)
             } else {
               productsAdded++
-              
-              // Add initial price history
-              await supabase
-                .from('supermarket_price_history')
-                .insert({
-                  product_id: newProduct.id,
-                  price: product.price,
-                  original_price: product.original_price,
-                  is_on_sale: product.isOnSale,
-                  recorded_at: new Date().toISOString()
-                })
+              console.log(`➕ Added product: ${product.name}`)
             }
+            
+            // Add price history
+            await supabase
+              .from('supermarket_price_history')
+              .insert({
+                product_id: upsertedProduct.id,
+                price: product.price,
+                original_price: product.original_price,
+                is_on_sale: product.is_on_sale,
+                recorded_at: new Date().toISOString()
+              })
           }
           
           processedCount++
