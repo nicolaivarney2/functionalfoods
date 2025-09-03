@@ -15,9 +15,34 @@ function transformProduct(productData: any): any {
     }
 
     const externalId = String(product.id)
-    const currentPrice = product.prices?.[0]?.price || 0
-    const originalPrice = product.prices?.[0]?.price || currentPrice
-    const onSale = product.prices?.[0]?.is_campaign || false
+    
+    // 🔥 FIXED: REMA has 2 prices - [0] = campaign, [1] = regular
+    let currentPrice = 0
+    let originalPrice = 0
+    let onSale = false
+    
+    if (product.prices && product.prices.length >= 2) {
+      // Two prices: campaign price (index 0) and regular price (index 1)
+      const campaignPrice = product.prices[0]
+      const regularPrice = product.prices[1]
+      
+      if (campaignPrice.is_campaign) {
+        currentPrice = campaignPrice.price
+        originalPrice = regularPrice.price
+        onSale = true
+      } else {
+        // No campaign, use regular price
+        currentPrice = regularPrice.price
+        originalPrice = regularPrice.price
+        onSale = false
+      }
+    } else if (product.prices && product.prices.length === 1) {
+      // Only one price - check if it's a campaign
+      const price = product.prices[0]
+      currentPrice = price.price
+      originalPrice = price.price
+      onSale = price.is_campaign || false
+    }
 
     return {
       external_id: `rema-${externalId}`,
