@@ -49,7 +49,7 @@ export default function SupermarketScraperPage() {
   const [lastScraping, setLastScraping] = useState<string | null>(null)
   const [databaseStats, setDatabaseStats] = useState<DatabaseStats | null>(null)
   const [selectedStore, setSelectedStore] = useState<string>('rema1000')
-  const [importResult, setImportResult] = useState<{success: boolean, message: string} | null>(null)
+  const [importResult, setImportResult] = useState<{success: boolean, message: string, jsonUrl?: string | null, storagePath?: string} | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [latestScraping, setLatestScraping] = useState<{
     timestamp: string
@@ -382,7 +382,9 @@ export default function SupermarketScraperPage() {
       if (result.success) {
         setImportResult({
           success: true,
-          message: `✅ Full import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`
+          message: `✅ Full import successful! ${result.import?.newProducts || result.newProducts || 0} new, ${result.import?.updatedProducts || result.updatedProducts || 0} updated products`,
+          jsonUrl: result.metadata?.jsonUrl || null,
+          storagePath: result.metadata?.storagePath || 'scraper-data/rema/latest.json'
         })
         // Refresh database stats
         loadDatabaseStats()
@@ -878,6 +880,18 @@ export default function SupermarketScraperPage() {
                     <p className={`text-sm ${importResult.success ? 'text-green-800' : 'text-red-800'}`}>
                       {importResult.message}
                     </p>
+                    {importResult.success && (
+                      <div className="mt-2 text-xs text-green-700 space-y-1">
+                        {importResult.jsonUrl && (
+                          <div>
+                            Public URL: <a className="underline" href={importResult.jsonUrl} target="_blank" rel="noreferrer">{importResult.jsonUrl}</a>
+                          </div>
+                        )}
+                        {importResult.storagePath && (
+                          <div>Storage path: {importResult.storagePath}</div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

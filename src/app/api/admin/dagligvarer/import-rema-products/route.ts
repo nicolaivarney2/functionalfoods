@@ -591,7 +591,9 @@ export async function POST(request: NextRequest) {
         stored: !metadataError,
         timestamp: scrapedDataMetadata.timestamp,
         store: scrapedDataMetadata.store,
-        totalProducts: scrapedDataMetadata.totalProducts
+        totalProducts: scrapedDataMetadata.totalProducts,
+        jsonUrl: scrapedDataMetadata.jsonUrl || null,
+        storagePath: 'scraper-data/rema/latest.json'
       },
       timestamp: new Date().toISOString()
     })
