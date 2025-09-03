@@ -317,22 +317,53 @@ export default function AdminDagligvarerPage() {
             <p className="text-sm text-yellow-800 mb-3">
               Test REMA 1000's endpoints for at finde ud af hvorfor scraping ikke virker.
             </p>
-            <button
-              onClick={async () => {
-                try {
-                  const response = await fetch('/api/admin/dagligvarer/debug-rema')
-                  const result = await response.json()
-                  console.log('🔍 Debug results:', result)
-                  alert('Check console for detailed debug results!')
-                } catch (error) {
-                  console.error('Debug failed:', error)
-                  alert('Debug test failed - check console')
-                }
-              }}
-              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
-            >
-              Test REMA Endpoints
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/admin/dagligvarer/debug-rema')
+                    const result = await response.json()
+                    console.log('🔍 Debug results:', result)
+                    alert('Check console for detailed debug results!')
+                  } catch (error) {
+                    console.error('Debug failed:', error)
+                    alert('Debug test failed - check console')
+                  }
+                }}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
+              >
+                Test REMA Endpoints
+              </button>
+              
+              <button
+                onClick={async () => {
+                  try {
+                    setIsLoading(true)
+                    const response = await fetch('/api/admin/dagligvarer/simple-rema-scraper', {
+                      method: 'POST'
+                    })
+                    const result = await response.json()
+                    console.log('🔍 Simple scraper results:', result)
+                    
+                    if (result.success) {
+                      alert(`✅ Simple scraper success!\n\nFound: ${result.stats?.found || 0}\nUpdated: ${result.stats?.updated || 0}\nNew: ${result.stats?.inserted || 0}\nApproach: ${result.approach || 'unknown'}`)
+                      await loadStats()
+                    } else {
+                      alert(`❌ Simple scraper failed: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('Simple scraper failed:', error)
+                    alert('Simple scraper failed - check console')
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
+              >
+                Test Simple Scraper
+              </button>
+            </div>
           </div>
 
           {/* Information */}
