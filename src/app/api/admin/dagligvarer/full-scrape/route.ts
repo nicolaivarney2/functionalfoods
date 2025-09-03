@@ -30,7 +30,8 @@ function transformProduct(productData: any): any {
       image_url: product.images?.[0]?.large || product.images?.[0]?.medium || null,
       available: product.is_available_in_all_stores !== false,
       last_updated: new Date().toISOString(),
-      source: 'rema1000'
+      source: 'rema1000',
+      store: 'rema1000'
     }
   } catch (error) {
     console.error('Transform error:', error)
