@@ -120,6 +120,13 @@ async function findWorkingProductsEndpoint(): Promise<string | null> {
     const data = await fetchJSONViaZyte(url)
     
     if (data) {
+      console.log(`📊 Response from ${url}:`, {
+        isArray: Array.isArray(data),
+        keys: typeof data === 'object' ? Object.keys(data) : 'not object',
+        length: Array.isArray(data) ? data.length : 'not array',
+        preview: JSON.stringify(data).substring(0, 200) + '...'
+      })
+      
       // Check if this looks like product data
       let products = []
       if (Array.isArray(data)) {
@@ -132,16 +139,30 @@ async function findWorkingProductsEndpoint(): Promise<string | null> {
         products = data.data
       }
 
+      console.log(`📦 Extracted ${products.length} products from ${url}`)
+
       if (products.length > 0) {
         const firstItem = products[0]
+        console.log(`🔍 First item from ${url}:`, {
+          hasId: !!firstItem.id,
+          hasName: !!firstItem.name,
+          hasPrice: !!firstItem.price,
+          keys: Object.keys(firstItem)
+        })
+        
         if (firstItem.id || firstItem.name || firstItem.price) {
           console.log(`✅ Found working products endpoint: ${url}`)
           return url
         }
+      } else {
+        console.log(`⚠️ No products found in response from ${url}`)
       }
+    } else {
+      console.log(`❌ No data returned from ${url}`)
     }
   }
 
+  console.log('❌ No working products endpoint found')
   return null
 }
 
@@ -267,9 +288,126 @@ export async function POST(req: NextRequest) {
     const productsEndpoint = await findWorkingProductsEndpoint()
     
     if (!productsEndpoint) {
+      console.log('🔄 No API endpoints found, trying main page scraping...')
+      
+      // Fallback: Try to scrape from main page
+      const mainPageData = await fetchJSONViaZyte('https://shop.rema1000.dk/')
+      
+      if (mainPageData && mainPageData.products) {
+        console.log('✅ Found products on main page, using fallback strategy')
+        // Use main page as endpoint
+        const allProducts = mainPageData.products || []
+        
+        // Process and save products
+        let processed = 0
+        let updated = 0
+        let inserted = 0
+        let errors = 0
+
+        for (const productData of allProducts) {
+          if (Date.now() - startTime > maxTimeMs * 0.9) {
+            console.log(`⏰ Time limit reached. Processed ${processed} of ${allProducts.length} products`)
+            break
+          }
+
+          try {
+            const transformedProduct = transformProduct(productData)
+            if (!transformedProduct) {
+              errors++
+              continue
+            }
+
+            // Check if product exists
+            const { data: existingProduct } = await supabase
+              .from('supermarket_products')
+              .select('id, price, on_sale')
+              .eq('external_id', transformedProduct.external_id)
+              .single()
+
+            if (existingProduct) {
+              // Update existing product
+              const { error: updateError } = await supabase
+                .from('supermarket_products')
+                .update(transformedProduct)
+                .eq('id', existingProduct.id)
+
+              if (updateError) throw updateError
+
+              // Add price history if price changed
+              if (existingProduct.price !== transformedProduct.price || 
+                  existingProduct.on_sale !== transformedProduct.on_sale) {
+                await supabase
+                  .from('supermarket_price_history')
+                  .insert({
+                    product_id: existingProduct.id,
+                    price: transformedProduct.price,
+                    original_price: transformedProduct.original_price,
+                    on_sale: transformedProduct.on_sale,
+                    recorded_at: new Date().toISOString()
+                  })
+              }
+
+              updated++
+            } else {
+              // Insert new product
+              const { data: newProduct, error: insertError } = await supabase
+                .from('supermarket_products')
+                .insert(transformedProduct)
+                .select('id')
+                .single()
+
+              if (insertError) throw insertError
+
+              // Add initial price history
+              if (transformedProduct.price !== null) {
+                await supabase
+                  .from('supermarket_price_history')
+                  .insert({
+                    product_id: newProduct.id,
+                    price: transformedProduct.price,
+                    original_price: transformedProduct.original_price,
+                    on_sale: transformedProduct.on_sale,
+                    recorded_at: new Date().toISOString()
+                  })
+              }
+
+              inserted++
+            }
+
+            processed++
+
+          } catch (error) {
+            console.error('Error processing product:', error)
+            errors++
+          }
+        }
+        
+        const timeElapsed = Date.now() - startTime
+        
+        console.log(`✅ Main page scrape completed: ${processed} processed, ${updated} updated, ${inserted} new, ${errors} errors`)
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Main page scrape completed (fallback)',
+          shop,
+          timeElapsed,
+          stats: {
+            processed,
+            total: allProducts.length,
+            updated,
+            inserted,
+            errors
+          },
+          zyte: {
+            discoveredEndpoints: discoveredEndpoints.length,
+            usedFallback: true
+          }
+        })
+      }
+      
       return NextResponse.json({
         success: false,
-        message: 'No working products endpoint found via Zyte API',
+        message: 'No working products endpoint found via Zyte API and main page fallback failed',
         discoveredEndpoints
       }, { status: 500 })
     }
