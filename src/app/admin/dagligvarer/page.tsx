@@ -201,15 +201,14 @@ export default function SupermarketScraperPage() {
   const handleFullScrapeOverwrite = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/admin/dagligvarer/sync-from-scraper', {
+      const response = await fetch('/api/admin/dagligvarer/full-scrape', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ forceLatestStorage: true })
+        headers: { 'Content-Type': 'application/json' }
       })
       const result = await response.json()
       if (result.success) {
-        console.log('✅ Full scrape (DB overwrite) completed:', result)
-        alert(`🎉 Full scrape completed!\n\nOpdaterede: ${result.changes?.updated ?? 0}\nIndsat nye: ${result.changes?.inserted ?? 0}`)
+        console.log('✅ Full scrape completed:', result)
+        alert(`🎉 Full scrape completed!\n\nScraped: ${result.scrape?.totalScraped ?? 0}\nNew products: ${result.scrape?.newProducts ?? 0}\nUpdated: ${result.scrape?.updatedProducts ?? 0}`)
         loadDatabaseStats()
         loadLatestProducts()
       } else {
@@ -217,7 +216,7 @@ export default function SupermarketScraperPage() {
         alert(`❌ Full scrape failed: ${result.message || 'Unknown error'}`)
       }
     } catch (e) {
-      console.error('Error running full scrape overwrite:', e)
+      console.error('Error running full scrape:', e)
       alert('❌ Network error while running full scrape')
     } finally {
       setIsLoading(false)

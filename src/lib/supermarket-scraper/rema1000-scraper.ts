@@ -844,6 +844,63 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     return enhancedProduct
   }
+
+  async scrapeAllProducts(): Promise<{ success: boolean; products?: SupermarketProduct[]; error?: string }> {
+    try {
+      console.log('🚀 Starting full REMA 1000 scrape...')
+      const products = await this.fetchAllProducts()
+      console.log(`✅ Scraped ${products.length} products`)
+      return { success: true, products }
+    } catch (error) {
+      console.error('❌ Full scrape failed:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  }
+
+  async uploadToStorage(products: SupermarketProduct[]): Promise<{ success: boolean; jsonUrl?: string; storagePath?: string; error?: string }> {
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+
+      const jsonData = JSON.stringify(products, null, 2)
+      const fileName = `rema/latest.json`
+      
+      const { data, error } = await supabase.storage
+        .from('scraper-data')
+        .upload(fileName, jsonData, {
+          contentType: 'application/json',
+          upsert: true
+        })
+
+      if (error) {
+        console.error('❌ Storage upload failed:', error)
+        return { success: false, error: error.message }
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from('scraper-data')
+        .getPublicUrl(fileName)
+
+      console.log('✅ Uploaded to Supabase Storage:', publicUrl.publicUrl)
+      return { 
+        success: true, 
+        jsonUrl: publicUrl.publicUrl,
+        storagePath: fileName
+      }
+    } catch (error) {
+      console.error('❌ Storage upload error:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  }
 }
 
 // Export the scraper instance
