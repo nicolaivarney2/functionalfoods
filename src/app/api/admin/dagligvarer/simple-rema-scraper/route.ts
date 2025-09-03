@@ -44,8 +44,8 @@ async function tryRemaEndpoint(url: string, options: any = {}): Promise<any> {
     } catch {
       return { raw: text, length: text.length }
     }
-  } catch (error) {
-    console.log(`❌ ${url} error:`, error.message)
+  } catch (error: any) {
+    console.log(`❌ ${url} error:`, error?.message || 'Unknown error')
     return null
   }
 }
@@ -168,8 +168,8 @@ export async function POST(req: NextRequest) {
           console.log(`✅ Approach ${i + 1} worked! Found ${products.length} products`)
           break
         }
-      } catch (error) {
-        console.log(`❌ Approach ${i + 1} failed:`, error.message)
+      } catch (error: any) {
+        console.log(`❌ Approach ${i + 1} failed:`, error?.message || 'Unknown error')
       }
     }
     
@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
           inserted++
         }
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error processing product:', error)
         errors++
       }
@@ -264,12 +264,12 @@ export async function POST(req: NextRequest) {
       }
     })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Simple scraper failed:', error)
     return NextResponse.json({
       success: false,
       message: 'Simple scraper failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error?.message || 'Unknown error'
     }, { status: 500 })
   }
 }
@@ -306,7 +306,7 @@ function transformRemaProduct(productData: any): any {
       last_updated: new Date().toISOString(),
       source: 'rema1000'
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Transform error:', error)
     return null
   }
