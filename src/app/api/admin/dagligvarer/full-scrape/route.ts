@@ -4,7 +4,131 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// REMA 1000 API helpers
+// REMA 1000 GraphQL/API helpers - updated based on their actual structure
+async function fetchRemaCategories(): Promise<string[]> {
+  try {
+    // Try to get categories from their main API
+    const response = await fetch('https://shop.rema1000.dk/api/categories', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://shop.rema1000.dk/'
+      }
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      return data.categories?.map((cat: any) => cat.slug || cat.id) || []
+    }
+    
+    // Fallback to known categories
+    return [
+      'frugt-groent',
+      'koed-fisk-fjerkrae', 
+      'mejeri-aegger',
+      'broed-kager',
+      'kolonial',
+      'drikkevarer',
+      'snacks-slik',
+      'husholdning-rengoring',
+      'personlig-pleje',
+      'fryse-koel'
+    ]
+  } catch (error) {
+    console.error('Failed to fetch categories:', error)
+    return [
+      'frugt-groent',
+      'koed-fisk-fjerkrae', 
+      'mejeri-aegger',
+      'broed-kager',
+      'kolonial',
+      'drikkevarer'
+    ]
+  }
+}
+
+async function fetchRemaProductsByCategory(category: string, page: number = 1): Promise<any[]> {
+  try {
+    // Try their GraphQL endpoint first
+    const graphqlResponse = await fetch('https://shop.rema1000.dk/api/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://shop.rema1000.dk/'
+      },
+      body: JSON.stringify({
+        query: `
+          query GetProducts($category: String!, $page: Int!, $limit: Int!) {
+            products(category: $category, page: $page, limit: $limit) {
+              items {
+                id
+                name
+                description
+                price {
+                  value
+                  currency
+                }
+                originalPrice {
+                  value
+                  currency
+                }
+                category {
+                  name
+                  slug
+                }
+                subcategory {
+                  name
+                  slug
+                }
+                unit
+                amount
+                quantity
+                unitPrice
+                imageUrl
+                available
+                labels
+              }
+              total
+              hasMore
+            }
+          }
+        `,
+        variables: {
+          category,
+          page,
+          limit: 100
+        }
+      })
+    })
+
+    if (graphqlResponse.ok) {
+      const graphqlData = await graphqlResponse.json()
+      return graphqlData.data?.products?.items || []
+    }
+
+    // Fallback to REST API
+    const restResponse = await fetch(`https://shop.rema1000.dk/api/products?category=${category}&page=${page}&limit=100`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://shop.rema1000.dk/'
+      }
+    })
+
+    if (restResponse.ok) {
+      const restData = await restResponse.json()
+      return restData.products || restData.items || []
+    }
+
+    return []
+  } catch (error) {
+    console.error(`Error fetching products for category ${category}:`, error)
+    return []
+  }
+}
+
 async function fetchRemaProduct(productId: number): Promise<any> {
   try {
     const response = await fetch(`https://shop.rema1000.dk/api/products/${productId}`, {
@@ -72,135 +196,126 @@ export async function POST(req: NextRequest) {
     
     const supabase = createSupabaseServiceClient()
     
-    // Discover products by scanning REMA's product IDs
-    const productIds: number[] = []
-    const scanRanges = [
-      { start: 1, end: 1000 },
-      { start: 10000, end: 15000 },
-      { start: 50000, end: 70000 },
-      { start: 100000, end: 120000 }
-    ]
+    // Get categories from REMA
+    console.log('🔍 Fetching categories...')
+    const categories = await fetchRemaCategories()
+    console.log(`📂 Found ${categories.length} categories:`, categories)
     
-    // Quick discovery scan (sample product IDs to find valid ones)
-    console.log('🔍 Discovering valid product IDs...')
-    for (const range of scanRanges) {
-      if (Date.now() - startTime > maxTimeMs * 0.3) break // Use max 30% of time for discovery
-      
-      const sampleSize = 20
-      const step = Math.floor((range.end - range.start) / sampleSize)
-      
-      for (let i = 0; i < sampleSize; i++) {
-        const testId = range.start + (i * step)
-        const product = await fetchRemaProduct(testId)
-        if (product?.product) {
-          productIds.push(testId)
-        }
-        
-        // Small delay to avoid overwhelming the API
-        await new Promise(resolve => setTimeout(resolve, 10))
-      }
-    }
-    
-    console.log(`📊 Found ${productIds.length} valid product IDs`)
-    
-    // Process products in batches
     let processed = 0
     let updated = 0
     let inserted = 0
     let errors = 0
-    const batchSize = 10
+    const allProducts: any[] = []
     
-    for (let i = 0; i < productIds.length; i += batchSize) {
+    // Scrape products by category
+    for (const category of categories) {
       // Check time limit
-      if (Date.now() - startTime > maxTimeMs) {
-        console.log(`⏰ Time limit reached. Processed ${processed}/${productIds.length} products`)
+      if (Date.now() - startTime > maxTimeMs * 0.8) {
+        console.log(`⏰ Time limit reached after ${processed} products. Stopping to avoid timeout.`)
         break
       }
       
-      const batch = productIds.slice(i, i + batchSize)
-      console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(productIds.length/batchSize)}`)
+      console.log(`🛒 Scraping category: ${category}`)
       
-      // Process batch in parallel
-      const batchPromises = batch.map(async (productId) => {
-        try {
-          const apiData = await fetchRemaProduct(productId)
-          if (!apiData?.product) return { status: 'error' }
+      try {
+        let page = 1
+        let hasMore = true
+        
+        while (hasMore && Date.now() - startTime < maxTimeMs * 0.8) {
+          const categoryProducts = await fetchRemaProductsByCategory(category, page)
           
-          const transformedProduct = transformRemaProduct(apiData)
-          if (!transformedProduct) return { status: 'error' }
-          
-          // Check if product exists
-          const { data: existingProduct } = await supabase
-            .from('supermarket_products')
-            .select('id, price, original_price, is_on_sale')
-            .eq('external_id', transformedProduct.external_id)
-            .single()
-          
-          if (existingProduct) {
-            // Update existing product
-            const { error: updateError } = await supabase
-              .from('supermarket_products')
-              .update(transformedProduct)
-              .eq('id', existingProduct.id)
-            
-            if (updateError) throw updateError
-            
-            // Add price history if price changed
-            if (existingProduct.price !== transformedProduct.price || 
-                existingProduct.is_on_sale !== transformedProduct.is_on_sale) {
-              await supabase
-                .from('supermarket_price_history')
-                .insert({
-                  product_id: existingProduct.id,
-                  price: transformedProduct.price,
-                  original_price: transformedProduct.original_price,
-                  is_on_sale: transformedProduct.is_on_sale,
-                  timestamp: transformedProduct.last_updated
-                })
-            }
-            
-            return { status: 'updated' }
-          } else {
-            // Insert new product
-            const { data: newProduct, error: insertError } = await supabase
-              .from('supermarket_products')
-              .insert(transformedProduct)
-              .select('id')
-              .single()
-            
-            if (insertError) throw insertError
-            
-            // Add initial price history
-            await supabase
-              .from('supermarket_price_history')
-              .insert({
-                product_id: newProduct.id,
-                price: transformedProduct.price,
-                original_price: transformedProduct.original_price,
-                is_on_sale: transformedProduct.is_on_sale,
-                timestamp: transformedProduct.last_updated
-              })
-            
-            return { status: 'inserted' }
+          if (categoryProducts.length === 0) {
+            hasMore = false
+            break
           }
-        } catch (error) {
-          console.error(`Error processing product ${productId}:`, error)
-          return { status: 'error' }
+          
+          console.log(`📦 Found ${categoryProducts.length} products in ${category} (page ${page})`)
+          allProducts.push(...categoryProducts)
+          
+          // Process this batch of products
+          for (const productData of categoryProducts) {
+            if (Date.now() - startTime > maxTimeMs * 0.8) break
+            
+            try {
+              const transformedProduct = transformRemaProduct({ product: productData })
+              if (!transformedProduct) {
+                errors++
+                continue
+              }
+              
+              // Check if product exists
+              const { data: existingProduct } = await supabase
+                .from('supermarket_products')
+                .select('id, price, original_price, is_on_sale')
+                .eq('external_id', transformedProduct.external_id)
+                .single()
+              
+              if (existingProduct) {
+                // Update existing product
+                const { error: updateError } = await supabase
+                  .from('supermarket_products')
+                  .update(transformedProduct)
+                  .eq('id', existingProduct.id)
+                
+                if (updateError) throw updateError
+                
+                // Add price history if price changed
+                if (existingProduct.price !== transformedProduct.price || 
+                    existingProduct.is_on_sale !== transformedProduct.is_on_sale) {
+                  await supabase
+                    .from('supermarket_price_history')
+                    .insert({
+                      product_id: existingProduct.id,
+                      price: transformedProduct.price,
+                      original_price: transformedProduct.original_price,
+                      is_on_sale: transformedProduct.is_on_sale,
+                      timestamp: transformedProduct.last_updated
+                    })
+                }
+                
+                updated++
+              } else {
+                // Insert new product
+                const { data: newProduct, error: insertError } = await supabase
+                  .from('supermarket_products')
+                  .insert(transformedProduct)
+                  .select('id')
+                  .single()
+                
+                if (insertError) throw insertError
+                
+                // Add initial price history
+                await supabase
+                  .from('supermarket_price_history')
+                  .insert({
+                    product_id: newProduct.id,
+                    price: transformedProduct.price,
+                    original_price: transformedProduct.original_price,
+                    is_on_sale: transformedProduct.is_on_sale,
+                    timestamp: transformedProduct.last_updated
+                  })
+                
+                inserted++
+              }
+              
+              processed++
+              
+            } catch (error) {
+              console.error(`Error processing product:`, error)
+              errors++
+            }
+          }
+          
+          page++
+          
+          // Small delay between pages
+          await new Promise(resolve => setTimeout(resolve, 50))
         }
-      })
-      
-      const batchResults = await Promise.all(batchPromises)
-      
-      // Count results
-      batchResults.forEach(result => {
-        processed++
-        if (result.status === 'updated') updated++
-        else if (result.status === 'inserted') inserted++
-        else if (result.status === 'error') errors++
-      })
-      
-      // Small delay between batches
-      await new Promise(resolve => setTimeout(resolve, 50))
+        
+      } catch (error) {
+        console.error(`Error scraping category ${category}:`, error)
+        errors++
+      }
     }
     
     const timeElapsed = Date.now() - startTime
@@ -214,14 +329,14 @@ export async function POST(req: NextRequest) {
       timeElapsed,
       stats: {
         processed,
-        total: productIds.length,
+        total: allProducts.length,
         updated,
         inserted,
         errors
       },
-      batches: {
-        completed: Math.ceil(processed / batchSize),
-        total: Math.ceil(productIds.length / batchSize)
+      categories: {
+        scanned: categories.length,
+        completed: categories.length
       }
     })
     
