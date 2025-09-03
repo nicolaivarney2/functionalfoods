@@ -311,6 +311,30 @@ export default function AdminDagligvarerPage() {
             </div>
           </div>
 
+          {/* Debug Section */}
+          <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <h4 className="font-medium text-yellow-900 mb-2">🔧 Debug & Test</h4>
+            <p className="text-sm text-yellow-800 mb-3">
+              Test REMA 1000's endpoints for at finde ud af hvorfor scraping ikke virker.
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/admin/dagligvarer/debug-rema')
+                  const result = await response.json()
+                  console.log('🔍 Debug results:', result)
+                  alert('Check console for detailed debug results!')
+                } catch (error) {
+                  console.error('Debug failed:', error)
+                  alert('Debug test failed - check console')
+                }
+              }}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm"
+            >
+              Test REMA Endpoints
+            </button>
+          </div>
+
           {/* Information */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
             <h4 className="font-medium text-blue-900 mb-2">ℹ️ Information</h4>
