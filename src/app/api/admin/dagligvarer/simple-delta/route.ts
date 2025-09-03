@@ -83,15 +83,22 @@ export async function POST(req: NextRequest) {
     let updated = 0
     let unchanged = 0
     let errors = 0
-    const batchSize = 10 // Small batches to avoid timeout
-    const maxProducts = 100 // Limit to avoid timeout
+    const batchSize = 20 // Process 20 products per batch
+    const maxTimeMs = 9000 // Stop after 9 seconds to avoid Vercel timeout
     
-    const productsToCheck = existingProducts?.slice(0, maxProducts) || []
+    const productsToCheck = existingProducts || []
+    const startTime = Date.now()
     
     for (let i = 0; i < productsToCheck.length; i += batchSize) {
+      // Check if we're running out of time
+      if (Date.now() - startTime > maxTimeMs) {
+        console.log(`⏰ Time limit reached after ${i} products. Stopping to avoid timeout.`)
+        break
+      }
+      
       const batch = productsToCheck.slice(i, i + batchSize)
       
-      console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(productsToCheck.length/batchSize)}`)
+      console.log(`🔄 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(productsToCheck.length/batchSize)} (products ${i + 1}-${Math.min(i + batchSize, productsToCheck.length)})`)
       
       // Process batch in parallel
       const batchPromises = batch.map(async (existingProduct) => {
@@ -170,11 +177,17 @@ export async function POST(req: NextRequest) {
       
       // Small delay between batches
       if (i + batchSize < productsToCheck.length) {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise(resolve => setTimeout(resolve, 50))
       }
     }
     
+    const totalProcessed = updated + unchanged + errors
+    const remaining = productsToCheck.length - totalProcessed
+    
     console.log(`✅ Simple delta update completed: ${updated} updated, ${unchanged} unchanged, ${errors} errors`)
+    if (remaining > 0) {
+      console.log(`📝 Note: ${remaining} products remaining (stopped due to time limit)`)
+    }
     
     return NextResponse.json({
       success: true,
@@ -184,7 +197,9 @@ export async function POST(req: NextRequest) {
         updated,
         unchanged,
         errors,
-        totalChecked: productsToCheck.length
+        totalProcessed: updated + unchanged + errors,
+        totalProducts: productsToCheck.length,
+        remaining: productsToCheck.length - (updated + unchanged + errors)
       }
     })
     

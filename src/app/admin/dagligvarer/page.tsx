@@ -233,7 +233,17 @@ export default function SupermarketScraperPage() {
       const result = await response.json()
       if (result.success) {
         console.log('✅ Simple delta completed:', result)
-        alert(`🎉 Simple delta completed!\n\nUpdated: ${result.results?.updated ?? 0}\nUnchanged: ${result.results?.unchanged ?? 0}\nErrors: ${result.results?.errors ?? 0}`)
+        const remaining = result.results?.remaining ?? 0
+        const totalProducts = result.results?.totalProducts ?? 0
+        const totalProcessed = result.results?.totalProcessed ?? 0
+        
+        let message = `🎉 Simple delta completed!\n\nUpdated: ${result.results?.updated ?? 0}\nUnchanged: ${result.results?.unchanged ?? 0}\nErrors: ${result.results?.errors ?? 0}\n\nProcessed: ${totalProcessed}/${totalProducts}`
+        
+        if (remaining > 0) {
+          message += `\n\n⚠️ ${remaining} products remaining (stopped due to time limit)\nRun again to continue processing.`
+        }
+        
+        alert(message)
         loadDatabaseStats()
         loadLatestProducts()
       } else {
