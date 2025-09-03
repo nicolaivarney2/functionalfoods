@@ -66,7 +66,7 @@ function transformProduct(productData: any): any {
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()
-  const maxTimeMs = 25000 // 25 seconds for Vercel timeout
+  const maxTimeMs = 8000 // 8 seconds for Vercel timeout (safe margin)
   
   try {
     console.log('🚀 Starting REMA 1000 full scrape with existing scraper...')
@@ -96,6 +96,12 @@ export async function POST(req: NextRequest) {
     console.log(`📂 Found ${departments.length} departments`)
     
     for (const department of departments) {
+      // Check timeout before starting each department
+      if (Date.now() - startTime > maxTimeMs) {
+        console.log(`⏰ Timeout reached, stopping at department ${department.name}`)
+        break
+      }
+      
       console.log(`🔍 Fetching products from ${department.name} (ID: ${department.id})...`)
       let page = 1
       let hasMorePages = true
@@ -164,6 +170,12 @@ export async function POST(req: NextRequest) {
       console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(discoveredProducts.length / batchSize)} (${batch.length} products)`)
       
       for (const product of batch) {
+        // Check timeout BEFORE processing each product
+        if (Date.now() - startTime > maxTimeMs) {
+          console.log(`⏰ Timeout reached after ${processedCount} products`)
+          break
+        }
+        
         try {
           // Check if product already exists BEFORE upsert
           const { data: existingProduct } = await supabase
