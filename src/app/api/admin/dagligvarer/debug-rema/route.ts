@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     console.log('🔍 Testing REMA 1000 endpoints...')
     
-    const testResults = {
+    const testResults: any = {
       endpoints: [],
       timestamp: new Date().toISOString()
     }
