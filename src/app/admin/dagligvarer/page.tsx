@@ -28,6 +28,7 @@ export default function AdminDagligvarerPage() {
   const [stats, setStats] = useState<ScrapingStats | null>(null)
   const [fullScrapeProgress, setFullScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [priceScrapeProgress, setPriceScrapeProgress] = useState<ScrapingProgress | null>(null)
+  const [batchScrapeProgress, setBatchScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [replaceAll, setReplaceAll] = useState(false)
@@ -101,6 +102,123 @@ export default function AdminDagligvarerPage() {
       console.error('Full scrape error:', error)
       alert(`❌ Full scrape failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       setFullScrapeProgress(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const startBatchScrape = async () => {
+    if (isLoading) return
+    setIsLoading(true)
+    
+    // Get departments first
+    let departments = []
+    try {
+      const deptResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments')
+      const deptData = await deptResponse.json()
+      departments = deptData.data || []
+    } catch (error) {
+      console.error('Failed to fetch departments:', error)
+      alert('❌ Failed to fetch departments')
+      setIsLoading(false)
+      return
+    }
+
+    setBatchScrapeProgress({
+      isRunning: true,
+      currentBatch: 0,
+      totalBatches: 0,
+      processed: 0,
+      total: 0,
+      updated: 0,
+      inserted: 0,
+      errors: 0,
+      timeElapsed: 0
+    })
+
+    let totalProcessed = 0
+    let totalUpdated = 0
+    let totalInserted = 0
+    let totalErrors = 0
+    const startTime = Date.now()
+
+    try {
+      // Process each department
+      for (let deptIndex = 0; deptIndex < departments.length; deptIndex++) {
+        const department = departments[deptIndex]
+        console.log(`🔍 Processing department: ${department.name} (${deptIndex + 1}/${departments.length})`)
+        
+        let page = 1
+        let hasMore = true
+        
+        while (hasMore) {
+          try {
+            const response = await fetch('/api/admin/dagligvarer/batch-scrape', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                departmentId: department.id,
+                page: page,
+                limit: 100
+              })
+            })
+
+            const result = await response.json()
+            
+            if (result.success) {
+              totalProcessed += result.productsFound
+              totalUpdated += result.productsUpdated
+              totalInserted += result.productsAdded
+              
+              setBatchScrapeProgress({
+                isRunning: true,
+                currentBatch: page,
+                totalBatches: 0, // We don't know total pages upfront
+                processed: totalProcessed,
+                total: 0,
+                updated: totalUpdated,
+                inserted: totalInserted,
+                errors: totalErrors,
+                timeElapsed: Date.now() - startTime
+              })
+              
+              hasMore = result.hasMore
+              page++
+              
+              // Small delay between batches to avoid overwhelming the API
+              await new Promise(resolve => setTimeout(resolve, 100))
+            } else {
+              console.error(`Batch failed for ${department.name} page ${page}:`, result.message)
+              totalErrors++
+              hasMore = false
+            }
+          } catch (error) {
+            console.error(`Error processing ${department.name} page ${page}:`, error)
+            totalErrors++
+            hasMore = false
+          }
+        }
+      }
+      
+      setBatchScrapeProgress({
+        isRunning: false,
+        currentBatch: 0,
+        totalBatches: 0,
+        processed: totalProcessed,
+        total: 0,
+        updated: totalUpdated,
+        inserted: totalInserted,
+        errors: totalErrors,
+        timeElapsed: Date.now() - startTime
+      })
+      
+      alert(`🎉 Batch scrape completed!\n\nTotal processed: ${totalProcessed}\nUpdated: ${totalUpdated}\nNew: ${totalInserted}\nErrors: ${totalErrors}\nTime: ${Math.round((Date.now() - startTime) / 1000)}s`)
+      await loadStats()
+      
+    } catch (error) {
+      console.error('Batch scrape error:', error)
+      alert(`❌ Batch scrape failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      setBatchScrapeProgress(null)
     } finally {
       setIsLoading(false)
     }
@@ -271,7 +389,7 @@ export default function AdminDagligvarerPage() {
           )}
 
           {/* Scraping Controls */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Full Scrape */}
             <div className="border rounded-lg p-4">
               <h3 className="text-lg font-semibold mb-2">Fuld Scraping</h3>
@@ -290,6 +408,26 @@ export default function AdminDagligvarerPage() {
               </button>
 
               {fullScrapeProgress && <ProgressBar progress={fullScrapeProgress} />}
+            </div>
+
+            {/* Batch Scrape */}
+            <div className="border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-2">Batch Scraping</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                🔄 Scraper alle produkter i små batches (100 ad gangen). 
+                Ingen timeout problemer - henter ALLE produkter fra alle afdelinger.
+              </p>
+              
+              <button
+                onClick={startBatchScrape}
+                disabled={isLoading}
+                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+              >
+                <Play size={16} />
+                Start Batch Scraping
+              </button>
+
+              {batchScrapeProgress && <ProgressBar progress={batchScrapeProgress} />}
             </div>
 
             {/* Price Scrape */}
