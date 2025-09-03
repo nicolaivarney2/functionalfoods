@@ -26,16 +26,11 @@ function transformProduct(productData: any): any {
       category: product.department?.name || 'Uncategorized',
       price: currentPrice || null,
       original_price: originalPrice || null,
-      isOnSale: onSale,
-      imageUrl: product.images?.[0]?.large || product.images?.[0]?.medium || null,
+      is_on_sale: onSale,
+      image_url: product.images?.[0]?.large || product.images?.[0]?.medium || null,
       available: product.is_available_in_all_stores !== false,
-      lastUpdated: new Date().toISOString(),
-      source: 'rema1000',
-      // Additional REMA-specific fields
-      underline: product.underline || null,
-      nutrition_info: product.nutrition_info || null,
-      compare_unit_price: product.prices?.[0]?.compare_unit_price || null,
-      compare_unit: product.prices?.[0]?.compare_unit || null
+      last_updated: new Date().toISOString(),
+      source: 'rema1000'
     }
   } catch (error) {
     console.error('Transform error:', error)
@@ -141,10 +136,10 @@ export async function POST(req: NextRequest) {
                 category: product.category,
                 price: product.price,
                 original_price: product.original_price,
-                is_on_sale: product.isOnSale,
-                imageUrl: product.imageUrl,
+                is_on_sale: product.is_on_sale,
+                image_url: product.image_url,
                 available: product.available,
-                lastUpdated: product.lastUpdated
+                last_updated: product.last_updated
               })
               .eq('external_id', product.external_id)
             
@@ -177,10 +172,10 @@ export async function POST(req: NextRequest) {
                 category: product.category,
                 price: product.price,
                 original_price: product.original_price,
-                is_on_sale: product.isOnSale,
-                imageUrl: product.imageUrl,
+                is_on_sale: product.is_on_sale,
+                image_url: product.image_url,
                 available: product.available,
-                lastUpdated: product.lastUpdated,
+                last_updated: product.last_updated,
                 source: product.source
               })
               .select('id')
