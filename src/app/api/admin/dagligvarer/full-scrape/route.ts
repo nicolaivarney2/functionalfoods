@@ -57,40 +57,60 @@ export async function POST(req: NextRequest) {
     
     console.log(`📊 Current products in DB: ${currentCount || 0}`)
     
-    // Simple test - just get a few products from one department
-    console.log('🔍 Testing with simple approach...')
+    // Get all products from all departments
+    console.log('🔍 Fetching all products from all departments...')
     const discoveredProducts = []
     
-    try {
-      // Test with department 10 (Brød & Bavinchi) - just first page
-      const url = 'https://api.digital.rema1000.dk/api/v3/departments/10/products?page=1&limit=10'
-      console.log(`📡 Fetching: ${url}`)
+    // Get all departments first
+    console.log('🔍 Fetching departments...')
+    const departmentsResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments')
+    console.log('📡 Departments response status:', departmentsResponse.status)
+    const departmentsData = await departmentsResponse.json()
+    console.log('📊 Departments data:', JSON.stringify(departmentsData).substring(0, 500) + '...')
+    const departments = departmentsData.data || []
+    console.log(`📂 Found ${departments.length} departments`)
+    
+    for (const department of departments) {
+      console.log(`🔍 Fetching products from ${department.name} (ID: ${department.id})...`)
+      let page = 1
+      let hasMorePages = true
       
-      const response = await fetch(url)
-      console.log(`📡 Response status: ${response.status}`)
-      
-      if (!response.ok) {
-        throw new Error(`API call failed: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      console.log(`📊 Response data keys:`, Object.keys(data))
-      console.log(`📦 Products in response:`, data.data?.length || 0)
-      
-      if (data.data && data.data.length > 0) {
-        for (const productData of data.data) {
-          const transformedProduct = transformProduct(productData)
-          if (transformedProduct) {
-            discoveredProducts.push(transformedProduct)
-            console.log(`✅ Added product: ${transformedProduct.name}`)
+      while (hasMorePages && Date.now() - startTime < maxTimeMs) {
+        try {
+          const url = `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=${page}&limit=50`
+          console.log(`📡 Fetching: ${url}`)
+          const response = await fetch(url)
+          console.log(`📡 Response status: ${response.status}`)
+          
+          if (!response.ok) {
+            throw new Error(`API call failed: ${response.status}`)
           }
+          
+          const data = await response.json()
+          console.log(`📊 Response data keys:`, Object.keys(data))
+          console.log(`📦 Products in response:`, data.data?.length || 0)
+          
+          if (data.data && data.data.length > 0) {
+            for (const productData of data.data) {
+              const transformedProduct = transformProduct(productData)
+              if (transformedProduct) {
+                discoveredProducts.push(transformedProduct)
+              }
+            }
+            console.log(`📦 Page ${page}: Found ${data.data.length} products (Total: ${discoveredProducts.length})`)
+            
+            const pagination = data.meta?.pagination
+            hasMorePages = pagination && page < pagination.last_page
+            page++
+          } else {
+            hasMorePages = false
+          }
+        } catch (error) {
+          console.log(`❌ Error fetching page ${page} from ${department.name}:`, error)
+          hasMorePages = false
         }
       }
-      
-      console.log(`📦 Total products found: ${discoveredProducts.length}`)
-      
-    } catch (error) {
-      console.error('❌ Error in simple test:', error)
+      console.log(`✅ Completed ${department.name}: ${discoveredProducts.length} total products`)
     }
     
     console.log(`📦 Discovered ${discoveredProducts.length} products`)
