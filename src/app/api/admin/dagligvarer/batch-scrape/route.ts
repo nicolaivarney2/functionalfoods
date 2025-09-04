@@ -213,8 +213,9 @@ export async function POST(req: NextRequest) {
           headers: { 'Content-Type': 'application/json' }
         })
         
+        let discontinuedData = null
         if (discontinuedResponse.ok) {
-          const discontinuedData = await discontinuedResponse.json()
+          discontinuedData = await discontinuedResponse.json()
           console.log('✅ Discontinued products handled:', discontinuedData)
         }
         
