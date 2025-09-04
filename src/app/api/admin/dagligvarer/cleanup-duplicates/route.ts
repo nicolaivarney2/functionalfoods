@@ -10,55 +10,57 @@ export async function POST(req: NextRequest) {
     
     const supabase = createSupabaseServiceClient()
     
-    // Find duplicates by name and category
-    const { data: duplicates, error: findError } = await supabase
+    // Get all REMA products
+    const { data: allProducts, error: fetchError } = await supabase
       .from('supermarket_products')
-      .select('name, category, count(*)')
+      .select('*')
       .eq('source', 'rema1000')
-      .group('name, category')
-      .having('count(*) > 1')
+      .order('name, category, created_at')
     
-    if (findError) {
-      throw new Error(`Failed to find duplicates: ${findError.message}`)
+    if (fetchError) {
+      throw new Error(`Failed to fetch products: ${fetchError.message}`)
     }
     
-    console.log(`🔍 Found ${duplicates?.length || 0} duplicate groups`)
+    console.log(`🔍 Found ${allProducts?.length || 0} total REMA products`)
+    
+    // Group by name and category to find duplicates
+    const productGroups = new Map<string, any[]>()
+    
+    if (allProducts) {
+      for (const product of allProducts) {
+        const key = `${product.name}|${product.category}`
+        if (!productGroups.has(key)) {
+          productGroups.set(key, [])
+        }
+        productGroups.get(key)!.push(product)
+      }
+    }
+    
+    // Find groups with duplicates
+    const duplicateGroups = Array.from(productGroups.values()).filter(group => group.length > 1)
+    
+    console.log(`🔍 Found ${duplicateGroups.length} duplicate groups`)
     
     let totalDeleted = 0
     
-    if (duplicates && duplicates.length > 0) {
-      for (const duplicate of duplicates) {
-        // Get all products with this name and category
-        const { data: products, error: fetchError } = await supabase
+    for (const group of duplicateGroups) {
+      // Sort by created_at to keep the oldest
+      group.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      
+      // Keep the first (oldest) product, delete the rest
+      const toDelete = group.slice(1)
+      
+      for (const product of toDelete) {
+        const { error: deleteError } = await supabase
           .from('supermarket_products')
-          .select('*')
-          .eq('name', duplicate.name)
-          .eq('category', duplicate.category)
-          .eq('source', 'rema1000')
-          .order('created_at', { ascending: true }) // Keep oldest
+          .delete()
+          .eq('id', product.id)
         
-        if (fetchError) {
-          console.error(`❌ Error fetching products for ${duplicate.name}:`, fetchError)
-          continue
-        }
-        
-        if (products && products.length > 1) {
-          // Keep the first (oldest) product, delete the rest
-          const toDelete = products.slice(1)
-          
-          for (const product of toDelete) {
-            const { error: deleteError } = await supabase
-              .from('supermarket_products')
-              .delete()
-              .eq('id', product.id)
-            
-            if (deleteError) {
-              console.error(`❌ Error deleting product ${product.id}:`, deleteError)
-            } else {
-              totalDeleted++
-              console.log(`🗑️ Deleted duplicate: ${product.name} (${product.external_id})`)
-            }
-          }
+        if (deleteError) {
+          console.error(`❌ Error deleting product ${product.id}:`, deleteError)
+        } else {
+          totalDeleted++
+          console.log(`🗑️ Deleted duplicate: ${product.name} (${product.external_id})`)
         }
       }
     }
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Cleanup completed successfully`,
-      duplicatesFound: duplicates?.length || 0,
+      duplicatesFound: duplicateGroups.length,
       duplicatesDeleted: totalDeleted
     })
     
