@@ -174,6 +174,12 @@ is_on_sale: onSale,           // Boolean for tilbud
 - **Løsning**: Lavet fix-store-branding endpoint
 - **Resultat**: Alle produkter har nu korrekt branding
 
+#### 2024-09-04:
+- **Problem**: Nogle produkter mangler original_price (compare price) selvom de er på tilbud
+- **Status**: KENDT FEJL - ikke fixet
+- **Løsning**: `/api/admin/dagligvarer/fix-missing-original-prices` endpoint findes
+- **Note**: Brugeren har valgt at lade det være som det er
+
 ---
 
 ## 🚨 HUSK: Læs denne dokumentation FØR du laver ændringer!
