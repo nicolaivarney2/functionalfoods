@@ -11,16 +11,21 @@ export async function POST(req: NextRequest) {
     const supabase = createSupabaseServiceClient()
     
     // Find products that are marked as on sale but have original_price = price (missing original price)
-    const { data: productsNeedingFix, error: fetchError } = await supabase
+    // We need to use a different approach since we can't compare columns directly in Supabase
+    const { data: allRemaProducts, error: fetchError } = await supabase
       .from('supermarket_products')
       .select('*')
       .eq('source', 'rema1000')
       .eq('is_on_sale', true)
-      .eq('original_price', supabase.rpc('price')) // original_price = price
 
     if (fetchError) {
       throw new Error(`Failed to fetch products needing fix: ${fetchError.message}`)
     }
+
+    // Filter in JavaScript to find products where original_price = price
+    const productsNeedingFix = allRemaProducts?.filter(product => 
+      product.original_price === product.price
+    ) || []
 
     console.log(`🎯 Found ${productsNeedingFix?.length || 0} products with missing original prices`)
 
