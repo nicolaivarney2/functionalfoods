@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAdminAuth } from '@/contexts/AdminAuthContext'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -20,6 +22,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [success, setSuccess] = useState('')
 
   const { signIn, signUp } = useAuth()
+  const { isAdmin } = useAdminAuth()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,6 +45,10 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           setError(error.message)
         } else {
           onClose()
+          // Redirect admin users to admin panel
+          if (isAdmin) {
+            router.push('/admin')
+          }
         }
       }
     } catch (err) {

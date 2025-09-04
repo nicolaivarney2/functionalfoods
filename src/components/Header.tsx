@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, LogOut, Settings, Heart } from 'lucide-react'
+import { Search, Menu, X, User, LogOut, Settings, Heart, Shield } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAdminAuth } from '@/contexts/AdminAuthContext'
 import LoginModal from './LoginModal'
 
 const mainMenuItems = [
@@ -30,6 +31,7 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const { user, signOut } = useAuth()
+  const { isAdmin } = useAdminAuth()
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -134,6 +136,18 @@ export default function Header() {
                           <Settings size={16} />
                           <span>Indstillinger</span>
                         </Link>
+                        
+                        {/* Admin Link - Only visible to admins */}
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            <Shield size={16} />
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
                         
                         <button
                           onClick={handleSignOut}

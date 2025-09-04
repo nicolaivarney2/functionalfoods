@@ -10,15 +10,32 @@ export async function POST(req: NextRequest) {
     
     const supabase = createSupabaseServiceClient()
     
-    // Get all REMA products
-    const { data: allProducts, error: fetchError } = await supabase
-      .from('supermarket_products')
-      .select('*')
-      .eq('source', 'rema1000')
-      .order('name, category, created_at')
-    
-    if (fetchError) {
-      throw new Error(`Failed to fetch products: ${fetchError.message}`)
+    // Get all REMA products (fetch in batches to avoid limits)
+    let allProducts: any[] = []
+    let offset = 0
+    const batchSize = 1000
+    let hasMore = true
+
+    while (hasMore) {
+      const { data: batch, error: fetchError } = await supabase
+        .from('supermarket_products')
+        .select('*')
+        .eq('source', 'rema1000')
+        .order('name, category, created_at')
+        .range(offset, offset + batchSize - 1)
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch products: ${fetchError.message}`)
+      }
+
+      if (batch && batch.length > 0) {
+        allProducts = allProducts.concat(batch)
+        offset += batchSize
+        hasMore = batch.length === batchSize
+        console.log(`📦 Fetched batch: ${batch.length} products (total: ${allProducts.length})`)
+      } else {
+        hasMore = false
+      }
     }
     
     console.log(`🔍 Found ${allProducts?.length || 0} total REMA products`)
