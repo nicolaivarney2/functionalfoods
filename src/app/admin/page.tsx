@@ -11,7 +11,9 @@ import {
   TrendingUp,
   Users,
   Clock,
-  CheckCircle
+  CheckCircle,
+  RefreshCw,
+  Play
 } from 'lucide-react'
 
 interface Recipe {
@@ -26,6 +28,8 @@ export default function AdminDashboard() {
   const { isAdmin, checking } = useAdminAuth()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
+  const [batchScraping, setBatchScraping] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, products: 0 })
 
   useEffect(() => {
     const loadRecipes = async () => {
@@ -49,6 +53,64 @@ export default function AdminDashboard() {
       loadRecipes()
     }
   }, [isAdmin])
+
+  const runBatchScraper = async () => {
+    setBatchScraping(true)
+    setBatchProgress({ current: 0, total: 0, products: 0 })
+    
+    let page = 1
+    let hasMore = true
+    let totalProducts = 0
+    let totalAdded = 0
+    let totalUpdated = 0
+    let batchCount = 0
+    
+    try {
+      while (hasMore) {
+        batchCount++
+        setBatchProgress({ current: batchCount, total: batchCount, products: totalProducts })
+        
+        console.log(`🔄 Processing batch ${batchCount} (page ${page})...`)
+        
+        const response = await fetch(`/api/admin/dagligvarer/batch-scrape?page=${page}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Batch scrape failed with status ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        if (!data.success) {
+          throw new Error(`Batch scrape failed: ${data.message}`)
+        }
+        
+        totalProducts += data.productsFound || 0
+        totalAdded += data.productsAdded || 0
+        totalUpdated += data.productsUpdated || 0
+        hasMore = data.hasMore || false
+        page = data.nextPage || page + 1
+        
+        console.log(`✅ Batch ${batchCount} completed: ${data.productsFound} found, ${data.productsAdded} added, ${data.productsUpdated} updated`)
+        
+        // Small delay between batches
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+      
+      alert(`🎉 Batch scrape completed!\n\n📊 Results:\n- Total products found: ${totalProducts}\n- Products added: ${totalAdded}\n- Products updated: ${totalUpdated}\n- Batches processed: ${batchCount}`)
+      
+    } catch (error) {
+      console.error('Batch scrape error:', error)
+      alert(`❌ Batch scrape failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setBatchScraping(false)
+      setBatchProgress({ current: 0, total: 0, products: 0 })
+    }
+  }
 
   if (checking) {
     return (
@@ -215,6 +277,31 @@ export default function AdminDashboard() {
                   <p className="text-sm text-gray-500">Importer mange opskrifter</p>
                 </div>
               </a>
+
+              <button
+                onClick={runBatchScraper}
+                disabled={batchScraping}
+                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div>
+                  {batchScraping ? (
+                    <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
+                  ) : (
+                    <Play className="h-6 w-6 text-blue-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">
+                    {batchScraping ? 'Scraper...' : 'REMA Batch Scraper'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {batchScraping 
+                      ? `Batch ${batchProgress.current} - ${batchProgress.products} produkter`
+                      : 'Scrape alle REMA produkter'
+                    }
+                  </p>
+                </div>
+              </button>
 
               <a
                 href="/admin/settings"
