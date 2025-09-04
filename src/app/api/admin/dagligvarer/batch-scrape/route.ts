@@ -55,7 +55,7 @@ function transformProduct(productData: any): any {
       available: product.is_available_in_all_stores || true,
       last_updated: new Date().toISOString(),
       source: 'rema1000',
-      store: 'rema1000'
+      store: 'REMA 1000'
     }
   } catch (error) {
     console.error('Error transforming product:', error)
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
         // Check if product already exists BEFORE upsert
         const { data: existingProduct } = await supabase
           .from('supermarket_products')
-          .select('id, price')
+          .select('id, price, original_price, is_on_sale')
           .eq('external_id', product.external_id)
           .single()
         
@@ -158,9 +158,28 @@ export async function POST(req: NextRequest) {
           console.error(`❌ Product data:`, JSON.stringify(product, null, 2))
         } else {
           if (existingProduct) {
-            // Product existed before - this was an update
-            productsUpdated++
-            console.log(`🔄 Updated product: ${product.name}`)
+            // Product existed before - check if prices changed
+            const priceChanged = existingProduct.price !== product.price || 
+                               existingProduct.original_price !== product.original_price ||
+                               existingProduct.is_on_sale !== product.is_on_sale
+
+            if (priceChanged) {
+              // Add price history entry for the OLD price before updating
+              await supabase
+                .from('supermarket_price_history')
+                .insert({
+                  product_external_id: product.external_id,
+                  price: existingProduct.price,
+                  original_price: existingProduct.original_price,
+                  is_on_sale: existingProduct.is_on_sale,
+                  timestamp: new Date().toISOString()
+                })
+              
+              productsUpdated++
+              console.log(`🔄 Updated product: ${product.name} (${existingProduct.price} → ${product.price})`)
+            } else {
+              console.log(`✅ No changes for: ${product.name}`)
+            }
           } else {
             // Product didn't exist before - this was an insert
             productsAdded++

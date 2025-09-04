@@ -56,7 +56,7 @@ function transformProduct(productData: any): any {
       available: product.is_available_in_all_stores !== false,
       last_updated: new Date().toISOString(),
       source: 'rema1000',
-      store: 'rema1000'
+      store: 'REMA 1000'
     }
   } catch (error) {
     console.error('Transform error:', error)

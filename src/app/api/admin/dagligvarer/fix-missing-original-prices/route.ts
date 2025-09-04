@@ -1,188 +1,151 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
-import { databaseService } from '@/lib/database-service'
+import { createSupabaseServiceClient } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export async function POST(req: NextRequest) {
   try {
-    console.log('🔧 Starting MISSING ORIGINAL PRICE FIXER...')
+    console.log('🔧 Starting missing original price fixer...')
     
-    // Get ALL products from database (bypassing discount logic)
-    console.log('📦 Fetching ALL products from database...')
-    const allProductsResult = await databaseService.getSupermarketProducts(1, 1000, undefined, false)
-    const allProducts = allProductsResult.products
+    const supabase = createSupabaseServiceClient()
     
-    console.log(`📊 Found ${allProducts.length} total products in database`)
-    
-    // Find products that are marked as on sale but have original_price = price
-    const needsFixing = allProducts.filter(p => 
-      p.is_on_sale && p.original_price === p.price
-    )
-    
-    console.log(`🎯 Found ${needsFixing.length} products with missing original prices`)
-    
-    if (needsFixing.length === 0) {
+    // Find products that are marked as on sale but have original_price = price (missing original price)
+    const { data: productsNeedingFix, error: fetchError } = await supabase
+      .from('supermarket_products')
+      .select('*')
+      .eq('source', 'rema1000')
+      .eq('is_on_sale', true)
+      .eq('original_price', supabase.rpc('price')) // original_price = price
+
+    if (fetchError) {
+      throw new Error(`Failed to fetch products needing fix: ${fetchError.message}`)
+    }
+
+    console.log(`🎯 Found ${productsNeedingFix?.length || 0} products with missing original prices`)
+
+    if (!productsNeedingFix || productsNeedingFix.length === 0) {
       return NextResponse.json({
         success: true,
         message: 'No products found that need original price fixing',
         fixed: 0,
-        total: allProducts.length
+        total: 0
       })
     }
-    
-    // Initialize scraper
-    const scraper = new Rema1000Scraper()
-    
-    // Fix products one by one
-    const fixed = []
-    const errors = []
-    
-    // Process in larger batches for better efficiency
-    const batchSize = 50 // Increased from 20 to 50
-    const toFix = needsFixing.slice(0, batchSize)
-    console.log(`🔧 Fixing ${toFix.length} products in batch ${batchSize}...`)
-    
-    for (let i = 0; i < toFix.length; i++) {
-      const product = toFix[i]
-      const external_id = product.external_id || product.id
-      
+
+    let fixedCount = 0
+    const fixedProducts = []
+
+    // Process each product that needs fixing
+    for (const product of productsNeedingFix) {
       try {
-        console.log(`[${i+1}/${toFix.length}] Checking ${product.name}...`)
+        // Extract REMA ID from external_id (python-12345 -> 12345)
+        const remaId = product.external_id.replace('python-', '')
         
-        // Extract REMA product ID
-        let remaId = null
-        if (external_id.startsWith('python-')) {
-          remaId = parseInt(external_id.replace('python-', ''))
-        } else if (external_id.startsWith('rema-')) {
-          remaId = parseInt(external_id.replace('rema-', ''))
-        }
-        
-        if (!remaId) {
-          console.log(`⚠️ Could not extract REMA ID from ${external_id}`)
+        // Fetch fresh data from REMA API
+        const productResponse = await fetch(
+          `https://api.digital.rema1000.dk/api/v3/products/${remaId}`
+        )
+
+        if (!productResponse.ok) {
+          console.warn(`⚠️ Failed to fetch fresh data for ${product.name} (ID: ${remaId})`)
           continue
         }
-        
-        // Use Delta Scraper's intelligent logic to get fresh data from REMA
-        const freshProduct = await scraper.fetchProduct(remaId)
-        
-        if (freshProduct) {
-          // 🔥 AGGRESSIVE APPROACH: Always try to enhance the product
-          console.log(`🏷️ ${product.name}: Using Delta Scraper's enhanced logic`)
-          
-          try {
-            // Simple approach: use fresh product data directly
-            if (freshProduct.price < product.price) {
-              console.log(`   ✅ Fresh data shows better price: ${freshProduct.price} kr (current: ${product.price} kr)`)
-              
-              await databaseService.updateSupermarketProduct({
-                ...product,
-                price: freshProduct.price,
-                originalPrice: product.price, // Use current price as original
-                isOnSale: true,
-                saleEndDate: freshProduct.saleEndDate
-              })
-              
-              const discount = Math.round((product.price - freshProduct.price) / product.price * 100)
-              
-              fixed.push({
-                name: product.name,
-                oldPrice: product.price,
-                oldOriginal: product.original_price,
-                newPrice: freshProduct.price,
-                newOriginal: product.price,
-                discount: discount,
-                note: "Fresh data pricing"
-              })
-              
-              console.log(`💾 Updated ${product.name} with fresh data pricing`)
-            } else {
-              // Fallback: estimate realistic original price
-              console.log(`   🏷️ Estimating realistic original price for ${product.name}`)
-              
-              // Simple estimation: add 15-25% to current price
-              const estimatedOriginalPrice = Math.round((freshProduct.price * (1 + (0.15 + Math.random() * 0.1))) * 100) / 100
-              
-              await databaseService.updateSupermarketProduct({
-                ...product,
-                price: freshProduct.price,
-                originalPrice: estimatedOriginalPrice,
-                isOnSale: true,
-                saleEndDate: freshProduct.saleEndDate
-              })
-              
-              const discount = Math.round((estimatedOriginalPrice - freshProduct.price) / estimatedOriginalPrice * 100)
-              
-              fixed.push({
-                name: product.name,
-                oldPrice: product.price,
-                oldOriginal: product.original_price,
-                newPrice: freshProduct.price,
-                newOriginal: estimatedOriginalPrice,
-                discount: discount,
-                note: "Estimated realistic pricing"
-              })
-              
-              console.log(`💾 Updated ${product.name} with estimated pricing: ${freshProduct.price} → ${estimatedOriginalPrice} kr`)
-            }
-          } catch (enhanceError) {
-            console.log(`⚠️ Enhancement failed for ${product.name}, using fallback:`, enhanceError)
-            
-            // Fallback: simple price increase
-            const fallbackOriginalPrice = Math.round((freshProduct.price * 1.2) * 100) / 100
-            
-            await databaseService.updateSupermarketProduct({
-              ...product,
-              price: freshProduct.price,
-              originalPrice: fallbackOriginalPrice,
-              isOnSale: true,
-              saleEndDate: freshProduct.saleEndDate
+
+        const productData = await productResponse.json()
+        const freshProduct = productData.data
+
+        if (!freshProduct || !freshProduct.prices || freshProduct.prices.length < 2) {
+          console.warn(`⚠️ No valid price data for ${product.name}`)
+          continue
+        }
+
+        // REMA API structure: prices[0] = campaign, prices[1] = regular
+        const campaignPrice = freshProduct.prices[0]
+        const regularPrice = freshProduct.prices[1]
+
+        let newPrice = product.price
+        let newOriginalPrice = product.original_price
+        let newIsOnSale = product.is_on_sale
+
+        if (campaignPrice.is_campaign && regularPrice) {
+          // Product is on sale - use campaign price and regular price
+          newPrice = campaignPrice.price
+          newOriginalPrice = regularPrice.price
+          newIsOnSale = true
+        } else {
+          // Product is not on sale - use regular price for both
+          newPrice = regularPrice.price
+          newOriginalPrice = regularPrice.price
+          newIsOnSale = false
+        }
+
+        // Only update if we found a valid original price
+        if (newOriginalPrice > newPrice) {
+          // Add price history entry for the old price
+          await supabase
+            .from('supermarket_price_history')
+            .insert({
+              product_external_id: product.external_id,
+              price: product.price,
+              original_price: product.original_price,
+              is_on_sale: product.is_on_sale,
+              timestamp: new Date().toISOString()
             })
+
+          // Update the product with correct prices
+          const { error: updateError } = await supabase
+            .from('supermarket_products')
+            .update({
+              price: newPrice,
+              original_price: newOriginalPrice,
+              is_on_sale: newIsOnSale,
+              last_updated: new Date().toISOString()
+            })
+            .eq('external_id', product.external_id)
+
+          if (updateError) {
+            console.error(`❌ Failed to update ${product.name}:`, updateError)
+          } else {
+            fixedCount++
+            const discount = Math.round((newOriginalPrice - newPrice) / newOriginalPrice * 100)
             
-            const discount = Math.round((fallbackOriginalPrice - freshProduct.price) / fallbackOriginalPrice * 100)
-            
-            fixed.push({
+            fixedProducts.push({
               name: product.name,
               oldPrice: product.price,
               oldOriginal: product.original_price,
-              newPrice: freshProduct.price,
-              newOriginal: fallbackOriginalPrice,
-              discount: discount,
-              note: "Fallback pricing"
+              newPrice: newPrice,
+              newOriginal: newOriginalPrice,
+              discount: discount
             })
             
-            console.log(`💾 Updated ${product.name} with fallback pricing: ${freshProduct.price} → ${fallbackOriginalPrice} kr`)
+            console.log(`✅ Fixed ${product.name}: ${product.price} → ${newPrice} (original: ${newOriginalPrice}, ${discount}% off)`)
           }
         } else {
-          console.log(`💸 ${product.name}: Could not fetch from REMA API`)
+          console.log(`ℹ️ ${product.name}: No valid original price found in fresh data`)
         }
-        
-        // Rate limiting (reduced for faster processing)
+
+        // Small delay to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 100))
-        
+
       } catch (error) {
-        console.error(`❌ Error fixing ${product.name}:`, error)
-        errors.push(`${product.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        console.error(`❌ Error processing ${product.name}:`, error)
       }
     }
-    
-    console.log(`✅ Original price fixing completed!`)
-    console.log(`   Fixed: ${fixed.length} products`)
-    console.log(`   Errors: ${errors.length} products`)
-    
+
     return NextResponse.json({
       success: true,
-      message: `Fixed ${fixed.length} products with missing original prices`,
-      fixed: fixed,
-      errors: errors,
-      total: needsFixing.length,
-      remaining: Math.max(0, needsFixing.length - toFix.length)
+      message: 'Missing original prices fixed successfully',
+      fixed: fixedCount,
+      total: productsNeedingFix.length,
+      fixedProducts: fixedProducts.slice(0, 10) // Show first 10 for reference
     })
-    
+
   } catch (error) {
-    console.error('❌ Original price fixer failed:', error)
+    console.error('❌ Error fixing missing original prices:', error)
     return NextResponse.json({
       success: false,
-      error: 'Original price fixer failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      message: `Failed to fix missing original prices: ${error instanceof Error ? error.message : 'Unknown error'}`
     }, { status: 500 })
   }
 }
