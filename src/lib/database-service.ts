@@ -369,9 +369,9 @@ export class DatabaseService {
         const priceDifference = originalPrice - price
         const isActualDiscount = priceDifference > 0.01
         
-        // 🔥 NEW LOGIC: Show offers even if original_price === price (for now)
-        // This allows products marked as offers to display while we fix their original prices
-        const isRealOffer = isMarkedOnSale && hasValidPrices
+        // 🔥 CORRECT LOGIC: Only show real offers where original_price > price
+        // Products without actual discount should not appear in offers section
+        const isRealOffer = isMarkedOnSale && hasValidPrices && isActualDiscount
         
         let discountPercentage = 0
         if (isRealOffer && originalPrice > 0 && isActualDiscount) {
