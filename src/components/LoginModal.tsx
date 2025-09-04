@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 
 interface LoginModalProps {
   isOpen: boolean

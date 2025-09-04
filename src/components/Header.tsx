@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { Search, Menu, X, User, LogOut, Settings, Heart, Shield } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAdminAuth } from '@/contexts/AdminAuthContext'
+import { useAdminAuth } from '@/hooks/useAdminAuth'
 import LoginModal from './LoginModal'
 
 const mainMenuItems = [
