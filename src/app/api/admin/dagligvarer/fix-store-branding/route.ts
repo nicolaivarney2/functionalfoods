@@ -50,31 +50,76 @@ export async function POST(req: NextRequest) {
 
     let fixedCount = 0
     const fixedProducts = []
+    const updateBatchSize = 50 // Update 50 products at a time to avoid timeout
 
-    // Update each product
-    for (const product of productsToFix) {
+    // Update products in batches
+    for (let i = 0; i < productsToFix.length; i += updateBatchSize) {
+      const batch = productsToFix.slice(i, i + updateBatchSize)
+      const batchNumber = Math.floor(i / updateBatchSize) + 1
+      const totalBatches = Math.ceil(productsToFix.length / updateBatchSize)
+      
+      console.log(`🔄 Processing batch ${batchNumber}/${totalBatches} (${batch.length} products)`)
+      
       try {
-        const { error: updateError } = await supabase
+        // Use bulk update for this batch
+        const { error: batchUpdateError } = await supabase
           .from('supermarket_products')
           .update({
             store: 'REMA 1000',
             last_updated: new Date().toISOString()
           })
-          .eq('external_id', product.external_id)
+          .in('external_id', batch.map(p => p.external_id))
+          .eq('store', 'rema1000')
 
-        if (updateError) {
-          console.error(`❌ Failed to update ${product.name}:`, updateError)
+        if (batchUpdateError) {
+          console.error(`❌ Failed to update batch ${batchNumber}:`, batchUpdateError)
+          // Fallback to individual updates for this batch
+          for (const product of batch) {
+            try {
+              const { error: updateError } = await supabase
+                .from('supermarket_products')
+                .update({
+                  store: 'REMA 1000',
+                  last_updated: new Date().toISOString()
+                })
+                .eq('external_id', product.external_id)
+                .eq('store', 'rema1000')
+
+              if (updateError) {
+                console.error(`❌ Failed to update ${product.name}:`, updateError)
+              } else {
+                fixedCount++
+                fixedProducts.push({
+                  name: product.name,
+                  oldStore: product.store,
+                  newStore: 'REMA 1000'
+                })
+                console.log(`✅ Fixed store branding: ${product.name}`)
+              }
+            } catch (error) {
+              console.error(`❌ Error processing ${product.name}:`, error)
+            }
+          }
         } else {
-          fixedCount++
-          fixedProducts.push({
-            name: product.name,
-            oldStore: product.store,
-            newStore: 'REMA 1000'
+          fixedCount += batch.length
+          console.log(`✅ Fixed batch ${batchNumber}: ${batch.length} products`)
+          
+          // Add batch products to fixedProducts for reference
+          batch.forEach(product => {
+            fixedProducts.push({
+              name: product.name,
+              oldStore: product.store,
+              newStore: 'REMA 1000'
+            })
           })
-          console.log(`✅ Fixed store branding: ${product.name}`)
         }
       } catch (error) {
-        console.error(`❌ Error processing ${product.name}:`, error)
+        console.error(`❌ Error processing batch ${batchNumber}:`, error)
+      }
+      
+      // Small delay to avoid overwhelming the database
+      if (i + updateBatchSize < productsToFix.length) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
 
