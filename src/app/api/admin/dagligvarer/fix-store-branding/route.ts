@@ -10,14 +10,31 @@ export async function POST(req: NextRequest) {
     
     const supabase = createSupabaseServiceClient()
     
-    // Find all products with 'rema1000' store name
-    const { data: productsToFix, error: fetchError } = await supabase
-      .from('supermarket_products')
-      .select('external_id, name, store')
-      .eq('store', 'rema1000')
+    // Find all products with 'rema1000' store name (fetch in batches to avoid limits)
+    let productsToFix: any[] = []
+    let offset = 0
+    const batchSize = 1000
+    let hasMore = true
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch products: ${fetchError.message}`)
+    while (hasMore) {
+      const { data: batch, error: fetchError } = await supabase
+        .from('supermarket_products')
+        .select('external_id, name, store')
+        .eq('store', 'rema1000')
+        .range(offset, offset + batchSize - 1)
+
+      if (fetchError) {
+        throw new Error(`Failed to fetch products: ${fetchError.message}`)
+      }
+
+      if (batch && batch.length > 0) {
+        productsToFix = productsToFix.concat(batch)
+        offset += batchSize
+        hasMore = batch.length === batchSize
+        console.log(`📦 Fetched batch: ${batch.length} products (total: ${productsToFix.length})`)
+      } else {
+        hasMore = false
+      }
     }
 
     console.log(`🎯 Found ${productsToFix?.length || 0} products with 'rema1000' store name`)
