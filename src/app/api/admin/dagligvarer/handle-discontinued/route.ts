@@ -119,17 +119,27 @@ export async function POST(req: NextRequest) {
             console.log(`🏷️ Removed REMA price for: ${product.name} (available in other stores)`)
           }
         } else {
-          // Product doesn't exist in other stores - hide it completely
-          const { error: deleteError } = await supabase
+          // Product doesn't exist in other stores - hide it but keep for history
+          const { error: updateError } = await supabase
             .from('supermarket_products')
-            .delete()
+            .update({
+              available: false,
+              last_updated: new Date().toISOString(),
+              // Keep the product but mark as discontinued and hidden
+              metadata: {
+                discontinued_from_rema: true,
+                discontinued_date: new Date().toISOString(),
+                hidden: true,
+                reason: 'discontinued_from_all_stores'
+              }
+            })
             .eq('external_id', product.external_id)
 
-          if (deleteError) {
-            console.error(`❌ Failed to delete discontinued product ${product.name}:`, deleteError)
+          if (updateError) {
+            console.error(`❌ Failed to hide discontinued product ${product.name}:`, updateError)
           } else {
             hiddenCount++
-            console.log(`🗑️ Hidden discontinued product: ${product.name}`)
+            console.log(`👁️ Hidden discontinued product: ${product.name} (kept for history)`)
           }
         }
       } catch (error) {

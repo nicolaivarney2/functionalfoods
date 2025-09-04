@@ -201,6 +201,53 @@ export async function POST(req: NextRequest) {
     console.log(`⏱️ Execution time: ${executionTime}ms`)
     console.log(`📄 Has more pages: ${hasMore}`)
     
+    // After successful batch scrape, run maintenance tasks
+    let maintenanceResults = null
+    if (discoveredProducts.length > 0) {
+      try {
+        console.log('🧹 Running maintenance tasks after batch scrape...')
+        
+        // 1. Handle discontinued products
+        const discontinuedResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/admin/dagligvarer/handle-discontinued`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        
+        if (discontinuedResponse.ok) {
+          const discontinuedData = await discontinuedResponse.json()
+          console.log('✅ Discontinued products handled:', discontinuedData)
+        }
+        
+        // 2. Fix missing original prices (only run occasionally to avoid API overload)
+        const shouldFixPrices = Math.random() < 0.1 // 10% chance to run
+        if (shouldFixPrices) {
+          console.log('🔧 Running price fix (10% chance)...')
+          const priceFixResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/admin/dagligvarer/fix-missing-original-prices`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          
+          if (priceFixResponse.ok) {
+            const priceFixData = await priceFixResponse.json()
+            console.log('✅ Price fixes applied:', priceFixData)
+            maintenanceResults = {
+              discontinued: discontinuedData,
+              priceFix: priceFixData
+            }
+          }
+        } else {
+          maintenanceResults = {
+            discontinued: discontinuedData,
+            priceFix: { message: 'Skipped (10% chance)' }
+          }
+        }
+        
+      } catch (error) {
+        console.warn('⚠️ Maintenance tasks failed:', error)
+        maintenanceResults = { error: error instanceof Error ? error.message : 'Unknown error' }
+      }
+    }
+    
     return NextResponse.json({
       success: true,
       message: 'Batch scrape completed successfully',
@@ -209,7 +256,8 @@ export async function POST(req: NextRequest) {
       productsUpdated,
       hasMore,
       nextPage: hasMore ? page + 1 : null,
-      executionTime
+      executionTime,
+      maintenance: maintenanceResults
     })
     
   } catch (error) {

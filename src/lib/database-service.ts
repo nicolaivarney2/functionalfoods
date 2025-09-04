@@ -333,6 +333,7 @@ export class DatabaseService {
     let query = supabase
       .from('supermarket_products')
       .select('*', { count: 'exact' })
+      .eq('available', true) // Only show available products (hide discontinued)
       .order('name', { ascending: true })
     
     if (categories && categories.length > 0) {
