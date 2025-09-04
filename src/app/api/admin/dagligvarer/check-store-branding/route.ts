@@ -11,17 +11,17 @@ export async function GET(req: NextRequest) {
     const supabase = createSupabaseServiceClient()
     
     // Count products with different store names
-    const { data: rema1000Count, error: rema1000Error } = await supabase
+    const { count: rema1000Count, error: rema1000Error } = await supabase
       .from('supermarket_products')
       .select('*', { count: 'exact', head: true })
       .eq('store', 'rema1000')
 
-    const { data: rema1000ProperCount, error: rema1000ProperError } = await supabase
+    const { count: rema1000ProperCount, error: rema1000ProperError } = await supabase
       .from('supermarket_products')
       .select('*', { count: 'exact', head: true })
       .eq('store', 'REMA 1000')
 
-    const { data: totalRemaCount, error: totalRemaError } = await supabase
+    const { count: totalRemaCount, error: totalRemaError } = await supabase
       .from('supermarket_products')
       .select('*', { count: 'exact', head: true })
       .eq('source', 'rema1000')
