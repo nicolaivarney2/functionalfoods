@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
     const { count: totalIngredients, error: ingredientsError } = await supabase
       .from('ingredients')
       .select('*', { count: 'exact', head: true })
-      .eq('is_active', true)
 
     if (ingredientsError) {
       throw new Error(`Failed to count ingredients: ${ingredientsError.message}`)
