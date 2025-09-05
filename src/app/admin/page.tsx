@@ -67,7 +67,7 @@ export default function AdminDashboard() {
               totalProducts: data.stats.totalProducts,
               matchedProducts: data.stats.matchedProducts,
               unmatchedProducts: data.stats.unmatchedProducts,
-              matchPercentage: parseFloat(data.stats.matchPercentage)
+                              matchPercentage: data.stats.matchPercentage
             })
           }
         }
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
                 totalProducts: data.stats.totalProducts,
                 matchedProducts: data.stats.matchedProducts,
                 unmatchedProducts: data.stats.unmatchedProducts,
-                matchPercentage: parseFloat(data.stats.matchPercentage)
+                matchPercentage: data.stats.matchPercentage
               })
             }
           }
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm font-medium text-gray-500">Match Percentage</p>
-                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.matchPercentage.toFixed(1)}%</p>
+                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.matchPercentage}%</p>
                   </div>
                 </div>
               </div>

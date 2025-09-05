@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     const unmatchedProducts = (totalProducts || 0) - matchedProducts
-    const matchPercentage = totalProducts ? Math.round((matchedProducts / totalProducts) * 100) : 0
+    const matchPercentage = totalProducts ? ((matchedProducts / totalProducts) * 100).toFixed(2) : 0
 
     return NextResponse.json({
       success: true,
