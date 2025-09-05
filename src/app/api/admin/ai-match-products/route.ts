@@ -71,11 +71,13 @@ export async function POST(request: NextRequest) {
     const matches = []
     
     for (const product of products) {
+      console.log(`🔍 Checking product: "${product.name}"`)
       const productMatches = []
       const productName = product.name.toLowerCase()
       const productCategory = product.category?.toLowerCase() || ''
 
       for (const ingredient of ingredients) {
+        console.log(`  🧪 Against ingredient: "${ingredient.name}"`)
         const ingredientName = ingredient.name.toLowerCase().trim()
         const ingredientCategory = ingredient.category?.toLowerCase() || ''
         
