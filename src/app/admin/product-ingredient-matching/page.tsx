@@ -163,9 +163,11 @@ export default function ProductIngredientMatchingPage() {
     const allProducts: GroceryProduct[] = []
     let page = 1
     let hasMore = true
+    const maxPages = 10 // Limit to 1000 products for testing
 
-    while (hasMore) {
+    while (hasMore && page <= maxPages) {
       try {
+        console.log(`📦 Loading products page ${page}...`)
         const response = await fetch(`/api/admin/products-for-matching?page=${page}&limit=100`)
         const data = await response.json()
         
@@ -184,6 +186,7 @@ export default function ProductIngredientMatchingPage() {
           
           hasMore = data.data.pagination.hasMore
           page++
+          console.log(`✅ Loaded ${allProducts.length} products so far...`)
         } else {
           hasMore = false
         }
