@@ -431,8 +431,13 @@ export default function ProductIngredientMatchingPage() {
                             <span className="text-xs text-blue-600">({match.product_store})</span>
                             <span className="text-xs text-gray-500">{match.product_price} kr</span>
                             <button
-                              onClick={() => removeProductMatch(match.id)}
-                              className="text-red-500 hover:text-red-700 ml-1"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                removeProductMatch(match.id)
+                              }}
+                              className="text-red-500 hover:text-red-700 ml-1 p-1 rounded hover:bg-red-100"
+                              title="Remove product match"
                             >
                               <XMarkIcon className="h-4 w-4" />
                             </button>
@@ -516,7 +521,16 @@ function GroceryProductSelector({
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          setIsOpen(!isOpen)
+          if (!isOpen) {
+            // Focus the search input when opening
+            setTimeout(() => {
+              const input = document.querySelector('.product-search-input') as HTMLInputElement
+              if (input) input.focus()
+            }, 100)
+          }
+        }}
         className="w-full px-3 py-2 text-left border border-gray-300 rounded-md bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {selectedProduct ? (
@@ -538,7 +552,8 @@ function GroceryProductSelector({
               placeholder="Search products..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="product-search-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
             />
           </div>
           
@@ -548,8 +563,9 @@ function GroceryProductSelector({
                 key={product.id}
                 onClick={() => {
                   onSelect(product)
-                  setIsOpen(false)
-                  setSearchTerm('')
+                  // Don't close dropdown - allow multiple selections
+                  // setIsOpen(false)
+                  // setSearchTerm('')
                 }}
                 className="w-full px-3 py-2 text-left hover:bg-gray-100 border-b border-gray-100 last:border-b-0"
               >
@@ -569,6 +585,19 @@ function GroceryProductSelector({
               No products found
             </div>
           )}
+          
+          {/* Close button */}
+          <div className="p-2 border-t border-gray-200">
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                setSearchTerm('')
+              }}
+              className="w-full px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
