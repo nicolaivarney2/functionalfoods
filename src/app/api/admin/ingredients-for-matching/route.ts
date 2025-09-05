@@ -21,9 +21,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        category,
-        created_at,
-        updated_at
+        category
       `)
       .order('name')
       .range(offset, offset + limit - 1)

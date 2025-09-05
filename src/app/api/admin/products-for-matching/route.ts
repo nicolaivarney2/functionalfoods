@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       .select(`
         external_id,
         name,
-        brand,
         category,
         store,
         source,
