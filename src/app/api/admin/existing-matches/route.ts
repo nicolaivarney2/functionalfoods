@@ -71,12 +71,12 @@ export async function GET(request: NextRequest) {
       match_type: match.match_type,
       created_at: match.created_at,
       updated_at: match.updated_at,
-      product_name: match.supermarket_products.name,
-      product_category: match.supermarket_products.category,
-      product_store: match.supermarket_products.store,
-      product_price: match.supermarket_products.price,
-      product_original_price: match.supermarket_products.original_price,
-      product_is_on_sale: match.supermarket_products.is_on_sale,
+      product_name: match.supermarket_products[0]?.name,
+      product_category: match.supermarket_products[0]?.category,
+      product_store: match.supermarket_products[0]?.store,
+      product_price: match.supermarket_products[0]?.price,
+      product_original_price: match.supermarket_products[0]?.original_price,
+      product_is_on_sale: match.supermarket_products[0]?.is_on_sale,
       ingredient_name: match.ingredients.name,
       ingredient_category: match.ingredients.category
     })) || []
