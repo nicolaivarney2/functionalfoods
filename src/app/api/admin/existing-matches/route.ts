@@ -77,8 +77,8 @@ export async function GET(request: NextRequest) {
       product_price: match.supermarket_products[0]?.price,
       product_original_price: match.supermarket_products[0]?.original_price,
       product_is_on_sale: match.supermarket_products[0]?.is_on_sale,
-      ingredient_name: match.ingredients.name,
-      ingredient_category: match.ingredients.category
+      ingredient_name: match.ingredients[0]?.name,
+      ingredient_category: match.ingredients[0]?.category
     })) || []
 
     console.log(`✅ Loaded ${transformedMatches.length} existing matches`)
