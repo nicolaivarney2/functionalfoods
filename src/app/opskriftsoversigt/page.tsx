@@ -193,12 +193,12 @@ export default function RecipeOverviewPage() {
   // Apply filters and sorting when dependencies change
   useEffect(() => {
     console.log('🔄 Applying filters and sorting...')
-    console.log(`📊 Total recipes: ${allRecipes.length}`)
+    console.log(`📊 Total recipes: ${allRecipes?.length || 0}`)
     console.log(`🔍 Search query: "${searchQuery}"`)
     console.log(`🥗 Selected dietary: "${selectedDietary}"`)
     console.log(`📂 Selected category: "${selectedCategory}"`)
     
-    let filtered = allRecipes
+    let filtered = allRecipes || []
 
     // Apply search filter
     if (searchQuery) {
@@ -298,7 +298,7 @@ export default function RecipeOverviewPage() {
     setDisplayCount(prev => prev + 8)
   }
 
-  const hasMoreRecipes = displayedRecipes.length < sortedRecipes.length
+  const hasMoreRecipes = displayedRecipes && sortedRecipes ? displayedRecipes.length < sortedRecipes.length : false
 
   if (isLoading) {
     return (
@@ -510,7 +510,7 @@ export default function RecipeOverviewPage() {
       {/* Recipe Grid Section */}
       <section className="py-8 bg-white">
         <div className="container">
-          {displayedRecipes.length > 0 ? (
+          {displayedRecipes && displayedRecipes.length > 0 ? (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {displayedRecipes && Array.isArray(displayedRecipes) ? displayedRecipes.map((recipe, index) => (
