@@ -174,7 +174,7 @@ export default function ProductIngredientMatchingPage() {
 
   const loadExistingMatches = async (): Promise<ExistingMatch[]> => {
     try {
-      const response = await fetch('/api/admin/existing-matches')
+      const response = await fetch(`/api/admin/existing-matches?t=${Date.now()}`)
       const data = await response.json()
       
       if (data.success) {

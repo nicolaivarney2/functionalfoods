@@ -92,6 +92,12 @@ export async function GET(request: NextRequest) {
         totalPages,
         hasMore
       }
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     })
 
   } catch (error) {
