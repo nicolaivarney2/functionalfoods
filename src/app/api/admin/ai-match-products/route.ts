@@ -87,10 +87,15 @@ export async function POST(request: NextRequest) {
           confidence = 100
           matchType = 'exact'
         }
-        // Contains match (high confidence)
-        else if (productName.includes(ingredientName) || ingredientName.includes(productName)) {
-          confidence = 80
-          matchType = 'contains'
+        // Contains match (high confidence) - but only if ingredient is a complete word
+        else if (ingredientName.trim().length > 3) {
+          const ingredientWord = ingredientName.trim()
+          // Only match if ingredient is a complete word in product name
+          const wordBoundaryRegex = new RegExp(`\\b${ingredientWord}\\b`, 'i')
+          if (wordBoundaryRegex.test(productName)) {
+            confidence = 80
+            matchType = 'contains'
+          }
         }
         // Category match (medium confidence)
         else if (productCategory === ingredientCategory && productCategory !== '') {

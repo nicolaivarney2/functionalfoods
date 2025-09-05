@@ -48,13 +48,15 @@ export async function GET(req: NextRequest) {
         totalMatches = totalMatchesCount || 0
       }
 
-      // Count unique matched products by counting distinct product_external_ids
-      const { count: matchedProductsCount, error: matchedError } = await supabase
+      // Count unique matched products using a subquery
+      const { data: matchedProductsData, error: matchedError } = await supabase
         .from('product_ingredient_matches')
-        .select('product_external_id', { count: 'exact', head: true })
+        .select('product_external_id')
+        .limit(1000) // Handle 1000 limit
 
-      if (!matchedError) {
-        matchedProducts = matchedProductsCount || 0
+      if (!matchedError && matchedProductsData) {
+        const uniqueMatchedProducts = new Set(matchedProductsData.map(match => match.product_external_id))
+        matchedProducts = uniqueMatchedProducts.size
       }
     }
 
