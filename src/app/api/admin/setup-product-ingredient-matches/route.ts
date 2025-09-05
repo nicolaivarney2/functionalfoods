@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       .select('id')
       .limit(1)
 
-    if (testError && testError.message.includes('relation "product_ingredient_matches" does not exist')) {
+    if (testError && (testError.message.includes('relation "product_ingredient_matches" does not exist') || testError.message.includes('Could not find the relation'))) {
       // Table doesn't exist - we need to create it manually in Supabase
       console.log('❌ Table does not exist - needs to be created manually in Supabase')
       return NextResponse.json({
