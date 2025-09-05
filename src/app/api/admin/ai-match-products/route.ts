@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
           matchType = 'category'
         }
         // Partial word match (lower confidence)
-        else if (productName.split(' ').some(word => 
-          word.length > 3 && ingredientName.split(' ').some(ingWord => 
+        else if (productName.split(' ').some((word: string) => 
+          word.length > 3 && ingredientName.split(' ').some((ingWord: string) => 
             word.includes(ingWord) || ingWord.includes(word)
           )
         )) {
