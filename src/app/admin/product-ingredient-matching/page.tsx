@@ -217,6 +217,17 @@ export default function ProductIngredientMatchingPage() {
   // Add a product match to an ingredient
   const addProductMatch = async (ingredientId: string, product: GroceryProduct) => {
     try {
+      // Check if match already exists
+      const existingMatch = existingMatches.find(match => 
+        match.ingredient_id === ingredientId && match.product_external_id === product.id
+      )
+      
+      if (existingMatch) {
+        console.log('⚠️ Match already exists:', existingMatch)
+        alert('This product is already matched to this ingredient')
+        return
+      }
+      
       const response = await fetch('/api/admin/add-product-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -228,10 +239,12 @@ export default function ProductIngredientMatchingPage() {
         })
       })
       
-      if (response.ok) {
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
         // Add to local state
         const newMatch: ExistingMatch = {
-          id: Date.now().toString(), // Temporary ID
+          id: data.data.id, // Use real ID from database
           ingredient_id: ingredientId,
           product_external_id: product.id,
           confidence: 100,
@@ -246,9 +259,14 @@ export default function ProductIngredientMatchingPage() {
         }
         
         setExistingMatches(prev => [...prev, newMatch])
+        console.log('✅ Product match added successfully')
+      } else {
+        console.error('❌ Failed to add product match:', data.message)
+        alert(`Failed to add product match: ${data.message}`)
       }
     } catch (error) {
-      console.error('Error adding product match:', error)
+      console.error('❌ Error adding product match:', error)
+      alert('Error adding product match')
     }
   }
 

@@ -133,7 +133,7 @@ const extendedDietaryCategories = [
     imageAlt: 'Fleksitariske retter med planter og lidt kød'
   },
   {
-    id: '8',
+    id: '9',
     name: '5:2 DIÆT',
     slug: '5-2-diet',
     description: 'Opskrifter til 5:2 intermittent fasting',
