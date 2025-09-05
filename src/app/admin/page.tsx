@@ -36,6 +36,8 @@ export default function AdminDashboard() {
     unmatchedProducts: 0,
     matchPercentage: 0
   })
+  const [aiMatching, setAiMatching] = useState(false)
+  const [matchingProgress, setMatchingProgress] = useState({ current: 0, total: 0, matches: 0 })
 
   useEffect(() => {
     const loadRecipes = async () => {
@@ -79,6 +81,63 @@ export default function AdminDashboard() {
       loadMatchingStats()
     }
   }, [isAdmin])
+
+  const runAiMatching = async () => {
+    setAiMatching(true)
+    setMatchingProgress({ current: 0, total: 0, matches: 0 })
+
+    let page = 1
+    let hasMore = true
+    let totalMatches = 0
+    let batchCount = 0
+
+    try {
+      while (hasMore) {
+        batchCount++
+        setMatchingProgress({ current: batchCount, total: batchCount, matches: totalMatches })
+
+        console.log(`🤖 Processing AI matching batch ${batchCount} (page ${page})...`)
+
+        const response = await fetch(`/api/admin/ai-match-products?page=${page}&limit=10`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+
+        if (!response.ok) {
+          throw new Error(`AI matching failed with status ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        if (!data.success) {
+          throw new Error(`AI matching failed: ${data.message}`)
+        }
+
+        totalMatches += data.data.totalMatches || 0
+        hasMore = data.data.pagination.hasMore || false
+        page = data.data.pagination.page + 1
+
+        console.log(`✅ Batch ${batchCount} completed: ${data.data.totalMatches} matches found`)
+
+        // Small delay between batches
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+
+      // Reload stats after matching
+      await loadMatchingStats()
+
+      alert(`🎉 AI matching completed!\n\n📊 Results:\n- Total matches found: ${totalMatches}\n- Batches processed: ${batchCount}`)
+
+    } catch (error) {
+      console.error('AI matching error:', error)
+      alert(`❌ AI matching failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setAiMatching(false)
+      setMatchingProgress({ current: 0, total: 0, matches: 0 })
+    }
+  }
 
   const runBatchScraper = async () => {
     setBatchScraping(true)
@@ -317,7 +376,7 @@ export default function AdminDashboard() {
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Hurtige Handlinger</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <a
                 href="/admin/publishing"
                 className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
@@ -380,6 +439,31 @@ export default function AdminDashboard() {
                     {batchScraping 
                       ? `Batch ${batchProgress.current} - ${batchProgress.products} produkter`
                       : 'Scrape alle REMA produkter'
+                    }
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={runAiMatching}
+                disabled={aiMatching}
+                className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div>
+                  {aiMatching ? (
+                    <RefreshCw className="h-6 w-6 text-purple-600 animate-spin" />
+                  ) : (
+                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">
+                    {aiMatching ? 'AI Matching...' : 'AI Product Matching'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {aiMatching 
+                      ? `Batch ${matchingProgress.current} - ${matchingProgress.matches} matches`
+                      : 'Match produkter med ingredienser'
                     }
                   </p>
                 </div>
