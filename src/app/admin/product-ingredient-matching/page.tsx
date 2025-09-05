@@ -89,6 +89,7 @@ export default function ProductIngredientMatchingPage() {
       const newMatches: ProductIngredientMatch[] = unmatchedIngredients.map(ingredient => {
         // Find potential matches based on simple keyword matching
         const potentialMatches = allProducts.filter(product => 
+          product.name && ingredient.name &&
           product.name.toLowerCase().includes(ingredient.name.toLowerCase()) ||
           ingredient.name.toLowerCase().includes(product.name.toLowerCase())
         )
@@ -345,7 +346,8 @@ export default function ProductIngredientMatchingPage() {
   }
 
   const filteredMatches = productMatches.filter(match => {
-    const matchesSearch = match.recipeIngredient.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = match.recipeIngredient.name && 
+      match.recipeIngredient.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'all' || match.recipeIngredient.category === selectedCategory
     return matchesSearch && matchesCategory
   })
@@ -636,9 +638,9 @@ function GroceryProductSelector({
   const [searchTerm, setSearchTerm] = useState('')
   
   const filteredProducts = groceryProducts.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.store.toLowerCase().includes(searchTerm.toLowerCase())
+    (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (product.store && product.store.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   return (
