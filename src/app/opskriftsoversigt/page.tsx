@@ -291,7 +291,7 @@ export default function RecipeOverviewPage() {
     setSortedRecipes(sorted)
     setDisplayedRecipes(sorted.slice(0, displayCount))
     console.log(`✅ Final result: ${sorted.length} sorted recipes, ${sorted.slice(0, displayCount).length} displayed`)
-    console.log('📋 Displayed recipes:', sorted.slice(0, displayCount).map(r => r.title))
+    console.log('📋 Displayed recipes:', sorted.slice(0, displayCount).map(r => r?.title || 'Unknown'))
   }, [allRecipes, searchQuery, selectedDietary, selectedCategory, sortBy, displayCount])
 
   const handleLoadMore = () => {
@@ -513,13 +513,13 @@ export default function RecipeOverviewPage() {
           {displayedRecipes.length > 0 ? (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {displayedRecipes.map((recipe, index) => (
+                {displayedRecipes && Array.isArray(displayedRecipes) ? displayedRecipes.map((recipe, index) => (
                   <RecipeCard 
                     key={recipe.id} 
                     recipe={recipe} 
                     priority={index < 6} // Priority loading for first 6 images
                   />
-                ))}
+                )) : null}
               </div>
               
               {/* Load More Button */}
