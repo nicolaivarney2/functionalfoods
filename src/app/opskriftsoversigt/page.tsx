@@ -357,7 +357,7 @@ export default function RecipeOverviewPage() {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {extendedDietaryCategories.map((category) => (
+            {extendedDietaryCategories && Array.isArray(extendedDietaryCategories) ? extendedDietaryCategories.map((category) => (
               <Link
                 key={category.id}
                 href={`/opskrifter/${category.slug}`}
@@ -391,7 +391,7 @@ export default function RecipeOverviewPage() {
                   </div>
                 </div>
               </Link>
-            ))}
+            )) : null}
           </div>
         </div>
       </section>
