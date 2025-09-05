@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronDownIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { ChevronDownIcon, CheckIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
-interface Ingredient {
+interface RecipeIngredient {
   id: string
   name: string
   category: string
-  description?: string
+  description: string
 }
 
 interface GroceryProduct {
@@ -21,6 +21,27 @@ interface GroceryProduct {
   isOnSale: boolean
   unit: string
   quantity: number
+}
+
+interface MatchSuggestion {
+  groceryProduct: GroceryProduct
+  confidence: number
+  matchType: 'exact' | 'synonym' | 'fuzzy' | 'category'
+}
+
+interface ProductIngredientMatch {
+  recipeIngredient: RecipeIngredient
+  suggestedMatch: MatchSuggestion | null
+  selectedMatch: GroceryProduct | null
+  isConfirmed: boolean
+  isRejected: boolean
+}
+
+interface Ingredient {
+  id: string
+  name: string
+  category: string
+  description?: string
 }
 
 interface ExistingMatch {
@@ -172,32 +193,104 @@ export default function ProductIngredientMatchingPage() {
     return allProducts
   }
 
-  const loadExistingMatches = async (): Promise<ExistingMatch[]> => {
+  const loadExistingMatches = async (): Promise<ProductIngredientMatch[]> => {
     try {
       const response = await fetch('/api/admin/existing-matches')
       const data = await response.json()
       
       if (data.success) {
         return data.matches.map((match: any) => ({
-          id: match.id,
-          ingredient_id: match.ingredient_id,
-          product_external_id: match.product_external_id,
-          confidence: match.confidence,
-          match_type: match.match_type,
-          ingredient_name: match.ingredient_name,
-          product_name: match.product_name,
-          product_category: match.product_category,
-          product_store: match.product_store,
-          product_price: match.product_price,
-          product_original_price: match.product_original_price,
-          product_is_on_sale: match.product_is_on_sale
+          recipeIngredient: {
+            id: match.ingredient_id,
+            name: match.ingredient_name,
+            category: match.ingredient_category || 'Andre',
+            description: `${match.ingredient_name} - importeret fra opskrifter`
+          },
+          suggestedMatch: {
+            groceryProduct: {
+              id: match.product_external_id,
+              name: match.product_name,
+              category: match.product_category || 'Andre',
+              store: match.product_store,
+              price: match.product_price,
+              originalPrice: match.product_original_price,
+              isOnSale: match.product_is_on_sale || false,
+              unit: 'stk',
+              quantity: 1
+            },
+            confidence: match.confidence,
+            matchType: match.match_type
+          },
+          selectedMatch: null,
+          isConfirmed: true,
+          isRejected: false
         }))
       }
-      return []
     } catch (error) {
       console.error('Error loading existing matches:', error)
-      return []
     }
+    
+    return []
+  }
+
+  const confirmMatch = async (recipeIngredientId: string) => {
+    const idx = productMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
+    
+    const updated = [...productMatches]
+    updated[idx].isConfirmed = true
+    updated[idx].isRejected = false
+    updated[idx].selectedMatch = updated[idx].suggestedMatch?.groceryProduct || null
+    setProductMatches(updated)
+    
+    // TODO: Auto-save to database when we have the API
+    // For now, just update stats
+    setTimeout(() => {
+      const total = updated.length
+      const confirmed = updated.filter(m => m.isConfirmed).length
+      const rejected = updated.filter(m => m.isRejected).length
+      const pending = total - confirmed - rejected
+      setStats({ total, confirmed, rejected, pending })
+    }, 0)
+  }
+
+  const rejectMatch = (recipeIngredientId: string) => {
+    const idx = productMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
+    
+    const updated = [...productMatches]
+    updated[idx].isRejected = true
+    updated[idx].isConfirmed = false
+    updated[idx].selectedMatch = null
+    setProductMatches(updated)
+    
+    setTimeout(() => {
+      const total = updated.length
+      const confirmed = updated.filter(m => m.isConfirmed).length
+      const rejected = updated.filter(m => m.isRejected).length
+      const pending = total - confirmed - rejected
+      setStats({ total, confirmed, rejected, pending })
+    }, 0)
+  }
+
+  const selectManualMatch = async (recipeIngredientId: string, groceryProduct: GroceryProduct) => {
+    const idx = productMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    if (idx === -1) return
+    
+    const updated = [...productMatches]
+    updated[idx].selectedMatch = groceryProduct
+    updated[idx].isConfirmed = true
+    updated[idx].isRejected = false
+    setProductMatches(updated)
+    
+    // TODO: Auto-save to database when we have the API
+    setTimeout(() => {
+      const total = updated.length
+      const confirmed = updated.filter(m => m.isConfirmed).length
+      const rejected = updated.filter(m => m.isRejected).length
+      const pending = total - confirmed - rejected
+      setStats({ total, confirmed, rejected, pending })
+    }, 0)
   }
 
   const updateStats = () => {
@@ -269,6 +362,42 @@ export default function ProductIngredientMatchingPage() {
     }
   }
 
+  const saveAllMatches = async () => {
+    try {
+      const confirmedMatches = productMatches
+        .filter(m => m.isConfirmed && m.selectedMatch)
+        .map(m => ({
+          recipeIngredientId: m.recipeIngredient.id,
+          groceryProductId: m.selectedMatch!.id,
+          confidence: m.suggestedMatch?.confidence || 100
+        }))
+      
+      console.log(`💾 Attempting to save ${confirmedMatches.length} matches:`, confirmedMatches)
+      
+      // TODO: Implement API endpoint for saving product-ingredient matches
+      alert(`Would save ${confirmedMatches.length} product-ingredient matches! (API not implemented yet)`)
+      
+      // For now, just remove saved matches from UI
+      const savedIngredientIds = confirmedMatches.map(m => m.recipeIngredientId)
+      const updatedMatches = productMatches.filter(m => 
+        !savedIngredientIds.includes(m.recipeIngredient.id)
+      )
+      setProductMatches(updatedMatches)
+      
+      setTimeout(() => {
+        const total = updatedMatches.length
+        const confirmed = updatedMatches.filter(m => m.isConfirmed).length
+        const rejected = updatedMatches.filter(m => m.isRejected).length
+        const pending = total - confirmed - rejected
+        setStats({ total, confirmed, rejected, pending })
+      }, 0)
+      
+    } catch (error) {
+      console.error('Error saving matches:', error)
+      alert('Error saving matches')
+    }
+  }
+
   // Filter ingredients based on search and category
   const filteredIngredients = ingredients.filter(ingredient => {
     const matchesSearch = ingredient.name && 
@@ -282,6 +411,22 @@ export default function ProductIngredientMatchingPage() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const currentIngredients = filteredIngredients.slice(startIndex, endIndex)
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 90) return 'text-green-600 bg-green-100'
+    if (confidence >= 70) return 'text-yellow-600 bg-yellow-100'
+    return 'text-red-600 bg-red-100'
+  }
+
+  const getMatchTypeIcon = (matchType: string) => {
+    switch (matchType) {
+      case 'exact': return '🎯'
+      case 'synonym': return '🔄'
+      case 'fuzzy': return '🔍'
+      case 'category': return '📂'
+      default: return '❓'
+    }
+  }
 
   if (isLoading) {
     return (
@@ -318,28 +463,26 @@ export default function ProductIngredientMatchingPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-sm text-gray-600">Total Ingredients</div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="text-2xl font-bold text-green-600">{stats.confirmed}</div>
-            <div className="text-sm text-gray-600">Matched Products</div>
+            <div className="text-sm text-gray-600">Confirmed Matches</div>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
+            <div className="text-sm text-gray-600">Rejected Matches</div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-gray-600">Unmatched Ingredients</div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">
-              {stats.total > 0 ? Math.round((stats.confirmed / stats.total) * 100) : 0}%
-            </div>
-            <div className="text-sm text-gray-600">Match Rate</div>
+            <div className="text-sm text-gray-600">Pending Review</div>
           </div>
         </div>
 
         {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search Ingredients
@@ -348,10 +491,10 @@ export default function ProductIngredientMatchingPage() {
                 <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-3 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search ingredients..."
+                  placeholder="Search by name..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -366,15 +509,16 @@ export default function ProductIngredientMatchingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Categories</option>
-                <option value="Kød og fisk">Kød og fisk</option>
-                <option value="Grøntsager">Grøntsager</option>
-                <option value="Mejeri">Mejeri</option>
-                <option value="Brød og kager">Brød og kager</option>
-                <option value="Krydderier">Krydderier</option>
-                <option value="Andre">Andre</option>
+                <option value="kød">Kød</option>
+                <option value="fisk">Fisk</option>
+                <option value="grøntsager">Grøntsager</option>
+                <option value="frugt">Frugt</option>
+                <option value="mejeri">Mejeri</option>
+                <option value="fedt">Fedt</option>
+                <option value="andre">Andre</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Store
@@ -387,104 +531,150 @@ export default function ProductIngredientMatchingPage() {
                 <option value="all">All Stores</option>
                 <option value="REMA 1000">REMA 1000</option>
                 <option value="Netto">Netto</option>
-                <option value="Fakta">Fakta</option>
+                <option value="Føtex">Føtex</option>
                 <option value="Bilka">Bilka</option>
               </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                onClick={saveAllMatches}
+                disabled={stats.confirmed === 0}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                Save All Matches ({stats.confirmed})
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Ingredients List */}
+        {/* Product-Ingredient Matches */}
         <div className="space-y-4">
-          {currentIngredients.map((ingredient, index) => {
-            const matchedProducts = getProductsForIngredient(ingredient.id)
-            
-            return (
-              <div key={ingredient.id} className="bg-white rounded-lg shadow">
-                <div className="p-6">
-                  {/* Ingredient Header */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{ingredient.name}</h3>
+          {filteredMatches.map((match, index) => (
+            <div key={match.recipeIngredient.id} className="bg-white rounded-lg shadow">
+              <div className="p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Recipe Ingredient */}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Recipe Ingredient
+                    </h3>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="font-medium text-gray-900">{match.recipeIngredient.name}</div>
                       <div className="text-sm text-gray-600 mt-1">
-                        Category: {ingredient.category}
+                        Category: {match.recipeIngredient.category}
                       </div>
-                      {ingredient.description && (
-                        <div className="text-sm text-gray-500 mt-1">
-                          {ingredient.description}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {matchedProducts.length} product{matchedProducts.length !== 1 ? 's' : ''} matched
+                      <div className="text-sm text-gray-500 mt-1">
+                        {match.recipeIngredient.description}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Matched Products */}
-                  {matchedProducts.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-md font-semibold text-gray-900 mb-3">Matched Products:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {matchedProducts.map((match) => (
-                          <div key={match.id} className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center space-x-2">
-                            <span className="text-sm font-medium text-blue-900">{match.product_name}</span>
-                            <span className="text-xs text-blue-600">({match.product_store})</span>
-                            <span className="text-xs text-gray-500">{match.product_price} kr</span>
-                            <button
-                              onClick={() => removeProductMatch(match.id)}
-                              className="text-red-500 hover:text-red-700 ml-1"
-                            >
-                              <XMarkIcon className="h-4 w-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Add Product Dropdown */}
+                  {/* Suggested Match */}
                   <div>
-                    <h4 className="text-md font-semibold text-gray-900 mb-3">
-                      Add Product Match:
-                    </h4>
-                    <GroceryProductSelector
-                      groceryProducts={groceryProducts}
-                      selectedProduct={null}
-                      onSelect={(product) => addProductMatch(ingredient.id, product)}
-                      placeholder="Search for a product to match..."
-                    />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Suggested Grocery Product
+                    </h3>
+                    
+                    {match.suggestedMatch ? (
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium text-gray-900">
+                            {match.suggestedMatch.groceryProduct.name}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConfidenceColor(match.suggestedMatch.confidence)}`}>
+                              {match.suggestedMatch.confidence}% {getMatchTypeIcon(match.suggestedMatch.matchType)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="text-sm text-gray-600 mb-2">
+                          Store: {match.suggestedMatch.groceryProduct.store}
+                        </div>
+                        
+                        <div className="text-sm text-gray-600 mb-2">
+                          Category: {match.suggestedMatch.groceryProduct.category}
+                        </div>
+                        
+                        {/* Price Information */}
+                        <div className="text-sm text-gray-700 mb-3">
+                          <strong>Price:</strong> {' '}
+                          {match.suggestedMatch.groceryProduct.isOnSale ? (
+                            <span>
+                              <span className="text-red-600 font-medium">
+                                {match.suggestedMatch.groceryProduct.price} kr
+                              </span>
+                              {' '}
+                              <span className="line-through text-gray-500">
+                                {match.suggestedMatch.groceryProduct.originalPrice} kr
+                              </span>
+                              {' '}
+                              <span className="text-green-600">
+                                (Sparer {match.suggestedMatch.groceryProduct.originalPrice! - match.suggestedMatch.groceryProduct.price} kr!)
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="font-medium">
+                              {match.suggestedMatch.groceryProduct.price} kr
+                            </span>
+                          )}
+                          {' '}
+                          per {match.suggestedMatch.groceryProduct.quantity}{match.suggestedMatch.groceryProduct.unit}
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => confirmMatch(match.recipeIngredient.id)}
+                            disabled={match.isConfirmed}
+                            className="flex items-center px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-green-300 text-sm"
+                          >
+                            <CheckIcon className="h-4 w-4 mr-1" />
+                            {match.isConfirmed ? 'Confirmed' : 'Confirm'}
+                          </button>
+                          
+                          <button
+                            onClick={() => rejectMatch(match.recipeIngredient.id)}
+                            disabled={match.isRejected}
+                            className="flex items-center px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-red-300 text-sm"
+                          >
+                            <XMarkIcon className="h-4 w-4 mr-1" />
+                            <XMarkIcon className="h-4 w-4 mr-1" />
+                            {match.isRejected ? 'Rejected' : 'Reject'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <div className="text-gray-500 text-center">
+                          No automatic match found
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Manual Selection */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-md font-medium text-gray-900 mb-3">
+                    Manual Selection
+                  </h4>
+                  <GroceryProductSelector
+                    groceryProducts={groceryProducts}
+                    selectedProduct={match.selectedMatch}
+                    onSelect={(groceryProduct) => selectManualMatch(match.recipeIngredient.id, groceryProduct)}
+                    placeholder="Search and select a grocery product..."
+                  />
+                </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredIngredients.length)} of {filteredIngredients.length} ingredients
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <span className="px-3 py-2 text-sm font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+        {filteredMatches.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-500">No ingredients found matching your criteria</div>
           </div>
         )}
       </div>
