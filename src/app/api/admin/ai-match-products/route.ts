@@ -102,14 +102,14 @@ export async function POST(request: NextRequest) {
           confidence = 60
           matchType = 'category'
         }
-        // Partial word match (lower confidence)
-        else if (productName.split(' ').some((word: string) => 
-          word.length > 3 && ingredientName.split(' ').some((ingWord: string) => 
-            word.includes(ingWord) || ingWord.includes(word)
-          )
-        )) {
-          confidence = 40
-          matchType = 'partial'
+        // Partial word match (lower confidence) - only for meaningful words
+        else if (ingredientName.trim().length > 3) {
+          const ingredientWord = ingredientName.trim()
+          const wordBoundaryRegex = new RegExp(`\\b${ingredientWord}\\b`, 'i')
+          if (wordBoundaryRegex.test(productName)) {
+            confidence = 40
+            matchType = 'partial'
+          }
         }
 
         // Only add matches with confidence >= 40
