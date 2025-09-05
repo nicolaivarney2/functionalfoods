@@ -19,15 +19,8 @@ export async function GET(request: NextRequest) {
     const { data: matches, error: matchesError } = await supabase
       .from('product_ingredient_matches')
       .select(`
-        id,
-        product_external_id,
-        ingredient_id,
-        confidence,
-        is_manual,
-        match_type,
-        created_at,
-        updated_at,
-        supermarket_products!inner(
+        *,
+        supermarket_products!left(
           external_id,
           name,
           category,
@@ -36,7 +29,7 @@ export async function GET(request: NextRequest) {
           original_price,
           is_on_sale
         ),
-        ingredients!inner(
+        ingredients!left(
           id,
           name,
           category
@@ -63,8 +56,8 @@ export async function GET(request: NextRequest) {
 
     // Transform data for frontend
     const transformedMatches = matches?.map(match => {
-      const product = match.supermarket_products?.[0] || {}
-      const ingredient = match.ingredients?.[0] || {}
+      const product = match.supermarket_products || {}
+      const ingredient = match.ingredients || {}
       
       return {
         id: match.id,
