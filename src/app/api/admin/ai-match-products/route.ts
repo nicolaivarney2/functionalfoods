@@ -82,33 +82,18 @@ export async function POST(request: NextRequest) {
         let confidence = 0
         let matchType = 'keyword'
 
-        // Exact name match (highest confidence)
-        if (productName === ingredientName) {
-          confidence = 100
-          matchType = 'exact'
-        }
-        // Contains match (high confidence) - but only if ingredient is a complete word
-        else if (ingredientName.trim().length > 2) {
-          const ingredientWord = ingredientName.trim()
-          // Only match if ingredient is a complete word in product name
-          const wordBoundaryRegex = new RegExp(`\\b${ingredientWord}\\b`, 'i')
-          if (wordBoundaryRegex.test(productName)) {
+        // SIMPLE MATCHING - just check if ingredient word is in product name
+        const cleanIngredient = ingredientName.trim()
+        if (cleanIngredient.length > 1) {
+          // Exact match
+          if (productName === cleanIngredient) {
+            confidence = 100
+            matchType = 'exact'
+          }
+          // Contains match - simple and effective
+          else if (productName.includes(cleanIngredient)) {
             confidence = 80
             matchType = 'contains'
-          }
-        }
-        // Category match (medium confidence)
-        else if (productCategory === ingredientCategory && productCategory !== '') {
-          confidence = 60
-          matchType = 'category'
-        }
-        // Partial word match (lower confidence) - only for meaningful words
-        else if (ingredientName.trim().length > 2) {
-          const ingredientWord = ingredientName.trim()
-          const wordBoundaryRegex = new RegExp(`\\b${ingredientWord}\\b`, 'i')
-          if (wordBoundaryRegex.test(productName)) {
-            confidence = 40
-            matchType = 'partial'
           }
         }
 
