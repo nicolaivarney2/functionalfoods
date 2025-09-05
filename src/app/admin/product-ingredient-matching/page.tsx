@@ -117,6 +117,7 @@ export default function ProductIngredientMatchingPage() {
       const allMatches = [...existingMatches, ...newMatches]
       
       setProductMatches(allMatches)
+      setGroceryProducts(allProducts) // Set grocery products for dropdown
       
       console.log(`📊 Loaded ${allProducts.length} grocery products`)
       console.log(`📋 Created ${allMatches.length} matches`)
