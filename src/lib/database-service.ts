@@ -288,8 +288,13 @@ export class DatabaseService {
         return this.getProductsWithSimpleQuery(page, limit, categories, true, search, stores)
       }
       
-      // Since offers are now default, we can use a smaller expansion for better performance
-      const expandedLimit = Math.min(500, limit * 10) // Fetch 10x more products (much more reasonable)
+      // For search queries, use simple query directly to avoid complex sorting
+      if (search && search.trim()) {
+        return this.getProductsWithSimpleQuery(page, limit, categories, false, search, stores)
+      }
+      
+      // For regular browsing, use expanded limit for better offer sorting
+      const expandedLimit = Math.min(2000, limit * 20)
       const { products: allProducts, total } = await this.getProductsWithSimpleQuery(1, expandedLimit, categories, false, search, stores)
       
       // Sort processed products so offers come first
