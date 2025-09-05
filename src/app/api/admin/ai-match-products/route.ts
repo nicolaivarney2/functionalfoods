@@ -89,16 +89,18 @@ export async function POST(request: NextRequest) {
           if (productName === cleanIngredient) {
             confidence = 100
             matchType = 'exact'
+            console.log(`🎯 EXACT MATCH: "${productName}" === "${cleanIngredient}"`)
           }
           // Contains match - simple and effective
           else if (productName.includes(cleanIngredient)) {
             confidence = 80
             matchType = 'contains'
+            console.log(`🎯 CONTAINS MATCH: "${productName}" contains "${cleanIngredient}"`)
           }
         }
 
-        // Only add matches with confidence >= 40
-        if (confidence >= 40) {
+        // Only add matches with confidence >= 50
+        if (confidence >= 50) {
           productMatches.push({
             product_external_id: product.external_id,
             ingredient_id: ingredient.id,
