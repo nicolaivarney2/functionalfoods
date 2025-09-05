@@ -62,24 +62,29 @@ export async function GET(request: NextRequest) {
     const hasMore = page < totalPages
 
     // Transform data for frontend
-    const transformedMatches = matches?.map(match => ({
-      id: match.id,
-      product_external_id: match.product_external_id,
-      ingredient_id: match.ingredient_id,
-      confidence: match.confidence,
-      is_manual: match.is_manual,
-      match_type: match.match_type,
-      created_at: match.created_at,
-      updated_at: match.updated_at,
-      product_name: match.supermarket_products[0]?.name,
-      product_category: match.supermarket_products[0]?.category,
-      product_store: match.supermarket_products[0]?.store,
-      product_price: match.supermarket_products[0]?.price,
-      product_original_price: match.supermarket_products[0]?.original_price,
-      product_is_on_sale: match.supermarket_products[0]?.is_on_sale,
-      ingredient_name: match.ingredients[0]?.name,
-      ingredient_category: match.ingredients[0]?.category
-    })) || []
+    const transformedMatches = matches?.map(match => {
+      const product = match.supermarket_products?.[0] || {}
+      const ingredient = match.ingredients?.[0] || {}
+      
+      return {
+        id: match.id,
+        product_external_id: match.product_external_id,
+        ingredient_id: match.ingredient_id,
+        confidence: match.confidence,
+        is_manual: match.is_manual,
+        match_type: match.match_type,
+        created_at: match.created_at,
+        updated_at: match.updated_at,
+        product_name: product.name || 'Unknown Product',
+        product_category: product.category || 'Andre',
+        product_store: product.store || 'Unknown Store',
+        product_price: product.price || 0,
+        product_original_price: product.original_price,
+        product_is_on_sale: product.is_on_sale || false,
+        ingredient_name: ingredient.name || 'Unknown Ingredient',
+        ingredient_category: ingredient.category || 'Andre'
+      }
+    }) || []
 
     console.log(`✅ Loaded ${transformedMatches.length} existing matches`)
 

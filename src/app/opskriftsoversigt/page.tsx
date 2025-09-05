@@ -103,7 +103,7 @@ const extendedDietaryCategories = [
     imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
   },
   {
-    id: '1',
+    id: '8',
     name: 'FAMILIEMAD',
     slug: 'familie',
     description: 'Almindelige familiemad opskrifter',

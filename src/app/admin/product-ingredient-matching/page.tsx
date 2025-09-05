@@ -255,17 +255,27 @@ export default function ProductIngredientMatchingPage() {
   // Remove a product match from an ingredient
   const removeProductMatch = async (matchId: string) => {
     try {
+      console.log('🗑️ Removing product match:', matchId)
+      
       const response = await fetch('/api/admin/remove-product-match', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ match_id: matchId })
       })
       
-      if (response.ok) {
+      const data = await response.json()
+      console.log('🗑️ Remove response:', data)
+      
+      if (response.ok && data.success) {
         setExistingMatches(prev => prev.filter(match => match.id !== matchId))
+        console.log('✅ Product match removed successfully')
+      } else {
+        console.error('❌ Failed to remove product match:', data.message)
+        alert(`Failed to remove product match: ${data.message}`)
       }
     } catch (error) {
-      console.error('Error removing product match:', error)
+      console.error('❌ Error removing product match:', error)
+      alert('Error removing product match')
     }
   }
 
