@@ -170,7 +170,8 @@ export default function RecipeOverviewPage() {
         console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
         
         if (response.ok) {
-          const recipes = await response.json()
+          const responseData = await response.json()
+          const recipes = responseData.recipes || responseData // Handle both old and new API formats
           console.log(`✅ Loaded ${recipes.length} recipes from API`)
           console.log('📋 First recipe:', recipes[0])
           setAllRecipes(recipes)
