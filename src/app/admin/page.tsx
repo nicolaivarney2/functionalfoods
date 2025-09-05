@@ -30,6 +30,12 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [batchScraping, setBatchScraping] = useState(false)
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0, products: 0 })
+  const [matchingStats, setMatchingStats] = useState({
+    totalProducts: 0,
+    matchedProducts: 0,
+    unmatchedProducts: 0,
+    matchPercentage: 0
+  })
 
   useEffect(() => {
     const loadRecipes = async () => {
@@ -49,8 +55,28 @@ export default function AdminDashboard() {
       }
     }
 
+    const loadMatchingStats = async () => {
+      try {
+        const response = await fetch('/api/admin/product-ingredient-stats')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setMatchingStats({
+              totalProducts: data.stats.totalProducts,
+              matchedProducts: data.stats.matchedProducts,
+              unmatchedProducts: data.stats.unmatchedProducts,
+              matchPercentage: parseFloat(data.stats.matchPercentage)
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error loading matching stats:', error)
+      }
+    }
+
     if (isAdmin) {
       loadRecipes()
+      loadMatchingStats()
     }
   }, [isAdmin])
 
@@ -225,6 +251,62 @@ export default function AdminDashboard() {
                       {loading ? 'Loading...' : stats.publishedToday}
                     </dd>
                   </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Product-Ingredient Matching Stats */}
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Product-Ingredient Matching</h3>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Database className="h-6 w-6 text-blue-500" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-500">Total Products</p>
+                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.totalProducts}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-500">Matched Products</p>
+                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.matchedProducts}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <Clock className="h-6 w-6 text-yellow-500" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-500">Unmatched Products</p>
+                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.unmatchedProducts}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 rounded-lg p-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <TrendingUp className="h-6 w-6 text-purple-500" />
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-500">Match Percentage</p>
+                    <p className="text-2xl font-semibold text-gray-900">{matchingStats.matchPercentage.toFixed(1)}%</p>
+                  </div>
                 </div>
               </div>
             </div>
