@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         let confidence = 0
         let matchType = 'keyword'
 
-        // SIMPLE MATCHING - just check if ingredient word is in product name
+        // SMART MATCHING - check if ingredient word is in product name
         const cleanIngredient = ingredientName.trim()
         if (cleanIngredient.length > 1) {
           // Exact match
@@ -93,16 +93,22 @@ export async function POST(request: NextRequest) {
             matchType = 'exact'
             console.log(`🎯 EXACT MATCH: "${productName}" === "${cleanIngredient}"`)
           }
-          // Contains match - simple and effective
+          // Contains match - check if ingredient is in product name
           else if (productName.includes(cleanIngredient)) {
             confidence = 80
             matchType = 'contains'
             console.log(`🎯 CONTAINS MATCH: "${productName}" contains "${cleanIngredient}"`)
           }
+          // Word match - check if ingredient is a complete word in product
+          else if (productName.split(' ').some(word => word === cleanIngredient)) {
+            confidence = 90
+            matchType = 'word'
+            console.log(`🎯 WORD MATCH: "${productName}" has word "${cleanIngredient}"`)
+          }
         }
 
-        // Only add matches with confidence >= 50
-        if (confidence >= 50) {
+        // Only add matches with confidence >= 30
+        if (confidence >= 30) {
           productMatches.push({
             product_external_id: product.external_id,
             ingredient_id: ingredient.id,
