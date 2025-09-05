@@ -80,6 +80,12 @@ const adminNavItems = [
     description: 'Supermarked produkter og priser'
   },
   {
+    name: 'Product-Ingredient Matching',
+    href: '/admin/product-ingredient-matching',
+    icon: List,
+    description: 'Match produkter med ingredienser'
+  },
+  {
     name: 'Indstillinger',
     href: '/admin/settings',
     icon: Settings,
