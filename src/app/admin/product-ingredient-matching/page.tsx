@@ -64,15 +64,22 @@ export default function ProductIngredientMatchingPage() {
   const loadData = async () => {
     try {
       setIsLoading(true)
+      console.log('🔄 Starting to load data...')
       
       // Load ingredients in batches
+      console.log('🧄 Loading ingredients...')
       const allIngredients = await loadIngredientsInBatches()
+      console.log(`✅ Loaded ${allIngredients.length} ingredients`)
       
       // Load products in batches
+      console.log('📦 Loading products...')
       const allProducts = await loadProductsInBatches()
+      console.log(`✅ Loaded ${allProducts.length} products`)
       
       // Load existing matches from database
+      console.log('🔗 Loading existing matches...')
       const existingMatches = await loadExistingMatches()
+      console.log(`✅ Loaded ${existingMatches.length} existing matches`)
       
       // Create matches for ingredients that don't have matches yet
       const unmatchedIngredients = allIngredients.filter(ingredient => 
