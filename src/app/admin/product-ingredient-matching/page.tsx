@@ -65,12 +65,172 @@ export default function ProductIngredientMatchingPage() {
     try {
       setIsLoading(true)
       
-      // Load current recipe ingredients
-      const recipeIngredientsResponse = await fetch('/api/ingredients')
-      const recipeIngredients = await recipeIngredientsResponse.json()
+      // Load ingredients in batches
+      const allIngredients = await loadIngredientsInBatches()
       
-      // Mock grocery products for now - later this will come from real product database
-      const mockGroceryProducts: GroceryProduct[] = [
+      // Load products in batches
+      const allProducts = await loadProductsInBatches()
+      
+      // Load existing matches from database
+      const existingMatches = await loadExistingMatches()
+      
+      // Create matches for ingredients that don't have matches yet
+      const unmatchedIngredients = allIngredients.filter(ingredient => 
+        !existingMatches.some(match => match.ingredient_id === ingredient.id)
+      )
+      
+      const newMatches: ProductIngredientMatch[] = unmatchedIngredients.map(ingredient => {
+        // Find potential matches based on simple keyword matching
+        const potentialMatches = allProducts.filter(product => 
+          product.name.toLowerCase().includes(ingredient.name.toLowerCase()) ||
+          ingredient.name.toLowerCase().includes(product.name.toLowerCase())
+        )
+        
+        let suggestedMatch: MatchSuggestion | null = null
+        if (potentialMatches.length > 0) {
+          const bestMatch = potentialMatches[0]
+          suggestedMatch = {
+            groceryProduct: bestMatch,
+            confidence: 85, // Mock confidence
+            matchType: 'fuzzy' as const
+          }
+        }
+        
+        return {
+          recipeIngredient: ingredient,
+          suggestedMatch,
+          selectedMatch: null,
+          isConfirmed: false,
+          isRejected: false
+        }
+      })
+      
+      // Combine existing matches with new ones
+      const allMatches = [...existingMatches, ...newMatches]
+      
+      setProductMatches(allMatches)
+      
+      console.log(`📊 Loaded ${allProducts.length} grocery products`)
+      console.log(`📋 Created ${allMatches.length} matches`)
+      
+    } catch (error) {
+      console.error('Error loading data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const loadIngredientsInBatches = async (): Promise<RecipeIngredient[]> => {
+    const allIngredients: RecipeIngredient[] = []
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      try {
+        const response = await fetch(`/api/admin/ingredients-for-matching?page=${page}&limit=100`)
+        const data = await response.json()
+        
+        if (data.success && data.data.ingredients) {
+          allIngredients.push(...data.data.ingredients.map((ing: any) => ({
+            id: ing.id,
+            name: ing.name,
+            category: ing.category || 'Andre',
+            description: `${ing.name} - importeret fra opskrifter`
+          })))
+          
+          hasMore = data.data.pagination.hasMore
+          page++
+        } else {
+          hasMore = false
+        }
+      } catch (error) {
+        console.error('Error loading ingredients batch:', error)
+        hasMore = false
+      }
+    }
+
+    return allIngredients
+  }
+
+  const loadProductsInBatches = async (): Promise<GroceryProduct[]> => {
+    const allProducts: GroceryProduct[] = []
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      try {
+        const response = await fetch(`/api/admin/products-for-matching?page=${page}&limit=100`)
+        const data = await response.json()
+        
+        if (data.success && data.data.products) {
+          allProducts.push(...data.data.products.map((prod: any) => ({
+            id: prod.external_id,
+            name: prod.name,
+            category: prod.category || 'Andre',
+            store: prod.store,
+            price: prod.price,
+            originalPrice: prod.original_price,
+            isOnSale: prod.is_on_sale || false,
+            unit: 'stk', // Default unit
+            quantity: 1 // Default quantity
+          })))
+          
+          hasMore = data.data.pagination.hasMore
+          page++
+        } else {
+          hasMore = false
+        }
+      } catch (error) {
+        console.error('Error loading products batch:', error)
+        hasMore = false
+      }
+    }
+
+    return allProducts
+  }
+
+  const loadExistingMatches = async (): Promise<ProductIngredientMatch[]> => {
+    try {
+      const response = await fetch('/api/admin/existing-matches')
+      const data = await response.json()
+      
+      if (data.success) {
+        return data.matches.map((match: any) => ({
+          recipeIngredient: {
+            id: match.ingredient_id,
+            name: match.ingredient_name,
+            category: match.ingredient_category || 'Andre',
+            description: `${match.ingredient_name} - importeret fra opskrifter`
+          },
+          suggestedMatch: {
+            groceryProduct: {
+              id: match.product_external_id,
+              name: match.product_name,
+              category: match.product_category || 'Andre',
+              store: match.product_store,
+              price: match.product_price,
+              originalPrice: match.product_original_price,
+              isOnSale: match.product_is_on_sale || false,
+              unit: 'stk',
+              quantity: 1
+            },
+            confidence: match.confidence,
+            matchType: match.match_type
+          },
+          selectedMatch: null,
+          isConfirmed: true,
+          isRejected: false
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading existing matches:', error)
+    }
+    
+    return []
+  }
+
+  // Mock grocery products for fallback
+  const mockGroceryProducts: GroceryProduct[] = [
         {
           id: '1',
           name: 'Kyllingebryst, fersk, 500g',
