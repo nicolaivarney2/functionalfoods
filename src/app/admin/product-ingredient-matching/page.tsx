@@ -76,7 +76,7 @@ export default function ProductIngredientMatchingPage() {
       
       // Create matches for ingredients that don't have matches yet
       const unmatchedIngredients = allIngredients.filter(ingredient => 
-        !existingMatches.some(match => match.ingredient_id === ingredient.id)
+        !existingMatches.some(match => match.recipeIngredient.id === ingredient.id)
       )
       
       const newMatches: ProductIngredientMatch[] = unmatchedIngredients.map(ingredient => {
