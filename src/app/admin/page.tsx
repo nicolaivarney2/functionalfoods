@@ -126,6 +126,25 @@ export default function AdminDashboard() {
       }
 
       // Reload stats after matching
+      const loadMatchingStats = async () => {
+        try {
+          const response = await fetch('/api/admin/product-ingredient-stats')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.success) {
+              setMatchingStats({
+                totalProducts: data.stats.totalProducts,
+                matchedProducts: data.stats.matchedProducts,
+                unmatchedProducts: data.stats.unmatchedProducts,
+                matchPercentage: parseFloat(data.stats.matchPercentage)
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error loading matching stats:', error)
+        }
+      }
+      
       await loadMatchingStats()
 
       alert(`🎉 AI matching completed!\n\n📊 Results:\n- Total matches found: ${totalMatches}\n- Batches processed: ${batchCount}`)
