@@ -310,7 +310,7 @@ export default function DagligvarerPage() {
       .then(data => {
         console.log('Direct API response:', data)
         if (data.success && data.products) {
-          console.log('Found products:', data.products.map(p => p.name))
+          console.log('Found products:', data.products.map((p: any) => p.name))
         }
       })
       .catch(error => console.error('API error:', error))
