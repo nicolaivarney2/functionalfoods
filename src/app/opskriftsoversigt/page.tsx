@@ -222,7 +222,7 @@ export default function RecipeOverviewPage() {
         }
         return false
       })
-      console.log(`🔍 After search filter: ${filtered.length} recipes`)
+      console.log(`🔍 After search filter: ${filtered?.length || 0} recipes`)
     }
 
     // Apply dietary filter
@@ -239,7 +239,7 @@ export default function RecipeOverviewPage() {
           return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
         })
       })
-      console.log(`🥗 After dietary filter: ${filtered.length} recipes`)
+      console.log(`🥗 After dietary filter: ${filtered?.length || 0} recipes`)
     }
 
     // Apply category filter
@@ -250,13 +250,13 @@ export default function RecipeOverviewPage() {
         const normalizedSelected = selectedCategory.replace(/[\[\]]/g, '').trim()
         return normalizedRecipeCat.toLowerCase() === normalizedSelected.toLowerCase()
       })
-      console.log(`📂 After category filter: ${filtered.length} recipes`)
+      console.log(`📂 After category filter: ${filtered?.length || 0} recipes`)
     }
 
     setFilteredRecipes(filtered)
 
     // Apply sorting
-    let sorted = [...filtered]
+    let sorted = [...(filtered || [])]
     switch (sortBy) {
       case 'newest':
         sorted.sort((a, b) => {
@@ -289,9 +289,9 @@ export default function RecipeOverviewPage() {
     }
 
     setSortedRecipes(sorted)
-    setDisplayedRecipes(sorted.slice(0, displayCount))
-    console.log(`✅ Final result: ${sorted.length} sorted recipes, ${sorted.slice(0, displayCount).length} displayed`)
-    console.log('📋 Displayed recipes:', sorted.slice(0, displayCount).map(r => r?.title || 'Unknown'))
+    setDisplayedRecipes(sorted?.slice(0, displayCount) || [])
+    console.log(`✅ Final result: ${sorted?.length || 0} sorted recipes, ${sorted?.slice(0, displayCount)?.length || 0} displayed`)
+    console.log('📋 Displayed recipes:', sorted?.slice(0, displayCount)?.map(r => r?.title || 'Unknown') || [])
   }, [allRecipes, searchQuery, selectedDietary, selectedCategory, sortBy, displayCount])
 
   const handleLoadMore = () => {
