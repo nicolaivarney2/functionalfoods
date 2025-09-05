@@ -39,16 +39,22 @@ export async function GET(req: NextRequest) {
     let totalMatches = 0
 
     if (!tableError && tableExists !== null) {
-      // Count matched products (products that have at least one ingredient match)
-      const { data: matchedData, error: matchedError } = await supabase
+      // Count total matches
+      const { count: totalMatchesCount, error: totalMatchesError } = await supabase
         .from('product_ingredient_matches')
-        .select('product_external_id')
-        .limit(1000) // Handle 1000 limit
+        .select('id', { count: 'exact', head: true })
 
-      if (!matchedError && matchedData) {
-        const uniqueMatchedProducts = new Set(matchedData.map(match => match.product_external_id))
-        matchedProducts = uniqueMatchedProducts.size
-        totalMatches = matchedData.length
+      if (!totalMatchesError) {
+        totalMatches = totalMatchesCount || 0
+      }
+
+      // Count unique matched products by counting distinct product_external_ids
+      const { count: matchedProductsCount, error: matchedError } = await supabase
+        .from('product_ingredient_matches')
+        .select('product_external_id', { count: 'exact', head: true })
+
+      if (!matchedError) {
+        matchedProducts = matchedProductsCount || 0
       }
     }
 
