@@ -372,10 +372,24 @@ export class DatabaseService {
     // Post-process search results to filter out irrelevant matches
     let filteredData = data || []
     if (search && search.trim().toLowerCase() === 'æg') {
-      // For "æg" search, only include products that contain "æg" as a complete word
-      // Use a more specific regex that works with Danish characters
-      const ægRegex = /(^|[^a-zæøå])æg([^a-zæøå]|$)|^æg/i
-      filteredData = filteredData.filter(product => ægRegex.test(product.name))
+      // For "æg" search, include products that contain "æg" but exclude obvious non-egg products
+      // Include: SKRABEÆG, FRILANDSÆG, SLOTSÆG, ØKOLOGISKE ÆG, etc.
+      // Exclude: KØDKVÆG, JÆGERPØLSE, etc.
+      const ægRegex = /æg/i
+      const excludeRegex = /(kød|pølse|køb|jæger|ungkvæg|trusseindlæg|pålæg)/i
+      filteredData = filteredData.filter(product => 
+        ægRegex.test(product.name) && !excludeRegex.test(product.name)
+      )
+      
+      // Sort to prioritize complete word matches first
+      filteredData.sort((a, b) => {
+        const aHasCompleteWord = /(^|[^a-zæøå])æg([^a-zæøå]|$)/i.test(a.name)
+        const bHasCompleteWord = /(^|[^a-zæøå])æg([^a-zæøå]|$)/i.test(b.name)
+        
+        if (aHasCompleteWord && !bHasCompleteWord) return -1
+        if (!aHasCompleteWord && bHasCompleteWord) return 1
+        return 0
+      })
     }
 
           // Process products with discount logic
