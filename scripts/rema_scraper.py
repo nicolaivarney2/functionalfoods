@@ -231,39 +231,39 @@ async def enrich_details(products: list, client: httpx.AsyncClient, test_mode: b
     """Enrich product details with additional information"""
     enriched_products = []
     
-    # Department ID to category name mapping
+    # Department ID to category name mapping - MATCHED TO USER DEFINED CATEGORIES
     department_mapping = {
         # Original mapping (probably wrong)
         1: "Brød & kager",
         2: "Frugt & grønt",
         3: "Kød, fisk & fjerkræ",
-        4: "Mejeri",  # Køl
-        5: "Frost",
-        6: "Mejeri",
-        7: "Mejeri",  # Ost m.v.
+        4: "Ost & mejeri",  # Køl - changed from "Mejeri" to match user categories
+        5: "Ukategoriseret",  # Frost - mapped to Uncategorized since not in user list
+        6: "Ost & mejeri",  # Changed from "Mejeri" to match user categories
+        7: "Ost & mejeri",  # Ost m.v. - already correct
         8: "Kolonial",
         9: "Drikkevarer",
         
-        # CORRECTED REMA department IDs based on actual data
+        # CORRECTED REMA department IDs based on actual data - UPDATED TO MATCH USER CATEGORIES
         40: "Kød, fisk & fjerkræ",  # Køl - kølede madvarer som leverpostej, sild, etc.
         50: "Færdigretter & takeaway",  # Pasta, lasagne, etc.
         70: "Ost & mejeri",  # Gouda, Havarti, etc.
         80: "Kolonial",  # Marmelade, ris, etc.
         81: "Frugt & grønt",
         82: "Kød, fisk & fjerkræ",
-        83: "Mejeri",
-        84: "Frost",
+        83: "Ost & mejeri",  # Changed from "Mejeri" to match user categories
+        84: "Ukategoriseret",  # Frost - mapped to Uncategorized since not in user list
         85: "Brød & kager",
         86: "Drikkevarer",  # This is the correct mapping for drinks
         87: "Snacks & slik",
         88: "Husholdning & rengøring",
-        89: "Baby & børn",
+        89: "Baby og småbørn",  # Changed from "Baby & børn" to match user categories
         90: "Drikkevarer",  # FIXED: This was incorrectly mapped to "Kæledyr"
         100: "Husholdning & rengøring",
         120: "Personlig pleje",
         130: "Snacks & slik",
         140: "Kiosk",  # Kiosk produkter
-        160: "Nemt & hurtigt"  # Convenience products
+        160: "Ukategoriseret"  # "Nemt & hurtigt" - mapped to Uncategorized since not in user list
     }
     
     for i, product in enumerate(products):
