@@ -339,7 +339,12 @@ export class DatabaseService {
       .from('supermarket_products')
       .select('*', { count: 'exact' })
       .eq('available', true) // Only show available products (hide discontinued)
-      .order('name', { ascending: true })
+    
+    // For search queries, don't order by name to get better results
+    // For regular queries, order alphabetically
+    if (!search || !search.trim()) {
+      query = query.order('name', { ascending: true })
+    }
     
     if (categories && categories.length > 0) {
       query = query.in('category', categories)

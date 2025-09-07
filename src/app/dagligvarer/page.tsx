@@ -291,30 +291,6 @@ export default function DagligvarerPage() {
     )
   }, [])
 
-  // Test function to debug search
-  const testSearch = () => {
-    console.log('Testing search with "æg"')
-    setSearchQuery('æg')
-  }
-
-  // Test function to debug search with URL encoding
-  const testSearchEncoded = () => {
-    console.log('Testing search with URL-encoded "æg"')
-    const params = new URLSearchParams()
-    params.append('search', 'æg')
-    params.append('limit', '5')
-    console.log('URLSearchParams result:', params.toString())
-    
-    fetch(`/api/supermarket/products?${params}`)
-      .then(response => response.json())
-      .then(data => {
-        console.log('Direct API response:', data)
-        if (data.success && data.products) {
-          console.log('Found products:', data.products.map((p: any) => p.name))
-        }
-      })
-      .catch(error => console.error('API error:', error))
-  }
 
   // Fetch products
   const fetchProducts = useCallback(async (page: number = 1, append: boolean = false) => {
@@ -554,21 +530,6 @@ export default function DagligvarerPage() {
                 />
               </div>
 
-              {/* Debug buttons */}
-              <div className="flex space-x-2 mb-4">
-                <button
-                  onClick={testSearch}
-                  className="px-3 py-1 bg-blue-500 text-white text-xs rounded"
-                >
-                  Test æg
-                </button>
-                <button
-                  onClick={testSearchEncoded}
-                  className="px-3 py-1 bg-green-500 text-white text-xs rounded"
-                >
-                  Test API
-                </button>
-              </div>
 
               {/* Quick toggles */}
               <div className="space-y-3 mb-4">
