@@ -372,13 +372,14 @@ export class DatabaseService {
     // Post-process search results to filter out irrelevant matches
     let filteredData = data || []
     if (search && search.trim().toLowerCase() === 'æg') {
-      // For "æg" search, include products that contain "æg" but exclude obvious non-egg products
-      // Include: SKRABEÆG, FRILANDSÆG, SLOTSÆG, ØKOLOGISKE ÆG, etc.
-      // Exclude: KØDKVÆG, JÆGERPØLSE, etc.
-      const ægRegex = /æg/i
-      const excludeRegex = /(kød|pølse|køb|jæger|ungkvæg|trusseindlæg|pålæg)/i
+      // For "æg" search, only include products that are actually egg-related
+      // Include: SKRABEÆG, FRILANDSÆG, SLOTSÆG, ØKOLOGISKE ÆG, ÆGGESALAT, etc.
+      // Exclude: KØDKVÆG, JÆGERPØLSE, MELLEMLÆGSPAPIR, LETVÆGTSKATTEGRUS, etc.
+      const includeRegex = /(æg|ægge|æggeblommer|æggehvider|æggesalat|æggestand|skrabeæg|frilandsæg|slotsæg|økologiske æg|helæg|brunchæg)/i
+      const excludeRegex = /(kød|pølse|køb|jæger|ungkvæg|trusseindlæg|pålæg|mellemlægspapir|letvægtskattegrus|ammeindlæg|ægte mayonnaise)/i
+      
       filteredData = filteredData.filter(product => 
-        ægRegex.test(product.name) && !excludeRegex.test(product.name)
+        includeRegex.test(product.name) && !excludeRegex.test(product.name)
       )
       
       // Sort to prioritize complete word matches first
