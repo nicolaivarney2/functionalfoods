@@ -68,7 +68,10 @@ export async function POST(req: NextRequest) {
   const maxTimeMs = 8000 // 8 seconds per batch
   
   try {
-    const { departmentId, page = 1, limit = 100 } = await req.json()
+    // Get page from query params, other params from body
+    const url = new URL(req.url)
+    const page = parseInt(url.searchParams.get('page') || '1')
+    const { departmentId, limit = 100 } = await req.json()
     
     console.log(`🚀 Starting batch scrape for department ${departmentId}, page ${page}`)
     
