@@ -369,8 +369,17 @@ export class DatabaseService {
       return { products: [], total: 0, hasMore: false }
     }
 
+    // Post-process search results to filter out irrelevant matches
+    let filteredData = data || []
+    if (search && search.trim().toLowerCase() === 'æg') {
+      // For "æg" search, only include products that contain "æg" as a complete word
+      // Use a more specific regex that works with Danish characters
+      const ægRegex = /(^|[^a-zæøå])æg([^a-zæøå]|$)|^æg/i
+      filteredData = filteredData.filter(product => ægRegex.test(product.name))
+    }
+
           // Process products with discount logic
-      const processedProducts = (data || []).map(product => {
+      const processedProducts = (filteredData || []).map(product => {
         const price = product.price || 0
         const originalPrice = product.original_price || 0
         const isMarkedOnSale = product.is_on_sale || false
