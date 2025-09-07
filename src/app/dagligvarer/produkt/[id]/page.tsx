@@ -306,7 +306,12 @@ export default function ProductPage() {
           setProduct(data.product)
           // Also fetch price history and similar products
           fetchPriceHistory(params.id as string)
-          fetchSimilarProducts(data.product.name, data.product.store)
+          // Fetch similar products but don't let it block the page if it fails
+          try {
+            fetchSimilarProducts(data.product.name, data.product.store)
+          } catch (err) {
+            console.warn('⚠️ Failed to fetch similar products, but continuing with page load:', err)
+          }
         } else {
           setError('Produkt ikke fundet')
         }
@@ -351,19 +356,33 @@ export default function ProductPage() {
   const fetchSimilarProducts = async (productName: string, excludeStore: string) => {
     try {
       setSimilarLoading(true)
-      const params = new URLSearchParams({
-        name: productName,
-        excludeStore: excludeStore
-      })
       
-      const response = await fetch(`/api/supermarket/similar-products?${params}`)
+      // Create URL with proper encoding
+      const url = new URL('/api/supermarket/similar-products', window.location.origin)
+      url.searchParams.set('name', productName)
+      url.searchParams.set('excludeStore', excludeStore)
+      
+      console.log('🔍 Fetching similar products from:', url.toString())
+      const response = await fetch(url.toString())
+      
+      if (!response.ok) {
+        console.error('❌ Similar products API failed:', response.status, response.statusText)
+        const errorText = await response.text()
+        console.error('❌ Error details:', errorText)
+        return
+      }
+      
       const data = await response.json()
+      console.log('✅ Similar products response:', data)
       
       if (data.success && data.products) {
         setSimilarProducts(data.products)
+      } else {
+        console.warn('⚠️ No similar products found or API error:', data)
       }
     } catch (err) {
-      console.error('Error fetching similar products:', err)
+      console.error('❌ Error fetching similar products:', err)
+      // Don't let this error crash the page - just log and continue
     } finally {
       setSimilarLoading(false)
     }
