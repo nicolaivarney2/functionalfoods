@@ -377,24 +377,21 @@ export async function POST(request: NextRequest) {
             const deptId = product.department.id
             const deptName = product.department.name || ''
             
-            // Map department ID to category (UPDATED TO MATCH USER DEFINED CATEGORIES)
-            if (deptId === 50) category = "Færdigretter & takeaway"
-            else if (deptId === 70) category = "Ost & mejeri"
-            else if (deptId === 80) category = "Kolonial"
-            else if (deptId === 81) category = "Frugt & grønt"
-            else if (deptId === 82) category = "Kød, fisk & fjerkræ"
-            else if (deptId === 83) category = "Ost & mejeri"  // Changed from "Mejeri" to match user categories
-            else if (deptId === 84) category = "Ukategoriseret"  // Frost - mapped to Uncategorized since not in user list
-            else if (deptId === 85) category = "Brød & kager"
-            else if (deptId === 86) category = "Drikkevarer"
-            else if (deptId === 87) category = "Snacks & slik"
-            else if (deptId === 88) category = "Husholdning & rengøring"
-            else if (deptId === 89) category = "Baby og småbørn"  // Changed from "Baby & børn" to match user categories
-            else if (deptId === 90) category = "Drikkevarer"  // Changed from "Kæledyr" to match user categories
-            else if (deptId === 100) category = "Husholdning & rengøring"
-            else if (deptId === 120) category = "Personlig pleje"
-            else if (deptId === 130) category = "Snacks & slik"
-            else if (deptId === 140) category = "Kiosk"  // Added Kiosk mapping
+            // Map department ID to category (UPDATED WITH NEW REMA API IDs - September 2025)
+            if (deptId === 10) category = "Brød & kager"  // Brød & Bavinchi
+            else if (deptId === 20) category = "Frugt & grønt"  // Frugt & grønt
+            else if (deptId === 30) category = "Kød, fisk & fjerkræ"  // Kød, fisk & fjerkræ
+            else if (deptId === 40) category = "Kød, fisk & fjerkræ"  // Køl - kølede madvarer
+            else if (deptId === 50) category = "Ukategoriseret"  // Frost - mapped to Uncategorized since not in user list
+            else if (deptId === 60) category = "Ost & mejeri"  // Mejeri - changed from "Mejeri" to match user categories
+            else if (deptId === 70) category = "Ost & mejeri"  // Ost m.v.
+            else if (deptId === 80) category = "Kolonial"  // Kolonial
+            else if (deptId === 90) category = "Drikkevarer"  // Drikkevarer
+            else if (deptId === 100) category = "Husholdning & rengøring"  // Husholdning
+            else if (deptId === 110) category = "Baby og småbørn"  // Baby og småbørn
+            else if (deptId === 120) category = "Personlig pleje"  // Personlig pleje
+            else if (deptId === 130) category = "Snacks & slik"  // Slik
+            else if (deptId === 140) category = "Kiosk"  // Kiosk
             else if (deptId === 160) category = "Ukategoriseret"  // "Nemt & hurtigt" - mapped to Uncategorized since not in user list
             else category = fallbackCategoryMapping(product.name)
             
