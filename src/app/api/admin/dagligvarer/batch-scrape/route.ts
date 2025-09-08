@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
   
   try {
     // Get page from query params, other params from body
-    const url = new URL(req.url)
-    const page = parseInt(url.searchParams.get('page') || '1')
+    const requestUrl = new URL(req.url)
+    const page = parseInt(requestUrl.searchParams.get('page') || '1')
     const { departmentId, limit = 100 } = await req.json()
     
     console.log(`🚀 Starting batch scrape for department ${departmentId}, page ${page}`)
