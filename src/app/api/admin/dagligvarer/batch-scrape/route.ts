@@ -43,11 +43,32 @@ function transformProduct(productData: any): any {
       onSale = price.is_campaign || false
     }
 
+    // Map department to correct category
+    let category = 'Ukategoriseret'
+    if (product.department && product.department.id) {
+      const deptId = product.department.id
+      if (deptId === 10) category = "Brød & kager"
+      else if (deptId === 20) category = "Frugt & grønt"
+      else if (deptId === 30) category = "Kød, fisk & fjerkræ"
+      else if (deptId === 40) category = "Kød, fisk & fjerkræ"
+      else if (deptId === 50) category = "Ukategoriseret"
+      else if (deptId === 60) category = "Ost & mejeri"
+      else if (deptId === 70) category = "Ost & mejeri"
+      else if (deptId === 80) category = "Kolonial"
+      else if (deptId === 90) category = "Drikkevarer"
+      else if (deptId === 100) category = "Husholdning & rengøring"
+      else if (deptId === 110) category = "Baby og småbørn"
+      else if (deptId === 120) category = "Personlig pleje"
+      else if (deptId === 130) category = "Snacks & slik"
+      else if (deptId === 140) category = "Kiosk"
+      else if (deptId === 160) category = "Ukategoriseret"
+    }
+
     return {
       external_id: `python-${externalId}`, // Use same format as existing products
       name: product.name || 'Unknown Product',
       description: product.declaration || product.description || null,
-      category: product.department?.name || 'Uncategorized',
+      category: category,
       price: currentPrice || null,
       original_price: originalPrice || null,
       is_on_sale: onSale,
@@ -68,10 +89,7 @@ export async function POST(req: NextRequest) {
   const maxTimeMs = 8000 // 8 seconds per batch
   
   try {
-    // Get page from query params, other params from body
-    const requestUrl = new URL(req.url)
-    const page = parseInt(requestUrl.searchParams.get('page') || '1')
-    const { departmentId, limit = 100 } = await req.json()
+    const { departmentId, page = 1, limit = 100 } = await req.json()
     
     console.log(`🚀 Starting batch scrape for department ${departmentId}, page ${page}`)
     
@@ -88,25 +106,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`API call failed: ${response.status}`)
     }
     
-    // Check if response is actually JSON
-    const contentType = response.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      const textResponse = await response.text()
-      console.error('❌ Response is not JSON:', textResponse.substring(0, 500))
-      throw new Error(`API returned non-JSON response: ${contentType}`)
-    }
-    
-    let data
-    try {
-      const responseText = await response.text()
-      console.log(`📡 Response length: ${responseText.length} characters`)
-      data = JSON.parse(responseText)
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError)
-      const responseText = await response.text()
-      console.error('❌ Response text (first 1000 chars):', responseText.substring(0, 1000))
-      throw new Error(`JSON parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
-    }
+    const data = await response.json()
     console.log(`📊 Response data keys:`, Object.keys(data))
     console.log(`📦 Products in response:`, data.data?.length || 0)
     
