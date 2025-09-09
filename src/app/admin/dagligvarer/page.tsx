@@ -414,24 +414,89 @@ export default function AdminDagligvarerPage() {
               {fullScrapeProgress && <ProgressBar progress={fullScrapeProgress} />}
             </div>
 
-            {/* Batch Scrape */}
+            {/* Simple REMA Scraper */}
             <div className="border rounded-lg p-4">
-              <h3 className="text-lg font-semibold mb-2">Batch Scraping</h3>
+              <h3 className="text-lg font-semibold mb-2">REMA Batch Scraper</h3>
               <p className="text-sm text-gray-600 mb-4">
-                🔄 Scraper alle produkter i små batches (100 ad gangen). 
-                Ingen timeout problemer - henter ALLE produkter fra alle afdelinger.
+                🚀 Simpel knap der kører det samme som konsollen. 
+                Henter alle produkter fra alle departments med korrekte kategorier.
               </p>
               
               <button
-                onClick={startBatchScrape}
+                onClick={async () => {
+                  if (isLoading) return
+                  setIsLoading(true)
+                  
+                  try {
+                    // Test med department 20 (Frugt & grønt) først
+                    const response = await fetch('/api/dagligvarer/batch-scrape-admin?page=1', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ departmentId: 20, limit: 5 })
+                    })
+                    
+                    const result = await response.json()
+                    console.log('Test result:', result)
+                    
+                    if (result.success) {
+                      alert(`✅ Test successful!\n\nFound: ${result.productsFound}\nAdded: ${result.productsAdded}\nUpdated: ${result.productsUpdated}`)
+                      
+                      // Hvis test virker, kør alle departments
+                      const departments = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 160]
+                      let totalFound = 0
+                      let totalAdded = 0
+                      let totalUpdated = 0
+                      
+                      for (const deptId of departments) {
+                        console.log(`Processing department ${deptId}...`)
+                        
+                        let page = 1
+                        let hasMore = true
+                        
+                        while (hasMore) {
+                          const deptResponse = await fetch(`/api/dagligvarer/batch-scrape-admin?page=${page}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ departmentId: deptId, limit: 100 })
+                          })
+                          
+                          const deptResult = await deptResponse.json()
+                          
+                          if (deptResult.success) {
+                            totalFound += deptResult.productsFound
+                            totalAdded += deptResult.productsAdded
+                            totalUpdated += deptResult.productsUpdated
+                            
+                            hasMore = deptResult.hasMore
+                            page++
+                            
+                            // Small delay
+                            await new Promise(resolve => setTimeout(resolve, 100))
+                          } else {
+                            console.error(`Department ${deptId} failed:`, deptResult.message)
+                            hasMore = false
+                          }
+                        }
+                      }
+                      
+                      alert(`🎉 All departments completed!\n\nTotal found: ${totalFound}\nTotal added: ${totalAdded}\nTotal updated: ${totalUpdated}`)
+                      await loadStats()
+                    } else {
+                      alert(`❌ Test failed: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('Scraper error:', error)
+                    alert(`❌ Scraper failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
                 disabled={isLoading}
                 className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
               >
                 <Play size={16} />
-                Start Batch Scraping
+                {isLoading ? 'Running...' : 'Start REMA Scraper'}
               </button>
-
-              {batchScrapeProgress && <ProgressBar progress={batchScrapeProgress} />}
             </div>
 
             {/* Price Scrape */}
