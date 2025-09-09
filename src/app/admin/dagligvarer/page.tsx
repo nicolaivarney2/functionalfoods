@@ -429,7 +429,7 @@ export default function AdminDagligvarerPage() {
                   
                   try {
                     // Test med department 20 (Frugt & grønt) først
-                    const response = await fetch('/api/dagligvarer/batch-scrape-admin?page=1', {
+                    const response = await fetch('/api/public/batch-scrape?page=1', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ departmentId: 20, limit: 5 })
@@ -454,7 +454,7 @@ export default function AdminDagligvarerPage() {
                         let hasMore = true
                         
                         while (hasMore) {
-                          const deptResponse = await fetch(`/api/dagligvarer/batch-scrape-admin?page=${page}`, {
+                          const deptResponse = await fetch(`/api/public/batch-scrape?page=${page}`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ departmentId: deptId, limit: 100 })
