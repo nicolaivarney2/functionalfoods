@@ -89,9 +89,29 @@
                                 if (data.data && data.data.length > 0) {
                                     deptFound += data.data.length;
                                     
-                                    // Simuler at vi tilføjer produkterne
-                                    // I en rigtig implementation ville vi sende dem til vores database
-                                    deptAdded += data.data.length;
+                                    // Send produkterne til vores import API
+                                    try {
+                                        const importResponse = await fetch('/api/admin/dagligvarer/import-rema-products', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ 
+                                                products: data.data,
+                                                departmentId: deptId
+                                            })
+                                        });
+                                        
+                                        const importResult = await importResponse.json();
+                                        
+                                        if (importResult.success) {
+                                            deptAdded += importResult.productsAdded || 0;
+                                            deptUpdated += importResult.productsUpdated || 0;
+                                            addLog(`    💾 Imported: ${importResult.productsAdded} added, ${importResult.productsUpdated} updated`);
+                                        } else {
+                                            addLog(`    ❌ Import failed: ${importResult.message}`, 'error');
+                                        }
+                                    } catch (importError) {
+                                        addLog(`    ❌ Import error: ${importError.message}`, 'error');
+                                    }
                                     
                                     addLog(`    ✅ Found ${data.data.length} products (${deptFound} total for department)`);
                                     
