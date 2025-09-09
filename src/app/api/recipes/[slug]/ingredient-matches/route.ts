@@ -110,7 +110,7 @@ export async function GET(
       }
     })
 
-    const matchedIngredients = ingredientMatches.filter(im => im.isMatched).length
+    const matchedIngredients = ingredientMatches.filter((im: any) => im.isMatched).length
     const unmatchedIngredients = ingredientMatches.length - matchedIngredients
 
     console.log(`✅ Found ${matchedIngredients}/${ingredientMatches.length} matched ingredients`)
