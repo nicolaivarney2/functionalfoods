@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PieChart, ChevronDown, ChevronUp } from 'lucide-react'
+import IngredientMatchesBox from './IngredientMatchesBox'
 
 interface NutritionFactsBoxProps {
   calories: number
@@ -12,6 +13,7 @@ interface NutritionFactsBoxProps {
   servings: number
   vitamins?: { [key: string]: number }
   minerals?: { [key: string]: number }
+  recipeSlug?: string
 }
 
 export default function NutritionFactsBox({
@@ -22,7 +24,8 @@ export default function NutritionFactsBox({
   fiber,
   servings,
   vitamins = {},
-  minerals = {}
+  minerals = {},
+  recipeSlug
 }: NutritionFactsBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -253,6 +256,13 @@ export default function NutritionFactsBox({
           <strong>Forstå Keto:</strong> Læs om anbefalet næringsindhold på Keto til vægttab
         </p>
       </div>
+
+      {/* Ingredient Matches Box */}
+      {recipeSlug && (
+        <div className="mt-4">
+          <IngredientMatchesBox recipeSlug={recipeSlug} />
+        </div>
+      )}
     </div>
   )
 } 

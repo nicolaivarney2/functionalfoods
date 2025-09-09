@@ -174,6 +174,7 @@ export default async function RecipePage({ params }: PageProps) {
                     servings={recipe.servings || 4}
                     vitamins={recipe.vitamins || {}}
                     minerals={recipe.minerals || {}}
+                    recipeSlug={recipe.slug}
                   />
                 </div>
 
