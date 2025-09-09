@@ -109,7 +109,25 @@ export async function POST(req: NextRequest) {
       throw new Error(`API call failed: ${response.status}`)
     }
     
-    const data = await response.json()
+    // Check if response is actually JSON
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.includes('application/json')) {
+      const textResponse = await response.text()
+      console.error('❌ Response is not JSON:', textResponse.substring(0, 500))
+      throw new Error(`API returned non-JSON response: ${contentType}`)
+    }
+    
+    let data
+    try {
+      const responseText = await response.text()
+      console.log(`📡 Response length: ${responseText.length} characters`)
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError)
+      const responseText = await response.text()
+      console.error('❌ Response text (first 1000 chars):', responseText.substring(0, 1000))
+      throw new Error(`JSON parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+    }
     console.log(`📊 Response data keys:`, Object.keys(data))
     console.log(`📦 Products in response:`, data.data?.length || 0)
     
