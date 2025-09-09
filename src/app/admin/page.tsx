@@ -176,7 +176,7 @@ export default function AdminDashboard() {
         
         console.log(`🔄 Processing batch ${batchCount} (page ${page})...`)
         
-        const response = await fetch(`/api/dagligvarer/batch-scrape?page=${page}`, {
+        const response = await fetch(`/api/dagligvarer/batch-scrape-admin?page=${page}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         })
