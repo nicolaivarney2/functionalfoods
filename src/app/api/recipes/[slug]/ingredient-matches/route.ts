@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServiceClient } from '@/lib/supabase/server'
+import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const revalidate = 0
 
