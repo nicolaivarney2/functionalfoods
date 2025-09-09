@@ -31,9 +31,8 @@ export async function GET(
 
     // Get all ingredients for this recipe
     const recipeIngredients = recipe.ingredients || []
-    const ingredientIds = recipeIngredients.map((ing: any) => ing.id).filter(Boolean)
-
-    if (ingredientIds.length === 0) {
+    
+    if (recipeIngredients.length === 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -43,6 +42,64 @@ export async function GET(
           totalIngredients: 0,
           matchedIngredients: 0,
           unmatchedIngredients: 0
+        }
+      })
+    }
+
+    // Extract ingredient names from recipe ingredients
+    const ingredientNames = recipeIngredients.map((ing: any) => ing.name.toLowerCase().trim()).filter(Boolean)
+    
+    if (ingredientNames.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          recipeId: recipe.id,
+          recipeTitle: recipe.title,
+          ingredientMatches: [],
+          totalIngredients: 0,
+          matchedIngredients: 0,
+          unmatchedIngredients: 0
+        }
+      })
+    }
+
+    // Find matching ingredients in the ingredients table by name
+    const { data: matchingIngredients, error: ingredientsError } = await supabase
+      .from('ingredients')
+      .select('id, name')
+      .in('name', ingredientNames)
+
+    if (ingredientsError) {
+      console.error('Error fetching matching ingredients:', ingredientsError)
+      return NextResponse.json({
+        success: false,
+        message: 'Failed to fetch matching ingredients'
+      }, { status: 500 })
+    }
+
+    const matchingIngredientIds = matchingIngredients?.map(ing => ing.id) || []
+    
+    if (matchingIngredientIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          recipeId: recipe.id,
+          recipeTitle: recipe.title,
+          ingredientMatches: recipeIngredients.map((ing: any) => ({
+            ingredient: {
+              id: ing.id,
+              name: ing.name,
+              amount: ing.amount,
+              unit: ing.unit
+            },
+            isMatched: false,
+            matches: [],
+            totalMatches: 0,
+            bestMatch: null
+          })),
+          totalIngredients: recipeIngredients.length,
+          matchedIngredients: 0,
+          unmatchedIngredients: recipeIngredients.length
         }
       })
     }
@@ -66,7 +123,7 @@ export async function GET(
           image_url
         )
       `)
-      .in('ingredient_id', ingredientIds)
+      .in('ingredient_id', matchingIngredientIds)
 
     if (matchesError) {
       console.error('Error fetching matches:', matchesError)
@@ -76,24 +133,35 @@ export async function GET(
       }, { status: 500 })
     }
 
-    // Group matches by ingredient
-    const matchesByIngredient = new Map()
+    // Create a map of ingredient name to ingredient ID for matching
+    const ingredientNameToId = new Map()
+    matchingIngredients?.forEach(ing => {
+      ingredientNameToId.set(ing.name.toLowerCase().trim(), ing.id)
+    })
+
+    // Group matches by ingredient name
+    const matchesByIngredientName = new Map()
     
     matches?.forEach(match => {
-      const ingredientId = match.ingredient_id
-      if (!matchesByIngredient.has(ingredientId)) {
-        matchesByIngredient.set(ingredientId, [])
+      // Find the ingredient name that matches this ingredient_id
+      const ingredientName = matchingIngredients?.find(ing => ing.id === match.ingredient_id)?.name
+      if (ingredientName) {
+        const normalizedName = ingredientName.toLowerCase().trim()
+        if (!matchesByIngredientName.has(normalizedName)) {
+          matchesByIngredientName.set(normalizedName, [])
+        }
+        matchesByIngredientName.get(normalizedName).push({
+          product: match.supermarket_products,
+          confidence: match.confidence,
+          matchType: match.match_type
+        })
       }
-      matchesByIngredient.get(ingredientId).push({
-        product: match.supermarket_products,
-        confidence: match.confidence,
-        matchType: match.match_type
-      })
     })
 
     // Create ingredient match summary
     const ingredientMatches = recipeIngredients.map((ingredient: any) => {
-      const matches = matchesByIngredient.get(ingredient.id) || []
+      const normalizedName = ingredient.name.toLowerCase().trim()
+      const matches = matchesByIngredientName.get(normalizedName) || []
       const isMatched = matches.length > 0
       
       return {
