@@ -55,7 +55,7 @@
                 // Test med department 20 først
                 addLog('🧪 Testing with department 20 (Frugt & grønt)...');
                 
-                const testResponse = await fetch('https://api.digital.rema1000.dk/api/v3/departments/20/products?page=1&limit=5');
+                const testResponse = await fetch('/api/proxy/rema?departmentId=20&page=1&limit=5');
                 const testData = await testResponse.json();
                 
                 if (testData.data && testData.data.length > 0) {
@@ -83,7 +83,7 @@
                             try {
                                 addLog(`  📄 Page ${page}...`);
                                 
-                                const response = await fetch(`https://api.digital.rema1000.dk/api/v3/departments/${deptId}/products?page=${page}&limit=100`);
+                                const response = await fetch(`/api/proxy/rema?departmentId=${deptId}&page=${page}&limit=100`);
                                 const data = await response.json();
                                 
                                 if (data.data && data.data.length > 0) {
