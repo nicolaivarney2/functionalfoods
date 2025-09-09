@@ -6,8 +6,8 @@ export const revalidate = 0
 
 function transformProduct(productData: any, departmentId: number): any {
   try {
-    // Handle REMA's API structure: { data: { ... } }
-    const product = productData.data || productData
+    // REMA API returns products directly in the data array
+    const product = productData
     
     if (!product.id && !product.name) {
       return null
