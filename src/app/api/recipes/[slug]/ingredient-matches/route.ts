@@ -92,7 +92,7 @@ export async function GET(
     })
 
     // Create ingredient match summary
-    const ingredientMatches = recipeIngredients.map(ingredient => {
+    const ingredientMatches = recipeIngredients.map((ingredient: any) => {
       const matches = matchesByIngredient.get(ingredient.id) || []
       const isMatched = matches.length > 0
       
