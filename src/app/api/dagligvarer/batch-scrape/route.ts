@@ -4,7 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-function transformProduct(productData: any): any {
+function transformProduct(productData: any, departmentId: number): any {
   try {
     // Handle REMA's API structure: { data: { ... } }
     const product = productData.data || productData
@@ -43,34 +43,28 @@ function transformProduct(productData: any): any {
       onSale = price.is_campaign || false
     }
 
-    // Map department to correct category
+    // Map department to correct category using the departmentId from the API call
     let category = 'Ukategoriseret'
-    console.log(`🏷️ Product: ${product.name}, Department:`, product.department)
+    console.log(`🏷️ Product: ${product.name}, Department ID from API call: ${departmentId}`)
     
-    if (product.department && product.department.id) {
-      const deptId = product.department.id
-      console.log(`🏷️ Department ID: ${deptId}`)
-      
-      if (deptId === 10) category = "Brød & kager"
-      else if (deptId === 20) category = "Frugt & grønt"
-      else if (deptId === 30) category = "Kød, fisk & fjerkræ"
-      else if (deptId === 40) category = "Kød, fisk & fjerkræ"
-      else if (deptId === 50) category = "Ukategoriseret"
-      else if (deptId === 60) category = "Ost & mejeri"
-      else if (deptId === 70) category = "Ost & mejeri"
-      else if (deptId === 80) category = "Kolonial"
-      else if (deptId === 90) category = "Drikkevarer"
-      else if (deptId === 100) category = "Husholdning & rengøring"
-      else if (deptId === 110) category = "Baby og småbørn"
-      else if (deptId === 120) category = "Personlig pleje"
-      else if (deptId === 130) category = "Snacks & slik"
-      else if (deptId === 140) category = "Kiosk"
-      else if (deptId === 160) category = "Ukategoriseret"
-      
-      console.log(`🏷️ Mapped to category: ${category}`)
-    } else {
-      console.log(`🏷️ No department info, using default: ${category}`)
-    }
+    // Use the departmentId from the API call since REMA doesn't include it in product data
+    if (departmentId === 10) category = "Brød & kager"
+    else if (departmentId === 20) category = "Frugt & grønt"
+    else if (departmentId === 30) category = "Kød, fisk & fjerkræ"
+    else if (departmentId === 40) category = "Kød, fisk & fjerkræ"
+    else if (departmentId === 50) category = "Ukategoriseret"
+    else if (departmentId === 60) category = "Ost & mejeri"
+    else if (departmentId === 70) category = "Ost & mejeri"
+    else if (departmentId === 80) category = "Kolonial"
+    else if (departmentId === 90) category = "Drikkevarer"
+    else if (departmentId === 100) category = "Husholdning & rengøring"
+    else if (departmentId === 110) category = "Baby og småbørn"
+    else if (departmentId === 120) category = "Personlig pleje"
+    else if (departmentId === 130) category = "Snacks & slik"
+    else if (departmentId === 140) category = "Kiosk"
+    else if (departmentId === 160) category = "Ukategoriseret"
+    
+    console.log(`🏷️ Mapped department ${departmentId} to category: ${category}`)
 
     const transformedProduct = {
       external_id: `python-${externalId}`, // Use same format as existing products
@@ -157,7 +151,7 @@ export async function POST(req: NextRequest) {
     // Transform products
     const discoveredProducts = []
     for (const productData of data.data) {
-      const transformedProduct = transformProduct(productData)
+      const transformedProduct = transformProduct(productData, departmentId)
       if (transformedProduct) {
         discoveredProducts.push(transformedProduct)
       }
