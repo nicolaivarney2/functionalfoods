@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
+import IngredientMatchesBox from '@/components/IngredientMatchesBox'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save } from 'lucide-react'
 
@@ -825,6 +826,11 @@ export default function AdminPublishingPage() {
                         recipeId={selectedRecipe.id} 
                         recipeName={selectedRecipe.title}
                       />
+                      
+                      {/* Ingredient Matches Box */}
+                      <div className="mt-4">
+                        <IngredientMatchesBox recipeSlug={selectedRecipe.slug} />
+                      </div>
                     </div>
                   </div>
 
