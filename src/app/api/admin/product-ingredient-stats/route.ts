@@ -48,15 +48,40 @@ export async function GET(req: NextRequest) {
         totalMatches = totalMatchesCount || 0
       }
 
-      // Count unique matched products using a subquery
+      // Count unique matched products using a proper SQL query
       const { data: matchedProductsData, error: matchedError } = await supabase
-        .from('product_ingredient_matches')
-        .select('product_external_id')
-        .limit(1000) // Handle 1000 limit
+        .rpc('count_unique_matched_products')
 
-      if (!matchedError && matchedProductsData) {
-        const uniqueMatchedProducts = new Set(matchedProductsData.map(match => match.product_external_id))
-        matchedProducts = uniqueMatchedProducts.size
+      if (!matchedError && matchedProductsData !== null) {
+        matchedProducts = matchedProductsData
+      } else {
+        // Fallback: count manually with pagination
+        let allMatchedProducts = new Set()
+        let offset = 0
+        const limit = 1000
+        let hasMore = true
+        
+        while (hasMore) {
+          const { data: batch, error: batchError } = await supabase
+            .from('product_ingredient_matches')
+            .select('product_external_id')
+            .range(offset, offset + limit - 1)
+          
+          if (batchError) {
+            console.error('Error fetching matches batch:', batchError)
+            break
+          }
+          
+          if (batch && batch.length > 0) {
+            batch.forEach(match => allMatchedProducts.add(match.product_external_id))
+            offset += limit
+            hasMore = batch.length === limit
+          } else {
+            hasMore = false
+          }
+        }
+        
+        matchedProducts = allMatchedProducts.size
       }
     }
 
