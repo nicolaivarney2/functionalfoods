@@ -45,8 +45,12 @@ function transformProduct(productData: any): any {
 
     // Map department to correct category
     let category = 'Ukategoriseret'
+    console.log(`🏷️ Product: ${product.name}, Department:`, product.department)
+    
     if (product.department && product.department.id) {
       const deptId = product.department.id
+      console.log(`🏷️ Department ID: ${deptId}`)
+      
       if (deptId === 10) category = "Brød & kager"
       else if (deptId === 20) category = "Frugt & grønt"
       else if (deptId === 30) category = "Kød, fisk & fjerkræ"
@@ -62,9 +66,13 @@ function transformProduct(productData: any): any {
       else if (deptId === 130) category = "Snacks & slik"
       else if (deptId === 140) category = "Kiosk"
       else if (deptId === 160) category = "Ukategoriseret"
+      
+      console.log(`🏷️ Mapped to category: ${category}`)
+    } else {
+      console.log(`🏷️ No department info, using default: ${category}`)
     }
 
-    return {
+    const transformedProduct = {
       external_id: `python-${externalId}`, // Use same format as existing products
       name: product.name || 'Unknown Product',
       description: product.declaration || product.description || null,
@@ -78,6 +86,9 @@ function transformProduct(productData: any): any {
       source: 'rema1000',
       store: 'REMA 1000'
     }
+    
+    console.log(`✅ Transformed product:`, JSON.stringify(transformedProduct, null, 2))
+    return transformedProduct
   } catch (error) {
     console.error('Error transforming product:', error)
     return null
