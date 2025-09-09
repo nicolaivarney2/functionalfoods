@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       console.log(`🔄 Processing batch ${batchCount} (page ${page})...`)
       
       try {
-        const response = await fetch(`${baseUrl}/api/admin/dagligvarer/batch-scrape?page=${page}`, {
+        const response = await fetch(`${baseUrl}/api/dagligvarer/batch-scrape?page=${page}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         })

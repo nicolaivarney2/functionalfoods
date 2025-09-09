@@ -157,7 +157,7 @@ export default function AdminDagligvarerPage() {
         
         while (hasMore) {
           try {
-            const response = await fetch('/api/admin/dagligvarer/batch-scrape', {
+            const response = await fetch('/api/dagligvarer/batch-scrape', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
