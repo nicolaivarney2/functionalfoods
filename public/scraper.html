@@ -40,6 +40,27 @@
             log.innerHTML = '';
         }
         
+        function getDepartmentName(deptId) {
+            const departments = {
+                10: 'Brød & Bavinchi',
+                20: 'Frugt & grønt', 
+                30: 'Kød, fisk & fjerkræ',
+                40: 'Køl - kølede madvarer',
+                50: 'Frost',
+                60: 'Mejeri',
+                70: 'Ost m.v.',
+                80: 'Kolonial',
+                90: 'Drikkevarer',
+                100: 'Husholdning',
+                110: 'Baby og småbørn',
+                120: 'Personlig pleje',
+                130: 'Slik',
+                140: 'Kiosk',
+                160: 'Nemt & hurtigt'
+            };
+            return departments[deptId] || 'Ukendt';
+        }
+        
         clearBtn.onclick = clearLog;
         
         scraperBtn.onclick = async () => {
@@ -91,12 +112,17 @@
                                     
                                     // Send produkterne til vores import API
                                     try {
+                                        // Transform REMA data to match import API format
+                                        const transformedProducts = data.data.map(product => ({
+                                            ...product,
+                                            department: { id: deptId, name: getDepartmentName(deptId) }
+                                        }));
+                                        
                                         const importResponse = await fetch('/api/admin/dagligvarer/import-rema-products', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ 
-                                                products: data.data,
-                                                departmentId: deptId
+                                                products: transformedProducts
                                             })
                                         });
                                         
