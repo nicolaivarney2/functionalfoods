@@ -480,7 +480,46 @@ export default function AdminDagligvarerPage() {
                 </button>
               )}
 
-              {selectedShop !== 'rema1000' && (
+              {selectedShop === 'netto' && (
+                <button
+                  onClick={async () => {
+                    if (isLoading) return
+                    setIsLoading(true)
+                    
+                    try {
+                      const response = await fetch('/api/admin/dagligvarer/netto-scraper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                      })
+                      
+                      const result = await response.json()
+                      
+                      if (result.success) {
+                        alert(`✅ Netto scraper completed!\n\n` +
+                              `Products found: ${result.data.totalProducts}\n` +
+                              `Added: ${result.data.productsAdded}\n` +
+                              `Updated: ${result.data.productsUpdated}\n` +
+                              `Stores processed: ${result.data.storesProcessed}/${result.data.totalStores}`)
+                        await loadStats()
+                      } else {
+                        alert(`❌ Netto scraper failed: ${result.message}`)
+                      }
+                    } catch (error) {
+                      console.error('Netto scraper error:', error)
+                      alert(`❌ Netto scraper failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                    } finally {
+                      setIsLoading(false)
+                    }
+                  }}
+                  disabled={isLoading}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+                >
+                  <Play size={16} />
+                  {isLoading ? 'Running...' : 'Start Netto Scraper'}
+                </button>
+              )}
+
+              {selectedShop !== 'rema1000' && selectedShop !== 'netto' && (
                 <div className="text-center py-8 text-gray-500">
                   <Store size={48} className="mx-auto mb-4 opacity-50" />
                   <p>Scraper for {shops.find(s => s.id === selectedShop)?.name} kommer snart!</p>
