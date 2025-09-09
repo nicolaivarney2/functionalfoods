@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
         console.log(`🔍 Checking if product exists: ${product.external_id}`)
         const { data: existingProduct } = await supabase
           .from('supermarket_products')
-          .select('id, price, original_price, is_on_sale')
+          .select('id, price, original_price, is_on_sale, category')
           .eq('external_id', product.external_id)
           .single()
         
@@ -208,12 +208,17 @@ export async function POST(req: NextRequest) {
           console.error(`❌ Product data:`, JSON.stringify(product, null, 2))
         } else {
           if (existingProduct) {
-            // Product existed before - check if prices changed
+            // Product existed before - check if prices or category changed
             const priceChanged = existingProduct.price !== product.price || 
                                existingProduct.original_price !== product.original_price ||
                                existingProduct.is_on_sale !== product.is_on_sale
+            
+            const categoryChanged = existingProduct.category !== product.category
 
-            if (priceChanged) {
+            if (priceChanged || categoryChanged) {
+              if (categoryChanged) {
+                console.log(`🏷️ Category changed for ${product.name}: ${existingProduct.category} → ${product.category}`)
+              }
               // Add price history entry for the OLD price before updating
               await supabase
                 .from('supermarket_price_history')
