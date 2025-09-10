@@ -36,7 +36,7 @@ interface NettoProduct {
 }
 
 export default function NettoAdminPage() {
-  const { isAdmin, isLoading } = useAdminAuth()
+  const { isAdmin, checking } = useAdminAuth()
   const [stores, setStores] = useState<NettoStore[]>([])
   const [selectedStore, setSelectedStore] = useState<string>('')
   const [query, setQuery] = useState<string>('')
@@ -109,7 +109,7 @@ export default function NettoAdminPage() {
     }
   }
 
-  if (isLoading) {
+  if (checking) {
     return <div className="p-8">Loading...</div>
   }
 
