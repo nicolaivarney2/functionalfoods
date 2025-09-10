@@ -9,10 +9,21 @@ export async function GET(request: NextRequest) {
     
     // Get API token from environment variables
     const apiToken = process.env.SALLING_GROUP_API_TOKEN
+    console.log(`🔑 API Token check:`, {
+      hasToken: !!apiToken,
+      tokenLength: apiToken?.length,
+      tokenStart: apiToken?.substring(0, 10) + '...',
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('SALLING'))
+    })
+    
     if (!apiToken) {
       return NextResponse.json({
         success: false,
-        message: 'Salling Group API token not configured. Please add SALLING_GROUP_API_TOKEN to your environment variables.'
+        message: 'Salling Group API token not configured. Please add SALLING_GROUP_API_TOKEN to your environment variables.',
+        debug: {
+          hasToken: !!apiToken,
+          envKeys: Object.keys(process.env).filter(key => key.includes('SALLING'))
+        }
       }, { status: 500 })
     }
 
