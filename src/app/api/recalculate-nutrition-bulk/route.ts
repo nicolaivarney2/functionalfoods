@@ -11,8 +11,8 @@ export async function POST(request: NextRequest) {
     const matcher = new FridaDTUMatcher()
     const supabase = createSupabaseClient()
     
-    // Get all recipes
-    const allRecipes = await databaseService.getRecipes()
+    // Get all recipes (including drafts)
+    const allRecipes = await databaseService.getAllRecipes()
     console.log(`📊 Found ${allRecipes.length} recipes to process`)
     
     const results = {

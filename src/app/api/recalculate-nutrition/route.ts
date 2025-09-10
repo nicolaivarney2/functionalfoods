@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔄 Starting nutrition recalculation for recipe ID: ${recipeId}`)
 
-    // Get the recipe
-    const allRecipes = await databaseService.getRecipes()
+    // Get the recipe (including drafts)
+    const allRecipes = await databaseService.getAllRecipes()
     const recipe = allRecipes.find(r => r.id === recipeId)
     
     if (!recipe) {
