@@ -1,195 +1,221 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
+  const startTime = Date.now()
+  const maxTimeMs = 8000 // 8 seconds per batch
+  
   try {
-    console.log('🛒 Starting Netto scraper...')
-
-    const supabase = createSupabaseServiceClient()
-
-    // Get Salling Group API key from environment
-    const sallingApiKey = process.env.SALLING_GROUP_API_KEY
-    if (!sallingApiKey) {
-      throw new Error('SALLING_GROUP_API_KEY not found in environment variables')
-    }
-
-    // First, get all Netto stores in Denmark
-    console.log('📍 Fetching Netto stores...')
-    const storesResponse = await fetch('https://api.sallinggroup.com/v2/stores', {
-      headers: {
-        'Authorization': `Bearer ${sallingApiKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!storesResponse.ok) {
-      throw new Error(`Failed to fetch stores: ${storesResponse.status}`)
-    }
-
-    const storesData = await storesResponse.json()
-    const nettoStores = storesData.filter((store: any) => store.brand === 'netto')
+    const { category, page = 1, limit = 100 } = await req.json()
     
-    console.log(`🏪 Found ${nettoStores.length} Netto stores`)
-
-    // Get food waste (tilbuds) data for all stores
-    let totalProducts = 0
-    let totalAdded = 0
-    let totalUpdated = 0
-    let totalErrors = 0
-
-    for (const store of nettoStores.slice(0, 10)) { // Limit to first 10 stores for testing
+    console.log(`🚀 Starting Netto scraper for category: ${category}, page: ${page}`)
+    
+    // Scrape Netto's website to find EAN numbers
+    const eanNumbers = await scrapeNettoEANs(category, page, limit)
+    
+    if (eanNumbers.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No EAN numbers found',
+        eanNumbers: [],
+        hasMore: false,
+        executionTime: Date.now() - startTime
+      })
+    }
+    
+    console.log(`📦 Found ${eanNumbers.length} EAN numbers`)
+    
+    // Now lookup each EAN in Salling Group API
+    const supabase = createSupabaseServiceClient()
+    let productsAdded = 0
+    let productsUpdated = 0
+    
+    for (const ean of eanNumbers) {
+      // Check timeout
+      if (Date.now() - startTime > maxTimeMs) {
+        console.log(`⏰ Timeout reached, stopping processing`)
+        break
+      }
+      
       try {
-        console.log(`🛒 Processing store: ${store.name} (${store.id})`)
+        // Lookup product in Salling Group API
+        const productData = await lookupProductByEAN(ean)
         
-        const foodWasteResponse = await fetch(`https://api.sallinggroup.com/v1/food-waste/${store.id}`, {
-          headers: {
-            'Authorization': `Bearer ${sallingApiKey}`,
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (!foodWasteResponse.ok) {
-          console.warn(`⚠️ Failed to fetch food waste for store ${store.name}: ${foodWasteResponse.status}`)
-          continue
-        }
-
-        const foodWasteData = await foodWasteResponse.json()
-        const clearances = foodWasteData.clearances || []
-
-        console.log(`📦 Found ${clearances.length} clearance products in ${store.name}`)
-
-        for (const clearance of clearances) {
-          try {
-            const offer = clearance.offer
-            const product = clearance.product
-
-            if (!offer || !product) continue
-
-            // Transform Netto product data to our format
-            const productData = {
-              external_id: `netto-${product.ean}`,
-              name: product.description,
-              description: null,
-              category: 'Tilbud', // All food waste products are on sale
-              subcategory: 'Kort udløb',
-              price: offer.newPrice,
-              original_price: offer.originalPrice,
-              unit: offer.stockUnit || 'stk',
-              amount: offer.stock || 1,
-              quantity: `${offer.stock} ${offer.stockUnit || 'stk'}`,
-              unit_price: 0,
-              is_on_sale: true,
-              sale_end_date: offer.endTime,
-              currency: offer.currency || 'DKK',
-              store: 'Netto',
-              store_url: `https://www.netto.dk/butikker/${store.id}`,
-              image_url: product.image || null,
-              available: offer.stock > 0,
-              temperature_zone: null,
-              nutrition_info: null,
-              labels: ['Tilbud', 'Kort udløb'],
-              source: 'netto-food-waste-api',
-              last_updated: new Date().toISOString(),
-              metadata: {
-                netto_store_id: store.id,
-                netto_store_name: store.name,
-                netto_store_address: store.address,
-                ean: product.ean,
-                discount_percent: offer.percentDiscount,
-                stock: offer.stock,
-                stock_unit: offer.stockUnit,
-                start_time: offer.startTime,
-                end_time: offer.endTime
-              }
-            }
-
+        if (productData) {
+          // Transform and save to database
+          const transformedProduct = transformNettoProduct(productData, ean)
+          
+          if (transformedProduct) {
             // Check if product already exists
             const { data: existingProduct } = await supabase
               .from('supermarket_products')
               .select('id, price, original_price, is_on_sale')
-              .eq('external_id', productData.external_id)
+              .eq('external_id', transformedProduct.external_id)
               .single()
-
-            if (existingProduct) {
-              // Update existing product
-              const { error: updateError } = await supabase
-                .from('supermarket_products')
-                .update({
-                  price: productData.price,
-                  original_price: productData.original_price,
-                  is_on_sale: productData.is_on_sale,
-                  sale_end_date: productData.sale_end_date,
-                  available: productData.available,
-                  last_updated: productData.last_updated,
-                  metadata: productData.metadata
-                })
-                .eq('external_id', productData.external_id)
-
-              if (updateError) {
-                console.error('❌ Update error:', updateError)
-                totalErrors++
-              } else {
-                totalUpdated++
-                console.log(`🔄 Updated: ${productData.name}`)
-              }
+            
+            // Upsert product
+            const { error: upsertError } = await supabase
+              .from('supermarket_products')
+              .upsert({
+                external_id: transformedProduct.external_id,
+                name: transformedProduct.name,
+                description: transformedProduct.description,
+                category: transformedProduct.category,
+                price: transformedProduct.price,
+                original_price: transformedProduct.original_price,
+                is_on_sale: transformedProduct.is_on_sale,
+                image_url: transformedProduct.image_url,
+                available: transformedProduct.available,
+                last_updated: transformedProduct.last_updated,
+                source: transformedProduct.source,
+                store: transformedProduct.store
+              }, {
+                onConflict: 'external_id'
+              })
+            
+            if (upsertError) {
+              console.error(`❌ Failed to upsert product ${ean}:`, upsertError)
             } else {
-              // Insert new product
-              const { error: insertError } = await supabase
-                .from('supermarket_products')
-                .insert(productData)
-
-              if (insertError) {
-                console.error('❌ Insert error:', insertError)
-                totalErrors++
+              if (existingProduct) {
+                productsUpdated++
+                console.log(`🔄 Updated product: ${transformedProduct.name}`)
               } else {
-                totalAdded++
-                console.log(`➕ Added: ${productData.name}`)
+                productsAdded++
+                console.log(`➕ Added product: ${transformedProduct.name}`)
               }
             }
-
-            totalProducts++
-
-          } catch (productError) {
-            console.error('❌ Product processing error:', productError)
-            totalErrors++
           }
         }
-
-        // Small delay between stores
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-      } catch (storeError) {
-        console.error(`❌ Store processing error for ${store.name}:`, storeError)
-        totalErrors++
+      } catch (error) {
+        console.error(`❌ Error processing EAN ${ean}:`, error)
       }
     }
-
-    console.log(`✅ Netto scraper completed!`)
-    console.log(`📊 Total products: ${totalProducts}`)
-    console.log(`➕ Added: ${totalAdded}`)
-    console.log(`🔄 Updated: ${totalUpdated}`)
-    console.log(`❌ Errors: ${totalErrors}`)
-
+    
+    const executionTime = Date.now() - startTime
+    
     return NextResponse.json({
       success: true,
-      message: 'Netto scraper completed successfully',
-      data: {
-        totalProducts,
-        productsAdded: totalAdded,
-        productsUpdated: totalUpdated,
-        errors: totalErrors,
-        storesProcessed: nettoStores.slice(0, 10).length,
-        totalStores: nettoStores.length
-      }
+      message: 'Netto scraper completed',
+      eanNumbers: eanNumbers,
+      productsAdded,
+      productsUpdated,
+      executionTime
     })
-
+    
   } catch (error) {
     console.error('❌ Netto scraper error:', error)
     return NextResponse.json({
       success: false,
-      message: `Netto scraper failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: `Scraper failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      executionTime: Date.now() - startTime
     }, { status: 500 })
+  }
+}
+
+async function scrapeNettoEANs(category: string, page: number, limit: number): Promise<string[]> {
+  try {
+    // This is a placeholder - we need to implement actual scraping
+    // For now, return some example EANs
+    const exampleEANs = [
+      '6935364070199', // From Salling Group documentation
+      '5701234567890', // Example EAN
+      '5701234567891', // Example EAN
+      '5701234567892', // Example EAN
+      '5701234567893', // Example EAN
+    ]
+    
+    console.log(`📡 Scraping Netto website for category: ${category}, page: ${page}`)
+    
+    // TODO: Implement actual scraping of Netto's website
+    // This would involve:
+    // 1. Making a request to Netto's website
+    // 2. Parsing the HTML to find product links
+    // 3. Extracting EAN numbers from product pages
+    // 4. Returning the list of EANs
+    
+    return exampleEANs.slice(0, limit)
+  } catch (error) {
+    console.error('Error scraping Netto EANs:', error)
+    return []
+  }
+}
+
+async function lookupProductByEAN(ean: string): Promise<any> {
+  try {
+    // Use the first available store ID for now
+    const storeId = '12345' // This should be dynamically selected
+    
+    const response = await fetch(`https://api.sallinggroup.com/v2/products/${ean}?storeId=${storeId}`, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      console.error(`Failed to lookup EAN ${ean}: ${response.status}`)
+      return null
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error(`Error looking up EAN ${ean}:`, error)
+    return null
+  }
+}
+
+function transformNettoProduct(data: any, ean: string) {
+  try {
+    const product = data.instore
+    
+    if (!product) {
+      return null
+    }
+
+    // Calculate pricing
+    let currentPrice = product.price || 0
+    let originalPrice = product.price || 0
+    let onSale = false
+    
+    if (product.campaign) {
+      // Product is on campaign
+      currentPrice = product.campaign.unitPrice || product.price || 0
+      originalPrice = product.price || 0
+      onSale = true
+    }
+
+    return {
+      external_id: `netto-${ean}`,
+      name: product.name || 'Unknown Product',
+      description: product.description || null,
+      category: 'Ukategoriseret', // Salling Group doesn't provide category
+      price: currentPrice,
+      original_price: originalPrice,
+      is_on_sale: onSale,
+      image_url: null, // Salling Group doesn't provide images
+      available: true,
+      last_updated: new Date().toISOString(),
+      source: 'netto',
+      store: 'Netto',
+      ean: ean,
+      unit: product.unit || null,
+      unit_price: product.unitPrice || currentPrice,
+      campaign: product.campaign ? {
+        display_text: product.campaign.displayText,
+        from_date: product.campaign.fromDate,
+        to_date: product.campaign.toDate,
+        quantity: product.campaign.quantity,
+        price: product.campaign.price
+      } : null,
+      deposit: product.deposit ? {
+        price: product.deposit.price,
+        text: product.deposit.text
+      } : null
+    }
+  } catch (error) {
+    console.error('Error transforming Netto product:', error)
+    return null
   }
 }
