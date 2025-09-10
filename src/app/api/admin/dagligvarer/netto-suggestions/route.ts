@@ -126,25 +126,26 @@ async function searchNettoProducts(query: string, storeId: string, limit: number
     // Choose the right endpoint based on method
     switch (method) {
       case 'relevant':
-        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
         break
       case 'similar':
         // For similar products, we need a product ID/EAN
-        url = `https://api.sallinggroup.com/v1/product-suggestions/similar-products?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/similar-products?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
         break
       case 'frequently-bought':
         // For frequently bought together, we need a product ID/EAN
-        url = `https://api.sallinggroup.com/v1/product-suggestions/frequently-bought-together?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/frequently-bought-together?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
         break
       default:
-        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
     }
     
     console.log(`📡 Fetching: ${url}`)
     
     const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiToken}`
       }
     })
     

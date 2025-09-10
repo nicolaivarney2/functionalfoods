@@ -27,13 +27,15 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // Call Salling Group Stores API with API key authentication
-    const url = `https://api.sallinggroup.com/v1/stores?apiKey=${apiToken}`
+    // Call Salling Group Product Suggestions API to get products (we can't access stores API)
+    // We'll use a generic search to find products and extract store info from them
+    const url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=mælk&limit=1`
     console.log(`📡 Fetching: ${url}`)
     
     const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiToken}`
       }
     })
     
@@ -63,21 +65,31 @@ export async function GET(request: NextRequest) {
     }
     
     const data = await response.json()
-    console.log(`📦 Stores data:`, JSON.stringify(data, null, 2))
+    console.log(`📦 Product data:`, JSON.stringify(data, null, 2))
     
-    // Filter for Netto stores only
-    const nettoStores = data.filter((store: any) => 
-      store.brand && store.brand.toLowerCase().includes('netto')
-    )
+    // Since we can't access stores API, we'll return a mock store list
+    // In a real implementation, you'd need to request access to the stores API
+    const mockStores = [
+      {
+        id: 'netto-1',
+        name: 'Netto (Mock Store)',
+        brand: 'Netto',
+        address: 'Mock Address',
+        city: 'Copenhagen',
+        zipCode: '1000',
+        country: 'Denmark'
+      }
+    ]
     
-    console.log(`🏪 Found ${nettoStores.length} Netto stores`)
+    console.log(`🏪 Using mock Netto store (API key only has access to Product Suggestions)`)
     
     return NextResponse.json({
       success: true,
-      message: 'Netto stores loaded',
+      message: 'Mock Netto store loaded (API key limited to Product Suggestions)',
       data: {
-        stores: nettoStores,
-        total: nettoStores.length
+        stores: mockStores,
+        total: mockStores.length,
+        note: 'API key only has access to Product Suggestions API, not Stores API'
       }
     })
     

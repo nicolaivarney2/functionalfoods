@@ -25,13 +25,14 @@ export async function POST(req: NextRequest) {
       }, { status: 500 })
     }
 
-    // Call Salling Group API with API key authentication
-    const url = `https://api.sallinggroup.com/v2/products/${ean}?storeId=${storeId}&apiKey=${apiToken}`
+    // Call Salling Group API with Bearer token authentication
+    const url = `https://api.sallinggroup.com/v2/products/${ean}?storeId=${storeId}`
     console.log(`📡 Fetching: ${url}`)
     
     const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiToken}`
       }
     })
     
