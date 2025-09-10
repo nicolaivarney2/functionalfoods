@@ -470,11 +470,22 @@ export default function AdminPublishingPage() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Publishing Administration</h1>
-          <p className="mt-2 text-gray-600">
-            Planlæg udgivelse af opskrifter, tilføj personlige tips og administrer publishing status.
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Publishing Administration</h1>
+            <p className="mt-2 text-gray-600">
+              Planlæg udgivelse af opskrifter, tilføj personlige tips og administrer publishing status.
+            </p>
+          </div>
+          <div className="flex space-x-3">
+            <a
+              href="/admin/publishing/create"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Opret Opskrift
+            </a>
+          </div>
         </div>
 
         {/* Status Filter */}
