@@ -46,8 +46,22 @@ export async function GET(
       })
     }
 
-    // Extract ingredient names from recipe ingredients
-    const ingredientNames = recipeIngredients.map((ing: any) => ing.name.toLowerCase().trim()).filter(Boolean)
+    // Extract ingredient names from recipe ingredients (remove amount and unit)
+    const ingredientNames = recipeIngredients.map((ing: any) => {
+      // Remove amount and unit from ingredient name
+      // "1 stk avocado" -> "avocado"
+      // "2 dl mælk" -> "mælk"
+      // "500 g gulerødder" -> "gulerødder"
+      const name = ing.name.toLowerCase().trim()
+      
+      // Remove common amount patterns
+      const cleanedName = name
+        .replace(/^\d+\s*(stk|st|styk|stykker|dl|ml|l|g|kg|tsk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/, '')
+        .replace(/^\d+\s*/, '') // Remove any remaining numbers
+        .trim()
+      
+      return cleanedName
+    }).filter(Boolean)
     
     if (ingredientNames.length === 0) {
       return NextResponse.json({
@@ -138,6 +152,9 @@ export async function GET(
     matchingIngredients?.forEach(ing => {
       ingredientNameToId.set(ing.name.toLowerCase().trim(), ing.id)
     })
+    
+    console.log(`🔍 Extracted ingredient names:`, ingredientNames)
+    console.log(`🔍 Found matching ingredients:`, matchingIngredients?.map(ing => ing.name))
 
     // Group matches by ingredient name
     const matchesByIngredientName = new Map()
