@@ -7,8 +7,17 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`🏪 Fetching Netto stores from Salling Group API`)
     
-    // Call Salling Group Stores API (no token required for granted access)
-    const url = 'https://api.sallinggroup.com/v1/stores'
+    // Get API token from environment variables
+    const apiToken = process.env.SALLING_GROUP_API_TOKEN
+    if (!apiToken) {
+      return NextResponse.json({
+        success: false,
+        message: 'Salling Group API token not configured. Please add SALLING_GROUP_API_TOKEN to your environment variables.'
+      }, { status: 500 })
+    }
+
+    // Call Salling Group Stores API with API key authentication
+    const url = `https://api.sallinggroup.com/v1/stores?apiKey=${apiToken}`
     console.log(`📡 Fetching: ${url}`)
     
     const response = await fetch(url, {

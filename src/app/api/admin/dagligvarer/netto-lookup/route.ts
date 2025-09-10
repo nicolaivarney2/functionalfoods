@@ -16,8 +16,17 @@ export async function POST(req: NextRequest) {
 
     console.log(`🔍 Looking up EAN ${ean} in Netto store ${storeId}`)
     
-    // Call Salling Group API (no token required for granted access)
-    const url = `https://api.sallinggroup.com/v2/products/${ean}?storeId=${storeId}`
+    // Get API token from environment variables
+    const apiToken = process.env.SALLING_GROUP_API_TOKEN
+    if (!apiToken) {
+      return NextResponse.json({
+        success: false,
+        message: 'Salling Group API token not configured. Please add SALLING_GROUP_API_TOKEN to your environment variables.'
+      }, { status: 500 })
+    }
+
+    // Call Salling Group API with API key authentication
+    const url = `https://api.sallinggroup.com/v2/products/${ean}?storeId=${storeId}&apiKey=${apiToken}`
     console.log(`📡 Fetching: ${url}`)
     
     const response = await fetch(url, {

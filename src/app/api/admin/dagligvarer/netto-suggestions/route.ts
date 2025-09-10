@@ -114,23 +114,30 @@ export async function POST(req: NextRequest) {
 
 async function searchNettoProducts(query: string, storeId: string, limit: number, method: string): Promise<any[]> {
   try {
+    // Get API token from environment variables
+    const apiToken = process.env.SALLING_GROUP_API_TOKEN
+    if (!apiToken) {
+      console.error('Salling Group API token not configured')
+      return []
+    }
+
     let url: string
     
     // Choose the right endpoint based on method
     switch (method) {
       case 'relevant':
-        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
         break
       case 'similar':
         // For similar products, we need a product ID/EAN
-        url = `https://api.sallinggroup.com/v1/product-suggestions/similar-products?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/similar-products?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
         break
       case 'frequently-bought':
         // For frequently bought together, we need a product ID/EAN
-        url = `https://api.sallinggroup.com/v1/product-suggestions/frequently-bought-together?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/frequently-bought-together?productId=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
         break
       default:
-        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}`
+        url = `https://api.sallinggroup.com/v1/product-suggestions/relevant-products?q=${encodeURIComponent(query)}&storeId=${storeId}&limit=${limit}&apiKey=${apiToken}`
     }
     
     console.log(`📡 Fetching: ${url}`)
