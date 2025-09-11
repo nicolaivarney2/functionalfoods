@@ -63,8 +63,32 @@ export async function POST(request: NextRequest) {
       throw new Error('Familiemad Assistant ID not configured')
     }
     
+    // First, create a thread
+    const threadResponse = await fetch('https://api.openai.com/v1/threads', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+        'Content-Type': 'application/json',
+        'OpenAI-Beta': 'assistants=v2'
+      },
+      body: JSON.stringify({})
+    })
+
+    if (!threadResponse.ok) {
+      const errorData = await threadResponse.json()
+      throw new Error(`OpenAI thread creation error: ${errorData.error?.message || 'Unknown error'}`)
+    }
+
+    const threadData = await threadResponse.json()
+    const threadId = threadData.id
+    
+    console.log('🧵 Created thread:', threadId)
+
     // Generate recipe using Assistant API
-    const response = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.familiemad}/runs`, {
+    const assistantUrl = `https://api.openai.com/v1/threads/${threadId}/runs`
+    console.log('🔗 Assistant URL:', assistantUrl)
+    
+    const response = await fetch(assistantUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiConfig.apiKey}`,
@@ -72,6 +96,7 @@ export async function POST(request: NextRequest) {
         'OpenAI-Beta': 'assistants=v2'
       },
       body: JSON.stringify({
+        assistant_id: openaiConfig.assistantIds.familiemad,
         additional_instructions: `Generer en ny Familiemad opskrift der er unik og ikke ligner eksisterende opskrifter: ${existingTitles.join(', ')}. 
 
 Returnér kun valid JSON i det nøjagtige format herunder. Ingen ekstra tekst, ingen markdown.
@@ -134,7 +159,7 @@ JSON-struktur (obligatorisk):
       
       await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
       
-      const statusResponse = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.familiemad}/runs/${runData.id}`, {
+      const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runData.id}`, {
         headers: {
           'Authorization': `Bearer ${openaiConfig.apiKey}`,
           'OpenAI-Beta': 'assistants=v2'
@@ -151,7 +176,7 @@ JSON-struktur (obligatorisk):
     }
     
     // Get the messages from the thread
-    const messagesResponse = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.familiemad}/threads/${runData.thread_id}/messages`, {
+    const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       headers: {
         'Authorization': `Bearer ${openaiConfig.apiKey}`,
         'OpenAI-Beta': 'assistants=v2'
