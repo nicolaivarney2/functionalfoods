@@ -54,6 +54,15 @@ export async function POST(request: NextRequest) {
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
+    console.log('🔍 OpenAI Config:', {
+      apiKey: openaiConfig.apiKey ? 'Set' : 'Not set',
+      familiemadAssistant: openaiConfig.assistantIds?.familiemad || 'Not set'
+    })
+    
+    if (!openaiConfig.assistantIds?.familiemad) {
+      throw new Error('Familiemad Assistant ID not configured')
+    }
+    
     // Generate recipe using Assistant API
     const response = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.familiemad}/runs`, {
       method: 'POST',
