@@ -208,29 +208,11 @@ export default function CreateRecipePage() {
         throw new Error(`Validering fejlede: ${validationData.reasons.join(', ')}`)
       }
 
-      setProgress('Genererer billede...')
+      setProgress('Opskrift genereret!')
       
-      // Generate image via Make webhook with precise prompts
-      const imageResponse = await fetch('/api/admin/generate-recipe-image-smart', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          recipe: recipeData.recipe,
-          category: category.name
-        })
-      })
-
-      if (!imageResponse.ok) {
-        console.warn('Billede generering fejlede, fortsætter uden billede')
-      }
-
-      const imageData = await imageResponse.ok ? await imageResponse.json() : { imageUrl: null }
-
       const finalRecipe = {
         ...recipeData.recipe,
-        imageUrl: imageData.imageUrl || '/images/recipe-placeholder.jpg'
+        imageUrl: '/images/recipe-placeholder.jpg' // Placeholder - upload billede manuelt
       }
 
       // Set as AI-kladde for editing
@@ -377,6 +359,56 @@ export default function CreateRecipePage() {
     })
   }
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      alert('Filen skal være et billede')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Filen er for stor (max 5MB)')
+      return
+    }
+
+    try {
+      setProgress('Uploader billede...')
+      
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('recipeId', 'temp-' + Date.now()) // Temporary ID for upload
+
+      const response = await fetch('/api/admin/upload-recipe-image', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Upload fejlede')
+      }
+
+      const data = await response.json()
+      
+      // Update editable recipe with new image URL
+      setEditableRecipe(prev => prev ? {
+        ...prev,
+        imageUrl: data.imageUrl
+      } : null)
+
+      setProgress('Billede uploadet!')
+      setTimeout(() => setProgress(''), 2000)
+
+    } catch (error: any) {
+      console.error('Image upload error:', error)
+      alert(`Fejl ved upload: ${error.message}`)
+      setProgress('')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -515,6 +547,37 @@ export default function CreateRecipePage() {
                       <p className="text-gray-600 mb-4">{generatedRecipe.description}</p>
                     </>
                   )}
+                  
+                  {/* Recipe Image */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-3">Billede</h4>
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-4">
+                          <img 
+                            src={editableRecipe?.imageUrl || '/images/recipe-placeholder.jpg'} 
+                            alt="Recipe" 
+                            className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                          />
+                          <div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleImageUpload}
+                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Max 5MB, JPG/PNG/WebP</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <img 
+                        src={generatedRecipe.imageUrl} 
+                        alt={generatedRecipe.title} 
+                        className="w-full h-48 object-cover rounded-lg border border-gray-200"
+                      />
+                    )}
+                  </div>
                   
                   {/* Recipe Meta */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">

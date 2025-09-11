@@ -4,8 +4,6 @@ import path from 'path'
 interface OpenAIConfig {
   apiKey: string
   assistantId: string
-  midjourneyWebhookUrl?: string
-  midjourneyPromptTemplate?: string
 }
 
 // Check if we're in a serverless environment (Vercel)
@@ -21,15 +19,11 @@ export function getOpenAIConfig(): OpenAIConfig | null {
     if (isServerless) {
       const apiKey = process.env.OPENAI_API_KEY
       const assistantId = process.env.OPENAI_ASSISTANT_ID
-      const midjourneyWebhookUrl = process.env.MAKE_MIDJOURNEY_WEBHOOK_URL
-      const midjourneyPromptTemplate = process.env.MIDJOURNEY_PROMPT_TEMPLATE
       
       if (apiKey && assistantId) {
         return { 
           apiKey, 
-          assistantId,
-          midjourneyWebhookUrl,
-          midjourneyPromptTemplate
+          assistantId
         }
       }
       
@@ -45,9 +39,7 @@ export function getOpenAIConfig(): OpenAIConfig | null {
       if (config.apiKey && config.assistantId) {
         return {
           apiKey: config.apiKey,
-          assistantId: config.assistantId,
-          midjourneyWebhookUrl: config.midjourneyWebhookUrl,
-          midjourneyPromptTemplate: config.midjourneyPromptTemplate
+          assistantId: config.assistantId
         }
       }
     }
@@ -69,9 +61,7 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
     // Local environment - save to file
     const configData = JSON.stringify({
       apiKey: config.apiKey,
-      assistantId: config.assistantId,
-      midjourneyWebhookUrl: config.midjourneyWebhookUrl || '',
-      midjourneyPromptTemplate: config.midjourneyPromptTemplate || ''
+      assistantId: config.assistantId
     }, null, 2)
     fs.writeFileSync(CONFIG_FILE, configData)
     return true

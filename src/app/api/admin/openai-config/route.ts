@@ -20,9 +20,7 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       apiKey: config.apiKey,
-      assistantId: config.assistantId,
-      midjourneyWebhookUrl: config.midjourneyWebhookUrl || '',
-      midjourneyPromptTemplate: config.midjourneyPromptTemplate || ''
+      assistantId: config.assistantId
     })
 
   } catch (error: any) {
@@ -37,7 +35,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { apiKey, assistantId, midjourneyWebhookUrl, midjourneyPromptTemplate } = body
+    const { apiKey, assistantId } = body
 
     if (!apiKey || !assistantId) {
       return NextResponse.json({ 
@@ -48,9 +46,7 @@ export async function POST(request: NextRequest) {
 
     const success = saveOpenAIConfig({ 
       apiKey, 
-      assistantId, 
-      midjourneyWebhookUrl, 
-      midjourneyPromptTemplate 
+      assistantId
     })
 
     if (success) {
