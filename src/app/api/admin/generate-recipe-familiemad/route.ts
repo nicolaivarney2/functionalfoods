@@ -97,7 +97,19 @@ UNDGÅ:
 - Voksenmad (oksepølser, krydret bønnesalat)
 - Retter med stærke smage
 
-Maden skal være enkel, budgetvenlig og praktisk. Brug almindelige ingredienser der er lette at få fat i.
+INGREDIENS FORMATERING - VIGTIGT:
+- Brug små bogstaver (ikke forbogstav stort)
+- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg")
+- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille")
+- Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
+- Kartofler: "4 stk kartofler" (ikke "4 kartofler")
+- Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
+- Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
+
+MAD SKAL VÆRE:
+- Enkel, budgetvenlig og praktisk
+- Brug almindelige ingredienser der er lette at få fat i
+- Retter som børn vil spise
 
 Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et positivt tal - IKKE tom eller 0.`
           },
@@ -108,10 +120,19 @@ Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.map(title => `- ${title}`).join('\n')}
 
+INGREDIENS FORMATERING - FØLG DISSE REGLER:
+- Brug små bogstaver (ikke forbogstav stort)
+- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg")
+- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille")
+- Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
+- Kartofler: "4 stk kartofler" (ikke "4 kartofler")
+- Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
+- Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
+
 Returnér kun valid JSON i det nøjagtige format herunder. Ingen ekstra tekst, ingen markdown.
 Brug HTML i felterne summary, instructions_flat[].text og notes (enkle <p> eller <ul>/<ol> er nok).
 
-Enheder: Brug gram, ml, tsk, spsk, stk.
+Enheder: Brug gram, ml, tsk, spsk, stk, bundt.
 Alle ingredienser i ingredients_flat skal have name, type, amount, unit, og notes (tom streng hvis ikke relevant).
 VIKTIGT: amount skal være et positivt tal (f.eks. "2", "150", "0.5") - IKKE tom eller 0.
 Brug grupper i både ingredienser og instruktioner, når det giver mening (fx "Kød", "Sauce", "Topping").
