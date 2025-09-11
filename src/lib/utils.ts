@@ -4,6 +4,14 @@
 export function generateSlug(text: string): string {
   return text
     .toLowerCase()
+    .replace(/[æøå]/g, (match) => {
+      const replacements: { [key: string]: string } = {
+        'æ': 'ae',
+        'ø': 'oe',
+        'å': 'aa'
+      }
+      return replacements[match] || match
+    })
     .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
     .replace(/\s+/g, '-') // Replace spaces with hyphens
     .replace(/-+/g, '-') // Replace multiple hyphens with single

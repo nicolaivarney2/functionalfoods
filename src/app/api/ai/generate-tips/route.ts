@@ -29,7 +29,17 @@ Kategori: ${dietaryCategories.join(', ') || 'Generel'}
 Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
 
     // Kald OpenAI standard API
-    const tips = await callOpenAIStandardAPI(prompt)
+    const tipsJson = await callOpenAIStandardAPI(prompt)
+    
+    // Parse JSON response
+    let tips
+    try {
+      const parsed = JSON.parse(tipsJson)
+      tips = parsed.tips ? parsed.tips.join('\n\n') : tipsJson
+    } catch (error) {
+      console.error('Failed to parse AI tips JSON:', error)
+      tips = tipsJson // Fallback to raw response
+    }
 
     return NextResponse.json({ 
       success: true, 

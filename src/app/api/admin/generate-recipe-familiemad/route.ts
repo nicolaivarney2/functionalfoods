@@ -293,7 +293,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
         servings: 2, // Always 2 portions for familiemad
         prepTime: parseInt(recipe.prep_time) || 15,
         cookTime: parseInt(recipe.cook_time) || 30,
-        difficulty: 'Easy',
+        difficulty: 'Nem',
         dietaryCategories: ['Familiemad'], // Capitalize category
         nutritionalInfo: {
           calories: 400,
@@ -322,7 +322,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       servings: 2, // Always 2 portions for familiemad
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
-      difficulty: recipe.difficulty || 'Easy',
+      difficulty: recipe.difficulty || 'Nem',
       dietaryCategories: recipe.dietaryCategories || ['Familiemad'],
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 400,
