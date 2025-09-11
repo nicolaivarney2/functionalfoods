@@ -63,41 +63,50 @@ export async function POST(request: NextRequest) {
       throw new Error('Familiemad Assistant ID not configured')
     }
     
-    // First, create a thread
-    const threadResponse = await fetch('https://api.openai.com/v1/threads', {
+    // Generate recipe using standard OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'Content-Type': 'application/json',
-        'OpenAI-Beta': 'assistants=v2'
-      },
-      body: JSON.stringify({})
-    })
-
-    if (!threadResponse.ok) {
-      const errorData = await threadResponse.json()
-      throw new Error(`OpenAI thread creation error: ${errorData.error?.message || 'Unknown error'}`)
-    }
-
-    const threadData = await threadResponse.json()
-    const threadId = threadData.id
-    
-    console.log('🧵 Created thread:', threadId)
-
-    // Generate recipe using Assistant API
-    const assistantUrl = `https://api.openai.com/v1/threads/${threadId}/runs`
-    console.log('🔗 Assistant URL:', assistantUrl)
-    
-    const response = await fetch(assistantUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'Content-Type': 'application/json',
-        'OpenAI-Beta': 'assistants=v2'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        assistant_id: openaiConfig.assistantIds.familiemad,
-        additional_instructions: `Generer en ny Familiemad opskrift der er unik og ikke ligner eksisterende opskrifter: ${existingTitles.join(', ')}. 
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `Du er FunctionalFoods opskriftsassistent for Familiemad. Skriv altid på dansk.
+
+Formål: Generér familievenlige opskrifter, der passer til danske hjem. FOKUSÉR PÅ RETTER SOM BØRN VIL SPISE - ikke voksenmad.
+
+KLASSISKE DANSKE FAMILIERETTER:
+- Frikadeller med kartofler og brun sovs
+- Pasta bolognese
+- Kylling i karry med ris
+- Fiskefilet med kartofler og remoulade
+- Hakkebøf med løg og kartofler
+- Pasta med kødsovs
+- Ovnbagt kylling med grøntsager
+- Pølse med kartofler
+- Frikadeller med kartoffelmos
+- Kylling med kartofler og grøntsager
+
+UNDGÅ:
+- Krydede retter (chili, stærke krydderier)
+- Eksotiske ingredienser
+- Voksenmad (oksepølser, krydret bønnesalat)
+- Retter med stærke smage
+
+Maden skal være enkel, budgetvenlig og praktisk. Brug almindelige ingredienser der er lette at få fat i.
+
+Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et positivt tal - IKKE tom eller 0.`
+          },
+          {
+            role: "user",
+            content: `Generer en ny Familiemad opskrift der er unik og ikke ligner eksisterende opskrifter.
+
+EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
+${existingTitles.map(title => `- ${title}`).join('\n')}
 
 Returnér kun valid JSON i det nøjagtige format herunder. Ingen ekstra tekst, ingen markdown.
 Brug HTML i felterne summary, instructions_flat[].text og notes (enkle <p> eller <ul>/<ol> er nok).
@@ -136,8 +145,11 @@ JSON-struktur (obligatorisk):
     }
   ],
   "notes": "string (HTML formateret noter)"
-}`,
-        temperature: 0.8
+}`
+          }
+        ],
+        temperature: 0.8,
+        max_tokens: 2000
       })
     })
 
@@ -146,46 +158,8 @@ JSON-struktur (obligatorisk):
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
-    const runData = await response.json()
-    
-    // Wait for the assistant run to complete
-    let runStatus = runData.status
-    let attempts = 0
-    const maxAttempts = 30 // 30 seconds max wait
-    
-    while (runStatus === 'queued' || runStatus === 'in_progress') {
-      if (attempts >= maxAttempts) {
-        throw new Error('Assistant run timed out')
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-      
-      const statusResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runData.id}`, {
-        headers: {
-          'Authorization': `Bearer ${openaiConfig.apiKey}`,
-          'OpenAI-Beta': 'assistants=v2'
-        }
-      })
-      
-      const statusData = await statusResponse.json()
-      runStatus = statusData.status
-      attempts++
-    }
-    
-    if (runStatus !== 'completed') {
-      throw new Error(`Assistant run failed with status: ${runStatus}`)
-    }
-    
-    // Get the messages from the thread
-    const messagesResponse = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
-      headers: {
-        'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'OpenAI-Beta': 'assistants=v2'
-      }
-    })
-    
-    const messagesData = await messagesResponse.json()
-    const recipeContent = messagesData.data[0]?.content[0]?.text?.value
+    const completion = await response.json()
+    const recipeContent = completion.choices[0]?.message?.content
     
     if (!recipeContent) {
       throw new Error('No recipe content generated')
