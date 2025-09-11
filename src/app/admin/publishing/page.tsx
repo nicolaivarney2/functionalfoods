@@ -56,8 +56,8 @@ export default function AdminPublishingPage() {
       }
       
       const data = await response.json()
-      // API returns recipes array directly, not wrapped in data.recipes
-      const recipesArray = Array.isArray(data) ? data : []
+      // API returns { recipes: [...] } format
+      const recipesArray = data.recipes || []
       const recipesWithTips = recipesArray.map((recipe: any) => ({
         ...recipe,
         personalTips: recipe.personalTips || '',
