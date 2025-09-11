@@ -33,7 +33,8 @@ export function generateRecipeStructuredData(recipe: Recipe) {
       }
       return dietMap[category] || 'https://schema.org/GlutenFreeDiet'
     }) : [],
-    "keywords": recipe.keywords ? recipe.keywords.join(', ') : '',
+    "keywords": recipe.keywords ? 
+      (Array.isArray(recipe.keywords) ? recipe.keywords.join(', ') : recipe.keywords) : '',
     "recipeIngredient": recipe.ingredients ? recipe.ingredients.map(ingredient => 
       `${ingredient.amount} ${ingredient.unit} ${ingredient.name}`
     ) : [],
