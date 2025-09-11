@@ -117,6 +117,7 @@ export default function CreateRecipePage() {
   const [progress, setProgress] = useState<string>('')
   const [isEditing, setIsEditing] = useState(false)
   const [editableRecipe, setEditableRecipe] = useState<GeneratedRecipe | null>(null)
+  const [recipeStatus, setRecipeStatus] = useState<'ai-preview' | 'ready-to-save' | 'saved'>('ai-preview')
 
   // Redirect if not admin
   if (checking) {
@@ -254,6 +255,12 @@ export default function CreateRecipePage() {
   const handleSaveRecipe = async () => {
     if (!editableRecipe) return
 
+    // Check if image is uploaded
+    if (recipeStatus !== 'ready-to-save') {
+      alert('⚠️ Du skal uploade et billede før opskriften kan gemmes som kladde')
+      return
+    }
+
     try {
       setProgress('Gemmer AI-kladde som rigtig kladde...')
       
@@ -278,6 +285,7 @@ export default function CreateRecipePage() {
       setEditableRecipe(null)
       setIsEditing(false)
       setSelectedCategory(null)
+      setRecipeStatus('saved')
       
     } catch (error) {
       console.error('Error saving recipe:', error)
@@ -399,8 +407,11 @@ export default function CreateRecipePage() {
         imageUrl: data.imageUrl
       } : null)
 
-      setProgress('Billede uploadet!')
-      setTimeout(() => setProgress(''), 2000)
+      // Update status to ready-to-save when image is uploaded
+      setRecipeStatus('ready-to-save')
+
+      setProgress('Billede uploadet! Opskrift klar til at gemmes')
+      setTimeout(() => setProgress(''), 3000)
 
     } catch (error: any) {
       console.error('Image upload error:', error)
@@ -499,9 +510,29 @@ export default function CreateRecipePage() {
           {/* Generated Recipe Preview */}
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900">
-                {isEditing ? 'Rediger AI-kladde' : 'AI-kladde Forhåndsvisning'}
-              </h2>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {isEditing ? 'Rediger AI-kladde' : 'AI-kladde Forhåndsvisning'}
+                </h2>
+                {generatedRecipe && (
+                  <div className="flex items-center space-x-2 mt-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      recipeStatus === 'ai-preview' 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : recipeStatus === 'ready-to-save'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {recipeStatus === 'ai-preview' 
+                        ? '🤖 AI-Preview (venter på billede)' 
+                        : recipeStatus === 'ready-to-save'
+                        ? '✅ Klar til at gemmes'
+                        : '💾 Gemt som kladde'
+                      }
+                    </span>
+                  </div>
+                )}
+              </div>
               {generatedRecipe && !isEditing && (
                 <button
                   onClick={handleEditRecipe}
@@ -550,7 +581,12 @@ export default function CreateRecipePage() {
                   
                   {/* Recipe Image */}
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-3">Billede</h4>
+                    <h4 className="font-semibold text-gray-900 mb-3">
+                      Billede 
+                      {recipeStatus === 'ai-preview' && (
+                        <span className="ml-2 text-yellow-600 text-sm font-normal">(Påkrævet for at gemme)</span>
+                      )}
+                    </h4>
                     {isEditing ? (
                       <div className="space-y-3">
                         <div className="flex items-center space-x-4">
@@ -559,7 +595,7 @@ export default function CreateRecipePage() {
                             alt="Recipe" 
                             className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                           />
-                          <div>
+                          <div className="flex-1">
                             <input
                               type="file"
                               accept="image/*"
@@ -567,6 +603,9 @@ export default function CreateRecipePage() {
                               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                             />
                             <p className="text-xs text-gray-500 mt-1">Max 5MB, JPG/PNG/WebP</p>
+                            {recipeStatus === 'ai-preview' && (
+                              <p className="text-xs text-yellow-600 mt-1">⚠️ Upload et billede for at kunne gemme opskriften</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -766,9 +805,21 @@ export default function CreateRecipePage() {
                     <>
                       <button
                         onClick={handleSaveRecipe}
-                        className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        disabled={recipeStatus !== 'ready-to-save'}
+                        className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+                          recipeStatus === 'ready-to-save'
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : recipeStatus === 'ai-preview'
+                            ? 'bg-yellow-500 text-white cursor-not-allowed'
+                            : 'bg-gray-400 text-white cursor-not-allowed'
+                        }`}
                       >
-                        💾 Gem som Rigtig Kladde
+                        {recipeStatus === 'ai-preview' 
+                          ? '📸 Upload billede først' 
+                          : recipeStatus === 'ready-to-save'
+                          ? '💾 Gem som Rigtig Kladde'
+                          : '✅ Gemt'
+                        }
                       </button>
                       <button
                         onClick={handleCancelEdit}
