@@ -13,7 +13,16 @@ export async function GET() {
         success: false, 
         message: 'Ingen OpenAI config fundet',
         apiKey: '',
-        assistantId: ''
+        assistantIds: {
+          familiemad: '',
+          keto: '',
+          sense: '',
+          paleo: '',
+          antiinflammatorisk: '',
+          fleksitarisk: '',
+          '5-2': '',
+          'meal-prep': ''
+        }
       })
     }
 

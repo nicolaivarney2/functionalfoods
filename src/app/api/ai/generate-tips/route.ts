@@ -50,8 +50,8 @@ async function callOpenAIAssistant(prompt: string): Promise<string> {
   // Læs OpenAI config fra fil
   const config = getOpenAIConfig()
   
-  if (!config || !config.apiKey || !config.assistantId) {
-    throw new Error('OpenAI API key eller Assistant ID mangler. Tilføj dem i /admin/settings')
+  if (!config || !config.apiKey) {
+    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
   }
 
   try {
@@ -109,7 +109,7 @@ async function callOpenAIAssistant(prompt: string): Promise<string> {
         'OpenAI-Beta': 'assistants=v2'
       },
       body: JSON.stringify({
-        assistant_id: config.assistantId
+        assistant_id: config.assistantIds?.familiemad || 'asst_default'
       })
     })
 
