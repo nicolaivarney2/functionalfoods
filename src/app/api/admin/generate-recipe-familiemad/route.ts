@@ -99,17 +99,19 @@ UNDGÅ:
 
 INGREDIENS FORMATERING - VIGTIGT:
 - Brug små bogstaver (ikke forbogstav stort)
-- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg")
-- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille")
+- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
+- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - Kartofler: "4 stk kartofler" (ikke "4 kartofler")
 - Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
+- UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
 MAD SKAL VÆRE:
 - Enkel, budgetvenlig og praktisk
 - Brug almindelige ingredienser der er lette at få fat i
 - Retter som børn vil spise
+- ALTID 2 portioner (servings: "2")
 
 Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et positivt tal - IKKE tom eller 0.`
           },
@@ -122,12 +124,13 @@ ${existingTitles.map(title => `- ${title}`).join('\n')}
 
 INGREDIENS FORMATERING - FØLG DISSE REGLER:
 - Brug små bogstaver (ikke forbogstav stort)
-- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg")
-- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille")
+- Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
+- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - Kartofler: "4 stk kartofler" (ikke "4 kartofler")
 - Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
+- UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
 Returnér kun valid JSON i det nøjagtige format herunder. Ingen ekstra tekst, ingen markdown.
 Brug HTML i felterne summary, instructions_flat[].text og notes (enkle <p> eller <ul>/<ol> er nok).
@@ -287,11 +290,11 @@ function parseGeneratedRecipe(content: string, category: string): any {
         description: recipe.summary ? recipe.summary.replace(/<[^>]*>/g, '') : '',
         ingredients: ingredients,
         instructions: instructions,
-        servings: parseInt(recipe.servings) || 4,
+        servings: 2, // Always 2 portions for familiemad
         prepTime: parseInt(recipe.prep_time) || 15,
         cookTime: parseInt(recipe.cook_time) || 30,
         difficulty: 'Easy',
-        dietaryCategories: ['familiemad'],
+        dietaryCategories: ['Familiemad'], // Capitalize category
         nutritionalInfo: {
           calories: 400,
           protein: 25,
@@ -308,7 +311,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['familiemad']
+    recipe.dietaryCategories = ['Familiemad']
     
     // Ensure all required fields exist
     return {
@@ -316,11 +319,11 @@ function parseGeneratedRecipe(content: string, category: string): any {
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],
-      servings: recipe.servings || 4,
+      servings: 2, // Always 2 portions for familiemad
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Easy',
-      dietaryCategories: recipe.dietaryCategories || ['familiemad'],
+      dietaryCategories: recipe.dietaryCategories || ['Familiemad'],
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 400,
         protein: 25,
