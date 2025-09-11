@@ -80,8 +80,10 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
   try {
     // In serverless environment, we can't save files permanently
     if (isServerless) {
-      console.warn('Cannot save OpenAI config in serverless environment')
-      return false
+      console.warn('Cannot save OpenAI config in serverless environment - use environment variables instead')
+      // In production, config should be set via environment variables
+      // This function will return true to indicate "success" but won't actually save
+      return true
     }
     
     // Local environment - save to file

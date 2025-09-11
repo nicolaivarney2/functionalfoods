@@ -145,6 +145,24 @@ export default function AdminSettingsPage() {
       </div>
 
 
+      <div className="mt-8 bg-yellow-50 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-yellow-900 mb-3">⚠️ Vigtig Information:</h3>
+        <p className="text-yellow-800 mb-4">
+          I production (Vercel) gemmes konfigurationen via environment variables. 
+          For at Assistant IDs virker, skal du tilføje dem til Vercel environment variables:
+        </p>
+        <div className="bg-yellow-100 p-3 rounded text-sm font-mono text-yellow-900">
+          OPENAI_ASSISTANT_FAMILIEMAD=asst_xxx<br/>
+          OPENAI_ASSISTANT_KETO=asst_xxx<br/>
+          OPENAI_ASSISTANT_SENSE=asst_xxx<br/>
+          OPENAI_ASSISTANT_PALEO=asst_xxx<br/>
+          OPENAI_ASSISTANT_ANTIINFLAMMATORISK=asst_xxx<br/>
+          OPENAI_ASSISTANT_FLEKSITARISK=asst_xxx<br/>
+          OPENAI_ASSISTANT_5_2=asst_xxx<br/>
+          OPENAI_ASSISTANT_MEAL_PREP=asst_xxx
+        </div>
+      </div>
+
       <div className="mt-8 bg-blue-50 rounded-lg p-6">
         <h3 className="text-lg font-semibold text-blue-900 mb-3">📋 Sådan Opretter Du Dine Assistants:</h3>
         <ol className="list-decimal list-inside space-y-2 text-blue-800">
