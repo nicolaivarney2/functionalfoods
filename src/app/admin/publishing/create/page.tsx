@@ -119,6 +119,7 @@ export default function CreateRecipePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editableRecipe, setEditableRecipe] = useState<GeneratedRecipe | null>(null)
   const [recipeStatus, setRecipeStatus] = useState<'ai-preview' | 'ready-to-save' | 'saved'>('ai-preview')
+  const [midjourneyPrompt, setMidjourneyPrompt] = useState<string>('')
 
   // Redirect if not admin
   if (checking) {
@@ -155,6 +156,7 @@ export default function CreateRecipePage() {
     setIsGenerating(true)
     setError(null)
     setProgress('Initialiserer...')
+    setMidjourneyPrompt('') // Clear previous prompt
 
     try {
       const category = RECIPE_CATEGORIES.find(c => c.id === selectedCategory)
@@ -185,6 +187,11 @@ export default function CreateRecipePage() {
       }
 
       const recipeData = await generateResponse.json()
+      
+      // Store Midjourney prompt if available
+      if (recipeData.midjourneyPrompt) {
+        setMidjourneyPrompt(recipeData.midjourneyPrompt)
+      }
       
       setProgress('Validerer opskrift...')
       
@@ -618,6 +625,36 @@ export default function CreateRecipePage() {
                       />
                     )}
                   </div>
+                  
+                  {/* Midjourney Prompt */}
+                  {midjourneyPrompt && (
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-3">
+                        🎨 Midjourney Prompt
+                        <span className="ml-2 text-gray-500 text-sm font-normal">(Kopier til Midjourney)</span>
+                      </h4>
+                      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <textarea
+                          value={midjourneyPrompt}
+                          readOnly
+                          rows={3}
+                          className="w-full bg-transparent border-none resize-none text-sm text-gray-700 font-mono"
+                          onClick={(e) => e.currentTarget.select()}
+                        />
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(midjourneyPrompt)
+                              alert('Midjourney prompt kopieret!')
+                            }}
+                            className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                          >
+                            📋 Kopier
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Recipe Meta */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">

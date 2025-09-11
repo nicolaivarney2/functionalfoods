@@ -191,9 +191,14 @@ JSON-struktur (obligatorisk):
     
     console.log(`✅ Generated Familiemad recipe: ${recipe.title}`)
 
+    // Generate Midjourney prompt
+    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+    console.log(`🎨 Generated Midjourney prompt: ${midjourneyPrompt.substring(0, 100)}...`)
+
     return NextResponse.json({
       success: true,
-      recipe
+      recipe,
+      midjourneyPrompt
     })
 
   } catch (error) {
@@ -209,6 +214,36 @@ JSON-struktur (obligatorisk):
   }
 }
 
+
+function generateMidjourneyPrompt(recipe: any): string {
+  // Extract main ingredients for the visual description
+  const mainIngredients = recipe.ingredients_flat
+    ?.filter((item: any) => item.type === 'ingredient')
+    ?.slice(0, 6) // Take first 6 ingredients
+    ?.map((item: any) => {
+      const amount = item.amount || '1'
+      const unit = item.unit || ''
+      const name = item.name?.toLowerCase() || ''
+      
+      // Format ingredient nicely
+      if (unit === 'stk') {
+        return `${amount} ${name}`
+      } else if (unit === 'g' || unit === 'ml') {
+        return `${amount}${unit} ${name}`
+      } else {
+        return `${amount} ${unit} ${name}`
+      }
+    })
+    ?.join(', ') || 'ingredienser'
+
+  // Create a food-focused description
+  const foodDescription = `*${recipe.name.toLowerCase()}, featuring ${mainIngredients}, beautifully plated*`
+  
+  // Base Midjourney prompt structure
+  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --v 5 --ar 4:3`
+  
+  return basePrompt
+}
 
 function parseGeneratedRecipe(content: string, category: string): any {
   try {
