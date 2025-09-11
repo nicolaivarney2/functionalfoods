@@ -29,17 +29,7 @@ Kategori: ${dietaryCategories.join(', ') || 'Generel'}
 Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
 
     // Kald OpenAI standard API
-    const tipsJson = await callOpenAIStandardAPI(prompt)
-    
-    // Parse JSON response
-    let tips
-    try {
-      const parsed = JSON.parse(tipsJson)
-      tips = parsed.tips ? parsed.tips.join('\n\n') : tipsJson
-    } catch (error) {
-      console.error('Failed to parse AI tips JSON:', error)
-      tips = tipsJson // Fallback to raw response
-    }
+    const tips = await callOpenAIStandardAPI(prompt)
 
     return NextResponse.json({ 
       success: true, 
@@ -81,17 +71,15 @@ async function callOpenAIStandardAPI(prompt: string): Promise<string> {
             role: "system",
             content: `Du er en erfaren kok der skal give personlige tips til opskrifter. Skriv altid på dansk.
 
-Returnér kun valid JSON i dette format:
-{
-  "tips": [
-    "Tip 1 her",
-    "Tip 2 her", 
-    "Tip 3 her",
-    "Tip 4 her"
-  ]
-}
+Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.
 
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
+Formatér tips sådan:
+- Første tip her
+- Andet tip her  
+- Tredje tip her
+- Fjerde tip her
+
+Brug bindestreg (-) foran hvert tip.`
           },
           {
             role: "user",
@@ -126,12 +114,9 @@ Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gang
 }
 
 function generatePersonalTipsFallback(): string {
-  return `{
-  "tips": [
-    "Denne ret har jeg lavet mange gange, og den bliver bedre hver gang!",
-    "Min bedste tip er at tage dig tid til at forberede alle ingredienserne først.",
-    "Jeg plejer at servere den med en frisk salat til - det giver en perfekt balance.",
-    "Lad retten hvile i 5 minutter efter den er færdig, så udvikler alle smagene sig perfekt."
-  ]
-}`
+  return `Denne ret har jeg lavet mange gange, og den bliver bedre hver gang!
+
+- Min bedste tip er at tage dig tid til at forberede alle ingredienserne først.
+- Jeg plejer at servere den med en frisk salat til - det giver en perfekt balance.
+- Lad retten hvile i 5 minutter efter den er færdig, så udvikler alle smagene sig perfekt.`
 }
