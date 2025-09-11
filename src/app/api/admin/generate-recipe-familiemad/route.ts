@@ -104,6 +104,7 @@ Brug HTML i felterne summary, instructions_flat[].text og notes (enkle <p> eller
 
 Enheder: Brug gram, ml, tsk, spsk, stk.
 Alle ingredienser i ingredients_flat skal have name, type, amount, unit, og notes (tom streng hvis ikke relevant).
+VIKTIGT: amount skal være et positivt tal (f.eks. "2", "150", "0.5") - IKKE tom eller 0.
 Brug grupper i både ingredienser og instruktioner, når det giver mening (fx "Kød", "Sauce", "Topping").
 
 JSON-struktur (obligatorisk):
@@ -229,12 +230,18 @@ function parseGeneratedRecipe(content: string, category: string): any {
       // Convert from new format to old format for validation
       const ingredients = recipe.ingredients_flat
         .filter((item: any) => item.type === 'ingredient')
-        .map((item: any) => ({
-          name: item.name,
-          amount: parseFloat(item.amount) || 0,
-          unit: item.unit || '',
-          notes: item.notes || ''
-        }))
+        .map((item: any) => {
+          const amount = parseFloat(item.amount)
+          if (isNaN(amount) || amount <= 0) {
+            console.warn(`Invalid amount for ingredient ${item.name}: ${item.amount}, using 1 as default`)
+          }
+          return {
+            name: item.name,
+            amount: isNaN(amount) || amount <= 0 ? 1 : amount,
+            unit: item.unit || 'stk',
+            notes: item.notes || ''
+          }
+        })
       
       const instructions = recipe.instructions_flat
         .filter((item: any) => item.type === 'instruction')
