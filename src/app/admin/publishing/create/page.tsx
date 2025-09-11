@@ -106,6 +106,7 @@ interface GeneratedRecipe {
     fat: number
     fiber: number
   }
+  imageUrl?: string
 }
 
 export default function CreateRecipePage() {
