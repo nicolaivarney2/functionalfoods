@@ -115,6 +115,8 @@ export default function CreateRecipePage() {
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<string>('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [editableRecipe, setEditableRecipe] = useState<GeneratedRecipe | null>(null)
 
   // Redirect if not admin
   if (checking) {
@@ -158,22 +160,20 @@ export default function CreateRecipePage() {
 
       setProgress('Tjekker eksisterende opskrifter...')
       
-      // Check existing recipes
-      const existingResponse = await fetch('/api/admin/recipes')
-      const existingRecipes = await existingResponse.json()
+      // Check existing recipes in batches to respect Supabase limit
+      const existingRecipes = await loadExistingRecipes()
       
-      setProgress('Genererer ny opskrift med AI...')
+      setProgress(`Genererer ${category.name} opskrift med dedikeret AI assistent...`)
       
-      // Generate new recipe
-      const generateResponse = await fetch('/api/admin/generate-recipe', {
+      // Generate new recipe using category-specific ChatGPT assistant
+      const generateResponse = await fetch(`/api/admin/generate-recipe-${selectedCategory}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          category: selectedCategory,
           categoryName: category.name,
-          existingRecipes: existingRecipes.recipes || []
+          existingRecipes: existingRecipes
         })
       })
 
@@ -210,8 +210,8 @@ export default function CreateRecipePage() {
 
       setProgress('Genererer billede...')
       
-      // Generate image via Make webhook
-      const imageResponse = await fetch('/api/admin/generate-recipe-image', {
+      // Generate image via Make webhook with precise prompts
+      const imageResponse = await fetch('/api/admin/generate-recipe-image-smart', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -228,12 +228,17 @@ export default function CreateRecipePage() {
 
       const imageData = await imageResponse.ok ? await imageResponse.json() : { imageUrl: null }
 
-      setGeneratedRecipe({
+      const finalRecipe = {
         ...recipeData.recipe,
         imageUrl: imageData.imageUrl || '/images/recipe-placeholder.jpg'
-      })
+      }
 
-      setProgress('Færdig!')
+      // Set as AI-kladde for editing
+      setGeneratedRecipe(finalRecipe)
+      setEditableRecipe({ ...finalRecipe })
+      setIsEditing(true)
+
+      setProgress('Færdig! AI-kladde klar til redigering')
       
     } catch (error) {
       console.error('Error generating recipe:', error)
@@ -244,19 +249,39 @@ export default function CreateRecipePage() {
     }
   }
 
+  const loadExistingRecipes = async () => {
+    const allRecipes = []
+    let page = 0
+    const limit = 1000 // Supabase limit
+    
+    while (true) {
+      const response = await fetch(`/api/admin/recipes?page=${page}&limit=${limit}`)
+      const data = await response.json()
+      
+      if (!data.recipes || data.recipes.length === 0) break
+      
+      allRecipes.push(...data.recipes)
+      page++
+      
+      if (data.recipes.length < limit) break // No more data
+    }
+    
+    return allRecipes
+  }
+
   const handleSaveRecipe = async () => {
-    if (!generatedRecipe) return
+    if (!editableRecipe) return
 
     try {
-      setProgress('Gemmer opskrift...')
+      setProgress('Gemmer AI-kladde som rigtig kladde...')
       
-      const response = await fetch('/api/admin/save-generated-recipe', {
+      const response = await fetch('/api/admin/save-ai-draft', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          recipe: generatedRecipe,
+          recipe: editableRecipe,
           category: selectedCategory
         })
       })
@@ -266,8 +291,10 @@ export default function CreateRecipePage() {
         throw new Error(errorData.error || 'Fejl ved gemning')
       }
 
-      alert('✅ Opskrift gemt succesfuldt!')
+      alert('✅ AI-kladde gemt som rigtig kladde! Du kan nu finde den i Publishing siden.')
       setGeneratedRecipe(null)
+      setEditableRecipe(null)
+      setIsEditing(false)
       setSelectedCategory(null)
       
     } catch (error) {
@@ -276,6 +303,78 @@ export default function CreateRecipePage() {
     } finally {
       setProgress('')
     }
+  }
+
+  const handleEditRecipe = () => {
+    setIsEditing(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditableRecipe(generatedRecipe)
+  }
+
+  const handleUpdateEditableRecipe = (field: string, value: any) => {
+    if (!editableRecipe) return
+    
+    setEditableRecipe(prev => {
+      if (!prev) return null
+      
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.')
+        const parentValue = prev[parent as keyof GeneratedRecipe] as any
+        return {
+          ...prev,
+          [parent]: {
+            ...(parentValue || {}),
+            [child]: value
+          }
+        }
+      }
+      
+      return {
+        ...prev,
+        [field]: value
+      }
+    })
+  }
+
+  const handleUpdateIngredient = (index: number, field: string, value: any) => {
+    if (!editableRecipe) return
+    
+    setEditableRecipe(prev => {
+      if (!prev) return null
+      
+      const newIngredients = [...prev.ingredients]
+      newIngredients[index] = {
+        ...newIngredients[index],
+        [field]: value
+      }
+      
+      return {
+        ...prev,
+        ingredients: newIngredients
+      }
+    })
+  }
+
+  const handleUpdateInstruction = (index: number, field: string, value: any) => {
+    if (!editableRecipe) return
+    
+    setEditableRecipe(prev => {
+      if (!prev) return null
+      
+      const newInstructions = [...prev.instructions]
+      newInstructions[index] = {
+        ...newInstructions[index],
+        [field]: value
+      }
+      
+      return {
+        ...prev,
+        instructions: newInstructions
+      }
+    })
   }
 
   return (
@@ -308,20 +407,18 @@ export default function CreateRecipePage() {
           {/* Category Selection */}
           <div className="space-y-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Vælg Kategori</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Vælg Kategori & Generer Opskrift</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {RECIPE_CATEGORIES.map((category) => (
-                  <button
+                  <div
                     key={category.id}
-                    onClick={() => handleCategorySelect(category.id)}
-                    disabled={isGenerating}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
                       selectedCategory === category.id
                         ? `${category.color} text-white border-transparent`
                         : 'bg-white border-gray-200 hover:border-gray-300'
-                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    }`}
                   >
-                    <div className="flex items-start space-x-3">
+                    <div className="flex items-start space-x-3 mb-3">
                       <span className="text-2xl">{category.icon}</span>
                       <div className="flex-1">
                         <h3 className="font-semibold">{category.name}</h3>
@@ -345,43 +442,79 @@ export default function CreateRecipePage() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedCategory(category.id)
+                        handleGenerateRecipe()
+                      }}
+                      disabled={isGenerating}
+                      className={`w-full py-2 px-3 rounded-lg transition-colors text-sm font-medium ${
+                        selectedCategory === category.id
+                          ? 'bg-white/20 text-white hover:bg-white/30'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {isGenerating && selectedCategory === category.id ? 'Genererer...' : `🤖 Generer ${category.name}`}
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* Generate Button */}
-            {selectedCategory && (
-              <div className="pt-4">
-                <button
-                  onClick={handleGenerateRecipe}
-                  disabled={isGenerating}
-                  className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-colors ${
-                    isGenerating
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
-                  }`}
-                >
-                  {isGenerating ? 'Genererer...' : '🚀 Generer Opskrift'}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Generated Recipe Preview */}
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Forhåndsvisning</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {isEditing ? 'Rediger AI-kladde' : 'AI-kladde Forhåndsvisning'}
+              </h2>
+              {generatedRecipe && !isEditing && (
+                <button
+                  onClick={handleEditRecipe}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  ✏️ Rediger
+                </button>
+              )}
+            </div>
             
             {!generatedRecipe ? (
               <div className="p-8 text-center bg-gray-100 rounded-lg">
-                <p className="text-gray-500">Vælg en kategori og generer en opskrift for at se forhåndsvisning</p>
+                <p className="text-gray-500">Vælg en kategori og generer en opskrift for at se AI-kladde</p>
               </div>
             ) : (
               <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
                 {/* Recipe Header */}
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{generatedRecipe.title}</h3>
-                  <p className="text-gray-600 mb-4">{generatedRecipe.description}</p>
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Titel</label>
+                        <input
+                          type="text"
+                          value={editableRecipe?.title || ''}
+                          onChange={(e) => handleUpdateEditableRecipe('title', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivelse</label>
+                        <textarea
+                          value={editableRecipe?.description || ''}
+                          onChange={(e) => handleUpdateEditableRecipe('description', e.target.value)}
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-2">{generatedRecipe.title}</h3>
+                      <p className="text-gray-600 mb-4">{generatedRecipe.description}</p>
+                    </>
+                  )}
                   
                   {/* Recipe Meta */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -407,41 +540,134 @@ export default function CreateRecipePage() {
                 {/* Ingredients */}
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">Ingredienser</h4>
-                  <ul className="space-y-2">
-                    {generatedRecipe.ingredients.map((ingredient, index) => (
-                      <li key={index} className="flex justify-between">
-                        <span className="text-gray-700">
-                          {ingredient.amount} {ingredient.unit} {ingredient.name}
-                        </span>
-                        {ingredient.notes && (
-                          <span className="text-gray-500 text-sm">({ingredient.notes})</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      {editableRecipe?.ingredients.map((ingredient, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-3">
+                            <input
+                              type="number"
+                              value={ingredient.amount}
+                              onChange={(e) => handleUpdateIngredient(index, 'amount', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="Antal"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <input
+                              type="text"
+                              value={ingredient.unit}
+                              onChange={(e) => handleUpdateIngredient(index, 'unit', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="Enhed"
+                            />
+                          </div>
+                          <div className="col-span-5">
+                            <input
+                              type="text"
+                              value={ingredient.name}
+                              onChange={(e) => handleUpdateIngredient(index, 'name', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="Ingrediens navn"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <input
+                              type="text"
+                              value={ingredient.notes || ''}
+                              onChange={(e) => handleUpdateIngredient(index, 'notes', e.target.value)}
+                              className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                              placeholder="Note"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {generatedRecipe.ingredients.map((ingredient, index) => (
+                        <li key={index} className="flex justify-between">
+                          <span className="text-gray-700">
+                            {ingredient.amount} {ingredient.unit} {ingredient.name}
+                          </span>
+                          {ingredient.notes && (
+                            <span className="text-gray-500 text-sm">({ingredient.notes})</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
                 {/* Instructions */}
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-3">Fremgangsmåde</h4>
-                  <ol className="space-y-3">
-                    {generatedRecipe.instructions.map((step, index) => (
-                      <li key={index} className="flex">
-                        <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
-                          {step.stepNumber}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-gray-700">{step.instruction}</p>
-                          {step.time && (
-                            <p className="text-sm text-gray-500 mt-1">⏱️ {step.time} minutter</p>
-                          )}
-                          {step.tips && (
-                            <p className="text-sm text-blue-600 mt-1">💡 {step.tips}</p>
-                          )}
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      {editableRecipe?.instructions.map((step, index) => (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center mb-2">
+                            <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                              {step.stepNumber}
+                            </span>
+                            <span className="text-sm font-medium text-gray-700">Trin {step.stepNumber}</span>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">Instruktion</label>
+                              <textarea
+                                value={step.instruction}
+                                onChange={(e) => handleUpdateInstruction(index, 'instruction', e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tid (min)</label>
+                                <input
+                                  type="number"
+                                  value={step.time || ''}
+                                  onChange={(e) => handleUpdateInstruction(index, 'time', parseInt(e.target.value) || null)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Tid"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Tip</label>
+                                <input
+                                  type="text"
+                                  value={step.tips || ''}
+                                  onChange={(e) => handleUpdateInstruction(index, 'tips', e.target.value)}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                  placeholder="Tip"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </li>
-                    ))}
-                  </ol>
+                      ))}
+                    </div>
+                  ) : (
+                    <ol className="space-y-3">
+                      {generatedRecipe.instructions.map((step, index) => (
+                        <li key={index} className="flex">
+                          <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-sm font-medium mr-3">
+                            {step.stepNumber}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-gray-700">{step.instruction}</p>
+                            {step.time && (
+                              <p className="text-sm text-gray-500 mt-1">⏱️ {step.time} minutter</p>
+                            )}
+                            {step.tips && (
+                              <p className="text-sm text-blue-600 mt-1">💡 {step.tips}</p>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
                 </div>
 
                 {/* Nutrition Info */}
@@ -473,18 +699,41 @@ export default function CreateRecipePage() {
 
                 {/* Action Buttons */}
                 <div className="flex space-x-4 pt-4 border-t border-gray-200">
-                  <button
-                    onClick={handleSaveRecipe}
-                    className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    💾 Gem Opskrift
-                  </button>
-                  <button
-                    onClick={() => setGeneratedRecipe(null)}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    🔄 Generer Ny
-                  </button>
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={handleSaveRecipe}
+                        className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        💾 Gem som Rigtig Kladde
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        ❌ Annuller
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleEditRecipe}
+                        className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        ✏️ Rediger AI-kladde
+                      </button>
+                      <button
+                        onClick={() => {
+                          setGeneratedRecipe(null)
+                          setEditableRecipe(null)
+                          setIsEditing(false)
+                        }}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        🔄 Generer Ny
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}

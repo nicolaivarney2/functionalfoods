@@ -8,6 +8,12 @@ export async function GET(request: NextRequest) {
   try {
     console.log('🔍 Admin recipes route: Starting...')
     
+    // Get pagination parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '0')
+    const limit = parseInt(searchParams.get('limit') || '1000')
+    const offset = page * limit
+    
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -43,19 +49,25 @@ export async function GET(request: NextRequest) {
     // TODO: Implement proper admin authentication later
     console.log('🍽️ GET /api/admin/recipes called (all recipes including drafts)')
     
-    // Use service role client to fetch all recipes
+    // Use service role client to fetch recipes with pagination
     const { data: recipes, error } = await supabase
       .from('recipes')
       .select('*')
       .order('updatedAt', { ascending: false })
+      .range(offset, offset + limit - 1)
     
     if (error) {
       console.error('❌ Error fetching recipes:', error)
       return NextResponse.json({ error: 'Failed to fetch recipes' }, { status: 500 })
     }
     
-    console.log(`✅ Returning ${recipes?.length || 0} recipes (all statuses)`)
-    return NextResponse.json(recipes || [])
+    console.log(`✅ Returning ${recipes?.length || 0} recipes (page ${page}, limit ${limit})`)
+    return NextResponse.json({
+      recipes: recipes || [],
+      page,
+      limit,
+      hasMore: recipes?.length === limit
+    })
   } catch (error) {
     console.error('❌ Error in /api/admin/recipes:', error)
     return NextResponse.json(
