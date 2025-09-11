@@ -3,7 +3,16 @@ import path from 'path'
 
 interface OpenAIConfig {
   apiKey: string
-  assistantId: string
+  assistantIds?: {
+    familiemad: string
+    keto: string
+    sense: string
+    paleo: string
+    antiinflammatorisk: string
+    fleksitarisk: string
+    '5-2': string
+    'meal-prep': string
+  }
 }
 
 // Check if we're in a serverless environment (Vercel)
@@ -18,12 +27,20 @@ export function getOpenAIConfig(): OpenAIConfig | null {
     // In serverless environment, try to get config from environment variables
     if (isServerless) {
       const apiKey = process.env.OPENAI_API_KEY
-      const assistantId = process.env.OPENAI_ASSISTANT_ID
       
-      if (apiKey && assistantId) {
+      if (apiKey) {
         return { 
-          apiKey, 
-          assistantId
+          apiKey,
+          assistantIds: {
+            familiemad: process.env.OPENAI_ASSISTANT_FAMILIEMAD || '',
+            keto: process.env.OPENAI_ASSISTANT_KETO || '',
+            sense: process.env.OPENAI_ASSISTANT_SENSE || '',
+            paleo: process.env.OPENAI_ASSISTANT_PALEO || '',
+            antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
+            fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
+            '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',
+            'meal-prep': process.env.OPENAI_ASSISTANT_MEAL_PREP || ''
+          }
         }
       }
       
@@ -36,10 +53,19 @@ export function getOpenAIConfig(): OpenAIConfig | null {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf-8')
       const config = JSON.parse(configData)
       
-      if (config.apiKey && config.assistantId) {
+      if (config.apiKey) {
         return {
           apiKey: config.apiKey,
-          assistantId: config.assistantId
+          assistantIds: config.assistantIds || {
+            familiemad: '',
+            keto: '',
+            sense: '',
+            paleo: '',
+            antiinflammatorisk: '',
+            fleksitarisk: '',
+            '5-2': '',
+            'meal-prep': ''
+          }
         }
       }
     }
@@ -61,7 +87,7 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
     // Local environment - save to file
     const configData = JSON.stringify({
       apiKey: config.apiKey,
-      assistantId: config.assistantId
+      assistantIds: config.assistantIds || {}
     }, null, 2)
     fs.writeFileSync(CONFIG_FILE, configData)
     return true
@@ -73,7 +99,19 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
 
 export function updateOpenAIConfig(updates: Partial<OpenAIConfig>): boolean {
   try {
-    const currentConfig = getOpenAIConfig() || { apiKey: '', assistantId: '' }
+    const currentConfig = getOpenAIConfig() || { 
+      apiKey: '', 
+      assistantIds: {
+        familiemad: '',
+        keto: '',
+        sense: '',
+        paleo: '',
+        antiinflammatorisk: '',
+        fleksitarisk: '',
+        '5-2': '',
+        'meal-prep': ''
+      }
+    }
     const newConfig = { ...currentConfig, ...updates }
     return saveOpenAIConfig(newConfig)
   } catch (error) {

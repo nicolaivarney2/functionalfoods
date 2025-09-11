@@ -40,33 +40,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!openaiConfig.assistantIds?.keto) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Keto Assistant ID not configured',
+          details: 'Please configure Keto Assistant ID in admin settings'
+        },
+        { status: 500 }
+      )
+    }
+
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
     // Create Keto-specific system prompt
     const systemPrompt = createKetoSystemPrompt(existingTitles)
     
-    // Generate recipe with OpenAI using existing config
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Generate recipe using Assistant API
+    const response = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.keto}/runs`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'OpenAI-Beta': 'assistants=v2'
       },
       body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til keto kost.`
-          }
-        ],
-        temperature: 0.8,
-        max_tokens: 2000
+        additional_instructions: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til keto kost. Eksisterende opskrifter: ${existingTitles.join(', ')}`,
+        temperature: 0.8
       })
     })
 
@@ -75,8 +76,46 @@ export async function POST(request: NextRequest) {
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
-    const completion = await response.json()
-    const recipeContent = completion.choices[0]?.message?.content
+    const runData = await response.json()
+    
+    // Wait for the assistant run to complete
+    let runStatus = runData.status
+    let attempts = 0
+    const maxAttempts = 30 // 30 seconds max wait
+    
+    while (runStatus === 'queued' || runStatus === 'in_progress') {
+      if (attempts >= maxAttempts) {
+        throw new Error('Assistant run timed out')
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+      
+      const statusResponse = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.keto}/runs/${runData.id}`, {
+        headers: {
+          'Authorization': `Bearer ${openaiConfig.apiKey}`,
+          'OpenAI-Beta': 'assistants=v2'
+        }
+      })
+      
+      const statusData = await statusResponse.json()
+      runStatus = statusData.status
+      attempts++
+    }
+    
+    if (runStatus !== 'completed') {
+      throw new Error(`Assistant run failed with status: ${runStatus}`)
+    }
+    
+    // Get the messages from the thread
+    const messagesResponse = await fetch(`https://api.openai.com/v1/assistants/${openaiConfig.assistantIds.keto}/threads/${runData.thread_id}/messages`, {
+      headers: {
+        'Authorization': `Bearer ${openaiConfig.apiKey}`,
+        'OpenAI-Beta': 'assistants=v2'
+      }
+    })
+    
+    const messagesData = await messagesResponse.json()
+    const recipeContent = messagesData.data[0]?.content[0]?.text?.value
     
     if (!recipeContent) {
       throw new Error('No recipe content generated')

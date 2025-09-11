@@ -20,7 +20,16 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       apiKey: config.apiKey,
-      assistantId: config.assistantId
+      assistantIds: config.assistantIds || {
+        familiemad: '',
+        keto: '',
+        sense: '',
+        paleo: '',
+        antiinflammatorisk: '',
+        fleksitarisk: '',
+        '5-2': '',
+        'meal-prep': ''
+      }
     })
 
   } catch (error: any) {
@@ -35,18 +44,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { apiKey, assistantId } = body
+    const { apiKey, assistantIds } = body
 
-    if (!apiKey || !assistantId) {
+    if (!apiKey) {
       return NextResponse.json({ 
         success: false, 
-        error: 'API nøgle og Assistant ID er påkrævet' 
+        error: 'API nøgle er påkrævet' 
       }, { status: 400 })
     }
 
     const success = saveOpenAIConfig({ 
       apiKey, 
-      assistantId
+      assistantIds: assistantIds || {}
     })
 
     if (success) {

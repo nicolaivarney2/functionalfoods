@@ -40,6 +40,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!openaiConfig.assistantIds?.paleo) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Paleo Assistant ID not configured',
+          details: 'Please configure Paleo Assistant ID in admin settings'
+        },
+        { status: 500 }
+      )
+    }
+
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     

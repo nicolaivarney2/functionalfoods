@@ -6,9 +6,20 @@ import { useAuth } from '@/contexts/AuthContext'
 export default function AdminSettingsPage() {
   const { user } = useAuth()
   const [openaiApiKey, setOpenaiApiKey] = useState('')
-  const [openaiAssistantId, setOpenaiAssistantId] = useState('')
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
+  
+  // Assistant IDs for each category
+  const [assistantIds, setAssistantIds] = useState({
+    familiemad: '',
+    keto: '',
+    sense: '',
+    paleo: '',
+    antiinflammatorisk: '',
+    fleksitarisk: '',
+    '5-2': '',
+    'meal-prep': ''
+  })
 
   useEffect(() => {
     // Load current settings from config file
@@ -21,7 +32,16 @@ export default function AdminSettingsPage() {
       if (response.ok) {
         const config = await response.json()
         setOpenaiApiKey(config.apiKey || '')
-        setOpenaiAssistantId(config.assistantId || '')
+        setAssistantIds(config.assistantIds || {
+          familiemad: '',
+          keto: '',
+          sense: '',
+          paleo: '',
+          antiinflammatorisk: '',
+          fleksitarisk: '',
+          '5-2': '',
+          'meal-prep': ''
+        })
       }
     } catch (error) {
       console.error('Error loading OpenAI config:', error)
@@ -38,7 +58,7 @@ export default function AdminSettingsPage() {
         },
         body: JSON.stringify({
           apiKey: openaiApiKey,
-          assistantId: openaiAssistantId,
+          assistantIds: assistantIds,
         })
       })
 
@@ -88,20 +108,31 @@ export default function AdminSettingsPage() {
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Assistant ID
-          </label>
-          <input
-            type="text"
-            value={openaiAssistantId}
-            onChange={(e) => setOpenaiAssistantId(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="asst_..."
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            ID på din ChatGPT Assistant til opskriftstips
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium text-gray-900">ChatGPT Assistant IDs</h3>
+          <p className="text-sm text-gray-600">
+            Konfigurer hver kategori med sin egen dedikerede Assistant
           </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(assistantIds).map(([category, assistantId]) => (
+              <div key={category}>
+                <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                  {category.replace('-', ' ')} Assistant
+                </label>
+                <input
+                  type="text"
+                  value={assistantId}
+                  onChange={(e) => setAssistantIds(prev => ({
+                    ...prev,
+                    [category]: e.target.value
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="asst_..."
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <button
@@ -115,13 +146,22 @@ export default function AdminSettingsPage() {
 
 
       <div className="mt-8 bg-blue-50 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-900 mb-3">📋 Sådan Opretter Du Din Assistant:</h3>
+        <h3 className="text-lg font-semibold text-blue-900 mb-3">📋 Sådan Opretter Du Dine Assistants:</h3>
         <ol className="list-decimal list-inside space-y-2 text-blue-800">
           <li>Gå til <a href="https://platform.openai.com/assistants" target="_blank" rel="noopener noreferrer" className="underline">platform.openai.com/assistants</a></li>
-          <li>Klik "Create"</li>
-          <li>Navn: "Recipe Tips Generator"</li>
-          <li>Instructions: Kopier prompten fra koden</li>
-          <li>Kopier Assistant ID og indsæt ovenfor</li>
+          <li>Opret 8 forskellige Assistants - en for hver kategori:</li>
+          <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
+            <li><strong>Familiemad:</strong> "Familiemad Recipe Generator"</li>
+            <li><strong>Keto:</strong> "Keto Recipe Generator"</li>
+            <li><strong>Sense:</strong> "Sense Recipe Generator"</li>
+            <li><strong>Paleo:</strong> "Paleo/LCHF Recipe Generator"</li>
+            <li><strong>Antiinflammatorisk:</strong> "Anti-inflammatory Recipe Generator"</li>
+            <li><strong>Fleksitarisk:</strong> "Flexitarian Recipe Generator"</li>
+            <li><strong>5:2:</strong> "5:2 Diet Recipe Generator"</li>
+            <li><strong>Meal Prep:</strong> "Meal Prep Recipe Generator"</li>
+          </ul>
+          <li>For hver Assistant: Kopier den relevante prompt fra koden</li>
+          <li>Kopier hver Assistant ID og indsæt i det relevante felt ovenfor</li>
         </ol>
       </div>
     </div>
