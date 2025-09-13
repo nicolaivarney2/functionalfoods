@@ -240,7 +240,7 @@ function generateMidjourneyPrompt(recipe: any): string {
     ?.join(', ') || 'ingredienser'
 
   // Create a food-focused description
-  const foodDescription = `*${recipe.name.toLowerCase()}, featuring ${mainIngredients}, beautifully plated*`
+  const foodDescription = `*${recipe.title?.toLowerCase() || 'opskrift'}, featuring ${mainIngredients}, beautifully plated*`
   
   // Base Midjourney prompt structure
   const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --v 5 --ar 4:3`
