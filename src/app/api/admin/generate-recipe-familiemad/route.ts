@@ -113,6 +113,11 @@ MAD SKAL VÆRE:
 - Retter som børn vil spise
 - ALTID 2 portioner (servings: "2")
 
+TITEL REGLER:
+- Varier titlerne - ikke altid "børnevenlig" eller "børnevenlige"
+- Brug beskrivende titler: "Kylling med kartofler", "Pasta bolognese", "Frikadeller med brun sovs"
+- Kun brug "børnevenlig" når det er relevant for retten
+
 Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et positivt tal - IKKE tom eller 0.`
           },
           {

@@ -69,7 +69,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Recipe validation result: ${isValid ? 'VALID' : 'INVALID'}`)
     if (!isValid) {
-      console.log(`❌ Validation reasons: ${allReasons.join(', ')}`)
+      console.log(`❌ Validation reasons:`)
+      allReasons.forEach((reason, index) => {
+        console.log(`  ${index + 1}. ${reason}`)
+      })
     }
 
     return NextResponse.json({
