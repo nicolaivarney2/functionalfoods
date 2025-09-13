@@ -104,7 +104,7 @@ INGREDIENS FORMATERING - VIGTIGT:
 - Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - Kartofler: "500 g kartofler" (ikke "4 stk kartofler" eller "4 kartofler")
-- Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
+- Kød: "500 g hakket oksekød", "400 g kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
@@ -135,7 +135,7 @@ INGREDIENS FORMATERING - FØLG DISSE REGLER:
 - Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - Kartofler: "500 g kartofler" (ikke "4 stk kartofler" eller "4 kartofler")
-- Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
+- Kød: "500 g hakket oksekød", "400 g kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
@@ -265,6 +265,9 @@ function translateTitleForMidjourney(danishTitle: string): string {
   const translations: Record<string, string> = {
     // Main dishes
     'kylling': 'chicken',
+    'kyllingefrikassé': 'chicken fricassee',
+    'kyllingefrikasse': 'chicken fricassee',
+    'hjemmelavet': 'homemade',
     'kartoffel': 'potato',
     'kartofler': 'potatoes',
     'fisk': 'fish',
@@ -276,6 +279,10 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'pasta': 'pasta',
     'ris': 'rice',
     'nudler': 'noodles',
+    'frikassé': 'fricassee',
+    'frikasse': 'fricassee',
+    'steg': 'roast',
+    'stegt': 'roasted',
     
     // Vegetables
     'gulerødder': 'carrots',
@@ -293,7 +300,6 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'kartoffeltopping': 'potato topping',
     
     // Cooking methods
-    'stegt': 'fried',
     'bagt': 'baked',
     'kogt': 'boiled',
     'grillet': 'grilled',
@@ -322,7 +328,11 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'til': 'for',
     'fad': 'dish',
     'ret': 'dish',
-    'opskrift': 'recipe'
+    'opskrift': 'recipe',
+    'sovs': 'sauce',
+    'sauce': 'sauce',
+    'dressing': 'dressing',
+    'topping': 'topping'
   }
   
   let englishTitle = danishTitle.toLowerCase()
