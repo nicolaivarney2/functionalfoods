@@ -45,7 +45,7 @@ const mockRecipes = [
     ingredients: [
       { name: 'kylling', amount: '400g', unit: 'g', price: 25.00 },
       { name: 'broccoli', amount: '1', unit: 'stk', price: 8.50 },
-      { name: 'gulerødder', amount: '4', unit: 'stk', price: 6.00 },
+      { name: 'gulerødder', amount: '4', unit: 'stk', price: 6.00 },Den er her
       { name: 'løg', amount: '2', unit: 'stk', price: 3.00 },
       { name: 'hvidløg', amount: '3', unit: 'fed', price: 2.00 },
       { name: 'olivenolie', amount: '2', unit: 'spsk', price: 1.00 }
@@ -182,7 +182,7 @@ export default function MadbudgetPage() {
   const [mealPlan, setMealPlan] = useState<Record<DayKey, Record<MealType, any | null>>>({
     monday: { breakfast: null, lunch: null, dinner: null },
     tuesday: { breakfast: null, lunch: null, dinner: null },
-    wednesday: { breakfast: null, lunch: null, dinner: null },
+    wednesday: { breakfast: null, lunch: null, dinner: null }So,
     thursday: { breakfast: null, lunch: null, dinner: null },
     friday: { breakfast: null, lunch: null, dinner: null },
     saturday: { breakfast: null, lunch: null, dinner: null },

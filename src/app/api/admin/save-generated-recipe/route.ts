@@ -83,34 +83,34 @@ export async function POST(request: NextRequest) {
       totalTime: recipe.prepTime + recipe.cookTime,
       servings: recipe.servings,
       difficulty: recipe.difficulty.toLowerCase(),
-      calories: recipe.nutritionalInfo.calories,
-      protein: recipe.nutritionalInfo.protein,
-      carbs: recipe.nutritionalInfo.carbs,
-      fat: recipe.nutritionalInfo.fat,
-      fiber: recipe.nutritionalInfo.fiber,
+      calories: recipe.nutritionalInfo?.calories || 0,
+      protein: recipe.nutritionalInfo?.protein || 0,
+      carbs: recipe.nutritionalInfo?.carbs || 0,
+      fat: recipe.nutritionalInfo?.fat || 0,
+      fiber: recipe.nutritionalInfo?.fiber || 0,
       imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg',
       imageAlt: `${recipe.title} - Functional Foods`,
-      metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0] || 'Opskrift'} | Functional Foods`,
+      metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: recipe.description.substring(0, 160),
-      keywords: recipe.dietaryCategories.join(', '),
+      keywords: recipe.dietaryCategories?.join(', ') || '',
       mainCategory: getMainCategory(category),
-      subCategories: null,
-      dietaryCategories: recipe.dietaryCategories,
+      subCategories: [getMainCategory(category)],
+      dietaryCategories: recipe.dietaryCategories || [],
       ingredients: recipe.ingredients.map((ingredient, i) => ({
-        id: `${crypto.randomUUID()}-${i + 1}`,
+        id: `temp-${i + 1}`,
         name: ingredient.name,
         amount: ingredient.amount,
         unit: ingredient.unit,
         notes: ingredient.notes || null
       })),
       instructions: recipe.instructions.map((instruction, i) => ({
-        id: `${crypto.randomUUID()}-${i + 1}`,
+        id: `temp-${i + 1}`,
         stepNumber: instruction.stepNumber,
         instruction: instruction.instruction,
         time: instruction.time || null,
         tips: instruction.tips || null
       })),
-      author: 'AI Generated',
+      author: category === 'manual' ? 'Ketoliv' : 'AI Generated',
       status: 'draft',
       publishedAt: null,
       updatedAt: new Date().toISOString(),
@@ -169,8 +169,9 @@ function getMainCategory(category: string): string {
     'antiinflammatorisk': 'Sund mad',
     'fleksitarisk': 'Sund mad',
     '5-2': 'Sund mad',
-    'meal-prep': 'Meal Prep'
+    'meal-prep': 'Meal Prep',
+    'manual': 'Aftensmad' // Default for manually created recipes
   }
   
-  return categoryMap[category] || 'Hovedretter'
+  return categoryMap[category] || 'Aftensmad'
 }

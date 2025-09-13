@@ -36,7 +36,7 @@ export default function AdminPublishingPage() {
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('draft')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('published')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
@@ -483,7 +483,14 @@ export default function AdminPublishingPage() {
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Pencil className="w-4 h-4 mr-2" />
-              Opret Opskrift
+              Opret AI opskrift
+            </a>
+            <a
+              href="/admin/publishing/create-manual"
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Opret opskrift
             </a>
           </div>
         </div>
@@ -492,14 +499,14 @@ export default function AdminPublishingPage() {
         <div className="bg-white shadow rounded-lg p-4">
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => setStatusFilter('published')}
               className={`px-3 py-2 text-sm font-medium rounded-md ${
-                statusFilter === 'all'
+                statusFilter === 'published'
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Alle ({recipes.length})
+              Udgivne ({recipes.filter(r => r.status === 'published').length})
             </button>
             <button
               onClick={() => setStatusFilter('draft')}
@@ -522,14 +529,14 @@ export default function AdminPublishingPage() {
               Planlagte ({recipes.filter(r => r.status === 'scheduled').length})
             </button>
             <button
-              onClick={() => setStatusFilter('published')}
+              onClick={() => setStatusFilter('all')}
               className={`px-3 py-2 text-sm font-medium rounded-md ${
-                statusFilter === 'published'
+                statusFilter === 'all'
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Udgivne ({recipes.filter(r => r.status === 'published').length})
+              Alle ({recipes.length})
             </button>
           </div>
           
