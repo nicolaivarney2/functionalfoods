@@ -1,7 +1,7 @@
 'use client'
 
 import AdminLayout from '@/components/AdminLayout'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, ChangeEvent } from 'react'
 import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
@@ -438,6 +438,55 @@ export default function AdminPublishingPage() {
     }
   };
 
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !selectedRecipe) return
+
+    try {
+      setSaving(true)
+      
+      // Upload image to the existing upload endpoint
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('recipeId', selectedRecipe.id)
+      formData.append('recipeTitle', selectedRecipe.title)
+
+      const response = await fetch('/api/admin/upload-recipe-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke uploade billede')
+      }
+
+      const data = await response.json()
+      
+      // Update the selected recipe with new image URL
+      const updatedRecipe = {
+        ...selectedRecipe,
+        imageUrl: data.imageUrl,
+        imageAlt: `${selectedRecipe.title} - Functional Foods`
+      }
+      
+      setSelectedRecipe(updatedRecipe)
+      
+      // Update the recipes list
+      const updatedRecipes = recipes.map(recipe => 
+        recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      alert('✅ Billede opdateret!')
+      
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('❌ Kunne ikke uploade billede. Prøv igen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (checking) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -663,6 +712,43 @@ export default function AdminPublishingPage() {
                           {description || 'Ingen beskrivelse endnu. Klik "Rediger" for at tilføje.'}
                         </p>
                       )}
+                    </div>
+
+                    {/* Billede sektion */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Billede</h4>
+                        <button
+                          onClick={() => document.getElementById('image-upload')?.click()}
+                          className="text-blue-600 hover:text-blue-700 text-sm"
+                        >
+                          Skift billede
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={selectedRecipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                          alt={selectedRecipe.imageAlt || selectedRecipe.title}
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">
+                            <strong>URL:</strong> {selectedRecipe.imageUrl || 'Ingen billede'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <strong>Alt tekst:</strong> {selectedRecipe.imageAlt || 'Ingen alt tekst'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
                     </div>
 
                     {/* Kategorier/Tags sektion */}
