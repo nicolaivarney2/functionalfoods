@@ -239,13 +239,104 @@ function generateMidjourneyPrompt(recipe: any): string {
     })
     ?.join(', ') || 'ingredienser'
 
+  // Translate Danish title to English for Midjourney
+  const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
+  
   // Create a food-focused description
-  const foodDescription = `*${recipe.title?.toLowerCase() || 'opskrift'}, featuring ${mainIngredients}, beautifully plated*`
+  const foodDescription = `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
   
   // Base Midjourney prompt structure
   const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --v 5 --ar 4:3`
   
   return basePrompt
+}
+
+function translateTitleForMidjourney(danishTitle: string): string {
+  // Simple translation mapping for common Danish food terms
+  const translations: Record<string, string> = {
+    // Main dishes
+    'kylling': 'chicken',
+    'kartoffel': 'potato',
+    'kartofler': 'potatoes',
+    'fisk': 'fish',
+    'fiskefilet': 'fish fillet',
+    'bøf': 'beef',
+    'hakkebøf': 'beef patty',
+    'frikadeller': 'meatballs',
+    'pølse': 'sausage',
+    'pasta': 'pasta',
+    'ris': 'rice',
+    'nudler': 'noodles',
+    
+    // Vegetables
+    'gulerødder': 'carrots',
+    'gulerod': 'carrot',
+    'løg': 'onions',
+    'hvidløg': 'garlic',
+    'broccoli': 'broccoli',
+    'spinat': 'spinach',
+    'tomat': 'tomato',
+    'tomater': 'tomatoes',
+    'agurk': 'cucumber',
+    'peberfrugt': 'bell pepper',
+    'champignon': 'mushrooms',
+    'kartoffelmos': 'mashed potatoes',
+    
+    // Cooking methods
+    'stegt': 'fried',
+    'bagt': 'baked',
+    'kogt': 'boiled',
+    'grillet': 'grilled',
+    'ovnbagt': 'oven-baked',
+    'sauteret': 'sautéed',
+    
+    // Descriptive words
+    'børnevenlig': 'kid-friendly',
+    'børnevenlige': 'kid-friendly',
+    'nem': 'easy',
+    'hurtig': 'quick',
+    'sund': 'healthy',
+    'lækker': 'delicious',
+    'smagfuld': 'flavorful',
+    'krydret': 'spiced',
+    'mild': 'mild',
+    'cremet': 'creamy',
+    'sprød': 'crispy',
+    'saftig': 'juicy',
+    
+    // Common combinations
+    'med': 'with',
+    'og': 'and',
+    'i': 'in',
+    'på': 'on',
+    'til': 'for',
+    'fad': 'dish',
+    'ret': 'dish',
+    'opskrift': 'recipe'
+  }
+  
+  let englishTitle = danishTitle.toLowerCase()
+  
+  // Replace Danish words with English equivalents
+  Object.entries(translations).forEach(([danish, english]) => {
+    const regex = new RegExp(`\\b${danish}\\b`, 'gi')
+    englishTitle = englishTitle.replace(regex, english)
+  })
+  
+  // Clean up any remaining Danish characters
+  englishTitle = englishTitle
+    .replace(/æ/g, 'ae')
+    .replace(/ø/g, 'oe')
+    .replace(/å/g, 'aa')
+    .replace(/Æ/g, 'Ae')
+    .replace(/Ø/g, 'Oe')
+    .replace(/Å/g, 'Aa')
+  
+  // Capitalize first letter of each word
+  return englishTitle
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }
 
 function parseGeneratedRecipe(content: string, category: string): any {
