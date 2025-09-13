@@ -101,8 +101,9 @@ INGREDIENS FORMATERING - VIGTIGT:
 - Brug små bogstaver (ikke forbogstav stort)
 - Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
 - Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
+- Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
-- Kartofler: "4 stk kartofler" (ikke "4 kartofler")
+- Kartofler: "500 g kartofler" (ikke "4 stk kartofler" eller "4 kartofler")
 - Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
@@ -131,8 +132,9 @@ INGREDIENS FORMATERING - FØLG DISSE REGLER:
 - Brug små bogstaver (ikke forbogstav stort)
 - Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
 - Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
+- Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
-- Kartofler: "4 stk kartofler" (ikke "4 kartofler")
+- Kartofler: "500 g kartofler" (ikke "4 stk kartofler" eller "4 kartofler")
 - Kød: "500 g hakket oksekød", "1 stk kyllingebryst"
 - Grøntsager: "2 stk gulerødder", "1 stk løg", "200 g broccoli"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
@@ -242,16 +244,18 @@ function generateMidjourneyPrompt(recipe: any): string {
         return `${amount} ${unit} ${name}`
       }
     })
-    ?.join(', ') || 'ingredienser'
+    ?.join(', ') || ''
 
   // Translate Danish title to English for Midjourney
   const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
   
   // Create a food-focused description
-  const foodDescription = `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
+  const foodDescription = mainIngredients && mainIngredients.length > 0 
+    ? `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
+    : `*${englishTitle}, beautifully plated*`
   
   // Base Midjourney prompt structure
-  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --v 5 --ar 4:3`
+  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
   
   return basePrompt
 }
@@ -286,6 +290,7 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'peberfrugt': 'bell pepper',
     'champignon': 'mushrooms',
     'kartoffelmos': 'mashed potatoes',
+    'kartoffeltopping': 'potato topping',
     
     // Cooking methods
     'stegt': 'fried',
