@@ -120,6 +120,7 @@ export default function CreateRecipePage() {
   const [editableRecipe, setEditableRecipe] = useState<GeneratedRecipe | null>(null)
   const [recipeStatus, setRecipeStatus] = useState<'ai-preview' | 'ready-to-save' | 'saved'>('ai-preview')
   const [midjourneyPrompt, setMidjourneyPrompt] = useState<string>('')
+  const [aiTips, setAiTips] = useState<string>('')
 
   // Redirect if not admin
   if (checking) {
@@ -191,6 +192,11 @@ export default function CreateRecipePage() {
       // Store Midjourney prompt if available
       if (recipeData.midjourneyPrompt) {
         setMidjourneyPrompt(recipeData.midjourneyPrompt)
+      }
+      
+      // Store AI tips if available
+      if (recipeData.aiTips) {
+        setAiTips(recipeData.aiTips)
       }
       
       setProgress('Validerer opskrift...')
@@ -279,7 +285,8 @@ export default function CreateRecipePage() {
         },
         body: JSON.stringify({
           recipe: editableRecipe,
-          category: selectedCategory
+          category: selectedCategory,
+          aiTips: aiTips
         })
       })
 

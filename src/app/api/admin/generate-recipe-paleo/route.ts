@@ -98,9 +98,39 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ Generated Paleo recipe: ${recipe.title}`)
 
+    // Generate AI tips for the recipe
+    let aiTips = ''
+    try {
+      console.log('💡 Generating AI tips for recipe...')
+      const tipsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/ai/generate-tips`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: recipe.title,
+          description: recipe.description,
+          difficulty: recipe.difficulty,
+          totalTime: recipe.prepTime + recipe.cookTime,
+          dietaryCategories: recipe.dietaryCategories
+        })
+      })
+
+      if (tipsResponse.ok) {
+        const tipsData = await tipsResponse.json()
+        aiTips = tipsData.tips || ''
+        console.log('✅ AI tips generated successfully')
+      } else {
+        console.log('⚠️ Failed to generate AI tips, continuing without tips')
+      }
+    } catch (error) {
+      console.log('⚠️ Error generating AI tips:', error)
+    }
+
     return NextResponse.json({
       success: true,
-      recipe
+      recipe,
+      aiTips
     })
 
   } catch (error) {

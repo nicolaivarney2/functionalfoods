@@ -35,11 +35,12 @@ interface GeneratedRecipe {
 interface SaveRecipeRequest {
   recipe: GeneratedRecipe
   category: string
+  aiTips?: string
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { recipe, category }: SaveRecipeRequest = await request.json()
+    const { recipe, category, aiTips }: SaveRecipeRequest = await request.json()
     
     if (!recipe || !recipe.title) {
       return NextResponse.json(
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
       status: 'draft',
       publishedAt: null,
       updatedAt: new Date().toISOString(),
+      personalTips: aiTips || null,
       rating: null,
       reviewCount: null,
       prepTimeISO: `PT${recipe.prepTime}M`,
