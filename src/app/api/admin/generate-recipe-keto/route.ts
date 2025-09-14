@@ -151,25 +151,23 @@ KETO KOST REGLER:
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
-  "title": "Keto opskrift titel",
+  "title": "keto opskrift titel",
   "description": "Kort beskrivelse med fokus på keto fordele",
   "ingredients": [
     {
       "name": "ingrediens navn",
       "amount": 100,
-      "unit": "g",
-      "notes": "valgfri note om keto fordele"
+      "unit": "g"
     }
   ],
   "instructions": [
     {
       "stepNumber": 1,
       "instruction": "Detaljeret instruktion med keto tips",
-      "time": 10,
-      "tips": "valgfri keto tip"
+      "time": 10
     }
   ],
-  "servings": 4,
+  "servings": 2,
   "prepTime": 15,
   "cookTime": 30,
   "difficulty": "Easy|Medium|Hard",
@@ -182,6 +180,20 @@ OPPSKRIFT FORMAT (returner kun JSON):
     "fiber": 5.0
   }
 }
+
+INGREDIENS REGLER:
+- ALT skal være i gram (g) - aldrig kg eller stk
+- Kød: "500 g hakket oksekød", "200 g kyllingebryst"
+- Grøntsager: "300 g broccoli", "200 g spinat"
+- Fedt: "30 g olivenolie", "50 g smør"
+- Nødder: "30 g mandler", "20 g valnødder"
+- Bær: "100 g jordbær", "50 g blåbær"
+- Krydderier: "5 g kurkuma", "10 g ingefær"
+- Æg: "200 g æg" (ca. 4 stk)
+- Fisk: "400 g laks", "300 g makrel"
+- Ingen notes felt på ingredienser
+- Portioner: altid 2
+- Titel: ikke stort forbogstav for hvert ord
 
 KETO INGREDIENSER AT FOKUSERE PÅ:
 - Fedt kød: oksekød, svinekød, lam, kylling med skind
@@ -224,7 +236,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],
-      servings: recipe.servings || 4,
+      servings: 2, // Always 2 portions
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',

@@ -153,25 +153,23 @@ ANTIINFLAMMATORISK KOST PRINCIPPER:
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
-  "title": "Antiinflammatorisk opskrift titel",
+  "title": "antiinflammatorisk opskrift titel",
   "description": "Kort beskrivelse med fokus på helbredsfordele",
   "ingredients": [
     {
       "name": "ingrediens navn",
       "amount": 100,
-      "unit": "g",
-      "notes": "valgfri note om antiinflammatoriske fordele"
+      "unit": "g"
     }
   ],
   "instructions": [
     {
       "stepNumber": 1,
       "instruction": "Detaljeret instruktion med helbreds-tips",
-      "time": 10,
-      "tips": "valgfri helbreds-tip"
+      "time": 10
     }
   ],
-  "servings": 4,
+  "servings": 2,
   "prepTime": 15,
   "cookTime": 30,
   "difficulty": "Easy|Medium|Hard",
@@ -184,6 +182,20 @@ OPPSKRIFT FORMAT (returner kun JSON):
     "fiber": 8.0
   }
 }
+
+INGREDIENS REGLER:
+- ALT skal være i gram (g) - aldrig kg eller stk
+- Kød: "500 g oksekød", "200 g kyllingebryst"
+- Grøntsager: "300 g broccoli", "200 g spinat"
+- Fedt: "30 g olivenolie", "50 g smør"
+- Nødder: "30 g mandler", "20 g valnødder"
+- Bær: "100 g jordbær", "50 g blåbær"
+- Krydderier: "5 g kurkuma", "10 g ingefær"
+- Æg: "200 g æg" (ca. 4 stk)
+- Fisk: "400 g laks", "300 g makrel"
+- Ingen notes felt på ingredienser
+- Portioner: altid 2
+- Titel: ikke stort forbogstav for hvert ord
 
 ANTIINFLAMMATORISKE INGREDIENSER:
 - Fisk: laks, makrel, sardiner, tun (omega-3)
@@ -228,7 +240,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],
-      servings: recipe.servings || 4,
+      servings: 2, // Always 2 portions
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
