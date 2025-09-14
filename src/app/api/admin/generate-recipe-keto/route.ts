@@ -175,7 +175,7 @@ OPPSKRIFT FORMAT (returner kun JSON):
   "prepTime": 15,
   "cookTime": 30,
   "difficulty": "Easy|Medium|Hard",
-  "dietaryCategories": ["keto", "lav-kulhydrat"],
+  "dietaryCategories": ["Keto", "LCHF/Paleo"],
   "nutritionalInfo": {
     "calories": 350,
     "protein": 25.0,
@@ -232,7 +232,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['keto', 'lav-kulhydrat']
+    recipe.dietaryCategories = ['Keto', 'LCHF/Paleo']
     
     // Ensure all required fields exist
     return {
@@ -244,7 +244,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || ['keto'],
+      dietaryCategories: recipe.dietaryCategories || ['Keto', 'LCHF/Paleo'],
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 350,
         protein: 25,
