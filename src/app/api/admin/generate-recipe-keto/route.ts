@@ -117,10 +117,14 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Error generating AI tips:', error)
     }
 
+    // Generate Midjourney prompt
+    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+
     return NextResponse.json({
       success: true,
       recipe,
-      aiTips
+      aiTips,
+      midjourneyPrompt
     })
 
   } catch (error) {
@@ -151,7 +155,7 @@ KETO KOST REGLER:
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
-  "title": "keto opskrift titel",
+  "title": "Keto opskrift titel",
   "description": "Kort beskrivelse med fokus på keto fordele",
   "ingredients": [
     {
@@ -193,7 +197,7 @@ INGREDIENS REGLER:
 - Fisk: "400 g laks", "300 g makrel"
 - Ingen notes felt på ingredienser
 - Portioner: altid 2
-- Titel: ikke stort forbogstav for hvert ord
+- Titel: første bogstav stort, resten små bogstaver
 
 KETO INGREDIENSER AT FOKUSERE PÅ:
 - Fedt kød: oksekød, svinekød, lam, kylling med skind
@@ -253,5 +257,12 @@ function parseGeneratedRecipe(content: string, category: string): any {
     console.error('Error parsing generated Keto recipe:', error)
     throw new Error('Failed to parse generated recipe')
   }
+}
+
+function generateMidjourneyPrompt(recipe: any): string {
+  const title = recipe.title?.toLowerCase() || 'opskrift'
+  const mainIngredients = recipe.ingredients?.slice(0, 3).map((ing: any) => ing.name).join(', ') || ''
+  
+  return `top-down hyperrealistic photo of *${title}, featuring ${mainIngredients}, beautifully plated*, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
 }
 
