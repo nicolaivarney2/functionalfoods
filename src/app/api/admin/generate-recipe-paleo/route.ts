@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import OpenAI from 'openai'
 import { getOpenAIConfig } from '@/lib/openai-config'
 
 interface ExistingRecipe {
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate Midjourney prompt
-    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+    const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
 
     return NextResponse.json({
       success: true,
@@ -262,169 +263,55 @@ function parseGeneratedRecipe(content: string, category: string): any {
   }
 }
 
-function generateMidjourneyPrompt(recipe: any): string {
-  // Get main ingredients (first 3) and translate them to English
-  const mainIngredients = recipe.ingredients
-    ?.slice(0, 3)
-    .map((ing: any) => translateTitleForMidjourney(ing.name))
-    .filter((name: string) => name && name.trim())
-    .join(', ') || ''
+async function generateMidjourneyPrompt(recipe: any): Promise<string> {
+  try {
+    // Use ChatGPT to translate the entire description to English
+    const danishDescription = `${recipe.title || 'opskrift'}${recipe.ingredients?.slice(0, 3).map((ing: any) => ing.name).join(', ') ? ', featuring ' + recipe.ingredients.slice(0, 3).map((ing: any) => ing.name).join(', ') : ''}`
+    
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
 
-  // Translate Danish title to English for Midjourney
-  const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
-  
-  // Create a food-focused description
-  const foodDescription = mainIngredients && mainIngredients.length > 0 
-    ? `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
-    : `*${englishTitle}, beautifully plated*`
-  
-  // Base Midjourney prompt structure
-  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-  
-  return basePrompt
-}
+    const translationResponse = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a food translation expert. Translate Danish food terms to English for Midjourney image generation. Return ONLY the English translation, no explanations. Focus on food photography terms.'
+        },
+        {
+          role: 'user',
+          content: `Translate this Danish food description to English: "${danishDescription}"`
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.3
+    })
 
-function translateTitleForMidjourney(danishTitle: string): string {
-  // Simple translation mapping for common Danish food terms
-  const translations: Record<string, string> = {
-    // Main dishes
-    'kylling': 'chicken',
-    'kyllingebryst': 'chicken breast',
-    'kyllingefrikassé': 'chicken fricassee',
-    'kyllingefrikasse': 'chicken fricassee',
-    'hjemmelavet': 'homemade',
-    'kartoffel': 'potato',
-    'kartofler': 'potatoes',
-    'fisk': 'fish',
-    'fiskefilet': 'fish fillet',
-    'laks': 'salmon',
-    'makrel': 'mackerel',
-    'tun': 'tuna',
-    'bøf': 'beef',
-    'hakket oksekød': 'ground beef',
-    'hakkebøf': 'beef patty',
-    'frikadeller': 'meatballs',
-    'pølse': 'sausage',
-    'pasta': 'pasta',
-    'ris': 'rice',
-    'nudler': 'noodles',
-    'frikassé': 'fricassee',
-    'frikasse': 'fricassee',
-    'steg': 'roast',
-    'stegt': 'roasted',
-    'svinekød': 'pork',
-    'svinemørbrad': 'pork tenderloin',
-    'mørbradgryde': 'tenderloin stew',
-    'lam': 'lamb',
+    const englishDescription = translationResponse.choices[0]?.message?.content?.trim() || danishDescription
     
-    // Sauces and liquids
-    'flødesauce': 'cream sauce',
-    'flødesovs': 'cream sauce',
-    'sovs': 'sauce',
-    'sauce': 'sauce',
-    'bouillon': 'broth',
-    'fond': 'stock',
-    'vand': 'water',
-    'mælk': 'milk',
-    'fløde': 'cream',
+    // Create a food-focused description
+    const foodDescription = `*${englishDescription}, beautifully plated*`
     
-    // Vegetables
-    'gulerødder': 'carrots',
-    'gulerod': 'carrot',
-    'løg': 'onions',
-    'hvidløg': 'garlic',
-    'broccoli': 'broccoli',
-    'spinat': 'spinach',
-    'tomat': 'tomato',
-    'tomater': 'tomatoes',
-    'agurk': 'cucumber',
-    'peberfrugt': 'bell pepper',
-    'champignon': 'mushrooms',
-    'kartoffelmos': 'mashed potatoes',
-    'kartoffeltopping': 'potato topping',
+    // Base Midjourney prompt structure
+    const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
     
-    // Cooking methods
-    'bagt': 'baked',
-    'kogt': 'boiled',
-    'grillet': 'grilled',
-    'ovnbagt': 'oven-baked',
-    'sauteret': 'sautéed',
+    return basePrompt
+  } catch (error) {
+    console.error('Error translating for Midjourney prompt:', error)
+    // Fallback to original Danish if translation fails
+    const mainIngredients = recipe.ingredients
+      ?.slice(0, 3)
+      .map((ing: any) => ing.name)
+      .filter((name: string) => name && name.trim())
+      .join(', ') || ''
+
+    const foodDescription = mainIngredients && mainIngredients.length > 0 
+      ? `*${recipe.title || 'opskrift'}, featuring ${mainIngredients}, beautifully plated*`
+      : `*${recipe.title || 'opskrift'}, beautifully plated*`
     
-    // Descriptive words
-    'børnevenlig': 'kid-friendly',
-    'børnevenlige': 'kid-friendly',
-    'nem': 'easy',
-    'hurtig': 'quick',
-    'sund': 'healthy',
-    'lækker': 'delicious',
-    'smagfuld': 'flavorful',
-    'krydret': 'spiced',
-    'mild': 'mild',
-    'cremet': 'creamy',
-    'sprød': 'crispy',
-    'saftig': 'juicy',
-    
-    // Nuts and seeds
-    'mandler': 'almonds',
-    'valnødder': 'walnuts',
-    'cashews': 'cashews',
-    'pecan': 'pecans',
-    'frø': 'seeds',
-    'solsikkefrø': 'sunflower seeds',
-    'pumpkernfrø': 'pumpkin seeds',
-    
-    // Fats and oils
-    'olivenolie': 'olive oil',
-    'kokosolie': 'coconut oil',
-    'smør': 'butter',
-    'ghee': 'ghee',
-    'oliven': 'olives',
-    
-    // Berries
-    'jordbær': 'strawberries',
-    'hindbær': 'raspberries',
-    'blåbær': 'blueberries',
-    'bær': 'berries',
-    
-    // Eggs and dairy
-    'æg': 'eggs',
-    'ost': 'cheese',
-    'yoghurt': 'yogurt',
-    
-    // Common combinations
-    'med': 'with',
-    'og': 'and',
-    'i': 'in',
-    'på': 'on',
-    'til': 'for',
-    'fad': 'dish',
-    'ret': 'dish',
-    'opskrift': 'recipe',
-    'dressing': 'dressing',
-    'topping': 'topping'
+    return `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
   }
-  
-  let englishTitle = danishTitle.toLowerCase()
-  
-  // Replace Danish words with English equivalents
-  Object.entries(translations).forEach(([danish, english]) => {
-    const regex = new RegExp(`\\b${danish}\\b`, 'gi')
-    englishTitle = englishTitle.replace(regex, english)
-  })
-  
-  // Clean up any remaining Danish characters
-  englishTitle = englishTitle
-    .replace(/æ/g, 'ae')
-    .replace(/ø/g, 'oe')
-    .replace(/å/g, 'aa')
-    .replace(/Æ/g, 'Ae')
-    .replace(/Ø/g, 'Oe')
-    .replace(/Å/g, 'Aa')
-  
-  // Capitalize first letter of each word
-  return englishTitle
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
 }
+
 
