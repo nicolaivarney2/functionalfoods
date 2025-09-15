@@ -308,6 +308,21 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'frikasse': 'fricassee',
     'steg': 'roast',
     'stegt': 'roasted',
+    'svinekød': 'pork',
+    'svinemørbrad': 'pork tenderloin',
+    'mørbradgryde': 'tenderloin stew',
+    'lam': 'lamb',
+    
+    // Sauces and liquids
+    'flødesauce': 'cream sauce',
+    'flødesovs': 'cream sauce',
+    'sovs': 'sauce',
+    'sauce': 'sauce',
+    'bouillon': 'broth',
+    'fond': 'stock',
+    'vand': 'water',
+    'mælk': 'milk',
+    'fløde': 'cream',
     
     // Vegetables
     'gulerødder': 'carrots',
