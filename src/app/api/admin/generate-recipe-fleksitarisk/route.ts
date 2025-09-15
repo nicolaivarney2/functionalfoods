@@ -264,10 +264,10 @@ function parseGeneratedRecipe(content: string, category: string): any {
 }
 
 function generateMidjourneyPrompt(recipe: any): string {
-  // Get main ingredients (first 3)
+  // Get main ingredients (first 3) and translate them to English
   const mainIngredients = recipe.ingredients
     ?.slice(0, 3)
-    .map((ing: any) => ing.name)
+    .map((ing: any) => translateTitleForMidjourney(ing.name))
     .filter((name: string) => name && name.trim())
     .join(', ') || ''
 

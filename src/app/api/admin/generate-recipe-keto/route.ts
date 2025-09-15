@@ -260,10 +260,10 @@ function parseGeneratedRecipe(content: string, category: string): any {
 }
 
 function generateMidjourneyPrompt(recipe: any): string {
-  // Get main ingredients (first 3)
+  // Get main ingredients (first 3) and translate them to English
   const mainIngredients = recipe.ingredients
     ?.slice(0, 3)
-    .map((ing: any) => ing.name)
+    .map((ing: any) => translateTitleForMidjourney(ing.name))
     .filter((name: string) => name && name.trim())
     .join(', ') || ''
 
@@ -286,6 +286,7 @@ function translateTitleForMidjourney(danishTitle: string): string {
   const translations: Record<string, string> = {
     // Main dishes
     'kylling': 'chicken',
+    'kyllingebryst': 'chicken breast',
     'kyllingefrikassé': 'chicken fricassee',
     'kyllingefrikasse': 'chicken fricassee',
     'hjemmelavet': 'homemade',
@@ -293,7 +294,11 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'kartofler': 'potatoes',
     'fisk': 'fish',
     'fiskefilet': 'fish fillet',
+    'laks': 'salmon',
+    'makrel': 'mackerel',
+    'tun': 'tuna',
     'bøf': 'beef',
+    'hakket oksekød': 'ground beef',
     'hakkebøf': 'beef patty',
     'frikadeller': 'meatballs',
     'pølse': 'sausage',
@@ -304,6 +309,8 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'frikasse': 'fricassee',
     'steg': 'roast',
     'stegt': 'roasted',
+    'svinekød': 'pork',
+    'lam': 'lamb',
     
     // Vegetables
     'gulerødder': 'carrots',
@@ -319,6 +326,13 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'champignon': 'mushrooms',
     'kartoffelmos': 'mashed potatoes',
     'kartoffeltopping': 'potato topping',
+    'kål': 'cabbage',
+    'zucchini': 'zucchini',
+    'blomkål': 'cauliflower',
+    'rødbeder': 'beets',
+    'squash': 'squash',
+    'aubergine': 'eggplant',
+    'avocado': 'avocado',
     
     // Cooking methods
     'bagt': 'baked',
@@ -340,6 +354,34 @@ function translateTitleForMidjourney(danishTitle: string): string {
     'cremet': 'creamy',
     'sprød': 'crispy',
     'saftig': 'juicy',
+    
+    // Nuts and seeds
+    'mandler': 'almonds',
+    'valnødder': 'walnuts',
+    'cashews': 'cashews',
+    'pecan': 'pecans',
+    'frø': 'seeds',
+    'solsikkefrø': 'sunflower seeds',
+    'pumpkernfrø': 'pumpkin seeds',
+    
+    // Fats and oils
+    'olivenolie': 'olive oil',
+    'kokosolie': 'coconut oil',
+    'smør': 'butter',
+    'ghee': 'ghee',
+    'oliven': 'olives',
+    
+    // Berries
+    'jordbær': 'strawberries',
+    'hindbær': 'raspberries',
+    'blåbær': 'blueberries',
+    'bær': 'berries',
+    
+    // Eggs and dairy
+    'æg': 'eggs',
+    'ost': 'cheese',
+    'fløde': 'cream',
+    'yoghurt': 'yogurt',
     
     // Common combinations
     'med': 'with',
