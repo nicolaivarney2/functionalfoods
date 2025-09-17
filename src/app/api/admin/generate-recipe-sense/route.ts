@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -200,7 +202,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['sense', 'sund']
+    recipe.dietaryCategories = getDietaryCategories('sense')
     
     // Ensure all required fields exist
     return {
@@ -212,7 +214,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || ['sense'],
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('sense'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 300,
         protein: 20,

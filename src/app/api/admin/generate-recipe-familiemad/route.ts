@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -201,8 +203,8 @@ JSON-struktur (obligatorisk):
     
     console.log(`✅ Generated Familiemad recipe: ${recipe.title}`)
 
-    // Generate Midjourney prompt
-    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+    // Generate Midjourney prompt using centralized function
+    const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
     console.log(`🎨 Generated Midjourney prompt: ${midjourneyPrompt.substring(0, 100)}...`)
 
     // Generate AI tips for the recipe
@@ -255,139 +257,7 @@ JSON-struktur (obligatorisk):
 }
 
 
-function generateMidjourneyPrompt(recipe: any): string {
-  // Extract main ingredients for the visual description
-  const mainIngredients = recipe.ingredients_flat
-    ?.filter((item: any) => item.type === 'ingredient')
-    ?.slice(0, 6) // Take first 6 ingredients
-    ?.map((item: any) => {
-      const amount = item.amount || '1'
-      const unit = item.unit || ''
-      const name = item.name?.toLowerCase() || ''
-      
-      // Format ingredient nicely
-      if (unit === 'stk') {
-        return `${amount} ${name}`
-      } else if (unit === 'g' || unit === 'ml') {
-        return `${amount}${unit} ${name}`
-      } else {
-        return `${amount} ${unit} ${name}`
-      }
-    })
-    ?.join(', ') || ''
-
-  // Translate Danish title to English for Midjourney
-  const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
-  
-  // Create a food-focused description
-  const foodDescription = mainIngredients && mainIngredients.length > 0 
-    ? `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
-    : `*${englishTitle}, beautifully plated*`
-  
-  // Base Midjourney prompt structure
-  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-  
-  return basePrompt
-}
-
-function translateTitleForMidjourney(danishTitle: string): string {
-  // Simple translation mapping for common Danish food terms
-  const translations: Record<string, string> = {
-    // Main dishes
-    'kylling': 'chicken',
-    'kyllingefrikassé': 'chicken fricassee',
-    'kyllingefrikasse': 'chicken fricassee',
-    'hjemmelavet': 'homemade',
-    'kartoffel': 'potato',
-    'kartofler': 'potatoes',
-    'fisk': 'fish',
-    'fiskefilet': 'fish fillet',
-    'bøf': 'beef',
-    'hakkebøf': 'beef patty',
-    'frikadeller': 'meatballs',
-    'pølse': 'sausage',
-    'pasta': 'pasta',
-    'ris': 'rice',
-    'nudler': 'noodles',
-    'frikassé': 'fricassee',
-    'frikasse': 'fricassee',
-    'steg': 'roast',
-    'stegt': 'roasted',
-    
-    // Vegetables
-    'gulerødder': 'carrots',
-    'gulerod': 'carrot',
-    'løg': 'onions',
-    'hvidløg': 'garlic',
-    'broccoli': 'broccoli',
-    'spinat': 'spinach',
-    'tomat': 'tomato',
-    'tomater': 'tomatoes',
-    'agurk': 'cucumber',
-    'peberfrugt': 'bell pepper',
-    'champignon': 'mushrooms',
-    'kartoffelmos': 'mashed potatoes',
-    'kartoffeltopping': 'potato topping',
-    
-    // Cooking methods
-    'bagt': 'baked',
-    'kogt': 'boiled',
-    'grillet': 'grilled',
-    'ovnbagt': 'oven-baked',
-    'sauteret': 'sautéed',
-    
-    // Descriptive words
-    'børnevenlig': 'kid-friendly',
-    'børnevenlige': 'kid-friendly',
-    'nem': 'easy',
-    'hurtig': 'quick',
-    'sund': 'healthy',
-    'lækker': 'delicious',
-    'smagfuld': 'flavorful',
-    'krydret': 'spiced',
-    'mild': 'mild',
-    'cremet': 'creamy',
-    'sprød': 'crispy',
-    'saftig': 'juicy',
-    
-    // Common combinations
-    'med': 'with',
-    'og': 'and',
-    'i': 'in',
-    'på': 'on',
-    'til': 'for',
-    'fad': 'dish',
-    'ret': 'dish',
-    'opskrift': 'recipe',
-    'sovs': 'sauce',
-    'sauce': 'sauce',
-    'dressing': 'dressing',
-    'topping': 'topping'
-  }
-  
-  let englishTitle = danishTitle.toLowerCase()
-  
-  // Replace Danish words with English equivalents
-  Object.entries(translations).forEach(([danish, english]) => {
-    const regex = new RegExp(`\\b${danish}\\b`, 'gi')
-    englishTitle = englishTitle.replace(regex, english)
-  })
-  
-  // Clean up any remaining Danish characters
-  englishTitle = englishTitle
-    .replace(/æ/g, 'ae')
-    .replace(/ø/g, 'oe')
-    .replace(/å/g, 'aa')
-    .replace(/Æ/g, 'Ae')
-    .replace(/Ø/g, 'Oe')
-    .replace(/Å/g, 'Aa')
-  
-  // Capitalize first letter of each word
-  return englishTitle
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
+// Removed local generateMidjourneyPrompt and translateTitleForMidjourney functions - now using centralized version
 
 function parseGeneratedRecipe(content: string, category: string): any {
   try {
@@ -435,7 +305,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
         prepTime: parseInt(recipe.prep_time) || 15,
         cookTime: parseInt(recipe.cook_time) || 30,
         difficulty: 'Nem',
-        dietaryCategories: ['Familiemad'], // Capitalize category
+        dietaryCategories: getDietaryCategories('familiemad'),
         nutritionalInfo: {
           calories: 400,
           protein: 25,
@@ -452,7 +322,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['Familiemad']
+    recipe.dietaryCategories = getDietaryCategories('familiemad')
     
     // Ensure all required fields exist
     return {
@@ -464,7 +334,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Nem',
-      dietaryCategories: recipe.dietaryCategories || ['Familiemad'],
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('familiemad'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 400,
         protein: 25,

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -88,9 +90,13 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ Generated recipe: ${recipe.title}`)
 
+    // Generate Midjourney prompt
+    const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
+
     return NextResponse.json({
       success: true,
-      recipe
+      recipe,
+      midjourneyPrompt
     })
 
   } catch (error) {
@@ -271,18 +277,5 @@ function parseGeneratedRecipe(content: string, category: string): any {
   }
 }
 
-function getDietaryCategories(category: string): string[] {
-  const categoryMap: Record<string, string[]> = {
-    'familiemad': ['familiemad'],
-    'keto': ['keto', 'lav-kulhydrat'],
-    'sense': ['sense', 'sund'],
-    'paleo': ['paleo', 'lchf'],
-    'antiinflammatorisk': ['antiinflammatorisk', 'sund'],
-    'fleksitarisk': ['fleksitarisk', 'plantebaseret'],
-    '5-2': ['5-2', 'faste', 'lav-kalorie'],
-    'meal-prep': ['meal-prep', 'mealprep']
-  }
-  
-  return categoryMap[category] || [category]
-}
+// Removed local getDietaryCategories function - now using centralized version
 

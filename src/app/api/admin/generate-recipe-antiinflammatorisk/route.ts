@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -117,8 +119,8 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Error generating AI tips:', error)
     }
 
-    // Generate Midjourney prompt
-    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+    // Generate Midjourney prompt using centralized function
+    const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
 
     return NextResponse.json({
       success: true,
@@ -236,7 +238,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['antiinflammatorisk', 'sund']
+    recipe.dietaryCategories = getDietaryCategories('antiinflammatorisk')
     
     // Ensure all required fields exist
     return {
@@ -248,7 +250,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || ['antiinflammatorisk'],
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('antiinflammatorisk'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 280,
         protein: 22,

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -118,7 +120,7 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Error generating AI tips:', error)
     }
 
-    // Generate Midjourney prompt
+    // Generate Midjourney prompt using centralized function
     const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
 
     return NextResponse.json({
@@ -233,7 +235,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['Keto', 'LCHF/Paleo']
+    recipe.dietaryCategories = getDietaryCategories('keto')
     
     // Ensure all required fields exist
     return {
@@ -245,7 +247,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || ['Keto', 'LCHF/Paleo'],
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('keto'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 350,
         protein: 25,
@@ -260,55 +262,6 @@ function parseGeneratedRecipe(content: string, category: string): any {
   }
 }
 
-async function generateMidjourneyPrompt(recipe: any): Promise<string> {
-  try {
-    // Use ChatGPT to translate the entire description to English
-    const danishDescription = `${recipe.title || 'opskrift'}${recipe.ingredients?.slice(0, 3).map((ing: any) => ing.name).join(', ') ? ', featuring ' + recipe.ingredients.slice(0, 3).map((ing: any) => ing.name).join(', ') : ''}`
-    
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    })
-
-    const translationResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a food translation expert. Translate Danish food terms to English for Midjourney image generation. Return ONLY the English translation, no explanations. Focus on food photography terms.'
-        },
-        {
-          role: 'user',
-          content: `Translate this Danish food description to English: "${danishDescription}"`
-        }
-      ],
-      max_tokens: 100,
-      temperature: 0.3
-    })
-
-    const englishDescription = translationResponse.choices[0]?.message?.content?.trim() || danishDescription
-    
-    // Create a food-focused description
-    const foodDescription = `*${englishDescription}, beautifully plated*`
-    
-    // Base Midjourney prompt structure
-    const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-    
-    return basePrompt
-  } catch (error) {
-    console.error('Error translating for Midjourney prompt:', error)
-    // Fallback to original Danish if translation fails
-    const mainIngredients = recipe.ingredients
-      ?.slice(0, 3)
-      .map((ing: any) => ing.name)
-      .filter((name: string) => name && name.trim())
-      .join(', ') || ''
-
-    const foodDescription = mainIngredients && mainIngredients.length > 0 
-      ? `*${recipe.title || 'opskrift'}, featuring ${mainIngredients}, beautifully plated*`
-      : `*${recipe.title || 'opskrift'}, beautifully plated*`
-    
-    return `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-  }
-}
+// Removed local generateMidjourneyPrompt function - now using centralized version
 
 

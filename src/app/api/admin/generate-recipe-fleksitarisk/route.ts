@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 
 interface ExistingRecipe {
   id: string
@@ -117,8 +119,8 @@ export async function POST(request: NextRequest) {
       console.log('⚠️ Error generating AI tips:', error)
     }
 
-    // Generate Midjourney prompt
-    const midjourneyPrompt = generateMidjourneyPrompt(recipe)
+    // Generate Midjourney prompt using centralized function
+    const midjourneyPrompt = await generateMidjourneyPrompt(recipe)
 
     return NextResponse.json({
       success: true,
@@ -236,7 +238,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = ['fleksitarisk', 'plantebaseret']
+    recipe.dietaryCategories = getDietaryCategories('fleksitarisk')
     
     // Ensure all required fields exist
     return {
@@ -248,7 +250,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 15,
       cookTime: recipe.cookTime || 30,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || ['fleksitarisk'],
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('fleksitarisk'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 350,
         protein: 20,
@@ -263,36 +265,9 @@ function parseGeneratedRecipe(content: string, category: string): any {
   }
 }
 
-function generateMidjourneyPrompt(recipe: any): string {
-  // Get main ingredients (first 3) and translate them to English
-  const mainIngredients = recipe.ingredients
-    ?.slice(0, 3)
-    .map((ing: any) => translateTitleForMidjourney(ing.name))
-    .filter((name: string) => name && name.trim())
-    .join(', ') || ''
+// Removed local generateMidjourneyPrompt function - now using centralized version
 
-  // Translate Danish title to English for Midjourney
-  const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
-  
-  // Create a food-focused description
-  const foodDescription = mainIngredients && mainIngredients.length > 0 
-    ? `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
-    : `*${englishTitle}, beautifully plated*`
-  
-  // Base Midjourney prompt structure
-  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-  
-  return basePrompt
-}
-
-function translateTitleForMidjourney(danishTitle: string): string {
-  // Simple translation mapping for common Danish food terms
-  const translations: Record<string, string> = {
-    // Main dishes
-    'kylling': 'chicken',
-    'kyllingefrikassé': 'chicken fricassee',
-    'kyllingefrikasse': 'chicken fricassee',
-    'hjemmelavet': 'homemade',
+// Removed local translateTitleForMidjourney function - now using centralized version
     'kartoffel': 'potato',
     'kartofler': 'potatoes',
     'fisk': 'fish',
