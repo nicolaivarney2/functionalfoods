@@ -80,14 +80,14 @@ export async function POST(req: NextRequest) {
               } else {
                 productsUpdated++
                 
-                // Add price history
+                // Add price history (current price, not old price)
                 await supabase
                   .from('supermarket_price_history')
                   .insert({
                     product_id: existingProduct.id,
-                    price: newPrice,
-                    original_price: newOriginalPrice,
-                    is_on_sale: updatedProduct.isOnSale,
+                    price: newPrice, // Current price (tilbudspris hvis der er tilbud)
+                    original_price: newOriginalPrice, // Current original price
+                    is_on_sale: updatedProduct.isOnSale, // Current sale status
                     recorded_at: new Date().toISOString()
                   })
                 

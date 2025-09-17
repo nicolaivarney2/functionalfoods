@@ -87,14 +87,14 @@ export async function POST(req: NextRequest) {
 
         // Only update if we found a valid original price
         if (newOriginalPrice > newPrice) {
-          // Add price history entry for the old price
+          // Add price history entry for the NEW price (after fix)
           await supabase
             .from('supermarket_price_history')
             .insert({
               product_external_id: product.external_id,
-              price: product.price,
-              original_price: product.original_price,
-              is_on_sale: product.is_on_sale,
+              price: newPrice, // NEW price (tilbudspris hvis der er tilbud)
+              original_price: newOriginalPrice, // NEW original price
+              is_on_sale: newIsOnSale, // NEW sale status
               timestamp: new Date().toISOString()
             })
 

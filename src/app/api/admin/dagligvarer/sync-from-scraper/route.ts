@@ -228,8 +228,9 @@ export async function POST(req: NextRequest) {
             .from('supermarket_price_history')
             .insert({
               product_external_id: db.external_id,
-              price,
-              original_price,
+              price, // Current price (tilbudspris hvis der er tilbud)
+              original_price, // Current original price
+              is_on_sale, // Current sale status
               timestamp: new Date().toISOString()
             })
           if (histErr) console.warn('⚠️ Price history insert failed for', db.external_id, histErr.message)
