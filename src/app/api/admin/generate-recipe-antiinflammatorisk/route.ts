@@ -42,14 +42,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
     // Create Antiinflammatorisk-specific system prompt
     const systemPrompt = createAntiinflammatoriskSystemPrompt(existingTitles)
     
-    // Generate recipe with OpenAI using existing config
+    // Generate recipe using standard OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på ingredienser der bekæmper inflammation.`
+            content: `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til antiinflammatorisk kost.`
           }
         ],
         temperature: 0.8,
@@ -78,8 +77,8 @@ export async function POST(request: NextRequest) {
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
-    const completion = await response.json()
-    const recipeContent = completion.choices[0]?.message?.content
+    const data = await response.json()
+    const recipeContent = data.choices[0]?.message?.content
     
     if (!recipeContent) {
       throw new Error('No recipe content generated')
@@ -143,24 +142,22 @@ export async function POST(request: NextRequest) {
 }
 
 function createAntiinflammatoriskSystemPrompt(existingTitles: string[]): string {
-  return `Du er en ekspert i antiinflammatorisk kost og helbredsfremmende madlavning. Generer en detaljeret Antiinflammatorisk opskrift i JSON format.
+  return `Du er en ekspert i Antiinflammatorisk kost og dansk madlavning. Generer en detaljeret Antiinflammatorisk opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
 
-ANTIINFLAMMATORISK KOST PRINCIPPER:
-- Omega-3 fedtsyrer mod inflammation
-- Antioksidanter fra bær og grøntsager
-- Kurkuma og ingefær som naturlige antiinflammatoriske stoffer
-- Mørke grøntsager for folat og vitaminer
-- Fisk for DHA og EPA
-- Nødder og frø for hjernefedt
-- Undgå processerede fødevarer og for meget omega-6
+ANTIINFLAMMATORISK KOST REGLER:
+- Fokus på omega-3 fedtsyrer (fisk, nødder, frø)
+- Antioksidanter (bær, grøntsager, krydderier)
+- Kurkuma, ingefær, kanel, chili
+- Undgå: processerede fødevarer, for meget omega-6
+- Brug: fisk, nødder, bær, grøntsager, krydderier
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
   "title": "Antiinflammatorisk opskrift titel",
-  "description": "Kort beskrivelse med fokus på helbredsfordele",
+  "description": "Kort beskrivelse med fokus på antiinflammatoriske fordele",
   "ingredients": [
     {
       "name": "ingrediens navn",
@@ -171,7 +168,7 @@ OPPSKRIFT FORMAT (returner kun JSON):
   "instructions": [
     {
       "stepNumber": 1,
-      "instruction": "Detaljeret instruktion med helbreds-tips",
+      "instruction": "Detaljeret instruktion med antiinflammatoriske tips",
       "time": 10
     }
   ],
@@ -191,7 +188,7 @@ OPPSKRIFT FORMAT (returner kun JSON):
 
 INGREDIENS REGLER:
 - ALT skal være i gram (g) - aldrig kg eller stk
-- Kød: "500 g oksekød", "200 g kyllingebryst"
+- Kød: "500 g hakket oksekød", "200 g kyllingebryst"
 - Grøntsager: "300 g broccoli", "200 g spinat"
 - Fedt: "30 g olivenolie", "50 g smør"
 - Nødder: "30 g mandler", "20 g valnødder"
@@ -203,23 +200,20 @@ INGREDIENS REGLER:
 - Portioner: altid 2
 - Titel: første bogstav stort, resten små bogstaver
 
-ANTIINFLAMMATORISKE INGREDIENSER:
+ANTIINFLAMMATORISKE INGREDIENSER AT FOKUSERE PÅ:
 - Fisk: laks, makrel, sardiner, tun (omega-3)
-- Bær: blåbær, jordbær, hindbær (antioksidanter)
-- Grøntsager: broccoli, spinat, kål, rødbeder (folat)
-- Krydderier: kurkuma, ingefær, kanel, chili (antiinflammatorisk)
-- Nødder: valnødder, mandler (omega-3)
-- Frø: chia, hør, solsikkefrø (omega-3)
-- Mørk chokolade: 70%+ kakao (flavonoider)
-- Olivenolie: ekstra virgin (mono-umættede fedtsyrer)
+- Nødder: valnødder, mandler, hørfrø (omega-3)
+- Bær: jordbær, hindbær, blåbær (antioksidanter)
+- Grøntsager: broccoli, spinat, kål, zucchini
+- Krydderier: kurkuma, ingefær, kanel, chili
+- Olivenolie: ekstra virgin olivenolie
 
-HELBREDS-FOKUSEREDE TIPS:
-- Tilføj kurkuma for antiinflammatorisk effekt
-- Brug ingefær mod inflammation
-- Inkluder bær for antioksidanter
-- Vælg fed fisk for omega-3
-- Tilføj mørke grøntsager for folat
-- Brug olivenolie i stedet for solsikkeolie`
+UNDGÅ:
+- Processerede fødevarer
+- For meget omega-6 (solsikkeolie, majsolie)
+- Sukker og sødemidler
+- Transfedt
+- For meget rødt kød`
 }
 
 function parseGeneratedRecipe(content: string, category: string): any {
@@ -264,140 +258,3 @@ function parseGeneratedRecipe(content: string, category: string): any {
     throw new Error('Failed to parse generated recipe')
   }
 }
-
-function generateMidjourneyPrompt(recipe: any): string {
-  // Get main ingredients (first 3) and translate them to English
-  const mainIngredients = recipe.ingredients
-    ?.slice(0, 3)
-    .map((ing: any) => translateTitleForMidjourney(ing.name))
-    .filter((name: string) => name && name.trim())
-    .join(', ') || ''
-
-  // Translate Danish title to English for Midjourney
-  const englishTitle = translateTitleForMidjourney(recipe.title || 'opskrift')
-  
-  // Create a food-focused description
-  const foodDescription = mainIngredients && mainIngredients.length > 0 
-    ? `*${englishTitle}, featuring ${mainIngredients}, beautifully plated*`
-    : `*${englishTitle}, beautifully plated*`
-  
-  // Base Midjourney prompt structure
-  const basePrompt = `top-down hyperrealistic photo of ${foodDescription}, served on a white ceramic plate on a rustic dark wooden tabletop, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3`
-  
-  return basePrompt
-}
-
-function translateTitleForMidjourney(danishTitle: string): string {
-  // Simple translation mapping for common Danish food terms
-  const translations: Record<string, string> = {
-    // Main dishes
-    'kylling': 'chicken',
-    'kyllingefrikassé': 'chicken fricassee',
-    'kyllingefrikasse': 'chicken fricassee',
-    'hjemmelavet': 'homemade',
-    'kartoffel': 'potato',
-    'kartofler': 'potatoes',
-    'fisk': 'fish',
-    'fiskefilet': 'fish fillet',
-    'bøf': 'beef',
-    'hakkebøf': 'beef patty',
-    'frikadeller': 'meatballs',
-    'pølse': 'sausage',
-    'pasta': 'pasta',
-    'ris': 'rice',
-    'nudler': 'noodles',
-    'frikassé': 'fricassee',
-    'frikasse': 'fricassee',
-    'steg': 'roast',
-    'stegt': 'roasted',
-    'svinekød': 'pork',
-    'svinemørbrad': 'pork tenderloin',
-    'mørbradgryde': 'tenderloin stew',
-    'lam': 'lamb',
-    
-    // Sauces and liquids
-    'flødesauce': 'cream sauce',
-    'flødesovs': 'cream sauce',
-    'sovs': 'sauce',
-    'sauce': 'sauce',
-    'bouillon': 'broth',
-    'fond': 'stock',
-    'vand': 'water',
-    'mælk': 'milk',
-    'fløde': 'cream',
-    
-    // Vegetables
-    'gulerødder': 'carrots',
-    'gulerod': 'carrot',
-    'løg': 'onions',
-    'hvidløg': 'garlic',
-    'broccoli': 'broccoli',
-    'spinat': 'spinach',
-    'tomat': 'tomato',
-    'tomater': 'tomatoes',
-    'agurk': 'cucumber',
-    'peberfrugt': 'bell pepper',
-    'champignon': 'mushrooms',
-    'kartoffelmos': 'mashed potatoes',
-    'kartoffeltopping': 'potato topping',
-    
-    // Cooking methods
-    'bagt': 'baked',
-    'kogt': 'boiled',
-    'grillet': 'grilled',
-    'ovnbagt': 'oven-baked',
-    'sauteret': 'sautéed',
-    
-    // Descriptive words
-    'børnevenlig': 'kid-friendly',
-    'børnevenlige': 'kid-friendly',
-    'nem': 'easy',
-    'hurtig': 'quick',
-    'sund': 'healthy',
-    'lækker': 'delicious',
-    'smagfuld': 'flavorful',
-    'krydret': 'spiced',
-    'mild': 'mild',
-    'cremet': 'creamy',
-    'sprød': 'crispy',
-    'saftig': 'juicy',
-    
-    // Common combinations
-    'med': 'with',
-    'og': 'and',
-    'i': 'in',
-    'på': 'on',
-    'til': 'for',
-    'fad': 'dish',
-    'ret': 'dish',
-    'opskrift': 'recipe',
-    'sovs': 'sauce',
-    'sauce': 'sauce',
-    'dressing': 'dressing',
-    'topping': 'topping'
-  }
-  
-  let englishTitle = danishTitle.toLowerCase()
-  
-  // Replace Danish words with English equivalents
-  Object.entries(translations).forEach(([danish, english]) => {
-    const regex = new RegExp(`\\b${danish}\\b`, 'gi')
-    englishTitle = englishTitle.replace(regex, english)
-  })
-  
-  // Clean up any remaining Danish characters
-  englishTitle = englishTitle
-    .replace(/æ/g, 'ae')
-    .replace(/ø/g, 'oe')
-    .replace(/å/g, 'aa')
-    .replace(/Æ/g, 'Ae')
-    .replace(/Ø/g, 'Oe')
-    .replace(/Å/g, 'Aa')
-  
-  // Capitalize first letter of each word
-  return englishTitle
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
-
