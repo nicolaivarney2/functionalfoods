@@ -11,47 +11,60 @@ export async function POST(req: NextRequest) {
     let totalProducts = 0
     let totalAdded = 0
     let totalUpdated = 0
-    let page = 1
-    let hasMore = true
     let batchCount = 0
     
-    while (hasMore) {
-      batchCount++
-      console.log(`🔄 Processing batch ${batchCount} (page ${page})...`)
+    // Define all REMA departments to scrape
+    const departments = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 160]
+    
+    for (const departmentId of departments) {
+      console.log(`🏪 Processing department ${departmentId}...`)
+      let page = 1
+      let hasMore = true
       
-      try {
-        const response = await fetch(`${baseUrl}/api/dagligvarer/batch-scrape-admin?page=${page}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
+      while (hasMore) {
+        batchCount++
+        console.log(`🔄 Processing department ${departmentId}, batch ${batchCount} (page ${page})...`)
         
-        if (!response.ok) {
-          throw new Error(`Batch scrape failed with status ${response.status}`)
+        try {
+          const response = await fetch(`${baseUrl}/api/dagligvarer/batch-scrape-admin?page=${page}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ departmentId, limit: 100 })
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Batch scrape failed with status ${response.status}`)
+          }
+          
+          const data = await response.json()
+          
+          if (!data.success) {
+            throw new Error(`Batch scrape failed: ${data.message}`)
+          }
+          
+          totalProducts += data.productsFound || 0
+          totalAdded += data.productsAdded || 0
+          totalUpdated += data.productsUpdated || 0
+          hasMore = data.hasMore || false
+          page = data.nextPage || page + 1
+          
+          console.log(`✅ Department ${departmentId}, batch ${batchCount} completed: ${data.productsFound} found, ${data.productsAdded} added, ${data.productsUpdated} updated`)
+          
+          // Small delay between batches to avoid overwhelming the system
+          if (hasMore) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+          
+        } catch (error) {
+          console.error(`❌ Department ${departmentId}, batch ${batchCount} failed:`, error)
+          // Continue with next department instead of failing completely
+          hasMore = false
         }
-        
-        const data = await response.json()
-        
-        if (!data.success) {
-          throw new Error(`Batch scrape failed: ${data.message}`)
-        }
-        
-        totalProducts += data.productsFound || 0
-        totalAdded += data.productsAdded || 0
-        totalUpdated += data.productsUpdated || 0
-        hasMore = data.hasMore || false
-        page = data.nextPage || page + 1
-        
-        console.log(`✅ Batch ${batchCount} completed: ${data.productsFound} found, ${data.productsAdded} added, ${data.productsUpdated} updated`)
-        
-        // Small delay between batches to avoid overwhelming the system
-        if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
-        
-      } catch (error) {
-        console.error(`❌ Batch ${batchCount} failed:`, error)
-        // Continue with next batch instead of failing completely
-        hasMore = false
+      }
+      
+      // Delay between departments
+      if (departmentId !== departments[departments.length - 1]) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
       }
     }
     
@@ -65,7 +78,7 @@ export async function POST(req: NextRequest) {
       totalAdded,
       totalUpdated,
       batchesProcessed: batchCount,
-      finalPage: page
+      departmentsProcessed: departments.length
     })
     
   } catch (error) {
