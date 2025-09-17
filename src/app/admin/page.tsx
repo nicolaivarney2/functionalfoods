@@ -162,50 +162,28 @@ export default function AdminDashboard() {
     setBatchScraping(true)
     setBatchProgress({ current: 0, total: 0, products: 0 })
     
-    let page = 1
-    let hasMore = true
-    let totalProducts = 0
-    let totalAdded = 0
-    let totalUpdated = 0
-    let batchCount = 0
-    
     try {
-      while (hasMore) {
-        batchCount++
-        setBatchProgress({ current: batchCount, total: batchCount, products: totalProducts })
-        
-        console.log(`🔄 Processing batch ${batchCount} (page ${page})...`)
-        
-        const response = await fetch(`/api/dagligvarer/batch-scrape-admin?page=${page}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Batch scrape failed with status ${response.status}`)
-        }
-        
-        const data = await response.json()
-        
-        if (!data.success) {
-          throw new Error(`Batch scrape failed: ${data.message}`)
-        }
-        
-        totalProducts += data.productsFound || 0
-        totalAdded += data.productsAdded || 0
-        totalUpdated += data.productsUpdated || 0
-        hasMore = data.hasMore || false
-        page = data.nextPage || page + 1
-        
-        console.log(`✅ Batch ${batchCount} completed: ${data.productsFound} found, ${data.productsAdded} added, ${data.productsUpdated} updated`)
-        
-        // Small delay between batches
-        if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 1000))
-        }
+      console.log('🚀 Starting REMA batch scraper...')
+      
+      // Use the fixed auto-batch-scrape endpoint that handles all departments
+      const response = await fetch('/api/admin/dagligvarer/auto-batch-scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Batch scrape failed with status ${response.status}`)
       }
       
-      alert(`🎉 Batch scrape completed!\n\n📊 Results:\n- Total products found: ${totalProducts}\n- Products added: ${totalAdded}\n- Products updated: ${totalUpdated}\n- Batches processed: ${batchCount}`)
+      const data = await response.json()
+      
+      if (!data.success) {
+        throw new Error(`Batch scrape failed: ${data.message}`)
+      }
+      
+      console.log('✅ Auto batch scrape completed:', data)
+      
+      alert(`🎉 REMA Scraper completed!\n\n📊 Results:\n- Total products found: ${data.totalProducts}\n- Products added: ${data.totalAdded}\n- Products updated: ${data.totalUpdated}\n- Batches processed: ${data.batchesProcessed}\n- Departments processed: ${data.departmentsProcessed}`)
       
     } catch (error) {
       console.error('Batch scrape error:', error)
