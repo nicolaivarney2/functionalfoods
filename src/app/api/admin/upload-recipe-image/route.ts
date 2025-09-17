@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import sharp from 'sharp'
+import { createHash } from 'crypto'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,15 +46,36 @@ export async function POST(request: NextRequest) {
 
     console.log(`📸 Uploading image for recipe ${recipeId}: ${file.name} (${file.size} bytes)`)
 
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop()
-    const fileName = `recipe-${recipeId}-${Date.now()}.${fileExt}`
+    // Convert file to buffer for processing
+    const imageBuffer = await file.arrayBuffer()
+    console.log(`📥 Original image size: ${(imageBuffer.byteLength / 1024).toFixed(1)}KB`)
+
+    // Convert to WebP with optimization (same as Ketoliv import)
+    console.log(`🔧 Optimizing image to WebP format...`)
+    const optimizedBuffer = await sharp(Buffer.from(imageBuffer))
+      .webp({ 
+        quality: 80,
+        effort: 6,
+        nearLossless: false
+      })
+      .resize(800, 600, { 
+        fit: 'inside',
+        withoutEnlargement: true 
+      })
+      .toBuffer()
+    
+    console.log(`📊 Original size: ${(imageBuffer.byteLength / 1024).toFixed(1)}KB, Optimized: ${(optimizedBuffer.length / 1024).toFixed(1)}KB`)
+
+    // Generate unique filename with WebP extension
+    const hash = createHash('md5').update(file.name + Date.now()).digest('hex').substring(0, 8)
+    const fileName = `recipe-${recipeId}-${hash}.webp`
     const filePath = `recipe-images/${fileName}`
 
-    // Upload to Supabase Storage
+    // Upload optimized image to Supabase Storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('recipe-images')
-      .upload(filePath, file, {
+      .upload(filePath, optimizedBuffer, {
+        contentType: 'image/webp',
         cacheControl: '3600',
         upsert: false
       })
@@ -72,13 +95,16 @@ export async function POST(request: NextRequest) {
 
     const imageUrl = urlData.publicUrl
 
-    console.log(`✅ Image uploaded successfully: ${imageUrl}`)
+    console.log(`✅ Image uploaded and optimized successfully: ${imageUrl}`)
 
     return NextResponse.json({
       success: true,
       imageUrl: imageUrl,
       fileName: fileName,
-      message: 'Billede uploadet succesfuldt'
+      originalSize: `${(imageBuffer.byteLength / 1024).toFixed(1)}KB`,
+      optimizedSize: `${(optimizedBuffer.length / 1024).toFixed(1)}KB`,
+      compressionRatio: `${((1 - optimizedBuffer.length / imageBuffer.byteLength) * 100).toFixed(1)}%`,
+      message: 'Billede uploadet og komprimeret succesfuldt'
     })
 
   } catch (error: any) {
