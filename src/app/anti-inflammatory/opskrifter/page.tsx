@@ -17,7 +17,7 @@ export default function AntiInflammatoryRecipesPage() {
       cookingTime: 20,
       totalTime: 30,
       servings: 4,
-      difficulty: 'Nem',
+      difficulty: 'Nem' as const,
       calories: 350,
       protein: 25,
       carbs: 20,
