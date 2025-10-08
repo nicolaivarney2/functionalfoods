@@ -11,19 +11,19 @@ const mainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
   { name: 'MADBUDGET', href: '/madbudget' },
-  { name: 'VÆGTTAB', href: '/vaegttab' },
+  { name: 'VÆGTTAB', href: '/vægttab' },
   { name: 'BAG OM FF', href: '/bag-om-ff' },
 ]
 
 const dietaryCategories = [
-  { name: 'KETO', href: '/opskrifter/keto' },
-  { name: 'SENSE', href: '/opskrifter/sense' },
-  { name: 'LCHF/PALEO', href: '/opskrifter/lchch-paleo' },
-  { name: 'MEAL PREP', href: '/opskrifter/meal-prep' },
-  { name: 'ANTI-INFLAMMATORISK', href: '/opskrifter/anti-inflammatory' },
-  { name: 'FLEKSITARISK', href: '/opskrifter/flexitarian' },
-  { name: '5:2 DIÆT', href: '/opskrifter/5-2-diet' },
-  { name: 'FAMILIEMAD', href: '/opskrifter/familie' },
+  { name: 'KETO', href: '/keto' },
+  { name: 'SENSE', href: '/sense' },
+  { name: 'LCHF/PALEO', href: '/lchf-paleo' },
+  { name: 'MEAL PREP', href: '/meal-prep' },
+  { name: 'ANTI-INFLAMMATORISK', href: '/anti-inflammatory' },
+  { name: 'FLEKSITARISK', href: '/flexitarian' },
+  { name: '5:2 DIÆT', href: '/5-2-diet' },
+  { name: 'FAMILIEMAD', href: '/familie' },
 ]
 
 export default function Header() {
