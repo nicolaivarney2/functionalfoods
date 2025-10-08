@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { Search, Menu, X, User, LogOut, Settings, Heart, Shield } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
 
 const mainMenuItems = [
@@ -16,7 +16,6 @@ const mainMenuItems = [
 ]
 
 const dietaryCategories = [
-  { name: 'FAMILIEMAD', href: '/opskrifter/familie' },
   { name: 'KETO', href: '/opskrifter/keto' },
   { name: 'SENSE', href: '/opskrifter/sense' },
   { name: 'LCHF/PALEO', href: '/opskrifter/lchch-paleo' },
@@ -24,6 +23,7 @@ const dietaryCategories = [
   { name: 'ANTI-INFLAMMATORISK', href: '/opskrifter/anti-inflammatory' },
   { name: 'FLEKSITARISK', href: '/opskrifter/flexitarian' },
   { name: '5:2 DIÆT', href: '/opskrifter/5-2-diet' },
+  { name: 'FAMILIEMAD', href: '/opskrifter/familie' },
 ]
 
 export default function Header() {
@@ -31,7 +31,7 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const { user, signOut } = useAuth()
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin } = useAdminCheck()
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside

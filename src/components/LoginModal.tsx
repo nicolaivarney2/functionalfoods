@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { useAdminCheck } from '@/hooks/useAdminCheck'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -22,7 +22,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [success, setSuccess] = useState('')
 
   const { signIn, signUp } = useAuth()
-  const { isAdmin } = useAdminAuth()
+  const { isAdmin } = useAdminCheck()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {

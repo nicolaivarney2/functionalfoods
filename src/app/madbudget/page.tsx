@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 // Mock data for development
 const mockStores = [
@@ -730,7 +731,30 @@ export default function MadbudgetPage() {
   const dayLabels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ComingSoonWrapper
+      modalTitle="Madbudget - Kommer snart!"
+      modalContent={
+        <>
+          <p>
+            Vi er ved at udvikle en et automatisk madplans-system der, ud fra din og din families data, giver dig en madplan for næste uge der er perfekt til dig og ud fra ugens tilbud! Væk med dyre vægttabsplaner!
+          </p>
+          <p>
+            Baseret på fx.
+          </p>
+          <ul className="list-disc list-inside space-y-2 mt-4">
+            <li>Familiestørrelse</li>
+            <li>Børn</li>
+            <li>Tilbud i dagligvarerforretninger</li>
+            <li>Din mad ideologi</li>
+            <li>Evt. vægttabsplan og meget mere</li>
+          </ul>
+          <p className="font-semibold text-blue-600 mt-4">
+            Færdigt i starten af 2026. Stay tuned!
+          </p>
+        </>
+      }
+    >
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-6">
@@ -1871,6 +1895,7 @@ export default function MadbudgetPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ComingSoonWrapper>
   )
 }
