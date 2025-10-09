@@ -32,28 +32,40 @@ export async function GET(
       },
     })
     
-    // Check if slug is a UUID (ID) or regular slug
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
-    
-    let query = supabase.from('recipes').select('*')
-    
-    if (isUUID) {
-      // Search by ID
-      query = query.eq('id', slug)
-    } else {
-      // Search by slug
-      query = query.eq('slug', slug)
+    // Try fetch by slug first
+    const slugQuery = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('slug', slug)
+      .single()
+
+    if (!slugQuery.error && slugQuery.data) {
+      return NextResponse.json(slugQuery.data)
     }
-    
-    const { data, error } = await query.single()
-    
-    if (error) {
-      console.error('Error fetching recipe:', error)
-      console.error('Searching for:', isUUID ? `ID: ${slug}` : `Slug: ${slug}`)
+
+    // If not found by slug, try by ID (UUID or numeric)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+    const isNumericId = /^\d+$/.test(slug)
+
+    if (isUUID || isNumericId) {
+      const idValue = isNumericId ? Number(slug) : slug
+      const idQuery = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', idValue)
+        .single()
+
+      if (!idQuery.error && idQuery.data) {
+        return NextResponse.json(idQuery.data)
+      }
+
+      console.error('Error fetching recipe by ID:', idQuery.error)
       return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
     }
-    
-    return NextResponse.json(data)
+
+    // Not UUID or numeric, already tried slug → not found
+    console.error('Recipe not found for slug:', slug)
+    return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
     
   } catch (error) {
     console.error('Error in GET /api/recipes/[slug]:', error)
