@@ -104,14 +104,16 @@ export async function POST(request: NextRequest) {
     }
     
     // Convert to SlotSchedule format
-    const occupiedSlots: SlotSchedule[] = (scheduledRecipes || []).map(recipe => ({
-      recipeId: recipe.id,
-      recipeTitle: recipe.title,
-      scheduledDate: recipe.scheduledDate,
-      scheduledTime: recipe.scheduledTime,
-      slotNumber: SlotScheduler.getSlotNumberFromTime(recipe.scheduledTime),
-      status: recipe.status as 'scheduled' | 'published'
-    }))
+    const occupiedSlots: SlotSchedule[] = (scheduledRecipes || [])
+      .filter(recipe => recipe.scheduledDate && recipe.scheduledTime) // Extra safety filter
+      .map(recipe => ({
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        scheduledDate: recipe.scheduledDate!,
+        scheduledTime: recipe.scheduledTime!,
+        slotNumber: SlotScheduler.getSlotNumberFromTime(recipe.scheduledTime!),
+        status: recipe.status as 'scheduled' | 'published'
+      }))
     
     // Get next available slots
     const nextSlots = SlotScheduler.getNextAvailableSlots(count, occupiedSlots)
@@ -137,6 +139,8 @@ export async function POST(request: NextRequest) {
       
       if (updateError) {
         console.error('Error updating recipe:', updateError)
+        console.error('Recipe ID:', recipeId)
+        console.error('Slot data:', slot)
         return NextResponse.json({ error: 'Failed to schedule recipe' }, { status: 500 })
       }
       
