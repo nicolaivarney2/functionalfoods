@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
 import { da } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap, RefreshCw, Trash } from 'lucide-react'
 import { SlotScheduler, SlotSchedule } from '@/lib/slot-scheduler'
 
 interface Recipe {
@@ -157,6 +157,29 @@ export default function PublishingCalendarPage() {
     await loadScheduledRecipes()
   }
 
+  const cleanupOrphanedSlots = async () => {
+    if (!confirm('Er du sikker på at du vil rydde op i slots for ikke-eksisterende opskrifter?')) return
+
+    try {
+      const response = await fetch('/api/admin/cleanup-slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert(`✅ Cleanup completed!\n\nCleaned: ${result.cleaned} orphaned recipes\n\nOrphaned recipes:\n${result.orphanedRecipes?.map((r: any) => `- ${r.title} (ID: ${r.id})`).join('\n') || 'None'}`)
+        await loadScheduledRecipes()
+      } else {
+        alert(`❌ Cleanup failed: ${result.error}`)
+      }
+    } catch (error) {
+      console.error('Cleanup error:', error)
+      alert(`❌ Cleanup failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
   const handlePublishNow = async (recipeId: string) => {
     if (!confirm('Er du sikker på at du vil udgive denne opskrift nu?')) return
 
@@ -233,6 +256,13 @@ export default function PublishingCalendarPage() {
               >
                 <RefreshCw size={16} />
                 Opdater
+              </button>
+              <button
+                onClick={cleanupOrphanedSlots}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm flex items-center gap-2"
+              >
+                <Trash size={16} />
+                Ryd Op
               </button>
             </div>
             
