@@ -18,7 +18,7 @@ export interface SlotSchedule {
 
 export class SlotScheduler {
   // Define the 4 daily slots
-  private static readonly DAILY_SLOTS = [
+  public static readonly DAILY_SLOTS = [
     { time: '07:00', slotNumber: 1 },
     { time: '12:00', slotNumber: 2 },
     { time: '15:30', slotNumber: 3 },
