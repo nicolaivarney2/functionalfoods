@@ -44,6 +44,12 @@ const adminNavItems = [
     description: 'Planlæg og udgiv opskrifter'
   },
   {
+    name: 'Publishing Kalender',
+    href: '/admin/publishing-calendar',
+    icon: Calendar,
+    description: 'Se og administrer publishing kalender'
+  },
+  {
     name: 'Alle Opskrifter',
     href: '/admin/recipes',
     icon: BookOpen,
