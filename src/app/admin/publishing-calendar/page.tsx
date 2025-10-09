@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
 import { da } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap, RefreshCw } from 'lucide-react'
 import { SlotScheduler, SlotSchedule } from '@/lib/slot-scheduler'
 
 interface Recipe {
@@ -147,6 +147,10 @@ export default function PublishingCalendarPage() {
     }
   }
 
+  const refreshCalendar = async () => {
+    await loadScheduledRecipes()
+  }
+
   const handlePublishNow = async (recipeId: string) => {
     if (!confirm('Er du sikker på at du vil udgive denne opskrift nu?')) return
 
@@ -216,6 +220,13 @@ export default function PublishingCalendarPage() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
               >
                 I dag
+              </button>
+              <button
+                onClick={refreshCalendar}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center gap-2"
+              >
+                <RefreshCw size={16} />
+                Opdater
               </button>
             </div>
             
