@@ -386,7 +386,12 @@ export default function AdminPublishingPage() {
 
       // Opdater local state
       const updatedRecipes = recipes.map(r => 
-        r.id === recipeId ? { ...r, status: 'published' as const } : r
+        r.id === recipeId ? { 
+          ...r, 
+          status: 'published' as const,
+          scheduledDate: null,
+          scheduledTime: null
+        } : r
       )
       setRecipes(updatedRecipes)
 
@@ -396,6 +401,16 @@ export default function AdminPublishingPage() {
           : schedule
       )
       setSchedules(updatedSchedules)
+      
+      // Update selected recipe if it's the one being published
+      if (selectedRecipe && selectedRecipe.id === recipeId) {
+        setSelectedRecipe({
+          ...selectedRecipe,
+          status: 'published' as const,
+          scheduledDate: null,
+          scheduledTime: null
+        })
+      }
       
       console.log('✅ Opskrift udgivet nu:', recipe.title)
       
@@ -838,7 +853,7 @@ export default function AdminPublishingPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      {selectedRecipe.status === 'draft' && (
+                      {(selectedRecipe.status === 'draft' || selectedRecipe.status === 'scheduled') && (
                         <button
                           onClick={() => publishRecipeNow(selectedRecipe.id)}
                           className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"

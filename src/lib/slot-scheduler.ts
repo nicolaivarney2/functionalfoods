@@ -29,7 +29,9 @@ export class SlotScheduler {
    * Get the next available slot for a recipe
    */
   static getNextAvailableSlot(occupiedSlots: SlotSchedule[]): { date: string; time: string; slotNumber: number } {
-    const today = new Date()
+    const now = new Date()
+    const today = new Date(now)
+    today.setHours(0, 0, 0, 0) // Start of today
     const maxDaysToCheck = 30 // Don't look more than 30 days ahead
     
     for (let dayOffset = 0; dayOffset < maxDaysToCheck; dayOffset++) {
@@ -39,6 +41,14 @@ export class SlotScheduler {
       
       // Check each slot for this day
       for (const slot of this.DAILY_SLOTS) {
+        // If it's today, check if the slot time has already passed
+        if (dayOffset === 0) {
+          const slotDateTime = new Date(dateString + 'T' + slot.time + ':00')
+          if (slotDateTime <= now) {
+            continue // Skip this slot as it's already passed
+          }
+        }
+        
         const isOccupied = occupiedSlots.some(occupied => 
           occupied.scheduledDate === dateString && 
           occupied.scheduledTime === slot.time &&
