@@ -50,15 +50,24 @@ export async function GET(request: NextRequest) {
     console.log('📅 Raw scheduled recipes from DB:', scheduledRecipes)
     console.log('📅 Recipe IDs found:', scheduledRecipes?.map(r => r.id))
     
-    // Convert to SlotSchedule format
-    const occupiedSlots: SlotSchedule[] = (scheduledRecipes || []).map(recipe => ({
-      recipeId: recipe.id,
-      recipeTitle: recipe.title,
-      scheduledDate: recipe.scheduledDate,
-      scheduledTime: recipe.scheduledTime,
-      slotNumber: SlotScheduler.getSlotNumberFromTime(recipe.scheduledTime),
-      status: recipe.status as 'scheduled' | 'published'
-    }))
+    // Convert to SlotSchedule format (normalize time to HH:MM)
+    const occupiedSlots: SlotSchedule[] = (scheduledRecipes || []).map(recipe => {
+      const rawTime: string = (recipe as any).scheduledTime
+      const normalizedTime = typeof rawTime === 'string' && rawTime.includes(':')
+        ? rawTime.slice(0, 5) // HH:MM
+        : rawTime
+
+      const slotNumber = SlotScheduler.getSlotNumberFromTime(normalizedTime)
+
+      return {
+        recipeId: (recipe as any).id,
+        recipeTitle: (recipe as any).title,
+        scheduledDate: (recipe as any).scheduledDate,
+        scheduledTime: normalizedTime,
+        slotNumber,
+        status: (recipe as any).status as 'scheduled' | 'published'
+      }
+    })
     
     console.log('📅 Converted occupied slots:', occupiedSlots)
     
