@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
 import { da } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap } from 'lucide-react'
 import { SlotScheduler, SlotSchedule } from '@/lib/slot-scheduler'
 
 interface Recipe {
@@ -12,11 +12,25 @@ interface Recipe {
   status: 'draft' | 'scheduled' | 'published'
   scheduledDate?: string
   scheduledTime?: string
+  // Additional fields for icons
+  description?: string
+  nutritionalInfo?: {
+    calories: number
+    protein: number
+    carbs: number
+    fat: number
+    fiber: number
+  }
+  imageUrl?: string
+  personalTips?: string
+  dietaryCategories?: string[]
+  difficulty?: 'Nem' | 'Mellem' | 'Svær'
 }
 
 export default function PublishingCalendarPage() {
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [scheduledRecipes, setScheduledRecipes] = useState<SlotSchedule[]>([])
+  const [recipeDetails, setRecipeDetails] = useState<Record<string, Recipe>>({})
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
@@ -36,11 +50,39 @@ export default function PublishingCalendarPage() {
       
       if (data.success) {
         setScheduledRecipes(data.data.occupiedSlots || [])
+        
+        // Load detailed recipe data for each scheduled recipe
+        const recipeIds = data.data.occupiedSlots?.map((slot: SlotSchedule) => slot.recipeId) || []
+        if (recipeIds.length > 0) {
+          await loadRecipeDetails(recipeIds)
+        }
       }
     } catch (error) {
       console.error('Error loading scheduled recipes:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadRecipeDetails = async (recipeIds: string[]) => {
+    try {
+      const details: Record<string, Recipe> = {}
+      
+      for (const recipeId of recipeIds) {
+        try {
+          const response = await fetch(`/api/admin/recipes/${recipeId}`)
+          if (response.ok) {
+            const recipe = await response.json()
+            details[recipeId] = recipe
+          }
+        } catch (error) {
+          console.error(`Error loading recipe ${recipeId}:`, error)
+        }
+      }
+      
+      setRecipeDetails(details)
+    } catch (error) {
+      console.error('Error loading recipe details:', error)
     }
   }
 
@@ -231,6 +273,58 @@ export default function PublishingCalendarPage() {
                         <div className="text-sm font-medium text-blue-900 truncate">
                           {slot.recipe.recipeTitle}
                         </div>
+                        
+                        {/* Recipe Status Icons */}
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {(() => {
+                            const recipe = recipeDetails[slot.recipe.recipeId]
+                            if (!recipe) return null
+                            
+                            const icons = []
+                            
+                            // AI Description (if description is long and detailed)
+                            if (recipe.description && recipe.description.length > 100) {
+                              icons.push(
+                                <Brain key="ai-desc" size={12} className="text-purple-600" title="AI beskrivelse" />
+                              )
+                            }
+                            
+                            // Nutrition calculated
+                            if (recipe.nutritionalInfo?.calories) {
+                              icons.push(
+                                <Calculator key="nutrition" size={12} className="text-green-600" title="Ernæring beregnet" />
+                              )
+                            }
+                            
+                            // Has image
+                            if (recipe.imageUrl) {
+                              icons.push(
+                                <Image key="image" size={12} className="text-blue-600" title="Har billede" />
+                              )
+                            }
+                            
+                            // Personal tips
+                            if (recipe.personalTips) {
+                              icons.push(
+                                <Star key="tips" size={12} className="text-yellow-600" title="Personlige tips" />
+                              )
+                            }
+                            
+                            // Difficulty indicator
+                            if (recipe.difficulty === 'Svær') {
+                              icons.push(
+                                <AlertTriangle key="difficulty" size={12} className="text-red-600" title="Svær opskrift" />
+                              )
+                            } else if (recipe.difficulty === 'Nem') {
+                              icons.push(
+                                <Zap key="easy" size={12} className="text-green-600" title="Nem opskrift" />
+                              )
+                            }
+                            
+                            return icons
+                          })()}
+                        </div>
+                        
                         <div className="flex gap-1 mt-2">
                           <button
                             onClick={() => handlePublishNow(slot.recipe!.recipeId)}
@@ -263,7 +357,7 @@ export default function PublishingCalendarPage() {
         {/* Legend */}
         <div className="mt-6 bg-white rounded-lg shadow p-4">
           <h3 className="font-semibold text-gray-900 mb-3">Forklaring</h3>
-          <div className="flex gap-6 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-blue-50 border border-blue-200 rounded"></div>
               <span>Planlagt opskrift</span>
@@ -279,6 +373,36 @@ export default function PublishingCalendarPage() {
             <div className="flex items-center gap-2">
               <Trash2 size={16} className="text-red-600" />
               <span>Fjern fra slot</span>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <h4 className="font-medium text-gray-900 mb-2">Opskrift Status Ikoner</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <Brain size={16} className="text-purple-600" />
+                <span>AI beskrivelse</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calculator size={16} className="text-green-600" />
+                <span>Ernæring beregnet</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Image size={16} className="text-blue-600" />
+                <span>Har billede</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Star size={16} className="text-yellow-600" />
+                <span>Personlige tips</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-green-600" />
+                <span>Nem opskrift</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-red-600" />
+                <span>Svær opskrift</span>
+              </div>
             </div>
           </div>
         </div>
