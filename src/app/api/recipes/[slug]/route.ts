@@ -48,15 +48,28 @@ export async function GET(
     const isNumericId = /^\d+$/.test(slug)
 
     if (isUUID || isNumericId) {
-      const idValue = isNumericId ? Number(slug) : slug
-      const idQuery = await supabase
+      // Try string comparison first (handles text/uuid columns where numeric ids are stored as strings)
+      let idQuery = await supabase
         .from('recipes')
         .select('*')
-        .eq('id', idValue)
+        .eq('id', slug)
         .single()
 
       if (!idQuery.error && idQuery.data) {
         return NextResponse.json(idQuery.data)
+      }
+
+      // If still not found and it looks numeric, try numeric equality (for integer id columns)
+      if (isNumericId) {
+        idQuery = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', Number(slug))
+          .single()
+
+        if (!idQuery.error && idQuery.data) {
+          return NextResponse.json(idQuery.data)
+        }
       }
 
       console.error('Error fetching recipe by ID:', idQuery.error)
