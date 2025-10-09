@@ -285,39 +285,51 @@ export default function PublishingCalendarPage() {
                             // AI Description (if description is long and detailed)
                             if (recipe.description && recipe.description.length > 100) {
                               icons.push(
-                                <Brain key="ai-desc" size={12} className="text-purple-600" title="AI beskrivelse" />
+                                <div key="ai-desc" title="AI beskrivelse">
+                                  <Brain size={12} className="text-purple-600" />
+                                </div>
                               )
                             }
                             
                             // Nutrition calculated
                             if (recipe.nutritionalInfo?.calories) {
                               icons.push(
-                                <Calculator key="nutrition" size={12} className="text-green-600" title="Ernæring beregnet" />
+                                <div key="nutrition" title="Ernæring beregnet">
+                                  <Calculator size={12} className="text-green-600" />
+                                </div>
                               )
                             }
                             
                             // Has image
                             if (recipe.imageUrl) {
                               icons.push(
-                                <Image key="image" size={12} className="text-blue-600" title="Har billede" />
+                                <div key="image" title="Har billede">
+                                  <Image size={12} className="text-blue-600" />
+                                </div>
                               )
                             }
                             
                             // Personal tips
                             if (recipe.personalTips) {
                               icons.push(
-                                <Star key="tips" size={12} className="text-yellow-600" title="Personlige tips" />
+                                <div key="tips" title="Personlige tips">
+                                  <Star size={12} className="text-yellow-600" />
+                                </div>
                               )
                             }
                             
                             // Difficulty indicator
                             if (recipe.difficulty === 'Svær') {
                               icons.push(
-                                <AlertTriangle key="difficulty" size={12} className="text-red-600" title="Svær opskrift" />
+                                <div key="difficulty" title="Svær opskrift">
+                                  <AlertTriangle size={12} className="text-red-600" />
+                                </div>
                               )
                             } else if (recipe.difficulty === 'Nem') {
                               icons.push(
-                                <Zap key="easy" size={12} className="text-green-600" title="Nem opskrift" />
+                                <div key="easy" title="Nem opskrift">
+                                  <Zap size={12} className="text-green-600" />
+                                </div>
                               )
                             }
                             
