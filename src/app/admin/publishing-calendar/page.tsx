@@ -49,13 +49,17 @@ export default function PublishingCalendarPage() {
       const data = await response.json()
       
       if (data.success) {
+        console.log('📅 Calendar loaded scheduled recipes:', data.data.occupiedSlots)
         setScheduledRecipes(data.data.occupiedSlots || [])
         
         // Load detailed recipe data for each scheduled recipe
         const recipeIds = data.data.occupiedSlots?.map((slot: SlotSchedule) => slot.recipeId) || []
+        console.log('📅 Recipe IDs to load details for:', recipeIds)
         if (recipeIds.length > 0) {
           await loadRecipeDetails(recipeIds)
         }
+      } else {
+        console.error('❌ Failed to load scheduled recipes:', data.error)
       }
     } catch (error) {
       console.error('Error loading scheduled recipes:', error)

@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch scheduled recipes' }, { status: 500 })
     }
     
+    console.log('📅 Raw scheduled recipes from DB:', scheduledRecipes)
+    
     // Convert to SlotSchedule format
     const occupiedSlots: SlotSchedule[] = (scheduledRecipes || []).map(recipe => ({
       recipeId: recipe.id,
@@ -39,6 +41,8 @@ export async function GET(request: NextRequest) {
       slotNumber: SlotScheduler.getSlotNumberFromTime(recipe.scheduledTime),
       status: recipe.status as 'scheduled' | 'published'
     }))
+    
+    console.log('📅 Converted occupied slots:', occupiedSlots)
     
     // Get next available slot
     const nextAvailableSlot = SlotScheduler.getNextAvailableSlot(occupiedSlots)
