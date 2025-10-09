@@ -78,6 +78,8 @@ export default function PublishingCalendarPage() {
           if (response.ok) {
             const recipe = await response.json()
             details[recipeId] = recipe
+          } else {
+            console.warn(`⚠️ Recipe ${recipeId} not found (${response.status})`)
           }
         } catch (error) {
           console.error(`Error loading recipe ${recipeId}:`, error)

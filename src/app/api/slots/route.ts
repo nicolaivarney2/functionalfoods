@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     }
     
     console.log('📅 Raw scheduled recipes from DB:', scheduledRecipes)
+    console.log('📅 Recipe IDs found:', scheduledRecipes?.map(r => r.id))
     
     // Convert to SlotSchedule format
     const occupiedSlots: SlotSchedule[] = (scheduledRecipes || []).map(recipe => ({

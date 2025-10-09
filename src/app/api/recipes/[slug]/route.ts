@@ -49,6 +49,7 @@ export async function GET(
     
     if (error) {
       console.error('Error fetching recipe:', error)
+      console.error('Searching for:', isUUID ? `ID: ${slug}` : `Slug: ${slug}`)
       return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
     }
     
