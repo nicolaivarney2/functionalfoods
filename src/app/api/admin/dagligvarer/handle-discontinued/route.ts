@@ -5,6 +5,9 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now()
+  const maxExecutionTime = 8000 // 8 seconds max to avoid Vercel timeout
+  
   try {
     console.log('🔄 Starting discontinued products handler...')
     
@@ -45,13 +48,27 @@ export async function POST(req: NextRequest) {
 
     // Collect all current product IDs from REMA API
     const currentRemaProductIds = new Set<string>()
+    let departmentsProcessed = 0
+    let totalPagesProcessed = 0
     
     for (const department of departments) {
+      // Check if we're running out of time
+      if (Date.now() - startTime > maxExecutionTime) {
+        console.warn(`⏰ Timeout approaching, stopping after ${departmentsProcessed} departments, ${totalPagesProcessed} pages`)
+        break
+      }
+      
       try {
         let page = 1
         let hasMore = true
         
         while (hasMore) {
+          // Check timeout before each API call
+          if (Date.now() - startTime > maxExecutionTime) {
+            console.warn(`⏰ Timeout approaching, stopping department ${department.name} at page ${page}`)
+            break
+          }
+          
           // Fetch products for this department (all pages to catch discontinued products)
           const productsResponse = await fetch(
             `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=${page}&limit=1000`
@@ -66,6 +83,7 @@ export async function POST(req: NextRequest) {
             }
             
             console.log(`📦 Department ${department.name}, page ${page}: ${products.length} products`)
+            totalPagesProcessed++
             
             // Check if there are more pages
             hasMore = products.length === 1000 // If we got exactly 1000, there might be more
@@ -81,8 +99,11 @@ export async function POST(req: NextRequest) {
             hasMore = false
           }
         }
+        
+        departmentsProcessed++
       } catch (error) {
         console.warn(`⚠️ Failed to fetch products for department ${department.name}:`, error)
+        departmentsProcessed++
       }
     }
 
@@ -165,14 +186,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const executionTime = Date.now() - startTime
+    const wasTimeout = executionTime > maxExecutionTime * 0.8 // 80% of max time
+    
     return NextResponse.json({
       success: true,
-      message: 'Discontinued products handled successfully',
+      message: wasTimeout 
+        ? `Discontinued products handled (partial scan due to timeout)`
+        : 'Discontinued products handled successfully',
       discontinued: discontinuedProducts.length,
       hidden: hiddenCount,
       priceRemoved: priceRemovedCount,
       currentRemaProducts: currentRemaProductIds.size,
-      totalInDatabase: allRemaProducts.length
+      totalInDatabase: allRemaProducts.length,
+      executionTime: executionTime,
+      departmentsProcessed: departmentsProcessed,
+      totalPagesProcessed: totalPagesProcessed,
+      wasTimeout: wasTimeout
     })
 
   } catch (error) {
