@@ -45,7 +45,7 @@ export default function PublishingCalendarPage() {
   const loadScheduledRecipes = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/slots')
+      const response = await fetch('/api/slots')
       const data = await response.json()
       
       if (data.success) {
@@ -74,7 +74,7 @@ export default function PublishingCalendarPage() {
       
       for (const recipeId of recipeIds) {
         try {
-          const response = await fetch(`/api/admin/recipes/${recipeId}`)
+          const response = await fetch(`/api/recipes/${recipeId}`)
           if (response.ok) {
             const recipe = await response.json()
             details[recipeId] = recipe
