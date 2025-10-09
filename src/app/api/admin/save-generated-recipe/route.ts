@@ -142,6 +142,47 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Recipe saved successfully: ${recipe.title} (ID: ${recipeData.id})`)
 
+    // Auto-assign slot to the new recipe
+    try {
+      const { SlotScheduler } = await import('@/lib/slot-scheduler')
+      
+      // Get all scheduled recipes to find occupied slots
+      const { data: scheduledRecipes } = await supabase
+        .from('recipes')
+        .select('id, title, "scheduledDate", "scheduledTime", status')
+        .eq('status', 'scheduled')
+        .not('scheduledDate', 'is', null)
+        .not('scheduledTime', 'is', null)
+      
+      const occupiedSlots = (scheduledRecipes || []).map(recipe => ({
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        scheduledDate: recipe.scheduledDate,
+        scheduledTime: recipe.scheduledTime,
+        slotNumber: SlotScheduler.getSlotNumberFromTime(recipe.scheduledTime),
+        status: recipe.status as 'scheduled' | 'published'
+      }))
+      
+      // Get next available slot
+      const nextSlot = SlotScheduler.getNextAvailableSlot(occupiedSlots)
+      
+      // Update recipe with assigned slot
+      await supabase
+        .from('recipes')
+        .update({
+          status: 'scheduled',
+          scheduledDate: nextSlot.date,
+          scheduledTime: nextSlot.time,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', recipeData.id)
+      
+      console.log(`📅 Auto-assigned slot ${nextSlot.date} ${nextSlot.time} to: ${recipe.title}`)
+    } catch (slotError) {
+      console.error('⚠️ Error auto-assigning slot:', slotError)
+      // Don't fail the save if slot assignment fails
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Recipe saved successfully',

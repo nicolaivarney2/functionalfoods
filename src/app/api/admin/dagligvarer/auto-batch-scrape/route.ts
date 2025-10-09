@@ -7,7 +7,21 @@ export async function POST(req: NextRequest) {
   try {
     console.log('🚀 Starting automatic batch scrape for all REMA products...')
     
-    const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'
+    // Determine absolute base URL robustly
+    // Prefer the request origin (works both locally and on Vercel)
+    const requestOrigin = (() => {
+      try {
+        return new URL(req.url).origin
+      } catch {
+        return undefined
+      }
+    })()
+    const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL
+    // Ensure we include protocol for env URLs
+    const normalizedEnvUrl = envUrl
+      ? (/^https?:\/\//i.test(envUrl) ? envUrl : `https://${envUrl}`)
+      : undefined
+    const baseUrl = requestOrigin || normalizedEnvUrl || 'http://localhost:3000'
     let totalProducts = 0
     let totalAdded = 0
     let totalUpdated = 0

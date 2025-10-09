@@ -509,7 +509,11 @@ export async function importRecipesWithRetry(
 }
 
 function generateSlug(title: string): string {
-  return title
+  if (!title || title.trim() === '') {
+    return `recipe-${Date.now()}` // Fallback for empty titles
+  }
+  
+  const slug = title
     .toLowerCase()
     .replace(/[æøå]/g, (match) => {
       const replacements: { [key: string]: string } = {
@@ -523,6 +527,8 @@ function generateSlug(title: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .trim()
+  
+  return slug || `recipe-${Date.now()}` // Fallback if result is empty
 }
 
 function generateMetaDescription(recipe: RawRecipeData): string {

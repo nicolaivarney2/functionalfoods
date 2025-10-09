@@ -6,6 +6,7 @@ import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import IngredientMatchesBox from '@/components/IngredientMatchesBox'
+import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save } from 'lucide-react'
 
@@ -935,6 +936,25 @@ export default function AdminPublishingPage() {
                       <div className="mt-4">
                         <IngredientMatchesBox recipeSlug={selectedRecipe.slug} />
                       </div>
+                    </div>
+
+                    {/* Slot Scheduler */}
+                    <div className="mt-4">
+                      <SlotScheduler 
+                        recipeId={selectedRecipe.id}
+                        recipeTitle={selectedRecipe.title}
+                        showNextSlotOnly={true}
+                        onSlotAssigned={(slot) => {
+                          // Update local state when slot is assigned
+                          const updatedRecipes = recipes.map(r => 
+                            r.id === selectedRecipe.id 
+                              ? { ...r, status: 'scheduled' as const, scheduledDate: new Date(slot.date), scheduledTime: slot.time }
+                              : r
+                          )
+                          setRecipes(updatedRecipes)
+                          setSelectedRecipe({ ...selectedRecipe, status: 'scheduled' as const, scheduledDate: new Date(slot.date), scheduledTime: slot.time })
+                        }}
+                      />
                     </div>
                   </div>
 

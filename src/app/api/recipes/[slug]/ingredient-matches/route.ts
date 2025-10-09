@@ -15,12 +15,34 @@ export async function GET(
 
     const supabase = createSupabaseServiceClient()
 
-    // Get recipe by slug
-    const { data: recipe, error: recipeError } = await supabase
+    // First try to get recipe by slug
+    let { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .select('id, title, ingredients')
+      .select('id, title, ingredients, slug')
       .eq('slug', slug)
       .single()
+
+    // If not found by slug, try to find by ID (fallback for imported recipes)
+    if (recipeError || !recipe) {
+      console.log(`🔍 Recipe not found by slug "${slug}", trying to find by ID...`)
+      
+      // Check if slug is actually an ID (UUID format)
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+      
+      if (isUUID) {
+        const { data: recipeById, error: recipeByIdError } = await supabase
+          .from('recipes')
+          .select('id, title, ingredients, slug')
+          .eq('id', slug)
+          .single()
+        
+        if (!recipeByIdError && recipeById) {
+          recipe = recipeById
+          recipeError = null
+          console.log(`✅ Found recipe by ID: ${recipe.title}`)
+        }
+      }
+    }
 
     if (recipeError || !recipe) {
       return NextResponse.json({

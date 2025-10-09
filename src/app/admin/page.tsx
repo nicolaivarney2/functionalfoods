@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/AdminLayout'
+import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { 
   BookOpen, 
@@ -480,6 +481,12 @@ export default function AdminDashboard() {
                 </div>
               </a>
             </div>
+          </div>
+
+          {/* Slot Scheduler Overview */}
+          <div className="mt-8">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Publikation Slots</h2>
+            <SlotScheduler />
           </div>
         </div>
 

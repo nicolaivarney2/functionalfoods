@@ -262,8 +262,16 @@ export async function POST(req: NextRequest) {
       try {
         console.log('🧹 Running maintenance tasks after batch scrape...')
         
+        // Resolve absolute base URL from request or env
+        const requestOrigin = (() => {
+          try { return new URL(req.url).origin } catch { return undefined }
+        })()
+        const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL
+        const normalizedEnvUrl = envUrl ? (/^https?:\/\//i.test(envUrl) ? envUrl : `https://${envUrl}`) : undefined
+        const baseUrl = requestOrigin || normalizedEnvUrl || 'http://localhost:3000'
+
         // 1. Handle discontinued products
-        const discontinuedResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/admin/dagligvarer/handle-discontinued`, {
+        const discontinuedResponse = await fetch(`${baseUrl}/api/admin/dagligvarer/handle-discontinued`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' }
         })
