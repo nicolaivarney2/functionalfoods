@@ -167,15 +167,14 @@ export async function POST(request: NextRequest) {
       const nextSlot = SlotScheduler.getNextAvailableSlot(occupiedSlots)
       
       // Update recipe with assigned slot
-      await supabase
-        .from('recipes')
-        .update({
-          status: 'scheduled',
-          scheduledDate: nextSlot.date,
-          scheduledTime: nextSlot.time,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', recipeData.id)
+        await supabase
+          .from('recipes')
+          .update({
+            status: 'scheduled',
+            scheduledDate: nextSlot.date,
+            scheduledTime: nextSlot.time
+          })
+          .eq('id', recipeData.id)
       
       console.log(`📅 Auto-assigned slot ${nextSlot.date} ${nextSlot.time} to: ${recipe.title}`)
     } catch (slotError) {

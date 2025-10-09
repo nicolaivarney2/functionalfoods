@@ -132,8 +132,7 @@ export async function POST(request: NextRequest) {
         .update({
           status: 'scheduled',
           scheduledDate: slot.date,
-          scheduledTime: slot.time,
-          updated_at: new Date().toISOString()
+          scheduledTime: slot.time
         })
         .eq('id', recipeId)
       

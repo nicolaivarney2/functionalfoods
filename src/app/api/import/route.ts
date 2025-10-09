@@ -118,15 +118,14 @@ export async function POST(request: NextRequest) {
         const slot = nextSlots[i]
         
         if (slot) {
-          await supabase
-            .from('recipes')
-            .update({
-              status: 'scheduled',
-              scheduledDate: slot.date,
-              scheduledTime: slot.time,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', recipe.id)
+            await supabase
+              .from('recipes')
+              .update({
+                status: 'scheduled',
+                scheduledDate: slot.date,
+                scheduledTime: slot.time
+              })
+              .eq('id', recipe.id)
           
           console.log(`📅 Assigned slot ${slot.date} ${slot.time} to: ${recipe.title}`)
         }
