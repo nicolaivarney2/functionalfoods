@@ -389,8 +389,8 @@ export default function AdminPublishingPage() {
         r.id === recipeId ? { 
           ...r, 
           status: 'published' as const,
-          scheduledDate: null,
-          scheduledTime: null
+          scheduledDate: undefined,
+          scheduledTime: undefined
         } : r
       )
       setRecipes(updatedRecipes)
@@ -407,8 +407,8 @@ export default function AdminPublishingPage() {
         setSelectedRecipe({
           ...selectedRecipe,
           status: 'published' as const,
-          scheduledDate: null,
-          scheduledTime: null
+          scheduledDate: undefined,
+          scheduledTime: undefined
         })
       }
       
