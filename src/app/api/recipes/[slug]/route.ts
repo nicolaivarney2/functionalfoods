@@ -32,12 +32,20 @@ export async function GET(
       },
     })
     
-    // Get recipe by slug
-    const { data, error } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('slug', slug)
-      .single()
+    // Check if slug is a UUID (ID) or regular slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+    
+    let query = supabase.from('recipes').select('*')
+    
+    if (isUUID) {
+      // Search by ID
+      query = query.eq('id', slug)
+    } else {
+      // Search by slug
+      query = query.eq('slug', slug)
+    }
+    
+    const { data, error } = await query.single()
     
     if (error) {
       console.error('Error fetching recipe:', error)
