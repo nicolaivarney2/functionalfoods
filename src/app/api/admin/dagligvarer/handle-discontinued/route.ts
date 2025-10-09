@@ -48,20 +48,38 @@ export async function POST(req: NextRequest) {
     
     for (const department of departments) {
       try {
-        // Fetch products for this department (first page only for efficiency)
-        const productsResponse = await fetch(
-          `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=1&limit=1000`
-        )
+        let page = 1
+        let hasMore = true
         
-        if (productsResponse.ok) {
-          const productsData = await productsResponse.json()
-          const products = productsData.data || []
+        while (hasMore) {
+          // Fetch products for this department (all pages to catch discontinued products)
+          const productsResponse = await fetch(
+            `https://api.digital.rema1000.dk/api/v3/departments/${department.id}/products?page=${page}&limit=1000`
+          )
           
-          for (const product of products) {
-            currentRemaProductIds.add(`python-${product.id}`)
+          if (productsResponse.ok) {
+            const productsData = await productsResponse.json()
+            const products = productsData.data || []
+            
+            for (const product of products) {
+              currentRemaProductIds.add(`python-${product.id}`)
+            }
+            
+            console.log(`📦 Department ${department.name}, page ${page}: ${products.length} products`)
+            
+            // Check if there are more pages
+            hasMore = products.length === 1000 // If we got exactly 1000, there might be more
+            page++
+            
+            // Safety limit to prevent infinite loops
+            if (page > 50) {
+              console.warn(`⚠️ Reached page limit for department ${department.name}`)
+              hasMore = false
+            }
+          } else {
+            console.warn(`⚠️ Failed to fetch page ${page} for department ${department.name}: ${productsResponse.statusText}`)
+            hasMore = false
           }
-          
-          console.log(`📦 Department ${department.name}: ${products.length} products`)
         }
       } catch (error) {
         console.warn(`⚠️ Failed to fetch products for department ${department.name}:`, error)

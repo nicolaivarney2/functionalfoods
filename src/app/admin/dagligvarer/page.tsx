@@ -548,6 +548,53 @@ export default function AdminDagligvarerPage() {
 
               {priceScrapeProgress && <ProgressBar progress={priceScrapeProgress} />}
             </div>
+
+            {/* Discontinued Products Handler */}
+            <div className="border rounded-lg p-4">
+              <h3 className="text-lg font-semibold mb-2">Udgåede Produkter</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                🗑️ Finder og håndterer produkter som ikke længere er tilgængelige i REMA's API. 
+                Skjuler dem fra frontend men bevarer prishistorik.
+              </p>
+              
+              <button
+                onClick={async () => {
+                  if (isLoading) return
+                  setIsLoading(true)
+                  
+                  try {
+                    const response = await fetch('/api/admin/dagligvarer/handle-discontinued', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' }
+                    })
+                    
+                    const result = await response.json()
+                    
+                    if (result.success) {
+                      alert(`✅ Discontinued products handled!\n\n` +
+                            `Discontinued: ${result.discontinued}\n` +
+                            `Hidden: ${result.hidden}\n` +
+                            `Price removed: ${result.priceRemoved}\n` +
+                            `Current REMA products: ${result.currentRemaProducts}\n` +
+                            `Total in database: ${result.totalInDatabase}`)
+                      await loadStats()
+                    } else {
+                      alert(`❌ Failed to handle discontinued products: ${result.message}`)
+                    }
+                  } catch (error) {
+                    console.error('Discontinued handler error:', error)
+                    alert(`❌ Discontinued handler failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+                  } finally {
+                    setIsLoading(false)
+                  }
+                }}
+                disabled={isLoading}
+                className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mb-4"
+              >
+                <AlertCircle size={16} />
+                {isLoading ? 'Processing...' : 'Handle Discontinued Products'}
+              </button>
+            </div>
           </div>
 
           {/* Debug Section */}
