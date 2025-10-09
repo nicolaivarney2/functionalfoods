@@ -54,8 +54,7 @@ export async function POST() {
     const { error: updateError } = await supabase
       .from('recipes')
       .update({ 
-        status: 'published',
-        updated_at: new Date().toISOString()
+        status: 'published'
       })
       .in('id', recipeIds)
     
