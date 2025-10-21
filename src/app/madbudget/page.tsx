@@ -3,14 +3,23 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
 
-// Types for basisvarer functionality (ingredient-based)
-interface BasisvarerIngredient {
+// Types for basisvarer functionality
+interface BasisvarerProduct {
   id: number
-  ingredient_name: string
   quantity: number
-  unit: string
   notes?: string
   created_at: string
+  product: {
+    id: number
+    name: string
+    category: string
+    price: number
+    unit: string
+    image_url?: string
+    store: string
+    is_on_sale: boolean
+    original_price?: number
+  }
 }
 
 interface Product {
@@ -207,7 +216,7 @@ export default function MadbudgetPage() {
   const [showCostSavings, setShowCostSavings] = useState(true)
   
   // Basisvarer state
-  const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
+  const [basisvarer, setBasisvarer] = useState<BasisvarerProduct[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -288,16 +297,12 @@ export default function MadbudgetPage() {
     }
   }
 
-  const addToBasisvarer = async (ingredientName: string) => {
+  const addToBasisvarer = async (product: Product) => {
     try {
       const response = await fetch('/api/basisvarer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ingredient_name: ingredientName,
-          quantity: 1,
-          unit: 'stk'
-        })
+        body: JSON.stringify({ product_id: product.id })
       })
       
       if (response.ok) {
@@ -544,15 +549,13 @@ export default function MadbudgetPage() {
                   {basisvarer.slice(0, 4).map(item => (
                     <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+                        <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
                         <div className="text-xs text-gray-500 flex items-center space-x-2">
-                          <span>{item.quantity} {item.unit}</span>
-                          {item.notes && (
-                            <>
-                              <span>•</span>
-                              <span>{item.notes}</span>
-                            </>
-                          )}
+                          <span>{item.product.category}</span>
+                          <span>•</span>
+                          <span>{item.product.price.toFixed(2)} kr</span>
+                          <span>•</span>
+                          <span>{item.product.store}</span>
                         </div>
                       </div>
                       <button
@@ -1280,15 +1283,10 @@ export default function MadbudgetPage() {
                     </div>
                     
                     <button
-                      onClick={() => {
-                        if (productSearchQuery.trim()) {
-                          addToBasisvarer(productSearchQuery.trim())
-                        }
-                      }}
-                      disabled={!productSearchQuery.trim()}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                      onClick={() => addToBasisvarer(product)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
                     >
-                      Tilføj "{productSearchQuery || 'ingrediens'}" til basisvarer
+                      Tilføj til basisvarer
                     </button>
                   </div>
                 ))}
