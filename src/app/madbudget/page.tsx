@@ -230,7 +230,15 @@ export default function MadbudgetPage() {
   const loadBasisvarer = async () => {
     setLoadingBasisvarer(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      // --- TEMPORARY LOGGING ---
+      console.log('Supabase Session Data:', session)
+      if (sessionError) {
+        console.error('Error fetching session:', sessionError)
+      }
+      // --- END TEMPORARY LOGGING ---
+
       if (!session) {
         console.log('No session found - user not logged in')
         setBasisvarer([]) // Set empty array for non-logged in users
