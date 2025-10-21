@@ -292,6 +292,38 @@ export default function MadbudgetPage() {
     }
   }
 
+  const updateBasisvarerQuantity = async (basisvarerId: number, newQuantity: number) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        alert('Du skal være logget ind for at opdatere basisvarer')
+        return
+      }
+
+      const response = await fetch('/api/basisvarer', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          id: basisvarerId,
+          quantity: newQuantity
+        })
+      })
+      
+      if (response.ok) {
+        setBasisvarer(prev => prev.map(item => 
+          item.id === basisvarerId 
+            ? { ...item, quantity: newQuantity }
+            : item
+        ))
+      }
+    } catch (error) {
+      console.error('Error updating basisvarer quantity:', error)
+    }
+  }
+
   const removeFromBasisvarer = async (basisvarerId: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -530,29 +562,38 @@ export default function MadbudgetPage() {
                   ) : (
                     <div className="space-y-3">
                   {/* Show first 3-5 items */}
-                  {basisvarer.slice(0, 4).map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
-                        <div className="text-xs text-gray-500 flex items-center space-x-2">
-                          <span>{item.quantity} {item.unit}</span>
-                          {item.notes && (
-                            <>
-                              <span>•</span>
-                              <span>{item.notes}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeFromBasisvarer(item.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                        title="Fjern fra basisvarer"
-                      >
-                        <Minus size={16} />
-                      </button>
-                    </div>
-                  ))}
+        {basisvarer.slice(0, 4).map(item => (
+          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+              <div className="text-xs text-gray-500 flex items-center space-x-2">
+                <span>{item.quantity} {item.unit}</span>
+                {item.notes && (
+                  <>
+                    <span>•</span>
+                    <span>{item.notes}</span>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
+                className="text-green-500 hover:text-green-700 p-1"
+                title="Øg antal"
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                onClick={() => removeFromBasisvarer(item.id)}
+                className="text-red-500 hover:text-red-700 p-1"
+                title="Fjern fra basisvarer"
+              >
+                <Minus size={16} />
+              </button>
+            </div>
+          </div>
+        ))}
                       
                       {/* Show "show more" if there are more items */}
                       {basisvarer.length > 4 && (

@@ -113,6 +113,60 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT - Opdater basisvarer quantity
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    
+    // Get user from Authorization header
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader) {
+      return NextResponse.json({ error: 'No authorization header' }, { status: 401 })
+    }
+    
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id, quantity } = await request.json()
+
+    if (!id || !quantity) {
+      return NextResponse.json({ error: 'ID and quantity are required' }, { status: 400 })
+    }
+
+    // Update basisvarer quantity
+    const { data, error } = await supabase
+      .from('user_basisvarer')
+      .update({ quantity })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select(`
+        id,
+        ingredient_name,
+        quantity,
+        unit,
+        notes,
+        created_at
+      `)
+      .single()
+
+    if (error) {
+      console.error('Error updating basisvarer:', error)
+      return NextResponse.json({ error: 'Failed to update basisvarer' }, { status: 500 })
+    }
+
+    return NextResponse.json({ basisvarer: data })
+  } catch (error) {
+    console.error('Error in PUT /api/basisvarer:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 // DELETE - Fjern fra basisvarer
 export async function DELETE(request: NextRequest) {
   try {
