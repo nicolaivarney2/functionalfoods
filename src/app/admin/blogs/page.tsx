@@ -110,6 +110,50 @@ export default function AdminBlogsPage() {
     })
   }
 
+  const editPost = (post: BlogPost) => {
+    // TODO: Implement edit functionality
+    console.log('Edit post:', post)
+    alert(`Rediger post: ${post.title}`)
+  }
+
+  const viewPost = (post: BlogPost) => {
+    // TODO: Implement view functionality
+    console.log('View post:', post)
+    alert(`Vis post: ${post.title}`)
+  }
+
+  const deletePost = async (postId: number) => {
+    if (!confirm('Er du sikker på at du vil slette denne post?')) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        alert('Du skal være logget ind for at slette posts')
+        return
+      }
+
+      const response = await fetch(`/api/blogs/${postId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        setPosts(posts.filter(post => post.id !== postId))
+        alert('Post slettet succesfuldt')
+      } else {
+        const error = await response.json()
+        alert(`Fejl ved sletning: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error deleting post:', error)
+      alert('Der opstod en fejl ved sletning af posten')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
@@ -285,18 +329,21 @@ export default function AdminBlogsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
                           <button
+                            onClick={() => editPost(post)}
                             className="text-blue-600 hover:text-blue-900 p-1"
                             title="Rediger"
                           >
                             <Edit size={16} />
                           </button>
                           <button
+                            onClick={() => viewPost(post)}
                             className="text-green-600 hover:text-green-900 p-1"
                             title="Vis post"
                           >
                             <ExternalLink size={16} />
                           </button>
                           <button
+                            onClick={() => deletePost(post.id)}
                             className="text-red-600 hover:text-red-900 p-1"
                             title="Slet"
                           >
