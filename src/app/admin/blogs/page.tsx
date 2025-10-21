@@ -43,6 +43,8 @@ export default function AdminBlogsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const supabase = createSupabaseClient()
 
@@ -111,15 +113,13 @@ export default function AdminBlogsPage() {
   }
 
   const editPost = (post: BlogPost) => {
-    // TODO: Implement edit functionality
-    console.log('Edit post:', post)
-    alert(`Rediger post: ${post.title}`)
+    setEditingPost(post)
+    setShowEditModal(true)
   }
 
   const viewPost = (post: BlogPost) => {
-    // TODO: Implement view functionality
-    console.log('View post:', post)
-    alert(`Vis post: ${post.title}`)
+    // Open in new tab
+    window.open(`/blog/${post.slug}`, '_blank')
   }
 
   const deletePost = async (postId: number) => {
@@ -381,6 +381,131 @@ export default function AdminBlogsPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && editingPost && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Rediger Blog Post</h2>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Titel
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={editingPost.title}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Slug
+                  </label>
+                  <input
+                    type="text"
+                    defaultValue={editingPost.slug}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Beskrivelse
+                  </label>
+                  <textarea
+                    defaultValue={editingPost.excerpt}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Indhold
+                  </label>
+                  <textarea
+                    defaultValue={editingPost.content}
+                    rows={10}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Kategori
+                    </label>
+                    <select
+                      defaultValue={editingPost.category_id}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Status
+                    </label>
+                    <select
+                      defaultValue={editingPost.status}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="draft">Kladde</option>
+                      <option value="published">Publiceret</option>
+                      <option value="archived">Arkiveret</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    defaultChecked={editingPost.featured}
+                    className="rounded"
+                  />
+                  <label className="text-sm font-medium text-gray-700">
+                    Featured post
+                  </label>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: Implement save functionality
+                    alert('Gem funktionalitet kommer snart!')
+                    setShowEditModal(false)
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Gem Ændringer
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
