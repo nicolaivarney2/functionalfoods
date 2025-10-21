@@ -232,7 +232,8 @@ export default function MadbudgetPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        console.error('No session found')
+        console.log('No session found - user not logged in')
+        setBasisvarer([]) // Set empty array for non-logged in users
         return
       }
 
@@ -258,7 +259,7 @@ export default function MadbudgetPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        console.error('No session found')
+        alert('Du skal være logget ind for at tilføje basisvarer')
         return
       }
 
@@ -290,7 +291,7 @@ export default function MadbudgetPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        console.error('No session found')
+        alert('Du skal være logget ind for at fjerne basisvarer')
         return
       }
 
