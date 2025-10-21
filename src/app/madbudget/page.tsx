@@ -1,7 +1,43 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
+
+// Types for basisvarer functionality
+interface BasisvarerProduct {
+  id: number
+  quantity: number
+  notes?: string
+  created_at: string
+  product: {
+    id: number
+    name: string
+    category: string
+    price: number
+    unit: string
+    image_url?: string
+    store: string
+    is_on_sale: boolean
+    original_price?: number
+  }
+}
+
+interface Product {
+  id: number
+  name: string
+  category: string
+  price: number
+  unit: string
+  image_url?: string
+  store: string
+  is_on_sale: boolean
+  original_price?: number
+}
+
+interface Category {
+  name: string
+  slug: string
+}
 
 // Mock data for development
 const mockStores = [
@@ -13,17 +49,6 @@ const mockStores = [
   { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
   { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false }
-]
-
-const mockBasicItems = [
-  { id: 1, name: 'Smør', category: 'Mejeri', isOwned: false },
-  { id: 2, name: 'Olivenolie', category: 'Kolonial', isOwned: true },
-  { id: 3, name: 'Salt', category: 'Kolonial', isOwned: true },
-  { id: 4, name: 'Peber', category: 'Kolonial', isOwned: false },
-  { id: 5, name: 'Hvidløg', category: 'Frugt og grønt', isOwned: false },
-  { id: 6, name: 'Løg', category: 'Frugt og grønt', isOwned: true },
-  { id: 7, name: 'Ris', category: 'Kolonial', isOwned: false },
-  { id: 8, name: 'Pasta', category: 'Kolonial', isOwned: true }
 ]
 
 // Enhanced mock recipes with images and detailed ingredients
@@ -181,7 +206,6 @@ export default function MadbudgetPage() {
   
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
-  const [basicItems, setBasicItems] = useState(mockBasicItems)
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [basicItemsOpen, setBasicItemsOpen] = useState(true)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
@@ -190,6 +214,119 @@ export default function MadbudgetPage() {
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
   const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
   const [showCostSavings, setShowCostSavings] = useState(true)
+  
+  // Basisvarer state
+  const [basisvarer, setBasisvarer] = useState<BasisvarerProduct[]>([])
+  const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [products, setProducts] = useState<Product[]>([])
+  const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [loadingProducts, setLoadingProducts] = useState(false)
+  const [loadingBasisvarer, setLoadingBasisvarer] = useState(false)
+
+  // Load basisvarer on component mount
+  useEffect(() => {
+    loadBasisvarer()
+  }, [])
+
+  // Load categories when modal opens
+  useEffect(() => {
+    if (showBasisvarerModal) {
+      loadCategories()
+    }
+  }, [showBasisvarerModal])
+
+  // Load products when category or search changes
+  useEffect(() => {
+    if (showBasisvarerModal) {
+      loadProducts()
+    }
+  }, [selectedCategory, productSearchQuery, showBasisvarerModal])
+
+  // API functions
+  const loadBasisvarer = async () => {
+    setLoadingBasisvarer(true)
+    try {
+      const response = await fetch('/api/basisvarer')
+      if (response.ok) {
+        const data = await response.json()
+        setBasisvarer(data.basisvarer || [])
+      }
+    } catch (error) {
+      console.error('Error loading basisvarer:', error)
+    } finally {
+      setLoadingBasisvarer(false)
+    }
+  }
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/products/search', { method: 'POST' })
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data.categories || [])
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
+
+  const loadProducts = async () => {
+    setLoadingProducts(true)
+    try {
+      const params = new URLSearchParams({
+        category: selectedCategory,
+        limit: '20',
+        offset: '0'
+      })
+      
+      if (productSearchQuery) {
+        params.append('search', productSearchQuery)
+      }
+
+      const response = await fetch(`/api/products/search?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data.products || [])
+      }
+    } catch (error) {
+      console.error('Error loading products:', error)
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
+
+  const addToBasisvarer = async (product: Product) => {
+    try {
+      const response = await fetch('/api/basisvarer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: product.id })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setBasisvarer(prev => [data.basisvarer, ...prev])
+      }
+    } catch (error) {
+      console.error('Error adding to basisvarer:', error)
+    }
+  }
+
+  const removeFromBasisvarer = async (basisvarerId: number) => {
+    try {
+      const response = await fetch(`/api/basisvarer?id=${basisvarerId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        setBasisvarer(prev => prev.filter(item => item.id !== basisvarerId))
+      }
+    } catch (error) {
+      console.error('Error removing from basisvarer:', error)
+    }
+  }
 
   // Calculate ingredient overlap and cost savings
   const calculateIngredientOverlap = (recipe: any, selectedDay: DayKey, selectedMeal: MealType) => {
@@ -249,15 +386,6 @@ export default function MadbudgetPage() {
     return filtered
   }
 
-  const toggleBasicItem = (itemId: number) => {
-    setBasicItems(prev => 
-      prev.map(item => 
-        item.id === itemId 
-          ? { ...item, isOwned: !item.isOwned }
-          : item
-      )
-    )
-  }
 
   const addRecipeToMeal = (recipe: any) => {
     if (selectedMealSlot) {
@@ -326,6 +454,7 @@ export default function MadbudgetPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Madbudget</h1>
               <p className="text-gray-600">Planlæg din madplan baseret på ugens tilbud</p>
+              <p className="text-sm text-gray-400 mt-1">Butik/tilbuds-funktion er ikke aktiveret endnu. Kommer i 2026</p>
             </div>
             <button
               onClick={() => setShowFamilySettings(true)}
@@ -375,7 +504,7 @@ export default function MadbudgetPage() {
               </div>
             </div>
 
-            {/* Basic Items */}
+            {/* Basisvarer */}
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <button
                 onClick={() => setBasicItemsOpen(!basicItemsOpen)}
@@ -390,25 +519,62 @@ export default function MadbudgetPage() {
               
               {basicItemsOpen && (
                 <div className="px-6 pb-6 border-t border-gray-100">
-                  <p className="text-gray-600 text-sm mb-4">Kryds af hvad du allerede har</p>
-                  <div className="space-y-2">
-                    {basicItems.map(item => (
-                      <label key={item.id} className="flex items-center space-x-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.isOwned}
-                          onChange={() => toggleBasicItem(item.id)}
-                          className="text-blue-600 rounded"
-                        />
-                        <span className={`text-sm ${item.isOwned ? 'line-through text-gray-500' : 'text-gray-700'}`}>
-                          {item.name}
-                        </span>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                          {item.category}
-                        </span>
-                      </label>
-                    ))}
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-gray-600 text-sm">Produkter du altid køber</p>
+                    <button
+                      onClick={() => setShowBasisvarerModal(true)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
+                    >
+                      <Plus size={16} />
+                      <span>Tilføj vare</span>
+                    </button>
                   </div>
+                  
+                  {loadingBasisvarer ? (
+                    <div className="text-center py-4">
+                      <div className="text-gray-500">Indlæser basisvarer...</div>
+                    </div>
+                  ) : basisvarer.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <ShoppingCart size={32} className="mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Ingen basisvarer endnu</p>
+                      <p className="text-xs">Klik på "Tilføj vare" for at tilføje produkter</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Show first 3-5 items */}
+                      {basisvarer.slice(0, 4).map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
+                            <div className="text-xs text-gray-500 flex items-center space-x-2">
+                              <span>{item.product.category}</span>
+                              <span>•</span>
+                              <span>{item.product.price.toFixed(2)} kr</span>
+                              <span>•</span>
+                              <span>{item.product.store}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeFromBasisvarer(item.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Fjern fra basisvarer"
+                          >
+                            <Minus size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      
+                      {/* Show "show more" if there are more items */}
+                      {basisvarer.length > 4 && (
+                        <div className="text-center">
+                          <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                            Vis {basisvarer.length - 4} flere varer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1008,6 +1174,121 @@ export default function MadbudgetPage() {
                 Gem indstillinger
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Basisvarer Modal */}
+      {showBasisvarerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Tilføj til basisvarer</h3>
+              <button
+                onClick={() => {
+                  setShowBasisvarerModal(false)
+                  setProductSearchQuery('')
+                  setSelectedCategory('all')
+                }}
+                className="text-gray-400 hover:text-gray-600 p-2"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Search and Category Filters */}
+            <div className="mb-6 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Søg efter produkter..."
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">Alle kategorier</option>
+                    {categories.map(category => (
+                      <option key={category.slug} value={category.name}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            {/* Products Grid */}
+            {loadingProducts ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500">Indlæser produkter...</div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                <p>Ingen produkter fundet</p>
+                <p className="text-sm">Prøv at ændre søgning eller kategori</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {products.map(product => (
+                  <div
+                    key={product.id}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 text-sm mb-1">
+                          {product.name}
+                        </h4>
+                        <div className="text-xs text-gray-500 mb-2">
+                          {product.category} • {product.store}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-gray-900">
+                            {product.price.toFixed(2)} kr
+                          </span>
+                          {product.is_on_sale && product.original_price && (
+                            <span className="text-xs text-red-600 line-through">
+                              {product.original_price.toFixed(2)} kr
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            per {product.unit}
+                          </span>
+                        </div>
+                      </div>
+                      {product.image_url && (
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg ml-3 flex-shrink-0">
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => addToBasisvarer(product)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Tilføj til basisvarer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
