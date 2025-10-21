@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get unique categories
-    const uniqueCategories = [...new Set(categories.map(item => item.category))]
+    const categoryNames = categories.map(item => item.category)
+    const uniqueCategoryNames = Array.from(new Set(categoryNames))
+    const uniqueCategories = uniqueCategoryNames
       .sort()
       .map(category => ({
         name: category,
