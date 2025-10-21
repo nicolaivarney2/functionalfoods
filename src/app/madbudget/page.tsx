@@ -3,23 +3,14 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
 
-// Types for basisvarer functionality
-interface BasisvarerProduct {
+// Types for basisvarer functionality (ingredient-based)
+interface BasisvarerIngredient {
   id: number
+  ingredient_name: string
   quantity: number
+  unit: string
   notes?: string
   created_at: string
-  product: {
-    id: number
-    name: string
-    category: string
-    price: number
-    unit: string
-    image_url?: string
-    store: string
-    is_on_sale: boolean
-    original_price?: number
-  }
 }
 
 interface Product {
@@ -216,7 +207,7 @@ export default function MadbudgetPage() {
   const [showCostSavings, setShowCostSavings] = useState(true)
   
   // Basisvarer state
-  const [basisvarer, setBasisvarer] = useState<BasisvarerProduct[]>([])
+  const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -297,17 +288,24 @@ export default function MadbudgetPage() {
     }
   }
 
-  const addToBasisvarer = async (product: Product) => {
+  const addToBasisvarer = async (ingredientName: string) => {
     try {
       const response = await fetch('/api/basisvarer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: product.id })
+        body: JSON.stringify({ 
+          ingredient_name: ingredientName,
+          quantity: 1,
+          unit: 'stk'
+        })
       })
       
       if (response.ok) {
         const data = await response.json()
         setBasisvarer(prev => [data.basisvarer, ...prev])
+        setShowBasisvarerModal(false)
+        setProductSearchQuery('')
+        setSelectedCategory('all')
       }
     } catch (error) {
       console.error('Error adding to basisvarer:', error)
@@ -542,28 +540,30 @@ export default function MadbudgetPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {/* Show first 3-5 items */}
-                      {basisvarer.slice(0, 4).map(item => (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
-                            <div className="text-xs text-gray-500 flex items-center space-x-2">
-                              <span>{item.product.category}</span>
+                  {/* Show first 3-5 items */}
+                  {basisvarer.slice(0, 4).map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+                        <div className="text-xs text-gray-500 flex items-center space-x-2">
+                          <span>{item.quantity} {item.unit}</span>
+                          {item.notes && (
+                            <>
                               <span>•</span>
-                              <span>{item.product.price.toFixed(2)} kr</span>
-                              <span>•</span>
-                              <span>{item.product.store}</span>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeFromBasisvarer(item.id)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                            title="Fjern fra basisvarer"
-                          >
-                            <Minus size={16} />
-                          </button>
+                              <span>{item.notes}</span>
+                            </>
+                          )}
                         </div>
-                      ))}
+                      </div>
+                      <button
+                        onClick={() => removeFromBasisvarer(item.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                        title="Fjern fra basisvarer"
+                      >
+                        <Minus size={16} />
+                      </button>
+                    </div>
+                  ))}
                       
                       {/* Show "show more" if there are more items */}
                       {basisvarer.length > 4 && (
@@ -1280,10 +1280,15 @@ export default function MadbudgetPage() {
                     </div>
                     
                     <button
-                      onClick={() => addToBasisvarer(product)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                      onClick={() => {
+                        if (productSearchQuery.trim()) {
+                          addToBasisvarer(productSearchQuery.trim())
+                        }
+                      }}
+                      disabled={!productSearchQuery.trim()}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
                     >
-                      Tilføj til basisvarer
+                      Tilføj "{productSearchQuery || 'ingrediens'}" til basisvarer
                     </button>
                   </div>
                 ))}
