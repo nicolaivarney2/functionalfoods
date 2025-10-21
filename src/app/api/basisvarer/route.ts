@@ -14,25 +14,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's basisvarer with product details
+    // Get user's basisvarer (ingredienser)
     const { data, error } = await supabase
       .from('user_basisvarer')
       .select(`
         id,
+        ingredient_name,
         quantity,
+        unit,
         notes,
-        created_at,
-        product:supermarket_products(
-          id,
-          name,
-          category,
-          price,
-          unit,
-          image_url,
-          store,
-          is_on_sale,
-          original_price
-        )
+        created_at
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -66,37 +57,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { product_id, quantity = 1, notes } = await request.json()
+    const { ingredient_name, quantity = 1, unit = 'stk', notes } = await request.json()
 
-    if (!product_id) {
-      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
+    if (!ingredient_name) {
+      return NextResponse.json({ error: 'Ingredient name is required' }, { status: 400 })
     }
 
-    // Add product to user's basisvarer
+    // Add ingredient to user's basisvarer
     const { data, error } = await supabase
       .from('user_basisvarer')
       .insert({
         user_id: user.id,
-        product_id,
+        ingredient_name: ingredient_name.trim(),
         quantity,
+        unit,
         notes
       })
       .select(`
         id,
+        ingredient_name,
         quantity,
+        unit,
         notes,
-        created_at,
-        product:supermarket_products(
-          id,
-          name,
-          category,
-          price,
-          unit,
-          image_url,
-          store,
-          is_on_sale,
-          original_price
-        )
+        created_at
       `)
       .single()
 
