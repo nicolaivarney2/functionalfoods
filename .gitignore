@@ -1,8 +1,5 @@
-node_modules
-node_modules
-
 # Dependencies
-node_modules
+node_modules/
 /.pnp
 .pnp.js
 
@@ -28,6 +25,9 @@ yarn-error.log*
 # Local env files
 .env*.local
 
+# OpenAI config (contains API keys)
+.openai-config.json
+
 # Vercel
 .vercel
 
@@ -39,8 +39,6 @@ next-env.d.ts
 logs
 *.log
 dev-debug.log
-# Dependency directories
-node_modules/
 # Environment variables
 .env
 # Editor directories and files
