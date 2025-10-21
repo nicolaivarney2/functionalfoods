@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     // Apply pagination and ordering
     query = query
-      .order('published_at', { ascending: false, nullsLast: true })
+      .order('published_at', { ascending: false, nullsFirst: false })
       .range(offset, offset + limit - 1)
 
     const { data, error } = await query
