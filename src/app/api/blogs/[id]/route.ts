@@ -6,9 +6,10 @@ export const dynamic = 'force-dynamic'
 // GET - Hent specifik blog post
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -20,7 +21,7 @@ export async function GET(
         *,
         category:blog_categories(*)
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (error) {
@@ -36,7 +37,7 @@ export async function GET(
       await supabase
         .from('blog_posts')
         .update({ view_count: data.view_count + 1 })
-        .eq('id', params.id)
+        .eq('id', id)
     }
 
     return NextResponse.json({ post: data })
@@ -52,9 +53,10 @@ export async function GET(
 // PUT - Opdater blog post
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -78,7 +80,7 @@ export async function PUT(
     const { data: existingPost, error: fetchError } = await supabase
       .from('blog_posts')
       .select('author_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (fetchError) {
@@ -108,7 +110,7 @@ export async function PUT(
     const { data, error } = await supabase
       .from('blog_posts')
       .update(updateData)
-      .eq('id', params.id)
+      .eq('id', id)
       .select(`
         *,
         category:blog_categories(*)
@@ -136,9 +138,10 @@ export async function PUT(
 // DELETE - Slet blog post
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -160,7 +163,7 @@ export async function DELETE(
     const { data: existingPost, error: fetchError } = await supabase
       .from('blog_posts')
       .select('author_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (fetchError) {
@@ -185,7 +188,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('blog_posts')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (error) {
       console.error('Error deleting blog post:', error)
