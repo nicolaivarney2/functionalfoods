@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
+import { createSupabaseClient } from '@/lib/supabase'
 
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Use the same Supabase client as the rest of the app
+const supabase = createSupabaseClient()
 
 // Types for basisvarer functionality (ingredient-based)
 interface BasisvarerIngredient {
