@@ -3,17 +3,41 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
 
-// Types for basisvarer functionality (ingredient-based)
-interface BasisvarerIngredient {
+// Types for basisvarer functionality
+interface BasisvarerProduct {
   id: number
-  ingredient_name: string
   quantity: number
-  unit: string
   notes?: string
   created_at: string
+  product: {
+    id: number
+    name: string
+    category: string
+    price: number
+    unit: string
+    image_url?: string
+    store: string
+    is_on_sale: boolean
+    original_price?: number
+  }
 }
 
-// Removed Product and Category interfaces - not needed for ingredient-based basisvarer
+interface Product {
+  id: number
+  name: string
+  category: string
+  price: number
+  unit: string
+  image_url?: string
+  store: string
+  is_on_sale: boolean
+  original_price?: number
+}
+
+interface Category {
+  name: string
+  slug: string
+}
 
 // Mock data for development
 const mockStores = [
@@ -192,9 +216,13 @@ export default function MadbudgetPage() {
   const [showCostSavings, setShowCostSavings] = useState(true)
   
   // Basisvarer state
-  const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
+  const [basisvarer, setBasisvarer] = useState<BasisvarerProduct[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [products, setProducts] = useState<Product[]>([])
   const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [loadingProducts, setLoadingProducts] = useState(false)
   const [loadingBasisvarer, setLoadingBasisvarer] = useState(false)
 
   // Load basisvarer on component mount
@@ -202,7 +230,19 @@ export default function MadbudgetPage() {
     loadBasisvarer()
   }, [])
 
-  // No need to load categories or products for ingredient-based basisvarer
+  // Load categories when modal opens
+  useEffect(() => {
+    if (showBasisvarerModal) {
+      loadCategories()
+    }
+  }, [showBasisvarerModal])
+
+  // Load products when category or search changes
+  useEffect(() => {
+    if (showBasisvarerModal) {
+      loadProducts()
+    }
+  }, [selectedCategory, productSearchQuery, showBasisvarerModal])
 
   // API functions
   const loadBasisvarer = async () => {
@@ -220,25 +260,54 @@ export default function MadbudgetPage() {
     }
   }
 
-  // Removed loadCategories and loadProducts - not needed for ingredient-based basisvarer
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('/api/products/search', { method: 'POST' })
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data.categories || [])
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
 
-  const addToBasisvarer = async (ingredientName: string) => {
+  const loadProducts = async () => {
+    setLoadingProducts(true)
+    try {
+      const params = new URLSearchParams({
+        category: selectedCategory,
+        limit: '20',
+        offset: '0'
+      })
+      
+      if (productSearchQuery) {
+        params.append('search', productSearchQuery)
+      }
+
+      const response = await fetch(`/api/products/search?${params}`)
+      if (response.ok) {
+        const data = await response.json()
+        setProducts(data.products || [])
+      }
+    } catch (error) {
+      console.error('Error loading products:', error)
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
+
+  const addToBasisvarer = async (product: Product) => {
     try {
       const response = await fetch('/api/basisvarer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ingredient_name: ingredientName,
-          quantity: 1,
-          unit: 'stk'
-        })
+        body: JSON.stringify({ product_id: product.id })
       })
       
       if (response.ok) {
         const data = await response.json()
         setBasisvarer(prev => [data.basisvarer, ...prev])
-        setShowBasisvarerModal(false)
-        setProductSearchQuery('')
       }
     } catch (error) {
       console.error('Error adding to basisvarer:', error)
@@ -473,30 +542,28 @@ export default function MadbudgetPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                  {/* Show first 3-5 items */}
-                  {basisvarer.slice(0, 4).map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
-                        <div className="text-xs text-gray-500 flex items-center space-x-2">
-                          <span>{item.quantity} {item.unit}</span>
-                          {item.notes && (
-                            <>
+                      {/* Show first 3-5 items */}
+                      {basisvarer.slice(0, 4).map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">{item.product.name}</div>
+                            <div className="text-xs text-gray-500 flex items-center space-x-2">
+                              <span>{item.product.category}</span>
                               <span>•</span>
-                              <span>{item.notes}</span>
-                            </>
-                          )}
+                              <span>{item.product.price.toFixed(2)} kr</span>
+                              <span>•</span>
+                              <span>{item.product.store}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => removeFromBasisvarer(item.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Fjern fra basisvarer"
+                          >
+                            <Minus size={16} />
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => removeFromBasisvarer(item.id)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                        title="Fjern fra basisvarer"
-                      >
-                        <Minus size={16} />
-                      </button>
-                    </div>
-                  ))}
+                      ))}
                       
                       {/* Show "show more" if there are more items */}
                       {basisvarer.length > 4 && (
@@ -1115,55 +1182,113 @@ export default function MadbudgetPage() {
       {showBasisvarerModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-2xl font-semibold text-gray-900">Tilføj ingrediens til basisvarer</h3>
-                <button
-                  onClick={() => {
-                    setShowBasisvarerModal(false)
-                    setProductSearchQuery('')
-                  }}
-                  className="text-gray-400 hover:text-gray-600 p-2"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-
-              {/* Simple ingredient input */}
-              <div className="mb-6">
-                <div className="relative">
-                  <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Skriv ingrediens navn (fx. Mælk, Brød, Æg)..."
-                    value={productSearchQuery}
-                    onChange={(e) => setProductSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && productSearchQuery.trim()) {
-                        addToBasisvarer(productSearchQuery.trim())
-                      }
-                    }}
-                  />
-                </div>
-                <p className="text-sm text-gray-500 mt-2">
-                  Skriv navnet på ingrediensen du altid køber (fx. "Mælk", "Brød", "Æg")
-                </p>
-              </div>
-            
-            {/* Add ingredient button */}
-            <div className="text-center">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Tilføj til basisvarer</h3>
               <button
                 onClick={() => {
-                  if (productSearchQuery.trim()) {
-                    addToBasisvarer(productSearchQuery.trim())
-                  }
+                  setShowBasisvarerModal(false)
+                  setProductSearchQuery('')
+                  setSelectedCategory('all')
                 }}
-                disabled={!productSearchQuery.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg text-sm font-medium transition-colors"
+                className="text-gray-400 hover:text-gray-600 p-2"
               >
-                Tilføj "{productSearchQuery || 'ingrediens'}" til basisvarer
+                <X size={24} />
               </button>
             </div>
+
+            {/* Search and Category Filters */}
+            <div className="mb-6 space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Søg efter produkter..."
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="all">Alle kategorier</option>
+                    {categories.map(category => (
+                      <option key={category.slug} value={category.name}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
+            {/* Products Grid */}
+            {loadingProducts ? (
+              <div className="text-center py-8">
+                <div className="text-gray-500">Indlæser produkter...</div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                <p>Ingen produkter fundet</p>
+                <p className="text-sm">Prøv at ændre søgning eller kategori</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {products.map(product => (
+                  <div
+                    key={product.id}
+                    className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 text-sm mb-1">
+                          {product.name}
+                        </h4>
+                        <div className="text-xs text-gray-500 mb-2">
+                          {product.category} • {product.store}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-gray-900">
+                            {product.price.toFixed(2)} kr
+                          </span>
+                          {product.is_on_sale && product.original_price && (
+                            <span className="text-xs text-red-600 line-through">
+                              {product.original_price.toFixed(2)} kr
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            per {product.unit}
+                          </span>
+                        </div>
+                      </div>
+                      {product.image_url && (
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg ml-3 flex-shrink-0">
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={() => addToBasisvarer(product)}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      Tilføj til basisvarer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
