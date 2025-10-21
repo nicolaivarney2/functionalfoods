@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServiceClient } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabaseServer'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = createSupabaseServiceClient()
+    const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
       .from('family_basisvarer')
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createSupabaseServiceClient()
+    const supabase = createSupabaseServerClient()
     
     const { data, error } = await supabase
       .from('family_basisvarer')
@@ -99,7 +99,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const supabase = createSupabaseServiceClient()
+    const supabase = createSupabaseServerClient()
     
     const { error } = await supabase
       .from('family_basisvarer')
