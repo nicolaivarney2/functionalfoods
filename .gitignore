@@ -1,8 +1,5 @@
-node_modules
-node_modules
-
 # Dependencies
-node_modules
+node_modules/
 /.pnp
 .pnp.js
 
@@ -42,8 +39,6 @@ next-env.d.ts
 logs
 *.log
 dev-debug.log
-# Dependency directories
-node_modules/
 # Environment variables
 .env
 # Editor directories and files
