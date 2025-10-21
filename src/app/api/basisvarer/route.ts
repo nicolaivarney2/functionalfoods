@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabaseServer'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
 // GET - Hent brugerens basisvarer
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -49,7 +52,10 @@ export async function GET(request: NextRequest) {
 // POST - Tilføj produkt til basisvarer
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -98,7 +104,10 @@ export async function POST(request: NextRequest) {
 // DELETE - Fjern fra basisvarer
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
     
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
