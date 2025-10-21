@@ -223,7 +223,17 @@ export default function MadbudgetPage() {
   const loadBasisvarer = async () => {
     setLoadingBasisvarer(true)
     try {
-      const response = await fetch('/api/basisvarer')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('No session found')
+        return
+      }
+
+      const response = await fetch('/api/basisvarer', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
       if (response.ok) {
         const data = await response.json()
         setBasisvarer(data.basisvarer || [])
@@ -239,9 +249,18 @@ export default function MadbudgetPage() {
 
   const addToBasisvarer = async (ingredientName: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('No session found')
+        return
+      }
+
       const response = await fetch('/api/basisvarer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: JSON.stringify({ 
           ingredient_name: ingredientName,
           quantity: 1,
@@ -262,8 +281,17 @@ export default function MadbudgetPage() {
 
   const removeFromBasisvarer = async (basisvarerId: number) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('No session found')
+        return
+      }
+
       const response = await fetch(`/api/basisvarer?id=${basisvarerId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       })
       
       if (response.ok) {
