@@ -307,7 +307,8 @@ export default function EnhancedBlogEditor() {
       router.push('/admin/blogs')
     } catch (error) {
       console.error('Error saving blog post:', error)
-      alert(`Fejl ved gemning: ${error.message}`)
+      const errorMessage = error instanceof Error ? error.message : 'Ukendt fejl'
+      alert(`Fejl ved gemning: ${errorMessage}`)
     } finally {
       setSaving(false)
     }
