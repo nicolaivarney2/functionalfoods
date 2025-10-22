@@ -133,13 +133,13 @@ export default function BlogPostPage() {
   const generateTableOfContents = () => {
     if (!post?.content) return []
     
-    const headings = post.content.match(/<h[2-6][^>]*>(.*?)<\/h[2-6]>/gi) || []
+    const headings = post.content.match(/<h1[^>]*>(.*?)<\/h1>/gi) || []
     return headings.map((heading, index) => {
       const text = heading.replace(/<[^>]*>/g, '').trim()
       return {
         text,
         id: `heading-${index + 1}`,
-        level: parseInt(heading.match(/<h([2-6])/)?.[1] || '2')
+        level: 1
       }
     })
   }
@@ -150,7 +150,7 @@ export default function BlogPostPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#FAF9FD] shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             {/* Left side - Content */}
             <div>
@@ -221,13 +221,13 @@ export default function BlogPostPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-8">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
           {/* Table of Contents */}
           {tableOfContents.length > 0 && (
             <div className="lg:col-span-1">
               <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4 lg:p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Indholdsfortegnelse</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">Indholdsfortegnelse</h3>
                 <nav className="space-y-2">
                   {tableOfContents.map((item, index) => (
                     <a
@@ -357,6 +357,8 @@ export default function BlogPostPage() {
 
       {/* Custom CSS for blog sections */}
       <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+        
         .blog-content .blog-section {
           margin-bottom: 1.5rem !important;
           padding: 1rem !important;
@@ -374,6 +376,7 @@ export default function BlogPostPage() {
         }
         
         .blog-content .section-heading {
+          font-family: 'Playfair Display', serif !important;
           font-size: 1.5rem !important;
           font-weight: 600 !important;
           color: #1f2937 !important;
@@ -382,6 +385,8 @@ export default function BlogPostPage() {
         }
         
         .blog-content .section-content {
+          font-family: 'Raleway', sans-serif !important;
+          font-weight: 400 !important;
           line-height: 1.7 !important;
           color: #374151 !important;
           display: block !important;
@@ -441,6 +446,15 @@ export default function BlogPostPage() {
         .blog-content .conclusion-section {
           background: #f0fdf4 !important;
           border-left: 4px solid #10b981 !important;
+        }
+        
+        .blog-content .resume-section {
+          background: #f0fdf9 !important;
+          border-left: 4px solid #3b82f6 !important;
+        }
+        
+        .blog-content .resume-section .section-heading {
+          color: #1e40af !important;
         }
       `}</style>
     </div>

@@ -76,6 +76,7 @@ export default function EnhancedBlogEditor() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
   const [generatingContent, setGeneratingContent] = useState<number | null>(null)
+  const [generatingResume, setGeneratingResume] = useState(false)
   
   const [blogPost, setBlogPost] = useState<BlogPost>({
     title: '',
@@ -174,7 +175,7 @@ export default function EnhancedBlogEditor() {
                   return {
                     section_type: index === 0 ? 'introduction' as const : 'content' as const,
                     section_order: index + 1,
-                    title: index === 0 ? '' : `Sektion ${index}`,
+                    title: index === 0 ? undefined : undefined,
                     content: cleanSection
                   }
                 }
@@ -437,6 +438,16 @@ export default function EnhancedBlogEditor() {
     return formatted
   }
 
+  const insertHeading = (sectionIndex: number, level: number = 1) => {
+    const headingText = level === 1 ? 'Ny Overskrift' : level === 2 ? 'Underoverskrift' : 'Under-underoverskrift'
+    const headingMarkup = `${'#'.repeat(level)} ${headingText}`
+    
+    const currentContent = blogPost.sections[sectionIndex].content
+    const newContent = currentContent ? `${currentContent}\n\n${headingMarkup}\n\n` : `${headingMarkup}\n\n`
+    
+    updateSection(sectionIndex, { content: newContent })
+  }
+
   const generateContentFromSections = () => {
     // Generate HTML content from sections for the main content field
     let content = ''
@@ -470,6 +481,13 @@ export default function EnhancedBlogEditor() {
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
+          </div>
+        </div>`
+      } else if (section.title === 'Resume') {
+        content += `<div class="blog-section resume-section">
+          <h1 id="heading-${index + 1}" class="section-heading">Resume</h1>
+          <div class="section-content">
+            ${formatContent(section.content)}
           </div>
         </div>`
       }
@@ -537,6 +555,75 @@ export default function EnhancedBlogEditor() {
       alert(`Fejl ved generering af indhold: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
     } finally {
       setGeneratingContent(null)
+    }
+  }
+
+  const generateResume = async () => {
+    if (!blogPost.title || !blogPost.category_id) {
+      alert('Titel og kategori skal være udfyldt før resume generering')
+      return
+    }
+
+    setGeneratingResume(true)
+    
+    try {
+      // Get category name
+      const category = categories.find(c => c.id === blogPost.category_id)
+      const categoryName = category?.name || 'Keto'
+      
+      // Get all content from sections
+      const allContent = blogPost.sections
+        .map((section, index) => {
+          if (section.section_type === 'introduction') {
+            return `Indledning: ${section.content}`
+          } else if (section.section_type === 'content') {
+            return `${section.title || `Sektion ${index}`}: ${section.content}`
+          }
+          return null
+        })
+        .filter(Boolean)
+        .join('\n\n')
+
+      const response = await fetch('/api/admin/generate-blog-resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: blogPost.title,
+          category: categoryName,
+          content: allContent
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Fejl ved generering af resume')
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.resume) {
+        // Add resume as a new content section
+        const newSection = {
+          section_type: 'content' as const,
+          section_order: blogPost.sections.length + 1,
+          title: 'Resume',
+          content: data.resume
+        }
+        
+        setBlogPost(prev => ({
+          ...prev,
+          sections: [...prev.sections, newSection]
+        }))
+      } else {
+        throw new Error('Ingen resume blev genereret')
+      }
+    } catch (error) {
+      console.error('Error generating resume:', error)
+      alert(`Fejl ved generering af resume: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    } finally {
+      setGeneratingResume(false)
     }
   }
 
@@ -862,15 +949,37 @@ export default function EnhancedBlogEditor() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Indhold
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Indhold
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => insertHeading(index, 1)}
+                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                          >
+                            H1
+                          </button>
+                          <button
+                            onClick={() => insertHeading(index, 2)}
+                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                          >
+                            H2
+                          </button>
+                          <button
+                            onClick={() => insertHeading(index, 3)}
+                            className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                          >
+                            H3
+                          </button>
+                        </div>
+                      </div>
                       <textarea
                         value={section.content}
                         onChange={(e) => updateSection(index, { content: e.target.value })}
                         rows={6}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Skriv indholdet her..."
+                        placeholder="Skriv indholdet her... Brug # for overskrifter, • for lister"
                       />
                     </div>
                     
@@ -936,6 +1045,15 @@ export default function EnhancedBlogEditor() {
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Indholdsboks
+                </button>
+                
+                <button
+                  onClick={generateResume}
+                  disabled={generatingResume}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-md hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {generatingResume ? 'Genererer...' : '📋 Resume'}
                 </button>
                 
                 <div className="relative">
