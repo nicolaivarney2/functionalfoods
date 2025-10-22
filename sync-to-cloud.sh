@@ -13,10 +13,21 @@ echo "Syncing files to cloud..."
 cp .env "$CLOUD_SYNC_DIR/" 2>/dev/null || echo "No .env file found"
 cp .gitignore "$CLOUD_SYNC_DIR/" 2>/dev/null || echo "No .gitignore file found"
 
-# Kopier også Cursor settings hvis de eksisterer
-if [ -d "$HOME/Library/Application Support/Cursor" ]; then
-    echo "Syncing Cursor settings..."
-    cp -r "$HOME/Library/Application Support/Cursor" "$CLOUD_SYNC_DIR/cursor-settings" 2>/dev/null || echo "Could not sync Cursor settings"
+# Kopier kun vigtige Cursor settings (ikke extensions og cache)
+if [ -d "$HOME/Library/Application Support/Cursor/User" ]; then
+    echo "Syncing Cursor user settings (excluding extensions)..."
+    mkdir -p "$CLOUD_SYNC_DIR/cursor-user-settings"
+    
+    # Sync kun de vigtige filer, ikke extensions eller cache
+    cp "$HOME/Library/Application Support/Cursor/User/settings.json" "$CLOUD_SYNC_DIR/cursor-user-settings/" 2>/dev/null || echo "No settings.json"
+    cp "$HOME/Library/Application Support/Cursor/User/keybindings.json" "$CLOUD_SYNC_DIR/cursor-user-settings/" 2>/dev/null || echo "No keybindings.json"
+    
+    # Sync snippets hvis de eksisterer
+    if [ -d "$HOME/Library/Application Support/Cursor/User/snippets" ]; then
+        cp -r "$HOME/Library/Application Support/Cursor/User/snippets" "$CLOUD_SYNC_DIR/cursor-user-settings/" 2>/dev/null || echo "Could not sync snippets"
+    fi
+    
+    echo "✅ Cursor settings synced (extensions excluded - install manually)"
 fi
 
 echo "✅ Files synced to $CLOUD_SYNC_DIR"

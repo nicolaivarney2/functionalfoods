@@ -17,7 +17,9 @@ import {
   Users,
   X,
   Menu,
-  Loader2
+  Loader2,
+  FileText,
+  MessageSquare
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -90,6 +92,18 @@ const adminNavItems = [
     href: '/admin/product-ingredient-matching',
     icon: List,
     description: 'Match produkter med ingredienser'
+  },
+  {
+    name: 'Blogs',
+    href: '/admin/blogs',
+    icon: FileText,
+    description: 'Administrer blog indlæg og kernesider'
+  },
+  {
+    name: 'Reddit Communities',
+    href: '/admin/reddit-communities',
+    icon: MessageSquare,
+    description: 'Administrer Reddit integration'
   },
   {
     name: 'Indstillinger',

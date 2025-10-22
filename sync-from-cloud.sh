@@ -29,11 +29,21 @@ else
     echo "⚠️  No .gitignore file found in cloud sync"
 fi
 
-# Kopier Cursor settings hvis de eksisterer
-if [ -d "$CLOUD_SYNC_DIR/cursor-settings" ]; then
-    echo "Restoring Cursor settings..."
-    cp -r "$CLOUD_SYNC_DIR/cursor-settings" "$HOME/Library/Application Support/Cursor" 2>/dev/null || echo "Could not restore Cursor settings"
-    echo "✅ Cursor settings restored"
+# Kopier Cursor user settings hvis de eksisterer
+if [ -d "$CLOUD_SYNC_DIR/cursor-user-settings" ]; then
+    echo "Restoring Cursor user settings..."
+    mkdir -p "$HOME/Library/Application Support/Cursor/User"
+    
+    # Restore kun de vigtige filer
+    cp "$CLOUD_SYNC_DIR/cursor-user-settings/settings.json" "$HOME/Library/Application Support/Cursor/User/" 2>/dev/null || echo "No settings.json to restore"
+    cp "$CLOUD_SYNC_DIR/cursor-user-settings/keybindings.json" "$HOME/Library/Application Support/Cursor/User/" 2>/dev/null || echo "No keybindings.json to restore"
+    
+    # Restore snippets hvis de eksisterer
+    if [ -d "$CLOUD_SYNC_DIR/cursor-user-settings/snippets" ]; then
+        cp -r "$CLOUD_SYNC_DIR/cursor-user-settings/snippets" "$HOME/Library/Application Support/Cursor/User/" 2>/dev/null || echo "Could not restore snippets"
+    fi
+    
+    echo "✅ Cursor user settings restored (install extensions manually)"
 fi
 
 echo "🎉 Sync complete!"

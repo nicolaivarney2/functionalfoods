@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, Search, Filter, Calendar, User, Tag, ExternalLink } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, Filter, Calendar, User, Tag, ExternalLink, FileText, Settings } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
 interface BlogCategory {
@@ -164,13 +164,29 @@ export default function AdminBlogsPage() {
               <h1 className="text-3xl font-bold text-gray-900">Blog Management</h1>
               <p className="text-gray-600 mt-2">Administrer blog posts og kategorier</p>
             </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-            >
-              <Plus size={20} />
-              <span>Ny Blog Post</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <a
+                href="/admin/blogs/enhanced-editor"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+              >
+                <FileText size={20} />
+                <span>Enhanced Editor</span>
+              </a>
+              <a
+                href="/admin/blogs/widgets"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+              >
+                <Settings size={20} />
+                <span>Widgets</span>
+              </a>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+              >
+                <Plus size={20} />
+                <span>Ny Blog Post</span>
+              </button>
+            </div>
           </div>
         </div>
 
