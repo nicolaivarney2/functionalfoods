@@ -113,8 +113,8 @@ export default function AdminBlogsPage() {
   }
 
   const editPost = (post: BlogPost) => {
-    setEditingPost(post)
-    setShowEditModal(true)
+    // Redirect to Enhanced Editor instead of modal
+    window.location.href = `/admin/blogs/enhanced-editor?id=${post.id}`
   }
 
   const viewPost = (post: BlogPost) => {

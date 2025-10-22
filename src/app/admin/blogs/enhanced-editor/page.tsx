@@ -101,7 +101,57 @@ export default function EnhancedBlogEditor() {
   useEffect(() => {
     loadCategories()
     loadWidgets()
+    loadExistingBlog()
   }, [])
+
+  const loadExistingBlog = async () => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const blogId = urlParams.get('id')
+    
+    if (blogId) {
+      try {
+        const { data, error } = await supabase
+          .from('blog_posts')
+          .select('*')
+          .eq('id', blogId)
+          .single()
+
+        if (error) {
+          console.error('Error loading blog:', error)
+          return
+        }
+
+        if (data) {
+          setBlogPost({
+            id: data.id,
+            title: data.title || '',
+            slug: data.slug || '',
+            excerpt: data.excerpt || '',
+            content: data.content || '',
+            category_id: data.category_id || 1,
+            post_type: data.post_type || 'blog',
+            parent_id: data.parent_id,
+            is_evidence_based: data.is_evidence_based || false,
+            disclaimer_text: data.disclaimer_text || 'Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden. Det betyder, at vi nogle steder har markeret udtalelser med et ¹ ² ³ som er links til understøttende studier. Find referencelist i bunden af artiklen.',
+            breadcrumb_path: data.breadcrumb_path || ['Keto', 'Blogs'],
+            status: data.status || 'draft',
+            meta_title: data.meta_title || '',
+            meta_description: data.meta_description || '',
+            tags: data.tags || [],
+            sections: [
+              {
+                section_type: 'introduction',
+                section_order: 1,
+                content: data.content || ''
+              }
+            ]
+          })
+        }
+      } catch (error) {
+        console.error('Error loading blog:', error)
+      }
+    }
+  }
 
   const loadCategories = async () => {
     try {
@@ -306,8 +356,12 @@ export default function EnhancedBlogEditor() {
 
       console.log('Sending data to API:', finalPostData)
 
-      const response = await fetch('/api/blogs', {
-        method: 'POST',
+      const isUpdate = blogPost.id
+      const url = isUpdate ? `/api/blogs/${blogPost.id}` : '/api/blogs'
+      const method = isUpdate ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
