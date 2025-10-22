@@ -35,11 +35,6 @@ interface BlogPost {
   is_evidence_based: boolean
   disclaimer_text: string
   breadcrumb_path: string[]
-  author: {
-    id: string
-    email: string
-    full_name: string
-  }
 }
 
 export default function BlogPostPage() {
@@ -64,8 +59,7 @@ export default function BlogPostPage() {
         .from('blog_posts')
         .select(`
           *,
-          category:blog_categories(*),
-          author:profiles(id, email, full_name)
+          category:blog_categories(*)
         `)
         .eq('slug', slug)
         .eq('status', 'published')
@@ -159,7 +153,7 @@ export default function BlogPostPage() {
             <div>
               {/* Breadcrumb */}
               <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-                {post.breadcrumb_path.map((item, index) => (
+                {(post.breadcrumb_path || ['Keto', 'Blogs']).map((item, index) => (
                   <div key={index} className="flex items-center">
                     {index > 0 && <span className="mx-2">›</span>}
                     <span className="hover:text-blue-600 cursor-pointer">{item}</span>
@@ -180,7 +174,7 @@ export default function BlogPostPage() {
 
               {/* Meta info */}
               <div className="text-sm text-gray-600 mb-4">
-                <p>Skrevet af {post.author?.full_name || 'nicolaivarney'} den {formatDate(post.published_at)}</p>
+                <p>Skrevet af nicolaivarney den {formatDate(post.published_at)}</p>
                 {post.view_count > 0 && (
                   <p className="mt-1">{post.view_count} visninger</p>
                 )}
