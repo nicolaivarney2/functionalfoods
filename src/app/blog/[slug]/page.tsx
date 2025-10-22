@@ -265,6 +265,34 @@ export default function BlogPostPage() {
           display: block !important;
         }
         
+        .blog-content .section-content p {
+          margin-bottom: 1rem !important;
+        }
+        
+        .blog-content .section-content ul {
+          margin: 1rem 0 !important;
+          padding-left: 1.5rem !important;
+        }
+        
+        .blog-content .section-content li {
+          margin-bottom: 0.5rem !important;
+          list-style-type: disc !important;
+        }
+        
+        .blog-content .section-content h3 {
+          font-size: 1.25rem !important;
+          font-weight: 600 !important;
+          color: #1f2937 !important;
+          margin: 1.5rem 0 1rem 0 !important;
+        }
+        
+        .blog-content .section-content h4 {
+          font-size: 1.1rem !important;
+          font-weight: 600 !important;
+          color: #374151 !important;
+          margin: 1rem 0 0.5rem 0 !important;
+        }
+        
         .blog-content .widget-placeholder {
           background: #f3f4f6 !important;
           border: 2px dashed #d1d5db !important;

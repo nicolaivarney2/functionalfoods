@@ -145,15 +145,43 @@ export default function EnhancedBlogEditor() {
               section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion'
             }))
           } else if (data.content) {
-            // Parse existing content to extract introduction text
+            // Parse existing content to extract sections
             const contentText = data.content.replace(/<[^>]*>/g, '').trim()
-            defaultSections = [
-              {
-                section_type: 'introduction' as const,
-                section_order: 1,
-                content: contentText
-              }
-            ]
+            
+            // Try to split content into logical sections
+            const sections = contentText.split(/\n\s*\n/).filter(section => section.trim())
+            
+            if (sections.length > 0) {
+              defaultSections = sections.map((section, index) => {
+                const cleanSection = section.trim()
+                const firstLine = cleanSection.split('\n')[0]
+                
+                // Check if first line looks like a heading
+                if (firstLine.length < 100 && (firstLine.includes(':') || firstLine.includes('?'))) {
+                  return {
+                    section_type: 'content' as const,
+                    section_order: index + 1,
+                    title: firstLine,
+                    content: cleanSection.replace(firstLine, '').trim()
+                  }
+                } else {
+                  return {
+                    section_type: index === 0 ? 'introduction' as const : 'content' as const,
+                    section_order: index + 1,
+                    title: index === 0 ? '' : `Sektion ${index}`,
+                    content: cleanSection
+                  }
+                }
+              })
+            } else {
+              defaultSections = [
+                {
+                  section_type: 'introduction' as const,
+                  section_order: 1,
+                  content: contentText
+                }
+              ]
+            }
           }
 
           setBlogPost({
@@ -348,6 +376,39 @@ export default function EnhancedBlogEditor() {
     }))
   }
 
+  const formatContent = (text: string) => {
+    if (!text) return ''
+    
+    // Convert line breaks to paragraphs
+    let formatted = text
+      .split('\n\n')
+      .map(paragraph => paragraph.trim())
+      .filter(paragraph => paragraph.length > 0)
+      .map(paragraph => {
+        // Check if paragraph looks like a list
+        if (paragraph.includes('\n-') || paragraph.includes('\n•')) {
+          const lines = paragraph.split('\n')
+          const listItems = lines
+            .map(line => line.replace(/^[-•]\s*/, '').trim())
+            .filter(line => line.length > 0)
+            .map(line => `<li>${line}</li>`)
+            .join('')
+          return `<ul>${listItems}</ul>`
+        }
+        // Check if paragraph looks like a heading
+        else if (paragraph.length < 100 && (paragraph.includes(':') || paragraph.includes('?'))) {
+          return `<h3>${paragraph}</h3>`
+        }
+        // Regular paragraph
+        else {
+          return `<p>${paragraph}</p>`
+        }
+      })
+      .join('')
+    
+    return formatted
+  }
+
   const generateContentFromSections = () => {
     // Generate HTML content from sections for the main content field
     let content = ''
@@ -357,14 +418,14 @@ export default function EnhancedBlogEditor() {
         content += `<div class="blog-section content-section">
           <h2 class="section-heading">Indledning</h2>
           <div class="section-content">
-            <p>${section.content}</p>
+            ${formatContent(section.content)}
           </div>
         </div>`
       } else if (section.section_type === 'content') {
         content += `<div class="blog-section content-section">
           <h2 class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
           <div class="section-content">
-            <p>${section.content}</p>
+            ${formatContent(section.content)}
           </div>
         </div>`
       } else if (section.section_type === 'widget') {
@@ -376,7 +437,7 @@ export default function EnhancedBlogEditor() {
       } else if (section.section_type === 'conclusion') {
         content += `<div class="blog-section conclusion-section">
           <div class="section-content">
-            <p>${section.content}</p>
+            ${formatContent(section.content)}
           </div>
         </div>`
       }
