@@ -149,10 +149,10 @@ export default function EnhancedBlogEditor() {
             const contentText = data.content.replace(/<[^>]*>/g, '').trim()
             
             // Try to split content into logical sections
-            const sections = contentText.split(/\n\s*\n/).filter(section => section.trim())
+            const sections = contentText.split(/\n\s*\n/).filter((section: string) => section.trim())
             
             if (sections.length > 0) {
-              defaultSections = sections.map((section, index) => {
+              defaultSections = sections.map((section: string, index: number) => {
                 const cleanSection = section.trim()
                 const firstLine = cleanSection.split('\n')[0]
                 
