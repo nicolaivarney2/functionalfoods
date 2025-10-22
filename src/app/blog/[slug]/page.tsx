@@ -44,6 +44,7 @@ export default function BlogPostPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false)
+  const [showEvidenceModal, setShowEvidenceModal] = useState(false)
 
   const supabase = createSupabaseClient()
 
@@ -157,17 +158,26 @@ export default function BlogPostPage() {
                 {(post.breadcrumb_path || ['Keto', 'Blogs']).map((item, index) => (
                   <div key={index} className="flex items-center">
                     {index > 0 && <span className="mx-2">›</span>}
-                    <span className="hover:text-blue-600 cursor-pointer">{item}</span>
+                    {index === 0 ? (
+                      <a href="/keto" className="hover:text-blue-600 cursor-pointer">{item}</a>
+                    ) : index === 1 ? (
+                      <a href="/keto/blogs" className="hover:text-blue-600 cursor-pointer">{item}</a>
+                    ) : (
+                      <span className="text-gray-700">{item}</span>
+                    )}
                   </div>
                 ))}
               </nav>
 
               {/* Evidence-based badge */}
               {post.is_evidence_based && (
-                <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4">
+                <button
+                  onClick={() => setShowEvidenceModal(true)}
+                  className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4 hover:bg-green-200 transition-colors"
+                >
                   <CheckCircle className="w-4 h-4 mr-1" />
                   Evidensbaseret
-                </div>
+                </button>
               )}
 
               {/* Title */}
@@ -202,12 +212,12 @@ export default function BlogPostPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
           {/* Table of Contents */}
           {tableOfContents.length > 0 && (
             <div className="lg:col-span-1">
-              <div className="sticky top-8 bg-white rounded-lg shadow-sm p-6">
+              <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4 lg:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Indholdsfortegnelse</h3>
                 <nav className="space-y-2">
                   {tableOfContents.map((item, index) => (
@@ -228,13 +238,11 @@ export default function BlogPostPage() {
 
           {/* Main Content */}
           <div className={`${tableOfContents.length > 0 ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-            <div className="bg-white rounded-lg shadow-sm p-8">
-              {/* Content */}
-              <div 
-                className="blog-content"
-                dangerouslySetInnerHTML={{ __html: post.content }}
-              />
-            </div>
+            {/* Content */}
+            <div 
+              className="blog-content"
+              dangerouslySetInnerHTML={{ __html: post.content }}
+            />
           </div>
         </div>
 
@@ -302,6 +310,24 @@ export default function BlogPostPage() {
         </div>
       </div>
 
+      {/* Evidence Modal */}
+      {showEvidenceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Evidensbaseret</h3>
+            <p className="text-gray-700 mb-6">
+              {post.disclaimer_text || "Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden. Det betyder, at vi nogle steder har markeret udtalelser med et ¹ ² ³ som er links til understøttende studier. Find referencelist i bunden af artiklen."}
+            </p>
+            <button
+              onClick={() => setShowEvidenceModal(false)}
+              className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700"
+            >
+              Luk
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Disclaimer Modal */}
       {showDisclaimerModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -323,12 +349,19 @@ export default function BlogPostPage() {
       {/* Custom CSS for blog sections */}
       <style jsx global>{`
         .blog-content .blog-section {
-          margin-bottom: 2rem !important;
-          padding: 1.5rem !important;
+          margin-bottom: 1.5rem !important;
+          padding: 1rem !important;
           background: white !important;
           border-radius: 0.5rem !important;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
           display: block !important;
+        }
+        
+        @media (min-width: 640px) {
+          .blog-content .blog-section {
+            padding: 1.5rem !important;
+            margin-bottom: 2rem !important;
+          }
         }
         
         .blog-content .section-heading {
