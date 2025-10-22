@@ -137,7 +137,12 @@ export default function EnhancedBlogEditor() {
             .order('section_order')
 
           // If no sections exist, create default structure
-          let defaultSections = [
+          let defaultSections: Array<{
+            section_type: 'introduction' | 'content' | 'widget' | 'conclusion'
+            section_order: number
+            content: string
+            title?: string
+          }> = [
             {
               section_type: 'introduction' as const,
               section_order: 1,
