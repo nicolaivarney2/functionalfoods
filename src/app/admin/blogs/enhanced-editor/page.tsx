@@ -269,6 +269,26 @@ export default function EnhancedBlogEditor() {
     }))
   }
 
+  const generateContentFromSections = () => {
+    // Generate HTML content from sections for the main content field
+    let content = ''
+    
+    blogPost.sections.forEach(section => {
+      if (section.section_type === 'introduction') {
+        content += `<div class="introduction-section">${section.content}</div>`
+      } else if (section.section_type === 'content') {
+        content += `<div class="content-section">
+          <h3>${section.heading || 'Sektion'}</h3>
+          <p>${section.content}</p>
+        </div>`
+      } else if (section.section_type === 'conclusion') {
+        content += `<div class="conclusion-section">${section.content}</div>`
+      }
+    })
+    
+    return content || 'Indhold genereres fra sektioner...'
+  }
+
   const handleSave = async (status: 'draft' | 'published') => {
     setSaving(true)
     try {
@@ -277,9 +297,13 @@ export default function EnhancedBlogEditor() {
       
       const finalPostData = {
         ...postData,
+        content: generateContentFromSections(), // Generate content from sections
+        excerpt: postData.excerpt || postData.title || 'Blog indlæg', // Ensure excerpt exists
         status,
         published_at: status === 'published' ? new Date().toISOString() : null
       }
+
+      console.log('Sending data to API:', finalPostData)
 
       const response = await fetch('/api/blogs', {
         method: 'POST',
