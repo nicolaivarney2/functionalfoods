@@ -416,7 +416,7 @@ export default function EnhancedBlogEditor() {
     blogPost.sections.forEach((section, index) => {
       if (section.section_type === 'introduction') {
         content += `<div class="blog-section content-section">
-          <h2 class="section-heading">Indledning</h2>
+          <h2 id="heading-${index + 1}" class="section-heading">Indledning</h2>
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
@@ -424,7 +424,7 @@ export default function EnhancedBlogEditor() {
         </div>`
       } else if (section.section_type === 'content') {
         content += `<div class="blog-section content-section">
-          <h2 class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
+          <h2 id="heading-${index + 1}" class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
@@ -438,6 +438,7 @@ export default function EnhancedBlogEditor() {
         </div>`
       } else if (section.section_type === 'conclusion') {
         content += `<div class="blog-section conclusion-section">
+          <h2 id="heading-${index + 1}" class="section-heading">Afslutning</h2>
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}

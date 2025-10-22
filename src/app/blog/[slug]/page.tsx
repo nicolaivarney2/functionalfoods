@@ -35,6 +35,11 @@ interface BlogPost {
   is_evidence_based: boolean
   disclaimer_text: string
   breadcrumb_path: string[]
+  author: {
+    id: string
+    email: string
+    full_name: string
+  }
 }
 
 export default function BlogPostPage() {
@@ -59,7 +64,8 @@ export default function BlogPostPage() {
         .from('blog_posts')
         .select(`
           *,
-          category:blog_categories(*)
+          category:blog_categories(*),
+          author:profiles(id, email, full_name)
         `)
         .eq('slug', slug)
         .eq('status', 'published')
@@ -126,106 +132,176 @@ export default function BlogPostPage() {
     )
   }
 
+  // Generate table of contents from content
+  const generateTableOfContents = () => {
+    if (!post?.content) return []
+    
+    const headings = post.content.match(/<h[2-6][^>]*>(.*?)<\/h[2-6]>/gi) || []
+    return headings.map((heading, index) => {
+      const text = heading.replace(/<[^>]*>/g, '').trim()
+      return {
+        text,
+        id: `heading-${index + 1}`,
+        level: parseInt(heading.match(/<h([2-6])/)?.[1] || '2')
+      }
+    })
+  }
+
+  const tableOfContents = generateTableOfContents()
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6 text-center">
-          {/* Breadcrumb */}
-          <nav className="flex items-center justify-center space-x-2 text-sm text-gray-500 mb-4">
-            {post.breadcrumb_path.map((item, index) => (
-              <div key={index} className="flex items-center">
-                {index > 0 && <span className="mx-2">›</span>}
-                <span className="hover:text-blue-600 cursor-pointer">{item}</span>
+      <div className="bg-[#FAF9FD] shadow-sm border-b">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            {/* Left side - Content */}
+            <div>
+              {/* Breadcrumb */}
+              <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+                {post.breadcrumb_path.map((item, index) => (
+                  <div key={index} className="flex items-center">
+                    {index > 0 && <span className="mx-2">›</span>}
+                    <span className="hover:text-blue-600 cursor-pointer">{item}</span>
+                  </div>
+                ))}
+              </nav>
+
+              {/* Evidence-based badge */}
+              {post.is_evidence_based && (
+                <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4">
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Evidensbaseret
+                </div>
+              )}
+
+              {/* Title */}
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
+
+              {/* Meta info */}
+              <div className="text-sm text-gray-600 mb-4">
+                <p>Skrevet af {post.author?.full_name || 'nicolaivarney'} den {formatDate(post.published_at)}</p>
+                {post.view_count > 0 && (
+                  <p className="mt-1">{post.view_count} visninger</p>
+                )}
               </div>
-            ))}
-          </nav>
 
-          {/* Evidence-based badge */}
-          {post.is_evidence_based && (
-            <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4">
-              <CheckCircle className="w-4 h-4 mr-1" />
-              Evidensbaseret
+              {/* Disclaimer link */}
+              <button
+                onClick={() => setShowDisclaimerModal(true)}
+                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+              >
+                <Info className="w-4 h-4 mr-1" />
+                Disclaimer
+              </button>
             </div>
-          )}
 
-          {/* Title */}
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
-
-          {/* Meta info */}
-          <div className="flex items-center justify-center space-x-6 text-sm text-gray-600 mb-4">
-            <div className="flex items-center">
-              <Calendar className="w-4 h-4 mr-1" />
-              {formatDate(post.published_at)}
-            </div>
-            <div className="flex items-center">
-              <User className="w-4 h-4 mr-1" />
-              {post.category.name}
-            </div>
-            {post.view_count > 0 && (
-              <div className="flex items-center">
-                <ExternalLink className="w-4 h-4 mr-1" />
-                {post.view_count} visninger
+            {/* Right side - Image placeholder */}
+            <div className="hidden lg:block">
+              <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
+                <span className="text-gray-500">Blog billede</span>
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Disclaimer link */}
-          <button
-            onClick={() => setShowDisclaimerModal(true)}
-            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mb-6"
-          >
-            <Info className="w-4 h-4 mr-1" />
-            Disclaimer
-          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-[#FAF9FD] rounded-lg shadow-sm p-8">
-          {/* Excerpt */}
-          {post.excerpt && (
-            <div className="text-lg text-gray-700 mb-8 p-4 bg-white rounded-lg">
-              {post.excerpt}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Table of Contents */}
+          {tableOfContents.length > 0 && (
+            <div className="lg:col-span-1">
+              <div className="sticky top-8 bg-white rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Indholdsfortegnelse</h3>
+                <nav className="space-y-2">
+                  {tableOfContents.map((item, index) => (
+                    <a
+                      key={index}
+                      href={`#${item.id}`}
+                      className={`block text-sm text-gray-600 hover:text-blue-600 ${
+                        item.level === 3 ? 'ml-4' : item.level === 4 ? 'ml-8' : ''
+                      }`}
+                    >
+                      {item.text}
+                    </a>
+                  ))}
+                </nav>
+              </div>
             </div>
           )}
 
-          {/* Content */}
-          <div 
-            className="blog-content"
-            dangerouslySetInnerHTML={{ __html: post.content }}
-          />
+          {/* Main Content */}
+          <div className={`${tableOfContents.length > 0 ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
+            <div className="bg-white rounded-lg shadow-sm p-8">
+              {/* Content */}
+              <div 
+                className="blog-content"
+                dangerouslySetInnerHTML={{ __html: post.content }}
+              />
+            </div>
+          </div>
+        </div>
 
-          {/* Reddit integration */}
-          {post.reddit_post_id && post.reddit_subreddit && (
-            <div className="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-orange-800 mb-2">
-                Diskussion på Reddit
-              </h3>
-              <p className="text-orange-700 mb-3">
-                Dette indlæg er også diskuteret i r/{post.reddit_subreddit}
-              </p>
-              <a
-                href={`https://reddit.com/r/${post.reddit_subreddit}/comments/${post.reddit_post_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-              >
-                <ExternalLink className="w-4 h-4 mr-2" />
-                Se diskussion på Reddit
+        {/* Reddit integration */}
+        {post.reddit_post_id && post.reddit_subreddit && (
+          <div className="mt-8 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-orange-800 mb-2">
+              Diskussion på Reddit
+            </h3>
+            <p className="text-orange-700 mb-3">
+              Dette indlæg er også diskuteret i r/{post.reddit_subreddit}
+            </p>
+            <a
+              href={`https://reddit.com/r/${post.reddit_subreddit}/comments/${post.reddit_post_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Se diskussion på Reddit
+            </a>
+          </div>
+        )}
+
+        {/* Related content */}
+        <div className="mt-12 bg-white rounded-lg shadow-sm p-8">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Relateret indhold</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Keto Recipes */}
+            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
+              <div className="w-full h-32 bg-green-100 rounded-lg mb-4 flex items-center justify-center">
+                <span className="text-green-600 font-semibold">Keto Opskrifter</span>
+              </div>
+              <h4 className="font-semibold text-gray-900 mb-2">Keto Opskrifter</h4>
+              <p className="text-sm text-gray-600 mb-3">Lækre og nemme keto-venlige opskrifter til hverdag og fest</p>
+              <a href="/keto/opskrifter" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                Se alle opskrifter →
               </a>
             </div>
-          )}
 
-          {/* Related links */}
-          <div className="mt-10 p-6 bg-white rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Læs også</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-blue-700">
-              <a href="/keto/opskrifter" className="hover:underline">Keto opskrifter</a>
-              <a href="/keto/vægttab" className="hover:underline">Vægttab med Keto</a>
-              <a href="/keto" className="hover:underline">Flere artikler om Keto</a>
-              <a href="/reddit-communities" className="hover:underline">Keto communities</a>
+            {/* Weight Loss */}
+            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
+              <div className="w-full h-32 bg-blue-100 rounded-lg mb-4 flex items-center justify-center">
+                <span className="text-blue-600 font-semibold">Vægttab</span>
+              </div>
+              <h4 className="font-semibold text-gray-900 mb-2">Vægttab med Keto</h4>
+              <p className="text-sm text-gray-600 mb-3">Evidensbaseret guide til vægttab med ketogen diæt</p>
+              <a href="/keto/vægttab" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                Læs mere →
+              </a>
+            </div>
+
+            {/* More Articles */}
+            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
+              <div className="w-full h-32 bg-purple-100 rounded-lg mb-4 flex items-center justify-center">
+                <span className="text-purple-600 font-semibold">Flere Artikler</span>
+              </div>
+              <h4 className="font-semibold text-gray-900 mb-2">Flere Keto Artikler</h4>
+              <p className="text-sm text-gray-600 mb-3">Udforsk vores komplette samling af keto-relaterede artikler</p>
+              <a href="/keto" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                Se alle artikler →
+              </a>
             </div>
           </div>
         </div>
@@ -237,7 +313,7 @@ export default function BlogPostPage() {
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Disclaimer</h3>
             <p className="text-gray-700 mb-6">
-              {post.disclaimer_text || "Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden. Det betyder, at vi nogle steder har markeret udtalelser med et ¹ ² ³ som er links til understøttende studier. Find referencelist i bunden af artiklen."}
+              Indholdet på FunctionalFoods.dk er udelukkende tiltænkt uddannelses- og informationsformål. Det må ikke betragtes som medicinsk rådgivning eller erstatning for professionel vejledning, diagnose eller behandling. Kontakt altid en læge eller autoriseret sundhedspersonale ved spørgsmål om din helbredstilstand.
             </p>
             <button
               onClick={() => setShowDisclaimerModal(false)}
