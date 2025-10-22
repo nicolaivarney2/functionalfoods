@@ -217,6 +217,17 @@ export default function BlogPostPage() {
               </a>
             </div>
           )}
+
+          {/* Related links */}
+          <div className="mt-10 p-6 bg-white rounded-lg border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Læs også</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-blue-700">
+              <a href="/keto/opskrifter" className="hover:underline">Keto opskrifter</a>
+              <a href="/keto/vægttab" className="hover:underline">Vægttab med Keto</a>
+              <a href="/keto" className="hover:underline">Flere artikler om Keto</a>
+              <a href="/reddit-communities" className="hover:underline">Keto communities</a>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -253,9 +264,7 @@ export default function BlogPostPage() {
           font-size: 1.5rem !important;
           font-weight: 600 !important;
           color: #1f2937 !important;
-          margin-bottom: 1rem !important;
-          border-bottom: 2px solid #e5e7eb !important;
-          padding-bottom: 0.5rem !important;
+          margin-bottom: 0.75rem !important;
           display: block !important;
         }
         
@@ -277,6 +286,14 @@ export default function BlogPostPage() {
         .blog-content .section-content li {
           margin-bottom: 0.5rem !important;
           list-style-type: disc !important;
+        }
+        
+        .blog-content .section-content img.section-image {
+          width: 100% !important;
+          height: auto !important;
+          margin-top: 1rem !important;
+          border-radius: 0.5rem !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
         }
         
         .blog-content .section-content h3 {

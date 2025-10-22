@@ -419,6 +419,7 @@ export default function EnhancedBlogEditor() {
           <h2 class="section-heading">Indledning</h2>
           <div class="section-content">
             ${formatContent(section.content)}
+            ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
           </div>
         </div>`
       } else if (section.section_type === 'content') {
@@ -426,6 +427,7 @@ export default function EnhancedBlogEditor() {
           <h2 class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
           <div class="section-content">
             ${formatContent(section.content)}
+            ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
           </div>
         </div>`
       } else if (section.section_type === 'widget') {
@@ -438,6 +440,7 @@ export default function EnhancedBlogEditor() {
         content += `<div class="blog-section conclusion-section">
           <div class="section-content">
             ${formatContent(section.content)}
+            ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
           </div>
         </div>`
       }
