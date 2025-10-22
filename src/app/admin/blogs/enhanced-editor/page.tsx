@@ -39,6 +39,7 @@ interface ContentSection {
   section_type: 'introduction' | 'content' | 'widget' | 'conclusion'
   section_order: number
   title?: string
+  heading?: string  // Add heading property
   content: string
   image_url?: string
   widget_id?: number
@@ -278,7 +279,7 @@ export default function EnhancedBlogEditor() {
         content += `<div class="introduction-section">${section.content}</div>`
       } else if (section.section_type === 'content') {
         content += `<div class="content-section">
-          <h3>${section.heading || 'Sektion'}</h3>
+          <h3>${section.title || section.heading || 'Sektion'}</h3>
           <p>${section.content}</p>
         </div>`
       } else if (section.section_type === 'conclusion') {
