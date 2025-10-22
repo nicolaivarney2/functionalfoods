@@ -35,6 +35,12 @@ interface BlogPost {
   is_evidence_based: boolean
   disclaimer_text: string
   breadcrumb_path: string[]
+  author: {
+    id: string
+    email: string
+    first_name: string
+    last_name?: string
+  }
 }
 
 export default function BlogPostPage() {
@@ -59,7 +65,8 @@ export default function BlogPostPage() {
         .from('blog_posts')
         .select(`
           *,
-          category:blog_categories(*)
+          category:blog_categories(*),
+          author:profiles!blog_posts_author_id_fkey(id, email, first_name, last_name)
         `)
         .eq('slug', slug)
         .eq('status', 'published')
@@ -174,7 +181,7 @@ export default function BlogPostPage() {
 
               {/* Meta info */}
               <div className="text-sm text-gray-600 mb-4">
-                <p>Skrevet af nicolaivarney den {formatDate(post.published_at)}</p>
+                <p>Skrevet af {post.author?.first_name || 'nicolaivarney'} den {formatDate(post.published_at)}</p>
                 {post.view_count > 0 && (
                   <p className="mt-1">{post.view_count} visninger</p>
                 )}

@@ -71,6 +71,7 @@ export default function EnhancedBlogEditor() {
   const [saving, setSaving] = useState(false)
   const [categories, setCategories] = useState<BlogCategory[]>([])
   const [widgets, setWidgets] = useState<BlogWidget[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
   
   const [blogPost, setBlogPost] = useState<BlogPost>({
@@ -101,6 +102,7 @@ export default function EnhancedBlogEditor() {
   useEffect(() => {
     loadCategories()
     loadWidgets()
+    loadCurrentUser()
     loadExistingBlog()
   }, [])
 
@@ -235,6 +237,28 @@ export default function EnhancedBlogEditor() {
       setWidgets(data || [])
     } catch (error) {
       console.error('Error loading widgets:', error)
+    }
+  }
+
+  const loadCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id, email, first_name, last_name')
+          .eq('id', user.id)
+          .single()
+
+        if (error) {
+          console.error('Error loading user profile:', error)
+          return
+        }
+
+        setCurrentUser(profile)
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error)
     }
   }
 
@@ -540,9 +564,16 @@ export default function EnhancedBlogEditor() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-semibold text-gray-900">
-                {blogPost.id ? 'Rediger Blog' : 'Ny Blog'}
-              </h1>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  {blogPost.id ? 'Rediger Blog' : 'Ny Blog'}
+                </h1>
+                {currentUser && (
+                  <p className="text-sm text-gray-500">
+                    Forfatter: {currentUser.first_name || 'nicolaivarney'}
+                  </p>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center space-x-3">
