@@ -136,7 +136,7 @@ export default function EnhancedBlogEditor() {
             .eq('blog_post_id', data.id)
             .order('section_order')
 
-          // If no sections exist, create default structure
+          // If no sections exist, create default structure (TypeScript fix applied)
           let defaultSections: Array<{
             section_type: 'introduction' | 'content' | 'widget' | 'conclusion'
             section_order: number
