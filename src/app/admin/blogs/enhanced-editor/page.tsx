@@ -129,6 +129,33 @@ export default function EnhancedBlogEditor() {
             .eq('blog_post_id', data.id)
             .order('section_order')
 
+          // If no sections exist, create default structure
+          let defaultSections = [
+            {
+              section_type: 'introduction' as const,
+              section_order: 1,
+              content: ''
+            }
+          ]
+
+          // If sections exist, use them; otherwise create from content
+          if (sections && sections.length > 0) {
+            defaultSections = sections.map(section => ({
+              ...section,
+              section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion'
+            }))
+          } else if (data.content) {
+            // Parse existing content to extract introduction text
+            const contentText = data.content.replace(/<[^>]*>/g, '').trim()
+            defaultSections = [
+              {
+                section_type: 'introduction' as const,
+                section_order: 1,
+                content: contentText
+              }
+            ]
+          }
+
           setBlogPost({
             id: data.id,
             title: data.title || '',
@@ -145,13 +172,7 @@ export default function EnhancedBlogEditor() {
             meta_title: data.meta_title || '',
             meta_description: data.meta_description || '',
             tags: data.tags || [],
-            sections: sections && sections.length > 0 ? sections : [
-              {
-                section_type: 'introduction',
-                section_order: 1,
-                content: data.content || ''
-              }
-            ]
+            sections: defaultSections
           })
         }
       } catch (error) {
@@ -333,7 +354,8 @@ export default function EnhancedBlogEditor() {
     
     blogPost.sections.forEach((section, index) => {
       if (section.section_type === 'introduction') {
-        content += `<div class="blog-section introduction-section">
+        content += `<div class="blog-section content-section">
+          <h2 class="section-heading">Indledning</h2>
           <div class="section-content">
             <p>${section.content}</p>
           </div>

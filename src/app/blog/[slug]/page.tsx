@@ -276,7 +276,7 @@ export default function BlogPostPage() {
         }
         
         .blog-content .introduction-section {
-          background: #f8fafc !important;
+          background: white !important;
           border-left: 4px solid #3b82f6 !important;
         }
         
