@@ -193,7 +193,7 @@ export default function BlogPostPage() {
 
           {/* Content */}
           <div 
-            className="prose prose-lg max-w-none blog-content"
+            className="blog-content"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
 
@@ -239,36 +239,50 @@ export default function BlogPostPage() {
       )}
 
       {/* Custom CSS for blog sections */}
-      <style jsx>{`
+      <style jsx global>{`
         .blog-content .blog-section {
-          margin-bottom: 2rem;
-          padding: 1.5rem;
-          background: white;
-          border-radius: 0.5rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          margin-bottom: 2rem !important;
+          padding: 1.5rem !important;
+          background: white !important;
+          border-radius: 0.5rem !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+          display: block !important;
         }
         
         .blog-content .section-heading {
-          font-size: 1.5rem;
-          font-weight: 600;
-          color: #1f2937;
-          margin-bottom: 1rem;
-          border-bottom: 2px solid #e5e7eb;
-          padding-bottom: 0.5rem;
+          font-size: 1.5rem !important;
+          font-weight: 600 !important;
+          color: #1f2937 !important;
+          margin-bottom: 1rem !important;
+          border-bottom: 2px solid #e5e7eb !important;
+          padding-bottom: 0.5rem !important;
+          display: block !important;
         }
         
         .blog-content .section-content {
-          line-height: 1.7;
-          color: #374151;
+          line-height: 1.7 !important;
+          color: #374151 !important;
+          display: block !important;
         }
         
         .blog-content .widget-placeholder {
-          background: #f3f4f6;
-          border: 2px dashed #d1d5db;
-          padding: 2rem;
-          text-align: center;
-          color: #6b7280;
-          border-radius: 0.5rem;
+          background: #f3f4f6 !important;
+          border: 2px dashed #d1d5db !important;
+          padding: 2rem !important;
+          text-align: center !important;
+          color: #6b7280 !important;
+          border-radius: 0.5rem !important;
+          display: block !important;
+        }
+        
+        .blog-content .introduction-section {
+          background: #f8fafc !important;
+          border-left: 4px solid #3b82f6 !important;
+        }
+        
+        .blog-content .conclusion-section {
+          background: #f0fdf4 !important;
+          border-left: 4px solid #10b981 !important;
         }
       `}</style>
     </div>

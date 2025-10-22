@@ -335,14 +335,14 @@ export default function EnhancedBlogEditor() {
       if (section.section_type === 'introduction') {
         content += `<div class="blog-section introduction-section">
           <div class="section-content">
-            ${section.content}
+            <p>${section.content}</p>
           </div>
         </div>`
       } else if (section.section_type === 'content') {
         content += `<div class="blog-section content-section">
           <h2 class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
           <div class="section-content">
-            ${section.content}
+            <p>${section.content}</p>
           </div>
         </div>`
       } else if (section.section_type === 'widget') {
@@ -354,7 +354,7 @@ export default function EnhancedBlogEditor() {
       } else if (section.section_type === 'conclusion') {
         content += `<div class="blog-section conclusion-section">
           <div class="section-content">
-            ${section.content}
+            <p>${section.content}</p>
           </div>
         </div>`
       }
