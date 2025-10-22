@@ -13,7 +13,8 @@ import {
   CheckCircle,
   AlertCircle,
   Image as ImageIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Sparkles
 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
@@ -62,6 +63,7 @@ interface BlogPost {
   meta_title?: string
   meta_description?: string
   tags: string[]
+  header_image_url?: string
   sections: ContentSection[]
 }
 
@@ -73,6 +75,7 @@ export default function EnhancedBlogEditor() {
   const [widgets, setWidgets] = useState<BlogWidget[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
+  const [generatingContent, setGeneratingContent] = useState<number | null>(null)
   
   const [blogPost, setBlogPost] = useState<BlogPost>({
     title: '',
@@ -88,6 +91,7 @@ export default function EnhancedBlogEditor() {
     meta_title: '',
     meta_description: '',
     tags: [],
+    header_image_url: '',
     sections: [
       {
         section_type: 'introduction',
@@ -474,6 +478,68 @@ export default function EnhancedBlogEditor() {
     return content || 'Indhold genereres fra sektioner...'
   }
 
+  const generateContentWithAI = async (sectionIndex: number) => {
+    if (!blogPost.title || !blogPost.category_id) {
+      alert('Titel og kategori skal være udfyldt før AI generering')
+      return
+    }
+
+    setGeneratingContent(sectionIndex)
+    
+    try {
+      // Get category name
+      const category = categories.find(c => c.id === blogPost.category_id)
+      const categoryName = category?.name || 'Keto'
+      
+      // Get existing content from all sections
+      const existingContent = blogPost.sections
+        .map((section, index) => {
+          if (section.section_type === 'introduction') {
+            return `Indledning: ${section.content}`
+          } else if (section.section_type === 'content') {
+            return `Sektion ${index}: ${section.heading || `Indholdsboks ${index}`} - ${section.content}`
+          }
+          return null
+        })
+        .filter(Boolean)
+        .join('\n\n')
+
+      const response = await fetch('/api/admin/generate-blog-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: blogPost.title,
+          category: categoryName,
+          existingContent: existingContent
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Fejl ved generering af indhold')
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.content) {
+        // Update the specific section with generated content
+        updateSection(sectionIndex, { 
+          content: data.content,
+          heading: data.heading || `Sektion ${sectionIndex}`
+        })
+      } else {
+        throw new Error('Ingen indhold blev genereret')
+      }
+    } catch (error) {
+      console.error('Error generating content:', error)
+      alert(`Fejl ved generering af indhold: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    } finally {
+      setGeneratingContent(null)
+    }
+  }
+
   const handleSave = async (status: 'draft' | 'published') => {
     setSaving(true)
     try {
@@ -674,6 +740,26 @@ export default function EnhancedBlogEditor() {
                   />
                 </div>
               )}
+
+              {/* Header Image */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Header Billede URL
+                </label>
+                <input
+                  type="url"
+                  value={blogPost.header_image_url || ''}
+                  onChange={(e) => setBlogPost(prev => ({
+                    ...prev,
+                    header_image_url: e.target.value
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="https://example.com/image.jpg"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Billede der vises i blog header (valgfrit)
+                </p>
+              </div>
             </div>
 
             {/* Content Sections */}
@@ -753,9 +839,19 @@ export default function EnhancedBlogEditor() {
                 {section.section_type === 'content' && (
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Overskrift
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Overskrift
+                        </label>
+                        <button
+                          onClick={() => generateContentWithAI(index)}
+                          disabled={generatingContent === index}
+                          className="inline-flex items-center px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Sparkles className="w-4 h-4 mr-1" />
+                          {generatingContent === index ? 'Genererer...' : '🤖 AI Generer'}
+                        </button>
+                      </div>
                       <input
                         type="text"
                         value={section.title || ''}

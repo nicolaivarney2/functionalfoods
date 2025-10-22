@@ -35,6 +35,7 @@ interface BlogPost {
   is_evidence_based: boolean
   disclaimer_text: string
   breadcrumb_path: string[]
+  header_image_url?: string
 }
 
 export default function BlogPostPage() {
@@ -149,7 +150,7 @@ export default function BlogPostPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#FAF9FD] shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             {/* Left side - Content */}
             <div>
@@ -201,11 +202,19 @@ export default function BlogPostPage() {
               </button>
             </div>
 
-            {/* Right side - Image placeholder */}
+            {/* Right side - Header Image */}
             <div className="hidden lg:block">
-              <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
-                <span className="text-gray-500">Blog billede</span>
-              </div>
+              {post.header_image_url ? (
+                <img 
+                  src={post.header_image_url} 
+                  alt={post.title}
+                  className="w-full h-64 object-cover rounded-lg"
+                />
+              ) : (
+                <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
+                  <span className="text-gray-500">Blog billede</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

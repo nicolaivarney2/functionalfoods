@@ -106,7 +106,8 @@ export async function POST(request: NextRequest) {
       parent_id,
       is_evidence_based = false,
       disclaimer_text,
-      breadcrumb_path = []
+      breadcrumb_path = [],
+      header_image_url
     } = await request.json()
 
     if (!title || !content || !category_id) {
@@ -139,7 +140,8 @@ export async function POST(request: NextRequest) {
         parent_id,
         is_evidence_based,
         disclaimer_text,
-        breadcrumb_path
+        breadcrumb_path,
+        header_image_url
       })
       .select(`
         *,
