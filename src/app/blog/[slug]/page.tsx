@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { createSupabaseClient } from '@/lib/supabase'
-import { ArrowLeft, Calendar, User, Tag, ExternalLink, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Calendar, User, ExternalLink, CheckCircle, Info } from 'lucide-react'
 
 interface BlogPost {
   id: number
@@ -43,6 +43,7 @@ export default function BlogPostPage() {
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDisclaimerModal, setShowDisclaimerModal] = useState(false)
 
   const supabase = createSupabaseClient()
 
@@ -129,9 +130,9 @@ export default function BlogPostPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto px-4 py-6 text-center">
           {/* Breadcrumb */}
-          <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+          <nav className="flex items-center justify-center space-x-2 text-sm text-gray-500 mb-4">
             {post.breadcrumb_path.map((item, index) => (
               <div key={index} className="flex items-center">
                 {index > 0 && <span className="mx-2">›</span>}
@@ -140,11 +141,19 @@ export default function BlogPostPage() {
             ))}
           </nav>
 
+          {/* Evidence-based badge */}
+          {post.is_evidence_based && (
+            <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4">
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Evidensbaseret
+            </div>
+          )}
+
           {/* Title */}
           <h1 className="text-4xl font-bold text-gray-900 mb-4">{post.title}</h1>
 
           {/* Meta info */}
-          <div className="flex items-center space-x-6 text-sm text-gray-600 mb-4">
+          <div className="flex items-center justify-center space-x-6 text-sm text-gray-600 mb-4">
             <div className="flex items-center">
               <Calendar className="w-4 h-4 mr-1" />
               {formatDate(post.published_at)}
@@ -161,55 +170,32 @@ export default function BlogPostPage() {
             )}
           </div>
 
-          {/* Evidence-based badge */}
-          {post.is_evidence_based && (
-            <div className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full mb-4">
-              <CheckCircle className="w-4 h-4 mr-1" />
-              Evidensbaseret
-            </div>
-          )}
-
-          {/* Tags */}
-          {post.tags && post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-6">
-              {post.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded"
-                >
-                  <Tag className="w-3 h-3 mr-1" />
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* Disclaimer link */}
+          <button
+            onClick={() => setShowDisclaimerModal(true)}
+            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mb-6"
+          >
+            <Info className="w-4 h-4 mr-1" />
+            Disclaimer
+          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
+        <div className="bg-[#FAF9FD] rounded-lg shadow-sm p-8">
           {/* Excerpt */}
           {post.excerpt && (
-            <div className="text-lg text-gray-700 mb-8 p-4 bg-gray-50 rounded-lg">
+            <div className="text-lg text-gray-700 mb-8 p-4 bg-white rounded-lg">
               {post.excerpt}
             </div>
           )}
 
           {/* Content */}
           <div 
-            className="prose prose-lg max-w-none"
+            className="prose prose-lg max-w-none blog-content"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
-
-          {/* Disclaimer */}
-          {post.is_evidence_based && post.disclaimer_text && (
-            <div className="mt-8 p-4 bg-blue-50 border-l-4 border-blue-400 rounded">
-              <p className="text-sm text-blue-800">
-                <strong>Disclaimer:</strong> {post.disclaimer_text}
-              </p>
-            </div>
-          )}
 
           {/* Reddit integration */}
           {post.reddit_post_id && post.reddit_subreddit && (
@@ -233,6 +219,58 @@ export default function BlogPostPage() {
           )}
         </div>
       </div>
+
+      {/* Disclaimer Modal */}
+      {showDisclaimerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Disclaimer</h3>
+            <p className="text-gray-700 mb-6">
+              {post.disclaimer_text || "Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden. Det betyder, at vi nogle steder har markeret udtalelser med et ¹ ² ³ som er links til understøttende studier. Find referencelist i bunden af artiklen."}
+            </p>
+            <button
+              onClick={() => setShowDisclaimerModal(false)}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Luk
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom CSS for blog sections */}
+      <style jsx>{`
+        .blog-content .blog-section {
+          margin-bottom: 2rem;
+          padding: 1.5rem;
+          background: white;
+          border-radius: 0.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .blog-content .section-heading {
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: #1f2937;
+          margin-bottom: 1rem;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 0.5rem;
+        }
+        
+        .blog-content .section-content {
+          line-height: 1.7;
+          color: #374151;
+        }
+        
+        .blog-content .widget-placeholder {
+          background: #f3f4f6;
+          border: 2px dashed #d1d5db;
+          padding: 2rem;
+          text-align: center;
+          color: #6b7280;
+          border-radius: 0.5rem;
+        }
+      `}</style>
     </div>
   )
 }

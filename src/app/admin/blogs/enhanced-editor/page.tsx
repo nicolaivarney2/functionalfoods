@@ -122,6 +122,13 @@ export default function EnhancedBlogEditor() {
         }
 
         if (data) {
+          // Load sections from database
+          const { data: sections, error: sectionsError } = await supabase
+            .from('blog_post_sections')
+            .select('*')
+            .eq('blog_post_id', data.id)
+            .order('section_order')
+
           setBlogPost({
             id: data.id,
             title: data.title || '',
@@ -138,7 +145,7 @@ export default function EnhancedBlogEditor() {
             meta_title: data.meta_title || '',
             meta_description: data.meta_description || '',
             tags: data.tags || [],
-            sections: [
+            sections: sections && sections.length > 0 ? sections : [
               {
                 section_type: 'introduction',
                 section_order: 1,
@@ -324,16 +331,32 @@ export default function EnhancedBlogEditor() {
     // Generate HTML content from sections for the main content field
     let content = ''
     
-    blogPost.sections.forEach(section => {
+    blogPost.sections.forEach((section, index) => {
       if (section.section_type === 'introduction') {
-        content += `<div class="introduction-section">${section.content}</div>`
+        content += `<div class="blog-section introduction-section">
+          <div class="section-content">
+            ${section.content}
+          </div>
+        </div>`
       } else if (section.section_type === 'content') {
-        content += `<div class="content-section">
-          <h3>${section.title || section.heading || 'Sektion'}</h3>
-          <p>${section.content}</p>
+        content += `<div class="blog-section content-section">
+          <h2 class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
+          <div class="section-content">
+            ${section.content}
+          </div>
+        </div>`
+      } else if (section.section_type === 'widget') {
+        content += `<div class="blog-section widget-section">
+          <div class="widget-placeholder">
+            [Widget: ${section.widget_id || 'Widget'}]
+          </div>
         </div>`
       } else if (section.section_type === 'conclusion') {
-        content += `<div class="conclusion-section">${section.content}</div>`
+        content += `<div class="blog-section conclusion-section">
+          <div class="section-content">
+            ${section.content}
+          </div>
+        </div>`
       }
     })
     
