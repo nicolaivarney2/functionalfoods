@@ -152,42 +152,41 @@ export default function EnhancedBlogEditor() {
               section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion'
             }))
           } else if (data.content) {
-            // Parse existing content to extract sections
-            const contentText = data.content.replace(/<[^>]*>/g, '').trim()
-            
-            // Try to split content into logical sections
-            const sections = contentText.split(/\n\s*\n/).filter((section: string) => section.trim())
+            // Parse existing content by looking for .blog-section divs
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(data.content, 'text/html')
+            const sections = doc.querySelectorAll('.blog-section')
             
             if (sections.length > 0) {
-              defaultSections = sections.map((section: string, index: number) => {
-                const cleanSection = section.trim()
-                const firstLine = cleanSection.split('\n')[0]
+              defaultSections = Array.from(sections).map((section, index) => {
+                const heading = section.querySelector('.section-heading')
+                const content = section.querySelector('.section-content')
+                const sectionClass = section.className
                 
-                // Check if first line looks like a heading
-                if (firstLine.length < 100 && (firstLine.includes(':') || firstLine.includes('?'))) {
-                  return {
-                    section_type: 'content' as const,
-                    section_order: index + 1,
-                    title: firstLine,
-                    content: cleanSection.replace(firstLine, '').trim()
-                  }
-                } else {
-                  return {
-                    section_type: index === 0 ? 'introduction' as const : 'content' as const,
-                    section_order: index + 1,
-                    title: index === 0 ? undefined : undefined,
-                    content: cleanSection
-                  }
+                let sectionType: 'introduction' | 'content' | 'widget' | 'conclusion' = 'content'
+                if (sectionClass.includes('introduction-section')) {
+                  sectionType = 'introduction'
+                } else if (sectionClass.includes('conclusion-section')) {
+                  sectionType = 'conclusion'
+                } else if (sectionClass.includes('resume-section')) {
+                  sectionType = 'content' // Resume is treated as content
+                }
+                
+                return {
+                  section_type: sectionType,
+                  section_order: index + 1,
+                  content: content ? content.textContent || '' : section.textContent || '',
+                  title: heading ? heading.textContent || undefined : undefined
                 }
               })
             } else {
-              defaultSections = [
-                {
-                  section_type: 'introduction' as const,
-                  section_order: 1,
-                  content: contentText
-                }
-              ]
+              // Fallback: create introduction section with all content
+              const contentText = data.content.replace(/<[^>]*>/g, '').trim()
+              defaultSections = [{
+                section_type: 'introduction' as const,
+                section_order: 1,
+                content: contentText
+              }]
             }
           }
 
@@ -463,7 +462,7 @@ export default function EnhancedBlogEditor() {
         </div>`
       } else if (section.section_type === 'content') {
         content += `<div class="blog-section content-section">
-          <h2 id="heading-${index + 1}" class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h2>
+          <h1 id="heading-${index + 1}" class="section-heading">${section.title || section.heading || `Sektion ${index}`}</h1>
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
@@ -477,7 +476,7 @@ export default function EnhancedBlogEditor() {
         </div>`
       } else if (section.section_type === 'conclusion') {
         content += `<div class="blog-section conclusion-section">
-          <h2 id="heading-${index + 1}" class="section-heading">Afslutning</h2>
+          <h1 id="heading-${index + 1}" class="section-heading">Afslutning</h1>
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}

@@ -150,7 +150,7 @@ export default function BlogPostPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#FAF9FD] shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto px-4 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
             {/* Left side - Content */}
             <div>
@@ -221,7 +221,7 @@ export default function BlogPostPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-8">
+      <div className="max-w-5xl mx-auto px-2 sm:px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
           {/* Table of Contents */}
           {tableOfContents.length > 0 && (
