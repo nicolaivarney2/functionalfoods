@@ -80,7 +80,7 @@ export default function EnhancedBlogEditor() {
     category_id: 1,
     post_type: 'blog',
     is_evidence_based: false,
-    disclaimer_text: 'Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden.',
+    disclaimer_text: 'Denne artikel er baseret på evidensbaseret forskning og opdateret faglig viden. Det betyder, at vi nogle steder har markeret udtalelser med et ¹ ² ³ som er links til understøttende studier. Find referencelist i bunden af artiklen.',
     breadcrumb_path: ['Keto', 'Blogs'],
     status: 'draft',
     meta_title: '',
@@ -140,12 +140,39 @@ export default function EnhancedBlogEditor() {
       .trim()
   }
 
+  const generateBreadcrumb = (categoryId: number, postType: string) => {
+    const category = categories.find(c => c.id === categoryId)
+    if (!category) return ['Keto', 'Blogs']
+    
+    if (postType === 'core') {
+      return [category.name, 'Kerneartikler']
+    } else {
+      return [category.name, 'Blogs']
+    }
+  }
+
   const handleTitleChange = (title: string) => {
     setBlogPost(prev => ({
       ...prev,
       title,
       slug: generateSlug(title),
       meta_title: prev.meta_title || title
+    }))
+  }
+
+  const handleCategoryChange = (categoryId: number) => {
+    setBlogPost(prev => ({
+      ...prev,
+      category_id: categoryId,
+      breadcrumb_path: generateBreadcrumb(categoryId, prev.post_type)
+    }))
+  }
+
+  const handlePostTypeChange = (postType: 'core' | 'blog') => {
+    setBlogPost(prev => ({
+      ...prev,
+      post_type: postType,
+      breadcrumb_path: generateBreadcrumb(prev.category_id, postType)
     }))
   }
 
@@ -245,8 +272,11 @@ export default function EnhancedBlogEditor() {
   const handleSave = async (status: 'draft' | 'published') => {
     setSaving(true)
     try {
-      const postData = {
-        ...blogPost,
+      // Remove sections from postData as they're saved separately
+      const { sections, ...postData } = blogPost
+      
+      const finalPostData = {
+        ...postData,
         status,
         published_at: status === 'published' ? new Date().toISOString() : null
       }
@@ -257,17 +287,19 @@ export default function EnhancedBlogEditor() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
         },
-        body: JSON.stringify(postData)
+        body: JSON.stringify(finalPostData)
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save blog post')
+        const errorData = await response.json()
+        console.error('API Error:', errorData)
+        throw new Error(`Failed to save blog post: ${errorData.error || 'Unknown error'}`)
       }
 
       const result = await response.json()
       console.log('Blog post saved:', result)
       
-      // Save sections
+      // Save sections separately
       if (result.post?.id) {
         await saveSections(result.post.id)
       }
@@ -275,6 +307,7 @@ export default function EnhancedBlogEditor() {
       router.push('/admin/blogs')
     } catch (error) {
       console.error('Error saving blog post:', error)
+      alert(`Fejl ved gemning: ${error.message}`)
     } finally {
       setSaving(false)
     }
@@ -350,21 +383,24 @@ export default function EnhancedBlogEditor() {
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Blog Header</h2>
               
-              {/* Breadcrumb */}
+              {/* Auto-generated Breadcrumb */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Breadcrumb Path
+                  Breadcrumb Path (auto-genereret)
                 </label>
-                <input
-                  type="text"
-                  value={blogPost.breadcrumb_path.join(' > ')}
-                  onChange={(e) => setBlogPost(prev => ({
-                    ...prev,
-                    breadcrumb_path: e.target.value.split(' > ').map(s => s.trim())
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Keto > Vægttab > Blog"
-                />
+                <div className="flex items-center space-x-2 px-3 py-2 bg-gray-50 border border-gray-300 rounded-md">
+                  {blogPost.breadcrumb_path.map((item, index) => (
+                    <div key={index} className="flex items-center">
+                      {index > 0 && <span className="text-gray-400 mx-2">›</span>}
+                      <span className="text-sm text-gray-700 hover:text-blue-600 cursor-pointer">
+                        {item}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Breadcrumb opdateres automatisk baseret på kategori og post type
+                </p>
               </div>
 
               {/* Title */}
@@ -628,10 +664,7 @@ export default function EnhancedBlogEditor() {
                   </label>
                   <select
                     value={blogPost.category_id}
-                    onChange={(e) => setBlogPost(prev => ({
-                      ...prev,
-                      category_id: parseInt(e.target.value)
-                    }))}
+                    onChange={(e) => handleCategoryChange(parseInt(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {categories.map(category => (
@@ -648,10 +681,7 @@ export default function EnhancedBlogEditor() {
                   </label>
                   <select
                     value={blogPost.post_type}
-                    onChange={(e) => setBlogPost(prev => ({
-                      ...prev,
-                      post_type: e.target.value as 'core' | 'blog'
-                    }))}
+                    onChange={(e) => handlePostTypeChange(e.target.value as 'core' | 'blog')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="blog">Blog (Status 2)</option>

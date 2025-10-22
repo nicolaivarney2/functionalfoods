@@ -100,7 +100,13 @@ export async function POST(request: NextRequest) {
       status = 'draft',
       featured = false,
       reddit_post_id,
-      reddit_subreddit
+      reddit_subreddit,
+      // New enhanced fields
+      post_type = 'blog',
+      parent_id,
+      is_evidence_based = false,
+      disclaimer_text,
+      breadcrumb_path = []
     } = await request.json()
 
     if (!title || !content || !category_id) {
@@ -127,7 +133,13 @@ export async function POST(request: NextRequest) {
         featured,
         published_at: status === 'published' ? new Date().toISOString() : null,
         reddit_post_id,
-        reddit_subreddit
+        reddit_subreddit,
+        // New enhanced fields
+        post_type,
+        parent_id,
+        is_evidence_based,
+        disclaimer_text,
+        breadcrumb_path
       })
       .select(`
         *,
