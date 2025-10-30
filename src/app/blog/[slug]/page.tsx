@@ -129,14 +129,18 @@ export default function BlogPostPage() {
         }
       })
 
-      // Find first section to place TOCs (prefer one with heading 'Indledning')
-      const sections = Array.from(container.querySelectorAll('.blog-section')) as HTMLElement[]
+      // Find target to place TOCs:
+      // 1) Prefer a section with heading 'Indledning'
+      // 2) Else first h1/h2 in content
       let targetSection: HTMLElement | null = null
-      targetSection = sections.find(sec =>
+      const headingIndledning = container.querySelector('h1, h2') as HTMLElement | null
+      const allSections = Array.from(container.querySelectorAll('.blog-section')) as HTMLElement[]
+      const sectionWithIndledning = allSections.find(sec =>
         !!sec.querySelector('h2, h1') && /indledning/i.test((sec.querySelector('h2, h1') as HTMLElement)?.textContent || '')
-      ) || sections[0] || null
+      ) || null
+      targetSection = sectionWithIndledning || (allSections[0] || null)
 
-      if (targetSection && (mainToc.length > 0 || h4Toc.length > 0)) {
+      const placeInside = (host: HTMLElement) => {
         // Build TOC block
         const tocWrapper = document.createElement('div')
         tocWrapper.className = 'mt-4 p-4 sm:p-5 bg-gray-50 rounded-lg border border-gray-200 shadow-sm'
@@ -181,15 +185,31 @@ export default function BlogPostPage() {
           tocWrapper.appendChild(nav2)
         }
 
-        // Insert after first paragraph inside section-content if present, else at top of section content
-        const sectionContent = targetSection.querySelector('.section-content') as HTMLElement | null
+        // Insert after first paragraph inside section-content if present,
+        // else after the heading, else prepend
+        const sectionContent = host.querySelector('.section-content') as HTMLElement | null
         const firstParagraph = sectionContent?.querySelector('p')
         if (firstParagraph && firstParagraph.parentElement) {
           firstParagraph.parentElement.insertBefore(tocWrapper, firstParagraph.nextSibling)
-        } else if (sectionContent) {
-          sectionContent.insertBefore(tocWrapper, sectionContent.firstChild)
-        } else {
-          targetSection.appendChild(tocWrapper)
+          return
+        }
+        const firstHeading = host.querySelector('h1, h2, h3')
+        if (firstHeading && firstHeading.parentElement) {
+          firstHeading.parentElement.insertBefore(tocWrapper, firstHeading.nextSibling)
+          return
+        }
+        host.prepend(tocWrapper)
+      }
+
+      if ((mainToc.length > 0 || h4Toc.length > 0)) {
+        if (targetSection) {
+          placeInside(targetSection)
+        } else if (headingIndledning) {
+          // Create a wrapper div around the first heading for insertion
+          const wrapper = document.createElement('div')
+          headingIndledning.parentElement?.insertBefore(wrapper, headingIndledning)
+          wrapper.appendChild(headingIndledning)
+          placeInside(wrapper)
         }
       }
 
