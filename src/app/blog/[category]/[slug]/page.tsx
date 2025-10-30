@@ -222,23 +222,25 @@ export default function BlogPostPage() {
       // No admin controls on frontend; only render stored takeaway inside content
 
       // Hydrate widgets by calling API to render HTML
-      const widgetNodes = Array.from(container.querySelectorAll('.blog-widget')) as HTMLElement[]
-      for (const node of widgetNodes) {
-        try {
-          const type = node.getAttribute('data-widget-type') || ''
-          const configAttr = node.getAttribute('data-widget-config') || '{}'
-          const config = JSON.parse(configAttr)
-          const res = await fetch('/api/widgets/render', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: node.getAttribute('data-widget-id'), type, config, context: { categorySlug: post?.category?.slug } })
-          })
-          const data = await res.json()
-          if (data?.html) node.innerHTML = data.html
-        } catch {}
+      const hydrate = async () => {
+        const widgetNodes = Array.from(container.querySelectorAll('.blog-widget')) as HTMLElement[]
+        for (const node of widgetNodes) {
+          try {
+            const type = node.getAttribute('data-widget-type') || ''
+            const configAttr = node.getAttribute('data-widget-config') || '{}'
+            const config = JSON.parse(configAttr)
+            const res = await fetch('/api/widgets/render', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: node.getAttribute('data-widget-id'), type, config, context: { categorySlug: post?.category?.slug } })
+            })
+            const data = await res.json()
+            if (data?.html) node.innerHTML = data.html
+          } catch {}
+        }
+        setProcessedContent(container.innerHTML)
       }
-
-      setProcessedContent(container.innerHTML)
+      hydrate().catch(() => setProcessedContent(container.innerHTML))
     } catch (e) {
       setProcessedContent(post.content)
     }
