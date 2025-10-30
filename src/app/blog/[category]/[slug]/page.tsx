@@ -538,6 +538,4 @@ export default function BlogPostPage() {
   )
 }
 
-export { default } from '../../../blog/[slug]/page'
-
-
+ 
