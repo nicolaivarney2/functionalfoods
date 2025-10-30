@@ -18,24 +18,80 @@ export async function POST(req: NextRequest) {
     if (type === 'related_posts') {
       const limit = Number(cfg.limit || 3)
       const categorySlug = cfg.category || context?.categorySlug
+      const currentSlug = context?.slug
+      const contextTags: string[] = Array.isArray(cfg.tags) ? cfg.tags : (context?.tags || [])
+
+      // fetch more than needed to allow scoring by tags
       let query = supabase
         .from('blog_posts')
-        .select('id,title,slug,excerpt,category:blog_categories(slug)')
+        .select('id,title,slug,excerpt,tags,category:blog_categories(slug)')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
-        .limit(limit)
+        .limit(30)
 
       if (categorySlug) {
         query = query.eq('category:blog_categories.slug', categorySlug)
       }
+      if (currentSlug) {
+        query = query.neq('slug', currentSlug)
+      }
       const { data } = await query
-      const items = data || []
+      let items: any[] = data || []
+
+      if (contextTags && contextTags.length > 0) {
+        const tagsLower = contextTags.map((t) => String(t).toLowerCase())
+        items = items
+          .map((p) => ({
+            ...p,
+            _score: Array.isArray(p.tags)
+              ? p.tags.reduce((acc: number, t: string) => acc + (tagsLower.includes(String(t).toLowerCase()) ? 1 : 0), 0)
+              : 0
+          }))
+          .sort((a, b) => b._score - a._score)
+      }
+      items = items.slice(0, limit)
       html = `
         <div class="widget-related-posts">
           <h4 class="text-lg font-semibold mb-3">${cfg.title || 'Relaterede artikler'}</h4>
           <ul class="space-y-2">
             ${items.map((p: any) => `<li><a class="text-blue-700 hover:text-blue-900" href="/blog/${p.category?.slug || 'keto'}/${p.slug}">${p.title}</a></li>`).join('')}
           </ul>
+        </div>
+      `
+    } else if (type === 'related_recipes') {
+      const limit = Number(cfg.limit || 6)
+      const diet = (cfg.category || context?.categorySlug || '').toString().toLowerCase()
+      // try to query recipes table; be flexible with field names
+      const { data } = await supabase
+        .from('recipes')
+        .select('id,title,slug,image_url,imageUrl,dietary_categories,dietaryCategories,mainCategory')
+        .order('created_at', { ascending: false })
+        .limit(50)
+
+      let recipes: any[] = data || []
+      if (diet) {
+        recipes = recipes.filter((r) => {
+          const dc = r.dietary_categories || r.dietaryCategories || []
+          return Array.isArray(dc) && dc.map((x: any) => String(x).toLowerCase()).includes(diet)
+        })
+      }
+      recipes = recipes.slice(0, limit)
+      html = `
+        <div class="widget-related-recipes">
+          <h4 class="text-lg font-semibold mb-3">${cfg.title || 'Relaterede opskrifter'}</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ${recipes
+              .map((r) => {
+                const img = r.image_url || r.imageUrl || '/images/recipes/placeholder.jpg'
+                return `<a class="block bg-white rounded shadow hover:shadow-md transition overflow-hidden" href="/opskrift/${r.slug}">
+                  <img src="${img}" alt="${r.title}" class="w-full h-32 object-cover"/>
+                  <div class="p-3">
+                    <div class="text-sm font-medium text-gray-900">${r.title}</div>
+                  </div>
+                </a>`
+              })
+              .join('')}
+          </div>
         </div>
       `
     } else if (type === 'newsletter_signup') {

@@ -232,7 +232,7 @@ export default function BlogPostPage() {
             const res = await fetch('/api/widgets/render', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: node.getAttribute('data-widget-id'), type, config, context: { categorySlug: post?.category?.slug } })
+              body: JSON.stringify({ id: node.getAttribute('data-widget-id'), type, config, context: { categorySlug: post?.category?.slug, slug: post?.slug, tags: post?.tags } })
             })
             const data = await res.json()
             if (data?.html) node.innerHTML = data.html
