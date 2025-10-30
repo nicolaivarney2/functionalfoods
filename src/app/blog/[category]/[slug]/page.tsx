@@ -219,50 +219,7 @@ export default function BlogPostPage() {
         }
       }
 
-      // Add AI Takeaway button to each section
-      const allTakeawaySections = Array.from(container.querySelectorAll('.blog-section')) as HTMLElement[]
-      allTakeawaySections.forEach((sec) => {
-        const secContentEl = (sec.querySelector('.section-content') as HTMLElement) || sec
-        if (sec.querySelector('.takeaway-container')) return
-
-        const takeWrap = document.createElement('div')
-        takeWrap.className = 'takeaway-container mt-3'
-
-        const btn = document.createElement('button')
-        btn.type = 'button'
-        btn.className = 'px-3 py-1.5 text-sm rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
-        btn.textContent = '🤖 One takeaway'
-
-        const resultBox = document.createElement('div')
-        resultBox.className = 'hidden mt-2 p-3 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-sm'
-
-        btn.addEventListener('click', async () => {
-          try {
-            btn.disabled = true
-            btn.textContent = 'Genererer…'
-            const sectionText = secContentEl.textContent || ''
-            const resp = await fetch('/api/admin/generate-blog-takeaway', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ title: post?.title, sectionText })
-            })
-            const data = await resp.json()
-            if (!resp.ok || !data.success) throw new Error('API error')
-            resultBox.textContent = data.takeaway
-            resultBox.classList.remove('hidden')
-          } catch (e) {
-            resultBox.textContent = 'Kunne ikke generere takeaway denne gang.'
-            resultBox.classList.remove('hidden')
-          } finally {
-            btn.disabled = false
-            btn.textContent = '🤖 One takeaway'
-          }
-        })
-
-        takeWrap.appendChild(btn)
-        takeWrap.appendChild(resultBox)
-        secContentEl.appendChild(takeWrap)
-      })
+      // No admin controls on frontend; only render stored takeaway inside content
 
       setProcessedContent(container.innerHTML)
     } catch (e) {
