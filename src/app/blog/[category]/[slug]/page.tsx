@@ -528,6 +528,7 @@ export default function BlogPostPage() {
         .blog-content .section-content img.section-image { width: 100% !important; height: auto !important; margin-top: 1rem !important; border-radius: 0.5rem !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; }
         .blog-content .section-content h3 { font-size: 1.25rem !important; font-weight: 600 !important; color: #1f2937 !important; margin: 1.5rem 0 1rem 0 !important; }
         .blog-content .section-content h4 { font-size: 1.1rem !important; font-weight: 600 !important; color: #374151 !important; margin: 1rem 0 0.5rem 0 !important; }
+        .blog-content .takeaway-box { border: 1px solid #FDE68A !important; background: #FFFBEB !important; color: #92400E !important; padding: 0.75rem !important; border-radius: 0.5rem !important; }
         .blog-content .widget-placeholder { background: #f3f4f6 !important; border: 2px dashed #d1d5db !important; padding: 2rem !important; text-align: center !important; color: #6b7280 !important; border-radius: 0.5rem !important; display: block !important; }
         .blog-content .introduction-section { background: white !important; border-left: 4px solid #3b82f6 !important; }
         .blog-content .conclusion-section { background: #f0fdf4 !important; border-left: 4px solid #10b981 !important; }

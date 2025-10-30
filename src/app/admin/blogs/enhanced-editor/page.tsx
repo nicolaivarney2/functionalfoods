@@ -44,6 +44,7 @@ interface ContentSection {
   content: string
   image_url?: string
   widget_id?: number
+  takeaway?: string
 }
 
 interface BlogPost {
@@ -78,6 +79,7 @@ export default function EnhancedBlogEditor() {
   const [generatingContent, setGeneratingContent] = useState<number | null>(null)
   const [generatingResume, setGeneratingResume] = useState(false)
   const [generatingSeo, setGeneratingSeo] = useState(false)
+  const [generatingTakeaway, setGeneratingTakeaway] = useState<number | null>(null)
   const [tagInput, setTagInput] = useState('')
   
   const [blogPost, setBlogPost] = useState<BlogPost>({
@@ -571,6 +573,7 @@ export default function EnhancedBlogEditor() {
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
+            ${section.takeaway ? `<div class="takeaway-box"><strong>One takeaway:</strong> ${section.takeaway}</div>` : ''}
           </div>
         </div>`
       } else if (section.section_type === 'content') {
@@ -579,6 +582,7 @@ export default function EnhancedBlogEditor() {
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
+            ${section.takeaway ? `<div class="takeaway-box"><strong>One takeaway:</strong> ${section.takeaway}</div>` : ''}
           </div>
         </div>`
       } else if (section.section_type === 'widget') {
@@ -593,6 +597,7 @@ export default function EnhancedBlogEditor() {
           <div class="section-content">
             ${formatContent(section.content)}
             ${section.image_url ? `<img src="${section.image_url}" alt="" class="section-image" />` : ''}
+            ${section.takeaway ? `<div class="takeaway-box"><strong>One takeaway:</strong> ${section.takeaway}</div>` : ''}
           </div>
         </div>`
       } else if (section.title === 'Resume') {
@@ -600,12 +605,32 @@ export default function EnhancedBlogEditor() {
           <h1 id="heading-${index + 1}" class="section-heading">Resume</h1>
           <div class="section-content">
             ${formatContent(section.content)}
+            ${section.takeaway ? `<div class="takeaway-box"><strong>One takeaway:</strong> ${section.takeaway}</div>` : ''}
           </div>
         </div>`
       }
     })
     
     return content || 'Indhold genereres fra sektioner...'
+  }
+
+  const generateSectionTakeaway = async (sectionIndex: number) => {
+    try {
+      setGeneratingTakeaway(sectionIndex)
+      const section = blogPost.sections[sectionIndex]
+      const resp = await fetch('/api/admin/generate-blog-takeaway', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: blogPost.title, sectionText: section.content })
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'API error')
+      updateSection(sectionIndex, { takeaway: data.takeaway })
+    } catch (e) {
+      alert('Kunne ikke generere takeaway for denne sektion')
+    } finally {
+      setGeneratingTakeaway(null)
+    }
   }
 
   const generateContentWithAI = async (sectionIndex: number) => {
@@ -1032,6 +1057,24 @@ export default function EnhancedBlogEditor() {
                         )}
                       </div>
                     </div>
+
+                    {/* One Takeaway */}
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => generateSectionTakeaway(index)}
+                        disabled={generatingTakeaway === index}
+                        className="px-3 py-1.5 text-sm rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {generatingTakeaway === index ? 'Genererer…' : '🤖 One takeaway'}
+                      </button>
+                      {section.takeaway && (
+                        <div className="mt-2 p-3 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+                          <strong className="mr-1">One takeaway:</strong>
+                          {section.takeaway}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1095,6 +1138,24 @@ export default function EnhancedBlogEditor() {
                       />
                     </div>
                     
+                    {/* One Takeaway */}
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => generateSectionTakeaway(index)}
+                        disabled={generatingTakeaway === index}
+                        className="px-3 py-1.5 text-sm rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {generatingTakeaway === index ? 'Genererer…' : '🤖 One takeaway'}
+                      </button>
+                      {section.takeaway && (
+                        <div className="mt-2 p-3 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+                          <strong className="mr-1">One takeaway:</strong>
+                          {section.takeaway}
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Billede URL
@@ -1142,6 +1203,24 @@ export default function EnhancedBlogEditor() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Skriv en afslutning til artiklen..."
                     />
+
+                    {/* One Takeaway */}
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={() => generateSectionTakeaway(index)}
+                        disabled={generatingTakeaway === index}
+                        className="px-3 py-1.5 text-sm rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        {generatingTakeaway === index ? 'Genererer…' : '🤖 One takeaway'}
+                      </button>
+                      {section.takeaway && (
+                        <div className="mt-2 p-3 rounded-md border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+                          <strong className="mr-1">One takeaway:</strong>
+                          {section.takeaway}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

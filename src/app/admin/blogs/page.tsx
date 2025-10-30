@@ -118,8 +118,9 @@ export default function AdminBlogsPage() {
   }
 
   const viewPost = (post: BlogPost) => {
-    // Open in new tab
-    window.open(`/blog/${post.slug}`, '_blank')
+    // Open in new tab with category-scoped URL
+    const cat = post.category?.slug || 'keto'
+    window.open(`/blog/${cat}/${post.slug}`, '_blank')
   }
 
   const deletePost = async (postId: number) => {
