@@ -109,8 +109,8 @@ export default function EnhancedBlogEditor() {
     let t = text.replace(/\r\n/g, '\n').trim()
     // Insert double newlines after sentence end followed by uppercase letter (including Danish letters)
     t = t.replace(/([\.\!\?])\s+([A-ZÆØÅ])/g, '$1\n\n$2')
-    // Insert breaks after emoji then uppercase
-    t = t.replace(/([\u{1F300}-\u{1FAFF}])\s*([A-ZÆØÅ])/gu, '$1\n\n$2')
+    // Insert breaks after certain emojis then uppercase (avoid Unicode 'u' flag for TS target)
+    t = t.replace(/(🥓|🍔|🥗)\s*([A-ZÆØÅ])/g, '$1\n\n$2')
     return t
   }
 
