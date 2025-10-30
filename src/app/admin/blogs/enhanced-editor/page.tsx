@@ -103,6 +103,16 @@ export default function EnhancedBlogEditor() {
   })
 
   const supabase = createSupabaseClient()
+  // Normalize raw plain text from legacy posts into editor-friendly paragraphs
+  const normalizeForEditor = (text: string): string => {
+    if (!text) return ''
+    let t = text.replace(/\r\n/g, '\n').trim()
+    // Insert double newlines after sentence end followed by uppercase letter (including Danish letters)
+    t = t.replace(/([\.\!\?])\s+([A-ZÆØÅ])/g, '$1\n\n$2')
+    // Insert breaks after emoji then uppercase
+    t = t.replace(/([\u{1F300}-\u{1FAFF}])\s*([A-ZÆØÅ])/gu, '$1\n\n$2')
+    return t
+  }
 
   useEffect(() => {
     loadCategories()
@@ -154,6 +164,7 @@ export default function EnhancedBlogEditor() {
           if (sections && sections.length > 0) {
             defaultSections = sections.map(section => ({
               ...section,
+              content: normalizeForEditor(section.content || ''),
               section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion'
             }))
           } else if (data.content) {
@@ -180,7 +191,7 @@ export default function EnhancedBlogEditor() {
                 return {
                   section_type: sectionType,
                   section_order: index + 1,
-                  content: content ? content.textContent || '' : section.textContent || '',
+                  content: normalizeForEditor(content ? content.textContent || '' : section.textContent || ''),
                   title: heading ? heading.textContent || undefined : undefined
                 }
               })
@@ -190,7 +201,7 @@ export default function EnhancedBlogEditor() {
               defaultSections = [{
                 section_type: 'introduction' as const,
                 section_order: 1,
-                content: contentText
+                content: normalizeForEditor(contentText)
               }]
             }
           }
@@ -365,10 +376,15 @@ export default function EnhancedBlogEditor() {
   }
 
   const updateSection = (index: number, updates: Partial<ContentSection>) => {
+    // If content is being updated, normalize it so single-line pastes render well
+    const normalizedUpdates = {
+      ...updates,
+      ...(typeof updates.content === 'string' ? { content: normalizeForEditor(updates.content) } : {})
+    }
     setBlogPost(prev => ({
       ...prev,
       sections: prev.sections.map((section, i) => 
-        i === index ? { ...section, ...updates } : section
+        i === index ? { ...section, ...normalizedUpdates } : section
       )
     }))
   }
