@@ -143,7 +143,7 @@ export default function BlogPostPage() {
       const placeInside = (host: HTMLElement) => {
         // Build TOC block
         const tocWrapper = document.createElement('div')
-        tocWrapper.className = 'mt-4 p-4 sm:p-5 bg-gray-50 rounded-lg border border-gray-200 shadow-sm'
+        tocWrapper.className = 'mt-4 p-4 sm:p-5 bg-blue-50 rounded-md border border-blue-100 shadow-sm border-l-4 border-l-blue-500'
 
         if (mainToc.length > 0) {
           const title = document.createElement('h3')
@@ -179,23 +179,22 @@ export default function BlogPostPage() {
             const a = document.createElement('a')
             a.href = `#${item.id}`
             a.textContent = item.text
-            a.className = 'block text-[13px] sm:text-sm text-gray-700 hover:text-blue-600 hover:underline underline-offset-2'
+            a.className = 'block text-[13px] sm:text-sm text-blue-700 hover:text-blue-800 hover:underline underline-offset-2'
             nav2.appendChild(a)
           })
           tocWrapper.appendChild(nav2)
         }
 
-        // Insert after first paragraph inside section-content if present,
-        // else after the heading, else prepend
+        // Prefer placing immediately after the section heading (so it's visible early),
+        // else append to the bottom of section-content, else prepend
         const sectionContent = host.querySelector('.section-content') as HTMLElement | null
-        const firstParagraph = sectionContent?.querySelector('p')
-        if (firstParagraph && firstParagraph.parentElement) {
-          firstParagraph.parentElement.insertBefore(tocWrapper, firstParagraph.nextSibling)
-          return
-        }
         const firstHeading = host.querySelector('h1, h2, h3')
         if (firstHeading && firstHeading.parentElement) {
           firstHeading.parentElement.insertBefore(tocWrapper, firstHeading.nextSibling)
+          return
+        }
+        if (sectionContent) {
+          sectionContent.appendChild(tocWrapper)
           return
         }
         host.prepend(tocWrapper)
@@ -308,7 +307,18 @@ export default function BlogPostPage() {
               )}
 
               {/* Title */}
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-3">{post.title}</h1>
+
+              {/* Mobile Header Image under title */}
+              <div className="block lg:hidden mb-4">
+                {post.header_image_url ? (
+                  <img 
+                    src={post.header_image_url} 
+                    alt={post.title}
+                    className="w-full h-40 sm:h-56 object-cover rounded-lg"
+                  />
+                ) : null}
+              </div>
 
               {/* Meta info */}
               <div className="text-sm text-gray-600 mb-4">
@@ -328,13 +338,13 @@ export default function BlogPostPage() {
               </button>
             </div>
 
-            {/* Right side - Header Image */}
-            <div className="block">
+            {/* Right side - Header Image (desktop) */}
+            <div className="hidden lg:block">
               {post.header_image_url ? (
                 <img 
                   src={post.header_image_url} 
                   alt={post.title}
-                  className="w-full h-40 sm:h-56 lg:h-64 object-cover rounded-lg"
+                  className="w-full h-64 object-cover rounded-lg"
                 />
               ) : (
                 <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -469,6 +479,9 @@ export default function BlogPostPage() {
           border-radius: 0.5rem !important;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
           display: block !important;
+          max-width: 760px !important;
+          margin-left: auto !important;
+          margin-right: auto !important;
         }
         
         @media (min-width: 640px) {
