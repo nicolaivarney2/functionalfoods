@@ -22,21 +22,20 @@ export async function POST(req: NextRequest) {
       const contextTags: string[] = Array.isArray(cfg.tags) ? cfg.tags : (context?.tags || [])
 
       // fetch more than needed to allow scoring by tags
-      let query = supabase
+      const { data } = await supabase
         .from('blog_posts')
         .select('id,title,slug,excerpt,tags,category:blog_categories(slug)')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
         .limit(30)
+      let items: any[] = (data || [])
+        .filter((p: any) => !currentSlug || p.slug !== currentSlug)
 
+      // prefer same category if provided
       if (categorySlug) {
-        query = query.eq('category:blog_categories.slug', categorySlug)
+        const sameCat = items.filter((p: any) => (p.category?.slug || '').toLowerCase() === String(categorySlug).toLowerCase())
+        if (sameCat.length > 0) items = sameCat
       }
-      if (currentSlug) {
-        query = query.neq('slug', currentSlug)
-      }
-      const { data } = await query
-      let items: any[] = data || []
 
       if (contextTags && contextTags.length > 0) {
         const tagsLower = contextTags.map((t) => String(t).toLowerCase())
@@ -74,6 +73,10 @@ export async function POST(req: NextRequest) {
           const dc = r.dietary_categories || r.dietaryCategories || []
           return Array.isArray(dc) && dc.map((x: any) => String(x).toLowerCase()).includes(diet)
         })
+      }
+      // Fallback to latest if filter yields nothing
+      if (recipes.length === 0) {
+        recipes = (data || [])
       }
       recipes = recipes.slice(0, limit)
       html = `
