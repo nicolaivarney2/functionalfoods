@@ -46,6 +46,7 @@ export default function BlogPostPage() {
   const [error, setError] = useState<string | null>(null)
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
+  const [processedContent, setProcessedContent] = useState<string | null>(null)
 
   const supabase = createSupabaseClient()
 
@@ -92,6 +93,111 @@ export default function BlogPostPage() {
     }
   }
 
+  // Process HTML content to inject TOCs and ensure heading anchors
+  useEffect(() => {
+    if (!post?.content) {
+      setProcessedContent(null)
+      return
+    }
+
+    try {
+      const container = document.createElement('div')
+      container.innerHTML = post.content
+
+      // Ensure IDs on headings and collect for TOCs
+      const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4')) as HTMLElement[]
+      const mainToc: { text: string; id: string; level: number }[] = []
+      const h4Toc: { text: string; id: string }[] = []
+
+      const slugify = (text: string) =>
+        text
+          .toLowerCase()
+          .replace(/[^a-z0-9\u00C0-\u017F\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+
+      headings.forEach((el, idx) => {
+        const text = el.textContent?.trim() || `afsnit-${idx + 1}`
+        if (!el.id) {
+          el.id = slugify(text) || `heading-${idx + 1}`
+        }
+        if (el.tagName === 'H1') {
+          mainToc.push({ text, id: el.id, level: 1 })
+        }
+        if (el.tagName === 'H4') {
+          h4Toc.push({ text, id: el.id })
+        }
+      })
+
+      // Find first section to place TOCs (prefer one with heading 'Indledning')
+      const sections = Array.from(container.querySelectorAll('.blog-section')) as HTMLElement[]
+      let targetSection: HTMLElement | null = null
+      targetSection = sections.find(sec =>
+        !!sec.querySelector('h2, h1') && /indledning/i.test((sec.querySelector('h2, h1') as HTMLElement)?.textContent || '')
+      ) || sections[0] || null
+
+      if (targetSection && (mainToc.length > 0 || h4Toc.length > 0)) {
+        // Build TOC block
+        const tocWrapper = document.createElement('div')
+        tocWrapper.className = 'mt-4 p-4 sm:p-5 bg-gray-50 rounded-lg border border-gray-200 shadow-sm'
+
+        if (mainToc.length > 0) {
+          const title = document.createElement('h3')
+          title.className = 'text-sm font-semibold text-gray-900 mb-3'
+          title.textContent = 'Indholdsfortegnelse'
+          tocWrapper.appendChild(title)
+
+          const nav = document.createElement('nav')
+          nav.className = 'space-y-1'
+          mainToc.forEach(item => {
+            const a = document.createElement('a')
+            a.href = `#${item.id}`
+            a.textContent = item.text
+            a.className = 'block text-[13px] sm:text-sm text-gray-700 hover:text-blue-600 hover:underline underline-offset-2'
+            nav.appendChild(a)
+          })
+          tocWrapper.appendChild(nav)
+        }
+
+        if (h4Toc.length > 0) {
+          const sep = document.createElement('div')
+          sep.className = 'my-3 border-t border-gray-200'
+          tocWrapper.appendChild(sep)
+
+          const title2 = document.createElement('h3')
+          title2.className = 'text-sm font-semibold text-gray-900 mb-3'
+          title2.textContent = 'Hurtigmenu - Spørgsmål vi svarer i artiklen'
+          tocWrapper.appendChild(title2)
+
+          const nav2 = document.createElement('nav')
+          nav2.className = 'space-y-1'
+          h4Toc.forEach(item => {
+            const a = document.createElement('a')
+            a.href = `#${item.id}`
+            a.textContent = item.text
+            a.className = 'block text-[13px] sm:text-sm text-gray-700 hover:text-blue-600 hover:underline underline-offset-2'
+            nav2.appendChild(a)
+          })
+          tocWrapper.appendChild(nav2)
+        }
+
+        // Insert after first paragraph inside section-content if present, else at top of section content
+        const sectionContent = targetSection.querySelector('.section-content') as HTMLElement | null
+        const firstParagraph = sectionContent?.querySelector('p')
+        if (firstParagraph && firstParagraph.parentElement) {
+          firstParagraph.parentElement.insertBefore(tocWrapper, firstParagraph.nextSibling)
+        } else if (sectionContent) {
+          sectionContent.insertBefore(tocWrapper, sectionContent.firstChild)
+        } else {
+          targetSection.appendChild(tocWrapper)
+        }
+      }
+
+      setProcessedContent(container.innerHTML)
+    } catch (e) {
+      setProcessedContent(post.content)
+    }
+  }, [post?.content])
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('da-DK', {
       year: 'numeric',
@@ -203,12 +309,12 @@ export default function BlogPostPage() {
             </div>
 
             {/* Right side - Header Image */}
-            <div className="hidden lg:block">
+            <div className="block">
               {post.header_image_url ? (
                 <img 
                   src={post.header_image_url} 
                   alt={post.title}
-                  className="w-full h-64 object-cover rounded-lg"
+                  className="w-full h-40 sm:h-56 lg:h-64 object-cover rounded-lg"
                 />
               ) : (
                 <div className="w-full h-64 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -222,35 +328,12 @@ export default function BlogPostPage() {
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-2 sm:px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-8">
-          {/* Table of Contents */}
-          {tableOfContents.length > 0 && (
-            <div className="lg:col-span-1">
-              <div className="sticky top-8 bg-white rounded-lg shadow-sm p-4 lg:p-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">Indholdsfortegnelse</h3>
-                <nav className="space-y-2">
-                  {tableOfContents.map((item, index) => (
-                    <a
-                      key={index}
-                      href={`#${item.id}`}
-                      className={`block text-sm text-gray-600 hover:text-blue-600 ${
-                        item.level === 3 ? 'ml-4' : item.level === 4 ? 'ml-8' : ''
-                      }`}
-                    >
-                      {item.text}
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </div>
-          )}
-
+        <div className="grid grid-cols-1">
           {/* Main Content */}
-          <div className={`${tableOfContents.length > 0 ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-            {/* Content */}
+          <div>
             <div 
               className="blog-content"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: processedContent || post.content }}
             />
           </div>
         </div>

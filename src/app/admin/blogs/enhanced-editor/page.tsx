@@ -411,35 +411,68 @@ export default function EnhancedBlogEditor() {
 
   const formatContent = (text: string) => {
     if (!text) return ''
-    
-    // Convert line breaks to paragraphs
-    let formatted = text
-      .split('\n\n')
-      .map(paragraph => paragraph.trim())
-      .filter(paragraph => paragraph.length > 0)
-      .map(paragraph => {
-        // Check if paragraph looks like a list
-        if (paragraph.includes('\n-') || paragraph.includes('\n•')) {
-          const lines = paragraph.split('\n')
-          const listItems = lines
-            .map(line => line.replace(/^[-•]\s*/, '').trim())
-            .filter(line => line.length > 0)
-            .map(line => `<li>${line}</li>`)
-            .join('')
-          return `<ul>${listItems}</ul>`
-        }
-        // Check if paragraph looks like a heading
-        else if (paragraph.length < 100 && (paragraph.includes(':') || paragraph.includes('?'))) {
-          return `<h3>${paragraph}</h3>`
-        }
-        // Regular paragraph
-        else {
-          return `<p>${paragraph}</p>`
-        }
-      })
-      .join('')
-    
-    return formatted
+
+    const lines = text.replace(/\r\n/g, '\n').split('\n')
+    const htmlParts: string[] = []
+    let inList = false
+    let listItems: string[] = []
+    let paragraphLines: string[] = []
+
+    const flushParagraph = () => {
+      if (paragraphLines.length > 0) {
+        const content = paragraphLines.join('<br/>')
+        htmlParts.push(`<p>${content}</p>`)
+        paragraphLines = []
+      }
+    }
+
+    const flushList = () => {
+      if (inList) {
+        htmlParts.push(`<ul>${listItems.map(item => `<li>${item}</li>`).join('')}</ul>`)
+        inList = false
+        listItems = []
+      }
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim()
+
+      // Blank line: new paragraph or end list
+      if (line === '') {
+        flushList()
+        flushParagraph()
+        continue
+      }
+
+      // Markdown-style headings
+      const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
+      if (headingMatch) {
+        flushList()
+        flushParagraph()
+        const level = Math.min(headingMatch[1].length, 6)
+        const textContent = headingMatch[2].trim()
+        htmlParts.push(`<h${level}>${textContent}</h${level}>`)
+        continue
+      }
+
+      // Bullet list items
+      const bulletMatch = line.match(/^[-•]\s+(.+)$/)
+      if (bulletMatch) {
+        flushParagraph()
+        inList = true
+        listItems.push(bulletMatch[1].trim())
+        continue
+      }
+
+      // Default: part of paragraph; preserve single line breaks as <br/>
+      paragraphLines.push(line)
+    }
+
+    // Flush any remaining buffers
+    flushList()
+    flushParagraph()
+
+    return htmlParts.join('')
   }
 
   const insertHeading = (sectionIndex: number, level: number = 1) => {
