@@ -20,14 +20,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'OpenAI API key not configured' }, { status: 500 })
     }
 
-    const systemPrompt = `Du er en dansk sundheds- og ernæringsekspert. Du skriver ultra-kort og præcist på dansk.`
-    const userPrompt = `Giv én (1) klart formuleret "takeaway"-sætning (max 25 ord) for læseren baseret på dette blogafsnit${title ? ` i artiklen "${title}"` : ''}:
+    const systemPrompt = `Du er dansk sundheds- og ernæringsekspert og en ekstremt streng opsummeringsmaskine.
+OPGAVE: Udtræk den ENE mest specifikke og handlingsbare pointe fra et givet afsnit.
+REGLER (vigtige):
+- Brug KUN information fra afsnittet – ingen generelle råd, ingen fyld.
+- Vælg det mest konkrete faktum/tal/reglen/anbefalingen i afsnittet.
+- Vær specifik (tal, mængder, tidsrum, betingelser), undgå generiske formuleringer som "lær principperne" eller "spis low carb".
+- Maks 20 ord, én sætning, aktiv form, på dansk.
+- Ingen emojis, ingen overskrift, ingen forklaringer; KUN sætningen.`
+    const userPrompt = `Afsnit fra artiklen${title ? ` "${title}"` : ''}:
 
 ${content}
 
-Krav:
-- Svar som en enkelt sætning.
-- Ingen emojis, ingen overskrift, ingen forklaringer; kun sætningen.`
+Returnér præcis ÉN sætning (maks 20 ord) med den mest konkrete og handlingsbare pointe fra afsnittet.`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
