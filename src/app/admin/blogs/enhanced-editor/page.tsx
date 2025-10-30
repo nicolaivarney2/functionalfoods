@@ -586,10 +586,12 @@ export default function EnhancedBlogEditor() {
           </div>
         </div>`
       } else if (section.section_type === 'widget') {
+        const widget = widgets.find(w => w.id === section.widget_id)
+        const rawConfig = widget?.content || '{}'
+        let safeConfig = '{}'
+        try { safeConfig = JSON.stringify(JSON.parse(rawConfig as unknown as string)) } catch {}
         content += `<div class="blog-section widget-section">
-          <div class="widget-placeholder">
-            [Widget: ${section.widget_id || 'Widget'}]
-          </div>
+          <div class="blog-widget" data-widget-id="${section.widget_id || ''}" data-widget-type="${widget?.widget_type || ''}" data-widget-config='${safeConfig}'></div>
         </div>`
       } else if (section.section_type === 'conclusion') {
         content += `<div class="blog-section conclusion-section">
