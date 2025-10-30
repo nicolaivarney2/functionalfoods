@@ -77,6 +77,8 @@ export default function EnhancedBlogEditor() {
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
   const [generatingContent, setGeneratingContent] = useState<number | null>(null)
   const [generatingResume, setGeneratingResume] = useState(false)
+  const [generatingSeo, setGeneratingSeo] = useState(false)
+  const [tagInput, setTagInput] = useState('')
   
   const [blogPost, setBlogPost] = useState<BlogPost>({
     title: '',
@@ -387,6 +389,56 @@ export default function EnhancedBlogEditor() {
         i === index ? { ...section, ...normalizedUpdates } : section
       )
     }))
+  }
+
+  const addTag = (raw: string) => {
+    const value = raw.trim()
+    if (!value) return
+    setBlogPost(prev => ({
+      ...prev,
+      tags: Array.from(new Set([...(prev.tags || []), value]))
+    }))
+    setTagInput('')
+  }
+
+  const removeTag = (value: string) => {
+    setBlogPost(prev => ({
+      ...prev,
+      tags: (prev.tags || []).filter(t => t !== value)
+    }))
+  }
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+      e.preventDefault()
+      addTag(tagInput)
+    } else if (e.key === 'Backspace' && tagInput === '' && blogPost.tags.length) {
+      removeTag(blogPost.tags[blogPost.tags.length - 1])
+    }
+  }
+
+  const generateSeoDescription = async () => {
+    if (!blogPost.title) return
+    try {
+      setGeneratingSeo(true)
+      const contentPreview = blogPost.sections
+        .map(s => `${s.title || ''}\n${s.content || ''}`)
+        .join('\n\n')
+        .slice(0, 4000)
+
+      const resp = await fetch('/api/admin/generate-seo-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: blogPost.title, contentPreview })
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'SEO fejl')
+      setBlogPost(prev => ({ ...prev, meta_description: data.description }))
+    } catch (e) {
+      alert('Kunne ikke generere SEO beskrivelse')
+    } finally {
+      setGeneratingSeo(false)
+    }
   }
 
   const removeSection = (index: number) => {
@@ -1252,22 +1304,38 @@ export default function EnhancedBlogEditor() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="SEO beskrivelse"
                   />
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={generateSeoDescription}
+                      disabled={generatingSeo}
+                      className="inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {generatingSeo ? 'Genererer…' : '🤖 AI: Generer SEO'}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tags (kommasepareret)
+                    Tags
                   </label>
-                  <input
-                    type="text"
-                    value={blogPost.tags.join(', ')}
-                    onChange={(e) => setBlogPost(prev => ({
-                      ...prev,
-                      tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)
-                    }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="keto, vægttab, diæt"
-                  />
+                  <div className="w-full px-2 py-2 border border-gray-300 rounded-md flex flex-wrap gap-2">
+                    {blogPost.tags.map(tag => (
+                      <span key={tag} className="inline-flex items-center bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                        {tag}
+                        <button type="button" className="ml-2 text-blue-700 hover:text-blue-900" onClick={() => removeTag(tag)}>×</button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      className="flex-1 min-w-[160px] outline-none"
+                      placeholder="Skriv tag og tryk Enter eller Komma"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
