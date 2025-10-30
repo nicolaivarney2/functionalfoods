@@ -412,7 +412,14 @@ export default function EnhancedBlogEditor() {
   const formatContent = (text: string) => {
     if (!text) return ''
 
-    const lines = text.replace(/\r\n/g, '\n').split('\n')
+    // Normalize and heuristically insert paragraph breaks at sentence boundaries
+    let normalized = text.replace(/\r\n/g, '\n')
+    // Add paragraph breaks after period + space before uppercase (Danish included)
+    normalized = normalized.replace(/\.\s+([A-ZÆØÅ])/g, '.\n\n$1')
+    // Add breaks after common emoji separators before uppercase
+    normalized = normalized.replace(/([🥓🍔🥗])\s*([A-ZÆØÅ])/g, '$1\n\n$2')
+
+    const lines = normalized.split('\n')
     const htmlParts: string[] = []
     let inList = false
     let listItems: string[] = []

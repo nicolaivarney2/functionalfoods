@@ -178,7 +178,7 @@ export default function BlogPostPage() {
           h4Toc.forEach(item => {
             const a = document.createElement('a')
             a.href = `#${item.id}`
-            a.textContent = item.text
+            a.textContent = `- ${item.text}`
             a.className = 'block text-[13px] sm:text-sm text-blue-700 hover:text-blue-800 hover:underline underline-offset-2'
             nav2.appendChild(a)
           })
@@ -188,13 +188,20 @@ export default function BlogPostPage() {
         // Prefer placing immediately after the section heading (so it's visible early),
         // else append to the bottom of section-content, else prepend
         const sectionContent = host.querySelector('.section-content') as HTMLElement | null
+        // Place after the last paragraph in the section-content (bottom of intro)
+        if (sectionContent) {
+          const paragraphs = sectionContent.querySelectorAll('p')
+          const lastParagraph = paragraphs[paragraphs.length - 1]
+          if (lastParagraph && lastParagraph.parentElement) {
+            lastParagraph.parentElement.insertBefore(tocWrapper, lastParagraph.nextSibling)
+            return
+          }
+          sectionContent.appendChild(tocWrapper)
+          return
+        }
         const firstHeading = host.querySelector('h1, h2, h3')
         if (firstHeading && firstHeading.parentElement) {
           firstHeading.parentElement.insertBefore(tocWrapper, firstHeading.nextSibling)
-          return
-        }
-        if (sectionContent) {
-          sectionContent.appendChild(tocWrapper)
           return
         }
         host.prepend(tocWrapper)
