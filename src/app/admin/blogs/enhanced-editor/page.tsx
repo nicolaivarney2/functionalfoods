@@ -141,7 +141,7 @@ export default function EnhancedBlogEditor() {
         if (data) {
           // Load sections from database
           const { data: sections, error: sectionsError } = await supabase
-            .from('blog_post_sections')
+            .from('blog_content_sections')
             .select('*')
             .eq('blog_post_id', data.id)
             .order('section_order')
