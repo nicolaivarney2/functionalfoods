@@ -84,26 +84,27 @@ export async function POST(req: NextRequest) {
     } else if (type === 'related_recipes') {
       const limit = Number(cfg.limit || 6)
       const diet = (cfg.category || context?.categorySlug || '').toString().toLowerCase()
+      const blogTags: string[] = Array.isArray(context?.tags) ? context.tags : []
 
-      console.log('[Widget Render] Related Recipes:', { limit, diet })
+      console.log('[Widget Render] Related Recipes:', { limit, diet, blogTags })
 
       // try to query recipes table; be flexible with field names
       // Try both created_at and updatedAt for ordering
       let recipesData: any[] = []
       const { data, error } = await supabase
         .from('recipes')
-        .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status')
+        .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status,keywords')
         .order('updatedAt', { ascending: false })
-        .limit(50)
+        .limit(100)
 
       if (error) {
         console.error('[Widget Render] Error fetching recipes:', error)
         // Try with created_at as fallback
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('recipes')
-          .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status')
+          .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status,keywords')
           .order('created_at', { ascending: false })
-          .limit(50)
+          .limit(100)
         if (fallbackError) {
           console.error('[Widget Render] Fallback query also failed:', fallbackError)
           recipesData = []
@@ -119,14 +120,53 @@ export async function POST(req: NextRequest) {
       let recipes: any[] = recipesData
       console.log('[Widget Render] All recipes before filtering:', recipes.length)
 
-      // Filter by published status if available
+      // Filter by published status if available (but don't exclude if status field doesn't exist)
       const hasStatusField = recipes.some(r => r.status !== undefined)
       if (hasStatusField) {
+        const beforeStatus = recipes.length
         recipes = recipes.filter(r => !r.status || r.status === 'published')
-        console.log('[Widget Render] After status filter (published):', recipes.length)
+        console.log('[Widget Render] After status filter (published):', recipes.length, '(was', beforeStatus + ')')
+      } else {
+        console.log('[Widget Render] No status field found, skipping status filter')
       }
 
-      if (diet) {
+      // Score recipes by relevance: tags > dietaryCategories > latest
+      if (blogTags.length > 0 || diet) {
+        const blogTagsLower = blogTags.map(t => String(t).toLowerCase())
+        recipes = recipes.map((r) => {
+          let score = 0
+          
+          // Score by tags/keywords match (highest priority)
+          const keywords = r.keywords || []
+          if (Array.isArray(keywords)) {
+            const keywordsLower = keywords.map((k: any) => String(k).toLowerCase())
+            blogTagsLower.forEach(tag => {
+              if (keywordsLower.some((k: string) => k.includes(tag) || tag.includes(k))) score += 10
+            })
+          }
+          
+          // Score by dietary category match
+          if (diet) {
+            const dc = r.dietaryCategories || r.dietary_categories || []
+            if (Array.isArray(dc)) {
+              const dcLower = dc.map((x: any) => String(x).toLowerCase())
+              if (dcLower.includes(diet)) score += 5
+            }
+          }
+          
+          return { ...r, _relevanceScore: score }
+        }).sort((a, b) => b._relevanceScore - a._relevanceScore)
+        
+        console.log('[Widget Render] After relevance scoring, top scores:', recipes.slice(0, 3).map(r => ({ title: r.title, score: r._relevanceScore })))
+      }
+
+      // If we have matches with score > 0, use those; otherwise fallback to latest
+      const scoredMatches = recipes.filter(r => r._relevanceScore > 0)
+      if (scoredMatches.length > 0) {
+        recipes = scoredMatches
+        console.log('[Widget Render] Using scored matches:', recipes.length)
+      } else if (diet) {
+        // Try dietary category filter as fallback
         const beforeDietFilter = recipes.length
         recipes = recipes.filter((r) => {
           const dc = r.dietaryCategories || r.dietary_categories || []
@@ -136,7 +176,8 @@ export async function POST(req: NextRequest) {
         })
         console.log('[Widget Render] After diet filter (' + diet + '):', recipes.length, '(was', beforeDietFilter + ')')
       }
-      // Fallback to latest if filter yields nothing
+      
+      // Final fallback to latest published if no matches
       if (recipes.length === 0 && recipesData.length > 0) {
         recipes = [...recipesData]
         if (hasStatusField) {
@@ -144,6 +185,7 @@ export async function POST(req: NextRequest) {
         }
         console.log('[Widget Render] Using fallback (all published):', recipes.length)
       }
+      
       recipes = recipes.slice(0, limit)
 
       console.log('[Widget Render] Final recipes to render:', recipes.length)
