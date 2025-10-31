@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import { useImageMigration } from '@/hooks/useImageMigration'
 import { 
   BookOpen, 
   Calendar, 
@@ -16,7 +17,9 @@ import {
   Users,
   X,
   Menu,
-  Loader2
+  Loader2,
+  FileText,
+  MessageSquare
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -41,6 +44,12 @@ const adminNavItems = [
     href: '/admin/publishing',
     icon: Calendar,
     description: 'Planlæg og udgiv opskrifter'
+  },
+  {
+    name: 'Publishing Kalender',
+    href: '/admin/publishing-calendar',
+    icon: Calendar,
+    description: 'Se og administrer publishing kalender'
   },
   {
     name: 'Alle Opskrifter',
@@ -79,6 +88,24 @@ const adminNavItems = [
     description: 'Supermarked produkter og priser'
   },
   {
+    name: 'Product-Ingredient Matching',
+    href: '/admin/product-ingredient-matching',
+    icon: List,
+    description: 'Match produkter med ingredienser'
+  },
+  {
+    name: 'Blogs',
+    href: '/admin/blogs',
+    icon: FileText,
+    description: 'Administrer blog indlæg og kernesider'
+  },
+  {
+    name: 'Reddit Communities',
+    href: '/admin/reddit-communities',
+    icon: MessageSquare,
+    description: 'Administrer Reddit integration'
+  },
+  {
     name: 'Indstillinger',
     href: '/admin/settings',
     icon: Settings,
@@ -91,6 +118,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const pathname = usePathname()
   const { isAdmin, checking } = useAdminAuth()
   const router = useRouter()
+  
+  // Automatic image migration hook
+  const { isMigrating, migrationResult } = useImageMigration()
 
   // Centralized auth check for all admin pages
   useEffect(() => {
@@ -202,6 +232,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <h2 className="text-lg font-medium text-gray-900">
                 {adminNavItems.find(item => item.href === pathname)?.name || 'Admin'}
               </h2>
+              
+              {/* Image migration status */}
+              {isMigrating && (
+                <div className="ml-4 flex items-center text-sm text-blue-600">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Migrerer billeder...
+                </div>
+              )}
+              
+              {migrationResult && !isMigrating && (
+                <div className="ml-4 flex items-center text-sm text-green-600">
+                  ✅ {migrationResult.migratedImages} billeder migreret
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               <Link

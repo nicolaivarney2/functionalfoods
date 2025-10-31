@@ -33,7 +33,8 @@ export function generateRecipeStructuredData(recipe: Recipe) {
       }
       return dietMap[category] || 'https://schema.org/GlutenFreeDiet'
     }) : [],
-    "keywords": recipe.keywords ? recipe.keywords.join(', ') : '',
+    "keywords": recipe.keywords ? 
+      (Array.isArray(recipe.keywords) ? recipe.keywords.join(', ') : recipe.keywords) : '',
     "recipeIngredient": recipe.ingredients ? recipe.ingredients.map(ingredient => 
       `${ingredient.amount} ${ingredient.unit} ${ingredient.name}`
     ) : [],
@@ -128,7 +129,7 @@ export function generateRecipeCollectionStructuredData(category: string, recipes
           "description": recipe.shortDescription,
           "recipeCategory": recipe.mainCategory,
           "recipeCuisine": "Danish",
-          "suitableForDiet": recipe.dietaryCategories.map(cat => {
+          "suitableForDiet": (recipe.dietaryCategories && Array.isArray(recipe.dietaryCategories)) ? recipe.dietaryCategories.map(cat => {
             const dietMap: { [key: string]: string } = {
               'Keto': 'https://schema.org/LowCarbDiet',
               'LCHF': 'https://schema.org/LowCarbDiet',
@@ -139,7 +140,7 @@ export function generateRecipeCollectionStructuredData(category: string, recipes
               'SENSE': 'https://schema.org/GlutenFreeDiet'
             }
             return dietMap[cat] || 'https://schema.org/GlutenFreeDiet'
-          })
+          }) : []
         }
       }))
     },

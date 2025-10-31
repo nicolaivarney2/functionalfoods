@@ -129,7 +129,7 @@ export class SupermarketDatabaseService {
               if (existingProduct.price !== product.price || 
                   existingProduct.original_price !== product.originalPrice ||
                   existingProduct.is_on_sale !== product.isOnSale) {
-                await this.addPriceHistory(product.id, {
+                await this.addPriceHistory(String(product.id), {
                   price: product.price,
                   originalPrice: product.originalPrice,
                   isOnSale: product.isOnSale,
@@ -172,7 +172,7 @@ export class SupermarketDatabaseService {
               result.newProducts++
               
               // Add initial price history entry
-              await this.addPriceHistory(product.id, {
+              await this.addPriceHistory(String(product.id), {
                 price: product.price,
                 originalPrice: product.originalPrice,
                 isOnSale: product.isOnSale,

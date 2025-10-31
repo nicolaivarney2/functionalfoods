@@ -45,6 +45,13 @@ export interface Recipe {
   carbs?: number;
   fat?: number;
   fiber?: number;
+  vitamins?: Record<string, number>;
+  minerals?: Record<string, number>;
+  totalCalories?: number;
+  totalProtein?: number;
+  totalCarbs?: number;
+  totalFat?: number;
+  totalFiber?: number;
   nutritionalInfo?: {
     calories: number;
     protein: number;

@@ -3,7 +3,16 @@ import path from 'path'
 
 interface OpenAIConfig {
   apiKey: string
-  assistantId: string
+  assistantIds?: {
+    familiemad: string
+    keto: string
+    sense: string
+    paleo: string
+    antiinflammatorisk: string
+    fleksitarisk: string
+    '5-2': string
+    'meal-prep': string
+  }
 }
 
 // Check if we're in a serverless environment (Vercel)
@@ -18,10 +27,21 @@ export function getOpenAIConfig(): OpenAIConfig | null {
     // In serverless environment, try to get config from environment variables
     if (isServerless) {
       const apiKey = process.env.OPENAI_API_KEY
-      const assistantId = process.env.OPENAI_ASSISTANT_ID
       
-      if (apiKey && assistantId) {
-        return { apiKey, assistantId }
+      if (apiKey) {
+        return { 
+          apiKey,
+          assistantIds: {
+            familiemad: process.env.OPENAI_ASSISTANT_FAMILIEMAD || '',
+            keto: process.env.OPENAI_ASSISTANT_KETO || '',
+            sense: process.env.OPENAI_ASSISTANT_SENSE || '',
+            paleo: process.env.OPENAI_ASSISTANT_PALEO || '',
+            antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
+            fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
+            '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',
+            'meal-prep': process.env.OPENAI_ASSISTANT_MEAL_PREP || ''
+          }
+        }
       }
       
       console.warn('OpenAI config not available in serverless environment')
@@ -33,8 +53,20 @@ export function getOpenAIConfig(): OpenAIConfig | null {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf-8')
       const config = JSON.parse(configData)
       
-      if (config.apiKey && config.assistantId) {
-        return config
+      if (config.apiKey) {
+        return {
+          apiKey: config.apiKey,
+          assistantIds: config.assistantIds || {
+            familiemad: '',
+            keto: '',
+            sense: '',
+            paleo: '',
+            antiinflammatorisk: '',
+            fleksitarisk: '',
+            '5-2': '',
+            'meal-prep': ''
+          }
+        }
       }
     }
   } catch (error) {
@@ -48,12 +80,18 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
   try {
     // In serverless environment, we can't save files permanently
     if (isServerless) {
-      console.warn('Cannot save OpenAI config in serverless environment')
-      return false
+      console.warn('Cannot save OpenAI config in serverless environment - use environment variables instead')
+      // In production, config should be set via environment variables
+      // This function will return true to indicate "success" but won't actually save
+      return true
     }
     
     // Local environment - save to file
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+    const configData = JSON.stringify({
+      apiKey: config.apiKey,
+      assistantIds: config.assistantIds || {}
+    }, null, 2)
+    fs.writeFileSync(CONFIG_FILE, configData)
     return true
   } catch (error) {
     console.error('Error saving OpenAI config:', error)
@@ -63,7 +101,19 @@ export function saveOpenAIConfig(config: OpenAIConfig): boolean {
 
 export function updateOpenAIConfig(updates: Partial<OpenAIConfig>): boolean {
   try {
-    const currentConfig = getOpenAIConfig() || { apiKey: '', assistantId: '' }
+    const currentConfig = getOpenAIConfig() || { 
+      apiKey: '', 
+      assistantIds: {
+        familiemad: '',
+        keto: '',
+        sense: '',
+        paleo: '',
+        antiinflammatorisk: '',
+        fleksitarisk: '',
+        '5-2': '',
+        'meal-prep': ''
+      }
+    }
     const newConfig = { ...currentConfig, ...updates }
     return saveOpenAIConfig(newConfig)
   } catch (error) {

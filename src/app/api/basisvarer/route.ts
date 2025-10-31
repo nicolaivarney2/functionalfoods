@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
+// GET - Hent brugerens basisvarer
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -11,41 +14,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's basisvarer with product details
-    const { data: basisvarer, error } = await supabase
+    // Get user's basisvarer (ingredienser)
+    const { data, error } = await supabase
       .from('user_basisvarer')
       .select(`
         id,
+        ingredient_name,
         quantity,
+        unit,
         notes,
-        created_at,
-        product:supermarket_products(
-          id,
-          name,
-          category,
-          price,
-          unit,
-          image_url,
-          store,
-          is_on_sale,
-          original_price
-        )
+        created_at
       `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching basisvarer:', error)
-      return NextResponse.json({ error: 'Failed to fetch basisvarer' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Failed to fetch basisvarer', details: error.message },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ basisvarer })
+    return NextResponse.json({ basisvarer: data })
   } catch (error) {
-    console.error('Error in GET /api/basisvarer:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Unexpected error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
+// POST - Tilføj produkt til basisvarer
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -56,37 +57,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { product_id, quantity = 1, notes } = await request.json()
+    const { ingredient_name, quantity = 1, unit = 'stk', notes } = await request.json()
 
-    if (!product_id) {
-      return NextResponse.json({ error: 'Product ID is required' }, { status: 400 })
+    if (!ingredient_name) {
+      return NextResponse.json({ error: 'Ingredient name is required' }, { status: 400 })
     }
 
-    // Add product to user's basisvarer
+    // Add ingredient to user's basisvarer
     const { data, error } = await supabase
       .from('user_basisvarer')
       .insert({
         user_id: user.id,
-        product_id,
+        ingredient_name: ingredient_name.trim(),
         quantity,
+        unit,
         notes
       })
       .select(`
         id,
+        ingredient_name,
         quantity,
+        unit,
         notes,
-        created_at,
-        product:supermarket_products(
-          id,
-          name,
-          category,
-          price,
-          unit,
-          image_url,
-          store,
-          is_on_sale,
-          original_price
-        )
+        created_at
       `)
       .single()
 
@@ -102,6 +95,52 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT - Opdater basisvarer quantity
+export async function PUT(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id, quantity } = await request.json()
+
+    if (!id || !quantity) {
+      return NextResponse.json({ error: 'ID and quantity are required' }, { status: 400 })
+    }
+
+    // Update basisvarer quantity
+    const { data, error } = await supabase
+      .from('user_basisvarer')
+      .update({ quantity })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select(`
+        id,
+        ingredient_name,
+        quantity,
+        unit,
+        notes,
+        created_at
+      `)
+      .single()
+
+    if (error) {
+      console.error('Error updating basisvarer:', error)
+      return NextResponse.json({ error: 'Failed to update basisvarer' }, { status: 500 })
+    }
+
+    return NextResponse.json({ basisvarer: data })
+  } catch (error) {
+    console.error('Error in PUT /api/basisvarer:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// DELETE - Fjern fra basisvarer
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()

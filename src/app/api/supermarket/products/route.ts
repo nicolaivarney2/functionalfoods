@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     const countsOnly = searchParams.get('counts') === 'true'
     
     console.log(`📋 Query params: page=${page}, limit=${limit}, categories=${categories}, stores=${stores}, offers=${offers}, search=${search}, countsOnly=${countsOnly}`)
+    if (search) {
+      console.log(`🔍 Search term details: "${search}" (length: ${search.length}, char codes: ${search.split('').map(c => c.charCodeAt(0)).join(',')})`)
+    }
     
     // If only counts are requested, return optimized count data
     if (countsOnly) {

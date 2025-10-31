@@ -1,9 +1,12 @@
 'use client'
 
 import AdminLayout from '@/components/AdminLayout'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, ChangeEvent } from 'react'
 import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
+import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
+import IngredientMatchesBox from '@/components/IngredientMatchesBox'
+import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save } from 'lucide-react'
 
@@ -34,7 +37,7 @@ export default function AdminPublishingPage() {
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('all')
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('published')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
@@ -54,8 +57,8 @@ export default function AdminPublishingPage() {
       }
       
       const data = await response.json()
-      // API returns recipes array directly, not wrapped in data.recipes
-      const recipesArray = Array.isArray(data) ? data : []
+      // API returns { recipes: [...] } format
+      const recipesArray = data.recipes || []
       const recipesWithTips = recipesArray.map((recipe: any) => ({
         ...recipe,
         personalTips: recipe.personalTips || '',
@@ -383,7 +386,12 @@ export default function AdminPublishingPage() {
 
       // Opdater local state
       const updatedRecipes = recipes.map(r => 
-        r.id === recipeId ? { ...r, status: 'published' as const } : r
+        r.id === recipeId ? { 
+          ...r, 
+          status: 'published' as const,
+          scheduledDate: undefined,
+          scheduledTime: undefined
+        } : r
       )
       setRecipes(updatedRecipes)
 
@@ -393,6 +401,16 @@ export default function AdminPublishingPage() {
           : schedule
       )
       setSchedules(updatedSchedules)
+      
+      // Update selected recipe if it's the one being published
+      if (selectedRecipe && selectedRecipe.id === recipeId) {
+        setSelectedRecipe({
+          ...selectedRecipe,
+          status: 'published' as const,
+          scheduledDate: undefined,
+          scheduledTime: undefined
+        })
+      }
       
       console.log('✅ Opskrift udgivet nu:', recipe.title)
       
@@ -406,6 +424,84 @@ export default function AdminPublishingPage() {
     if (statusFilter === 'all') return true
     return recipe.status === statusFilter
   })
+
+  const handleBulkNutritionRecalculation = async () => {
+    if (!confirm('⚠️ ADVARSEL: Denne handling vil genberegne mikro og makro ernæring for ALLE opskrifter på én gang. Dette kan tage flere minutter. Er du sikker på at du vil fortsætte?')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch('/api/recalculate-nutrition-bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke genberegne masse ernæring');
+      }
+
+      const data = await response.json();
+      alert(`✅ Masse ernæring opdateret!\n\n${data.results.success} opskrifter opdateret\n${data.results.errors} fejl\n\nSe console for detaljer.`);
+      loadRecipes(); // Refresh recipes to show updated nutrition
+    } catch (error) {
+      console.error('❌ Error bulk nutrition recalculation:', error);
+      alert(`❌ Fejl ved masse ernæring opdatering: ${error instanceof Error ? error.message : 'Ukendt fejl'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !selectedRecipe) return
+
+    try {
+      setSaving(true)
+      
+      // Upload image to the existing upload endpoint
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('recipeId', selectedRecipe.id)
+      formData.append('recipeTitle', selectedRecipe.title)
+
+      const response = await fetch('/api/admin/upload-recipe-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunne ikke uploade billede')
+      }
+
+      const data = await response.json()
+      
+      // Update the selected recipe with new image URL
+      const updatedRecipe = {
+        ...selectedRecipe,
+        imageUrl: data.imageUrl,
+        imageAlt: `${selectedRecipe.title} - Functional Foods`
+      }
+      
+      setSelectedRecipe(updatedRecipe)
+      
+      // Update the recipes list
+      const updatedRecipes = recipes.map(recipe => 
+        recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      alert('✅ Billede opdateret!')
+      
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      alert('❌ Kunne ikke uploade billede. Prøv igen.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (checking) {
     return (
@@ -439,25 +535,43 @@ export default function AdminPublishingPage() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Publishing Administration</h1>
-          <p className="mt-2 text-gray-600">
-            Planlæg udgivelse af opskrifter, tilføj personlige tips og administrer publishing status.
-          </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Publishing Administration</h1>
+            <p className="mt-2 text-gray-600">
+              Planlæg udgivelse af opskrifter, tilføj personlige tips og administrer publishing status.
+            </p>
+          </div>
+          <div className="flex space-x-3">
+            <a
+              href="/admin/publishing/create"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Opret AI opskrift
+            </a>
+            <a
+              href="/admin/publishing/create-manual"
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Opret opskrift
+            </a>
+          </div>
         </div>
 
         {/* Status Filter */}
         <div className="bg-white shadow rounded-lg p-4">
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setStatusFilter('all')}
+              onClick={() => setStatusFilter('published')}
               className={`px-3 py-2 text-sm font-medium rounded-md ${
-                statusFilter === 'all'
+                statusFilter === 'published'
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Alle ({recipes.length})
+              Udgivne ({recipes.filter(r => r.status === 'published').length})
             </button>
             <button
               onClick={() => setStatusFilter('draft')}
@@ -480,14 +594,28 @@ export default function AdminPublishingPage() {
               Planlagte ({recipes.filter(r => r.status === 'scheduled').length})
             </button>
             <button
-              onClick={() => setStatusFilter('published')}
+              onClick={() => setStatusFilter('all')}
               className={`px-3 py-2 text-sm font-medium rounded-md ${
-                statusFilter === 'published'
+                statusFilter === 'all'
                   ? 'bg-blue-100 text-blue-700'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Udgivne ({recipes.filter(r => r.status === 'published').length})
+              Alle ({recipes.length})
+            </button>
+          </div>
+          
+          {/* Bulk Nutrition Recalculation */}
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Masse Opdatering af Ernæring</h4>
+            <p className="text-xs text-yellow-700 mb-3">
+              Genberegn mikro og makro ernæring på ALLE opskrifter på én gang
+            </p>
+            <button
+              onClick={handleBulkNutritionRecalculation}
+              className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm hover:bg-yellow-700"
+            >
+              🔄 Masse Opdater Ernæring (Alle {recipes.length} Opskrifter)
             </button>
           </div>
         </div>
@@ -521,13 +649,22 @@ export default function AdminPublishingPage() {
                                      recipe.status === 'scheduled' ? 'Planlagt' : 'Kladde'}
                           </p>
                         </div>
-                        {recipe.personalTips && (
-                          <div className="ml-2">
+                        <div className="ml-2 flex items-center gap-2">
+                          {recipe.personalTips && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                               💡 Tips
                             </span>
-                          </div>
-                        )}
+                          )}
+                          {/* Nutrition recalculation for drafts */}
+                          {recipe.status === 'draft' && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <RecipeNutritionRecalculator
+                                recipeId={recipe.id}
+                                recipeName={recipe.title}
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -591,6 +728,43 @@ export default function AdminPublishingPage() {
                           {description || 'Ingen beskrivelse endnu. Klik "Rediger" for at tilføje.'}
                         </p>
                       )}
+                    </div>
+
+                    {/* Billede sektion */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Billede</h4>
+                        <button
+                          onClick={() => document.getElementById('image-upload')?.click()}
+                          className="text-blue-600 hover:text-blue-700 text-sm"
+                        >
+                          Skift billede
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={selectedRecipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                          alt={selectedRecipe.imageAlt || selectedRecipe.title}
+                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-600">
+                            <strong>URL:</strong> {selectedRecipe.imageUrl || 'Ingen billede'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <strong>Alt tekst:</strong> {selectedRecipe.imageAlt || 'Ingen alt tekst'}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
                     </div>
 
                     {/* Kategorier/Tags sektion */}
@@ -679,7 +853,7 @@ export default function AdminPublishingPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      {selectedRecipe.status === 'draft' && (
+                      {(selectedRecipe.status === 'draft' || selectedRecipe.status === 'scheduled') && (
                         <button
                           onClick={() => publishRecipeNow(selectedRecipe.id)}
                           className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm"
@@ -760,6 +934,42 @@ export default function AdminPublishingPage() {
                         </svg>
                         Gå til opskrift
                       </a>
+                    </div>
+
+                    {/* Nutrition Recalculator */}
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Ernæring</h4>
+                      <p className="text-xs text-yellow-700 mb-3">
+                        Genberegn mikro og makro ernæring baseret på ingredienser
+                      </p>
+                      <RecipeNutritionRecalculator 
+                        recipeId={selectedRecipe.id} 
+                        recipeName={selectedRecipe.title}
+                      />
+                      
+                      {/* Ingredient Matches Box */}
+                      <div className="mt-4">
+                        <IngredientMatchesBox recipeSlug={selectedRecipe.slug} />
+                      </div>
+                    </div>
+
+                    {/* Slot Scheduler */}
+                    <div className="mt-4">
+                      <SlotScheduler 
+                        recipeId={selectedRecipe.id}
+                        recipeTitle={selectedRecipe.title}
+                        showNextSlotOnly={true}
+                        onSlotAssigned={(slot) => {
+                          // Update local state when slot is assigned
+                          const updatedRecipes = recipes.map(r => 
+                            r.id === selectedRecipe.id 
+                              ? { ...r, status: 'scheduled' as const, scheduledDate: new Date(slot.date), scheduledTime: slot.time }
+                              : r
+                          )
+                          setRecipes(updatedRecipes)
+                          setSelectedRecipe({ ...selectedRecipe, status: 'scheduled' as const, scheduledDate: new Date(slot.date), scheduledTime: slot.time })
+                        }}
+                      />
                     </div>
                   </div>
 

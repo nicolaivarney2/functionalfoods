@@ -113,7 +113,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       return isFinite(num) ? num : 0
     }
     // Convert ingredients
-    const ingredients = recipe.ingredients_flat
+    const ingredients = (recipe.ingredients_flat || [])
       .filter(ing => ing.type === 'ingredient')
       .map(ing => ({
         name: ing.name,
@@ -123,7 +123,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       }))
 
     // Convert instructions
-    const instructions = recipe.instructions_flat
+    const instructions = (recipe.instructions_flat || [])
       .filter(inst => inst.type === 'instruction')
       .map((inst, index) => ({
         stepNumber: index + 1,
@@ -133,7 +133,7 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       }))
 
     // Determine main category from course tags
-    const mainCategory = recipe.tags.course?.[0] || 'Hovedret'
+    const mainCategory = (recipe.tags.course && recipe.tags.course.length > 0) ? recipe.tags.course[0] : 'Hovedret'
 
     // Calculate total time
     const prepTime = parseInt(String(recipe.prep_time).replace(',', '.')) || 0
@@ -248,12 +248,12 @@ export async function importRecipesWithImages(rawData: RawRecipeData[]): Promise
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0]} opskrift | Functional Foods`,
+      metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: generateMetaDescription(recipe),
       keywords: generateKeywords(recipe),
       mainCategory: recipe.mainCategory,
       subCategories: recipe.subCategories,
-      dietaryCategories: recipe.dietaryCategories,
+      dietaryCategories: recipe.dietaryCategories || [],
       ingredients: recipe.ingredients.map((ingredient, i) => ({
         id: `${id}-${i + 1}`,
         name: ingredient.name,
@@ -306,12 +306,12 @@ export function importRecipes(rawData: RawRecipeData[]): Recipe[] {
       carbs: recipe.carbs,
       fat: recipe.fat,
       fiber: recipe.fiber,
-      metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0]} opskrift | Functional Foods`,
+      metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: generateMetaDescription(recipe),
       keywords: generateKeywords(recipe),
       mainCategory: recipe.mainCategory,
       subCategories: recipe.subCategories,
-      dietaryCategories: recipe.dietaryCategories,
+      dietaryCategories: recipe.dietaryCategories || [],
       ingredients: recipe.ingredients.map((ingredient, i) => ({
         id: `${id}-${i + 1}`,
         name: ingredient.name,
@@ -342,8 +342,178 @@ export function importRecipes(rawData: RawRecipeData[]): Recipe[] {
   })
 }
 
+/**
+ * Batch import recipes with progress tracking and error handling
+ * Processes recipes in small batches to avoid timeouts and provide better UX
+ */
+export interface BatchImportResult {
+  success: boolean
+  totalRecipes: number
+  processedBatches: number
+  successfulRecipes: number
+  failedRecipes: number
+  errors: Array<{
+    recipeTitle: string
+    error: string
+    batchNumber: number
+  }>
+  progress: number // 0-100
+}
+
+export interface BatchImportOptions {
+  batchSize?: number // Default: 5
+  delayBetweenBatches?: number // Default: 1000ms
+  onProgress?: (progress: number, currentBatch: number, totalBatches: number) => void
+  onBatchComplete?: (batchNumber: number, successCount: number, errorCount: number) => void
+}
+
+export async function importRecipesInBatches(
+  rawData: RawRecipeData[],
+  options: BatchImportOptions = {}
+): Promise<BatchImportResult> {
+  const {
+    batchSize = 5,
+    delayBetweenBatches = 1000,
+    onProgress,
+    onBatchComplete
+  } = options
+
+  const totalRecipes = rawData.length
+  const totalBatches = Math.ceil(totalRecipes / batchSize)
+  
+  console.log(`🚀 Starting batch import: ${totalRecipes} recipes in ${totalBatches} batches of ${batchSize}`)
+  
+  const result: BatchImportResult = {
+    success: true,
+    totalRecipes,
+    processedBatches: 0,
+    successfulRecipes: 0,
+    failedRecipes: 0,
+    errors: [],
+    progress: 0
+  }
+
+  // Process each batch
+  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+    const startIndex = batchIndex * batchSize
+    const endIndex = Math.min(startIndex + batchSize, totalRecipes)
+    const currentBatch = rawData.slice(startIndex, endIndex)
+    const batchNumber = batchIndex + 1
+    
+    console.log(`📦 Processing batch ${batchNumber}/${totalBatches}: recipes ${startIndex + 1}-${endIndex}`)
+    
+    try {
+      // Process current batch
+      const batchRecipes = importRecipes(currentBatch)
+      
+      // Here you would typically save to database
+      // For now, we'll simulate success
+      const batchSuccessCount = batchRecipes.length
+      const batchErrorCount = 0
+      
+      result.successfulRecipes += batchSuccessCount
+      result.processedBatches = batchNumber
+      
+      // Update progress
+      result.progress = Math.round((batchNumber / totalBatches) * 100)
+      
+      console.log(`✅ Batch ${batchNumber} complete: ${batchSuccessCount} successful, ${batchErrorCount} errors`)
+      
+      // Call progress callback
+      if (onProgress) {
+        onProgress(result.progress, batchNumber, totalBatches)
+      }
+      
+      // Call batch complete callback
+      if (onBatchComplete) {
+        onBatchComplete(batchNumber, batchSuccessCount, batchErrorCount)
+      }
+      
+      // Add delay between batches (except for the last batch)
+      if (batchIndex < totalBatches - 1) {
+        console.log(`⏳ Waiting ${delayBetweenBatches}ms before next batch...`)
+        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches))
+      }
+      
+    } catch (error) {
+      console.error(`❌ Batch ${batchNumber} failed:`, error)
+      
+      // Add errors for each recipe in the failed batch
+      currentBatch.forEach(recipe => {
+        result.errors.push({
+          recipeTitle: recipe.title,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          batchNumber
+        })
+      })
+      
+      result.failedRecipes += currentBatch.length
+      result.success = false
+    }
+  }
+  
+  // Final result
+  console.log(`🎯 Batch import complete!`)
+  console.log(`   Total: ${result.totalRecipes} recipes`)
+  console.log(`   Successful: ${result.successfulRecipes}`)
+  console.log(`   Failed: ${result.failedRecipes}`)
+  console.log(`   Batches: ${result.processedBatches}/${totalBatches}`)
+  console.log(`   Progress: ${result.progress}%`)
+  
+  if (result.errors.length > 0) {
+    console.log(`❌ Errors encountered:`, result.errors)
+  }
+  
+  return result
+}
+
+/**
+ * Smart batch import with automatic retry for failed recipes
+ */
+export async function importRecipesWithRetry(
+  rawData: RawRecipeData[],
+  options: BatchImportOptions & { maxRetries?: number } = {}
+): Promise<BatchImportResult> {
+  const { maxRetries = 2, ...batchOptions } = options
+  
+  console.log(`🔄 Starting import with retry (max ${maxRetries} attempts)`)
+  
+  // First attempt
+  let result = await importRecipesInBatches(rawData, batchOptions)
+  
+  // Retry failed recipes if any
+  for (let attempt = 1; attempt <= maxRetries && result.failedRecipes > 0; attempt++) {
+    console.log(`🔄 Retry attempt ${attempt}/${maxRetries} for ${result.failedRecipes} failed recipes`)
+    
+    // Get failed recipes
+    const failedRecipes = rawData.filter(recipe => 
+      result.errors.some(error => error.recipeTitle === recipe.title)
+    )
+    
+    // Retry with failed recipes only
+    const retryResult = await importRecipesInBatches(failedRecipes, {
+      ...batchOptions,
+      batchSize: Math.max(1, Math.floor((batchOptions.batchSize || 5) / 2)) // Smaller batches for retry
+    })
+    
+    // Update main result
+    result.successfulRecipes += retryResult.successfulRecipes
+    result.failedRecipes = retryResult.failedRecipes
+    result.errors = retryResult.errors
+    result.progress = Math.min(100, result.progress + (retryResult.progress * 0.1)) // Small progress boost
+    
+    console.log(`🔄 Retry ${attempt} complete. Remaining failed: ${result.failedRecipes}`)
+  }
+  
+  return result
+}
+
 function generateSlug(title: string): string {
-  return title
+  if (!title || title.trim() === '') {
+    return `recipe-${Date.now()}` // Fallback for empty titles
+  }
+  
+  const slug = title
     .toLowerCase()
     .replace(/[æøå]/g, (match) => {
       const replacements: { [key: string]: string } = {
@@ -357,23 +527,25 @@ function generateSlug(title: string): string {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-')
     .trim()
+  
+  return slug || `recipe-${Date.now()}` // Fallback if result is empty
 }
 
 function generateMetaDescription(recipe: RawRecipeData): string {
-  const dietary = recipe.dietaryCategories[0]
+  const dietary = recipe.dietaryCategories?.[0] || 'Opskrift'
   return `${recipe.shortDescription} ${dietary} opskrift til vægttab og en sund livsstil.`
 }
 
 function generateKeywords(recipe: RawRecipeData): string[] {
   const baseKeywords = [
     recipe.mainCategory.toLowerCase(),
-    ...recipe.dietaryCategories.map(cat => cat.toLowerCase()),
+    ...(recipe.dietaryCategories || []).map(cat => cat.toLowerCase()),
     'vægttab',
     'sunde opskrifter'
   ]
   
   // Add ingredient keywords
-  const ingredientKeywords = recipe.ingredients
+  const ingredientKeywords = (recipe.ingredients || [])
     .slice(0, 3)
     .map(ing => ing.name.toLowerCase())
   

@@ -4,6 +4,91 @@ import { createServerClient } from '@supabase/ssr'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params
+    
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl || !serviceRoleKey) {
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
+    
+    const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
+      cookies: {
+        get(name: string) {
+          return undefined
+        },
+        set(name: string, value: string, options: any) {
+          // Service role doesn't need cookies
+        },
+        remove(name: string, options: any) {
+          // Service role doesn't need cookies
+        },
+      },
+    })
+    
+    // Try fetch by slug first
+    const slugQuery = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('slug', slug)
+      .single()
+
+    if (!slugQuery.error && slugQuery.data) {
+      return NextResponse.json(slugQuery.data)
+    }
+
+    // If not found by slug, try by ID (UUID or numeric)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
+    const isNumericId = /^\d+$/.test(slug)
+
+    if (isUUID || isNumericId) {
+      // Try string comparison first (handles text/uuid columns where numeric ids are stored as strings)
+      let idQuery = await supabase
+        .from('recipes')
+        .select('*')
+        .eq('id', slug)
+        .single()
+
+      if (!idQuery.error && idQuery.data) {
+        return NextResponse.json(idQuery.data)
+      }
+
+      // If still not found and it looks numeric, try numeric equality (for integer id columns)
+      if (isNumericId) {
+        idQuery = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', Number(slug))
+          .single()
+
+        if (!idQuery.error && idQuery.data) {
+          return NextResponse.json(idQuery.data)
+        }
+      }
+
+      console.error('Error fetching recipe by ID:', idQuery.error)
+      return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+    }
+
+    // Not UUID or numeric, already tried slug → not found
+    console.error('Recipe not found for slug:', slug)
+    return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+    
+  } catch (error) {
+    console.error('Error in GET /api/recipes/[slug]:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch recipe' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }

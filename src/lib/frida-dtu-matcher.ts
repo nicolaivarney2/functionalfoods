@@ -1,4 +1,4 @@
-import { createSupabaseClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 // Types for Frida DTU data
 interface FridaFood {
@@ -36,57 +36,43 @@ export class FridaDTUMatcher {
   /**
    * Get manually confirmed match from ingredient_matches table
    */
-  private async getManualMatch(ingredientName: string): Promise<{ fridaId: string, fridaName: string } | null> {
+  private async getManualMatch(ingredientName: string): Promise<{ name: string, category: string, nutritionalInfo: NutritionalInfo | null } | null> {
     try {
-      const supabase = createSupabaseClient()
-      // Support both legacy name-based IDs and new slug-based IDs
-      const toSlug = (input: string) => input
-        .toLowerCase()
-        .replace(/[æøå]/g, (m) => ({ 'æ': 'ae', 'ø': 'oe', 'å': 'aa' }[m] as string))
-        .replace(/[^a-z0-9\s-]/g, ' ')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .trim()
-
-      const slugId = toSlug(ingredientName)
-
-      // Look for saved matches by either slug id or exact name
-      const orFilter = [
-        `recipe_ingredient_id.eq.${slugId}`,
-        `recipe_ingredient_id.eq.${ingredientName}`,
-        `recipe_ingredient_id.like.${slugId}-%`
-      ].join(',')
-
-      const { data: matches, error } = await supabase
-        .from('ingredient_matches')
-        .select('frida_ingredient_id')
-        .or(orFilter)
-        .order('created_at', { ascending: false })
-        .limit(1)
+      console.log(`🔍 Looking for manual match for: ${ingredientName}`)
       
-      if (error || !matches || matches.length === 0) {
+      // Use singleton Supabase client
+      const { data, error } = await supabase
+        .from('frida_ingredients')
+        .select('*')
+        .ilike('name', `%${ingredientName}%`)
+        .limit(1)
+        .single()
+      
+      if (error) {
+        console.log(`❌ No manual match found for: ${ingredientName}`)
         return null
       }
       
-      const fridaId = matches[0].frida_ingredient_id
+      console.log(`✅ Manual match found: ${data.name}`)
       
-      // Get the Frida ingredient details
-      const { data: fridaIngredient, error: fridaError } = await supabase
-        .from('frida_ingredients')
-        .select('name')
-        .eq('id', fridaId)
-        .limit(1)
-      
-      if (fridaError || !fridaIngredient || fridaIngredient.length === 0) {
-        return null
+      // Create proper NutritionalInfo object from direct fields
+      const nutritionalInfo: NutritionalInfo = {
+        calories: data.calories || 0,
+        protein: data.protein || 0,
+        carbs: data.carbs || 0,
+        fat: data.fat || 0,
+        fiber: data.fiber || 0,
+        vitamins: data.vitamins || {},
+        minerals: data.minerals || {}
       }
       
       return {
-        fridaId,
-        fridaName: fridaIngredient[0].name
+        name: data.name,
+        category: data.category,
+        nutritionalInfo
       }
     } catch (error) {
-      console.log(`⚠️ Error checking manual matches: ${error}`)
+      console.error(`❌ Error getting manual match for ${ingredientName}:`, error)
       return null
     }
   }
@@ -96,7 +82,6 @@ export class FridaDTUMatcher {
    */
   private async getFridaIngredientNutrition(fridaId: string): Promise<NutritionalInfo | null> {
     try {
-      const supabase = createSupabaseClient()
       const { data: ingredient, error } = await supabase
         .from('frida_ingredients')
         .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
@@ -129,22 +114,34 @@ export class FridaDTUMatcher {
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
     try {
-      const supabase = createSupabaseClient()
+      console.log(`🔍 Searching for: "${searchTerm}" in frida_ingredients`)
+      
       const normalizedTerm = this.normalizeIngredientName(searchTerm)
       
-      // Use full-text search for better Danish language support
+      // Search in frida_ingredients table - removed source filter since all have source = 'frida_dtu'
       const { data, error } = await supabase
-        .from('frida_foods')
-        .select('food_id, food_name_da, food_name_en')
-        .or(`food_name_da.ilike.%${normalizedTerm}%,food_name_en.ilike.%${normalizedTerm}%`)
-        .limit(10)
+        .from('frida_ingredients')
+        .select('id, name, category')
+        .ilike('name', `%${normalizedTerm}%`)
+        .limit(20) // Increased limit for better matching
       
       if (error) {
         console.error('❌ Error searching foods:', error)
         return []
       }
       
-      return data || []
+      console.log(`🔍 Found ${data?.length || 0} matches for "${searchTerm}"`)
+      
+      // Transform data to match FridaFood interface
+      const results = (data || []).map(item => ({
+        food_id: parseInt(item.id.replace('frida-', '')),
+        food_name_da: item.name,
+        food_name_en: item.name // Use Danish name for both since we only have Danish
+      }))
+      
+      console.log(`🔍 Transformed results:`, results.slice(0, 3)) // Log first 3 for debugging
+      
+      return results
     } catch (error) {
       console.error('❌ Failed to search foods:', error)
       return []
@@ -194,8 +191,11 @@ export class FridaDTUMatcher {
    * Find best match for ingredient in Frida database
    */
   private async findBestMatch(ingredientName: string): Promise<{ foodId: number, name: string, score: number } | null> {
-    const supabase = createSupabaseClient()
+    console.log(`🎯 Finding best match for: "${ingredientName}"`)
+    
     const foods = await this.searchFoods(ingredientName)
+    console.log(`🎯 searchFoods returned ${foods.length} foods`)
+    
     let bestMatch = null
     let bestScore = 0
 
@@ -204,6 +204,8 @@ export class FridaDTUMatcher {
       const scoreEn = this.calculateSimilarity(ingredientName, food.food_name_en || '')
       const score = Math.max(scoreDa, scoreEn)
       
+      console.log(`🎯 "${food.food_name_da}" - score: ${score.toFixed(3)}`)
+      
       if (score > bestScore && score > 0.3) { // Minimum threshold
         bestScore = score
         bestMatch = { 
@@ -211,7 +213,14 @@ export class FridaDTUMatcher {
           name: food.food_name_da, 
           score 
         }
+        console.log(`🎯 New best match: "${food.food_name_da}" (score: ${score.toFixed(3)})`)
       }
+    }
+
+    if (bestMatch) {
+      console.log(`🎯 Final best match: "${bestMatch.name}" (score: ${bestMatch.score.toFixed(3)})`)
+    } else {
+      console.log(`🎯 No match found for "${ingredientName}" (best score was ${bestScore.toFixed(3)})`)
     }
 
     return bestMatch
@@ -222,7 +231,6 @@ export class FridaDTUMatcher {
    */
   private async getNutritionalValues(foodId: number): Promise<FridaNutritionValue[]> {
     try {
-      const supabase = createSupabaseClient()
       const { data, error } = await supabase
         .from('frida_nutrition_values')
         .select('food_id, parameter_id, parameter_name_da, parameter_name_en, value, sort_key')
@@ -245,7 +253,6 @@ export class FridaDTUMatcher {
    * Get nutritional info for a specific food ID from Supabase
    */
   private async getNutritionalInfo(foodId: number): Promise<NutritionalInfo | null> {
-    const supabase = createSupabaseClient()
     const nutritionValues = await this.getNutritionalValues(foodId)
     
     if (nutritionValues.length === 0) return null
@@ -312,13 +319,13 @@ export class FridaDTUMatcher {
     // First, check if this ingredient has a manually confirmed match in the database
     const manualMatch = await this.getManualMatch(ingredientName)
     if (manualMatch) {
-      console.log(`🎯 Using manual match for "${ingredientName}" → "${manualMatch.fridaName}"`)
-      const nutrition = await this.getFridaIngredientNutrition(manualMatch.fridaId)
-      if (nutrition) {
-        this.ingredientCache.set(ingredientName, nutrition)
+      console.log(`🎯 Using manual match for "${ingredientName}" → "${manualMatch.name}"`)
+      // Use the nutritionalInfo directly from manual match
+      if (manualMatch.nutritionalInfo) {
+        this.ingredientCache.set(ingredientName, manualMatch.nutritionalInfo)
         return {
-          nutrition,
-          match: manualMatch.fridaName,
+          nutrition: manualMatch.nutritionalInfo,
+          match: manualMatch.name,
           score: 1.0 // Manual matches get perfect score
         }
       }
@@ -350,7 +357,6 @@ export class FridaDTUMatcher {
    * Process all ingredients in a recipe and calculate total nutrition
    */
   public async calculateRecipeNutrition(ingredients: Array<{ name: string, amount: number, unit: string }>): Promise<NutritionalInfo> {
-    const supabase = createSupabaseClient()
     const totalNutrition: NutritionalInfo = {
       calories: 0,
       protein: 0,
@@ -366,7 +372,7 @@ export class FridaDTUMatcher {
       
       if (result.nutrition) {
         // Convert to per 100g basis and scale by amount
-        const scaleFactor = this.getScaleFactor(ingredient.unit, ingredient.amount)
+        const scaleFactor = await this.getScaleFactor(ingredient.name, ingredient.amount, ingredient.unit)
         
         totalNutrition.calories += result.nutrition.calories * scaleFactor
         totalNutrition.protein += result.nutrition.protein * scaleFactor
@@ -391,31 +397,48 @@ export class FridaDTUMatcher {
   /**
    * Convert ingredient amount to 100g basis
    */
-  private getScaleFactor(unit: string, amount: number): number {
-    const supabase = createSupabaseClient()
-    const unitLower = unit.toLowerCase()
-    
-    // Common conversions to grams
-    const conversions: Record<string, number> = {
-      'g': 1,
-      'gram': 1,
-      'kg': 1000,
-      'kilo': 1000,
-      // Piece-based defaults (conservative)
-      'stk': 80,
-      'st': 80, // alias often seen in imported data
-      'stykke': 80,
-      'spsk': 15, // Tablespoon
-      'tesk': 5,  // Teaspoon (common misspelling)
-      'tsk': 5,   // Teaspoon
-      'dl': 100,  // Deciliter
-      'l': 1000,  // Liter
-      'ml': 1     // Milliliter
+  private async getScaleFactor(ingredientName: string, targetAmount: number, targetUnit: string): Promise<number> {
+    try {
+      console.log(`⚖️ Getting scale factor for: ${ingredientName} (${targetAmount} ${targetUnit})`)
+      
+      // Use singleton Supabase client
+      const { data, error } = await supabase
+        .from('frida_ingredients')
+        .select('*')
+        .ilike('name', `%${ingredientName}%`)
+        .limit(1)
+        .single()
+      
+      if (error || !data) {
+        console.log(`❌ No scale factor found for: ${ingredientName}`)
+        return 1.0
+      }
+      
+      // Common conversions to grams
+      const conversions: Record<string, number> = {
+        'g': 1,
+        'gram': 1,
+        'kg': 1000,
+        'kilo': 1000,
+        // Piece-based defaults (conservative)
+        'stk': 80,
+        'st': 80, // alias often seen in imported data
+        'stykke': 80,
+        'spsk': 13, // Tablespoon (mere præcis dansk mål)
+        'tesk': 4,  // Teaspoon (mere præcis dansk mål)
+        'tsk': 4,   // Teaspoon (mere præcis dansk mål)
+        'dl': 100,  // Deciliter
+        'l': 1000,  // Liter
+        'ml': 1     // Milliliter
+      }
+      
+      const gramsPerUnit = conversions[targetUnit.toLowerCase()] || 80 // Default to 80g per piece/unknown to avoid overcounting
+      const totalGrams = targetAmount * gramsPerUnit
+      
+      return totalGrams / 100 // Convert to per 100g basis
+    } catch (error) {
+      console.error(`❌ Error getting scale factor for ${ingredientName}:`, error)
+      return 1.0
     }
-    
-    const gramsPerUnit = conversions[unitLower] || 80 // Default to 80g per piece/unknown to avoid overcounting
-    const totalGrams = amount * gramsPerUnit
-    
-    return totalGrams / 100 // Convert to per 100g basis
   }
-} 
+}

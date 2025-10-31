@@ -2,27 +2,28 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, LogOut, Settings, Heart } from 'lucide-react'
+import { Search, Menu, X, User, LogOut, Settings, Heart, Shield } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
 
 const mainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
   { name: 'MADBUDGET', href: '/madbudget' },
-  { name: 'VÆGTTAB', href: '/vaegttab' },
+  { name: 'VÆGTTAB', href: '/vægttab' },
   { name: 'BAG OM FF', href: '/bag-om-ff' },
 ]
 
 const dietaryCategories = [
-  { name: 'FAMILIEMAD', href: '/opskrifter/familie' },
-  { name: 'KETO', href: '/opskrifter/keto' },
-  { name: 'SENSE', href: '/opskrifter/sense' },
-  { name: 'LCHF/PALEO', href: '/opskrifter/lchch-paleo' },
-  { name: 'MEAL PREP', href: '/opskrifter/meal-prep' },
-  { name: 'ANTI-INFLAMMATORISK', href: '/opskrifter/anti-inflammatory' },
-  { name: 'FLEKSITARISK', href: '/opskrifter/flexitarian' },
-  { name: '5:2 DIÆT', href: '/opskrifter/5-2-diet' },
+  { name: 'KETO', href: '/keto' },
+  { name: 'SENSE', href: '/sense' },
+  { name: 'LCHF/PALEO', href: '/lchf-paleo' },
+  { name: 'MEAL PREP', href: '/meal-prep' },
+  { name: 'ANTI-INFLAMMATORISK', href: '/anti-inflammatory' },
+  { name: 'FLEKSITARISK', href: '/flexitarian' },
+  { name: '5:2 DIÆT', href: '/5-2-diet' },
+  { name: 'FAMILIEMAD', href: '/familie' },
 ]
 
 export default function Header() {
@@ -30,6 +31,7 @@ export default function Header() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const { user, signOut } = useAuth()
+  const { isAdmin } = useAdminCheck()
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
@@ -134,6 +136,18 @@ export default function Header() {
                           <Settings size={16} />
                           <span>Indstillinger</span>
                         </Link>
+                        
+                        {/* Admin Link - Only visible to admins */}
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100"
+                            onClick={() => setIsUserMenuOpen(false)}
+                          >
+                            <Shield size={16} />
+                            <span>Admin Panel</span>
+                          </Link>
+                        )}
                         
                         <button
                           onClick={handleSignOut}

@@ -22,7 +22,7 @@ export function useAdminAuth() {
       }
 
       // Create a unique key for this check
-      const checkKey = `${user?.id}-${session?.access_token?.slice(-10)}-${loading}`
+      const checkKey = `${user?.id}-${loading}`
       
       // Skip if we've already checked this exact state
       if (lastCheckRef.current === checkKey) {
@@ -32,7 +32,6 @@ export function useAdminAuth() {
 
       console.log('🔒 useAdminAuth: Starting check...', { 
         hasUser: !!user, 
-        hasSession: !!session, 
         loading,
         userId: user?.id 
       })
@@ -46,8 +45,8 @@ export function useAdminAuth() {
         return
       }
       
-      if (!user || !session) {
-        console.log('🔒 useAdminAuth: No user or session, redirecting to home')
+      if (!user) {
+        console.log('🔒 useAdminAuth: No user, redirecting to home')
         setIsAdmin(false)
         setChecking(false)
         checkingRef.current = false
@@ -106,7 +105,7 @@ export function useAdminAuth() {
     }
 
     checkAdminStatus()
-  }, [user?.id, session?.access_token, loading, router])
+  }, [user?.id, loading, router])
 
   return { isAdmin, checking, user }
 }

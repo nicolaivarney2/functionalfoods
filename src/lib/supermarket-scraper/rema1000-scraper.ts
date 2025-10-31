@@ -349,6 +349,39 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
+   * Extract numeric REMA product ID from various database fields
+   * Supports formats like "rema-12345", "python-12345", image/store URLs with embedded IDs
+   */
+  private extractRemaNumericId(product: any): number | null {
+    const candidates: Array<string | number | undefined | null> = [
+      product?.external_id,
+      product?.store_url,
+      product?.image_url,
+      product?.id
+    ]
+
+    for (const candidate of candidates) {
+      // IMPORTANT: Never use the database numeric primary key as a REMA product id
+      // Only parse from strings we know may contain the external REMA id
+      if (typeof candidate === 'string') {
+        // Try simple hyphen pattern first (e.g., "python-510315" or "rema-91251")
+        const hyphenIdx = candidate.lastIndexOf('-')
+        const tail = hyphenIdx >= 0 ? candidate.slice(hyphenIdx + 1) : candidate
+        let match: RegExpMatchArray | null = tail.match(/\d{3,}/)
+
+        // Try known URL patterns if needed
+        if (!match) match = candidate.match(/\/produkt\/(\d{3,})/)
+        if (!match) match = candidate.match(/\/(\d{3,})\//)
+
+        const numStr = match?.[1] || match?.[0]
+        const n = numStr ? parseInt(numStr, 10) : NaN
+        if (!Number.isNaN(n)) return n
+      }
+    }
+    return null
+  }
+
+  /**
    * Update prices for existing products
    */
   async updatePrices(existingProducts: SupermarketProduct[]): Promise<SupermarketProduct[]> {
@@ -356,7 +389,7 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     for (const product of existingProducts) {
       if (product.source === 'rema1000') {
-        const productId = product.id.replace('rema-', '')
+        const productId = String(product.id).replace('rema-', '')
         const updatedProduct = await this.fetchProduct(parseInt(productId))
         
         if (updatedProduct) {
@@ -552,7 +585,7 @@ export class Rema1000Scraper implements SupermarketAPI {
     
     for (const product of existingProducts) {
       if (product.source === 'rema1000') {
-        const productId = product.id.replace('rema-', '')
+        const productId = String(product.id).replace('rema-', '')
         const lastModified = new Date(product.lastUpdated).toUTCString()
         
         try {
@@ -597,100 +630,155 @@ export class Rema1000Scraper implements SupermarketAPI {
   }
 
   /**
-   * Enhanced intelligent batch update - finds missing original prices for existing offers
+   * Simple batch update - checks REMA products in batches of 100
    */
-  private async intelligentBatchUpdate(existingProducts: SupermarketProduct[]): Promise<any> {
-    console.log('🧠 Using enhanced intelligent batch update strategy')
-    console.log('🔍 Special focus: Finding missing original prices for existing offers')
+  async intelligentBatchUpdate(existingProducts: SupermarketProduct[], opts?: { batchSize?: number; maxTimeMs?: number; delayMs?: number }): Promise<any> {
+    console.log('🔄 Starting simple batch update - checking REMA products (paged)')
+    console.log('🔧 TEST: This method is being called!')
     
-    // Find products that need original price correction
-    const needsPriceCorrection = existingProducts.filter(p => 
-      p.isOnSale && p.originalPrice === p.price // These have missing original prices!
+    // Filter to only REMA products (since we only have REMA data for now)
+    const storeProducts = existingProducts.filter(p => 
+      p.source === 'rema1000' || 
+      p.source === 'rema1000-python-scraper' ||
+      p.source?.includes('rema1000') ||
+      p.source?.includes('rema')
     )
+    console.log(`📊 Found ${storeProducts.length} store products to check`)
     
-    console.log(`🎯 Found ${needsPriceCorrection.length} products with missing original prices`)
+    // Log what sources we found for debugging
+    const allSources = Array.from(new Set(existingProducts.map(p => p.source)))
+    console.log(`🔍 All sources in database:`, allSources)
+    console.log(`🎯 REMA sources found:`, allSources.filter(s => s?.includes('rema')))
     
-    // Categorize products by update frequency and offer potential
-    const highPriority = existingProducts.filter(p => 
-      p.category === 'Frugt & grønt' || p.category === 'Kød, fisk & fjerkræ'
-    )
-    const mediumPriority = existingProducts.filter(p => 
-      p.category === 'Mejeri' || p.category === 'Køl' || p.category === 'Ost & mejeri'
-    )
-    const lowPriority = existingProducts.filter(p => 
-      p.category === 'Kolonial' || p.category === 'Frost'
-    )
+    // Debug: Check what sources we actually have
+    const sources = Array.from(new Set(existingProducts.map(p => p.source)))
+    console.log(`🔍 Available sources in database:`, sources)
+    console.log(`📊 Total products: ${existingProducts.length}, store products: ${storeProducts.length}`)
     
-    console.log(`📊 Update priorities: High: ${highPriority.length}, Medium: ${mediumPriority.length}, Low: ${lowPriority.length}`)
+    if (storeProducts.length === 0) {
+      console.log(`⚠️ No store products found! Check source field.`)
+      console.log(`🔍 Sample product sources:`, existingProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, source: p.source })))
+      return { updated: [], new: [], unchanged: existingProducts, totalChanges: 0 }
+    }
     
     const updated: SupermarketProduct[] = []
     const unchanged: SupermarketProduct[] = []
+    const batchSize = opts?.batchSize ?? 25 // More aggressive default to hit changed items
     
-    // 🎯 PRIORITY 1: Fix products with missing original prices FIRST
-    console.log(`🔧 Fixing ${needsPriceCorrection.length} products with missing original prices...`)
-    for (const existingProduct of needsPriceCorrection.slice(0, 20)) { // Limit to 20 for performance
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
-        const freshProduct = await this.fetchProduct(parseInt(productId))
+    // Process in small batches for Vercel timeout (10 seconds)
+    const startTime = Date.now()
+    const maxTime = opts?.maxTimeMs ?? 9000 // Slightly longer within Vercel limit
+    let processedCount = 0
+    
+    for (let batchStart = 0; batchStart < storeProducts.length; batchStart += batchSize) {
+      // Check if we're running out of time
+      if (Date.now() - startTime > maxTime) {
+        console.log(`⏰ Time limit reached (${maxTime}ms). Stopping delta update.`)
+        processedCount = batchStart
+        break
+      }
+      const batchEnd = Math.min(batchStart + batchSize, storeProducts.length)
+      const batch = storeProducts.slice(batchStart, batchEnd)
+      
+      console.log(`📦 Processing batch ${Math.floor(batchStart / batchSize) + 1}: products ${batchStart + 1}-${batchEnd}`)
+      
+      // Process each product in the batch
+      for (let i = 0; i < batch.length; i++) {
+        const existingProduct = batch[i]
+        // Derive numeric REMA product id robustly from DB fields
+        const numericId = this.extractRemaNumericId(existingProduct)
+        if (batchStart === 0 && i < 3) {
+          console.log(`   Derived Numeric ID:`, numericId)
+        }
+        if (numericId == null) {
+          // Cannot derive id – skip as unchanged
+          unchanged.push(existingProduct)
+          continue
+        }
+        
+        // Enhanced debugging for first few products
+        if (batchStart === 0 && i < 3) {
+          console.log(`🔍 DEBUG PRODUCT ${i + 1}: ${existingProduct.name}`)
+          console.log(`   Database ID: ${existingProduct.id}, External ID: ${existingProduct.external_id}`)
+          console.log(`   Extracted Product ID: ${numericId}`)
+          console.log(`   Database: price=${existingProduct.price}, isOnSale=${existingProduct.is_on_sale}, originalPrice=${existingProduct.original_price}`)
+        }
+        
+        try {
+          const freshProduct = await this.fetchProduct(numericId)
+          
+          // Debug: Log first few products to see what's happening
+          if (batchStart === 0 && i < 3) {
+            if (freshProduct) {
+              console.log(`   Fresh API: price=${freshProduct.price}, isOnSale=${freshProduct.isOnSale}, originalPrice=${freshProduct.originalPrice}`)
+              console.log(`   Changes: price=${freshProduct.price !== existingProduct.price}, offer=${freshProduct.isOnSale !== (existingProduct.is_on_sale ?? existingProduct.isOnSale)}, original=${freshProduct.originalPrice !== (existingProduct.original_price ?? existingProduct.originalPrice)}`)
+            } else {
+              console.log(`   Fresh API: null (not found)`)
+            }
+          }
         
         if (freshProduct) {
+             // Check if there are any changes - normalize DB snake_case vs camelCase
+             const dbIsOnSale = (existingProduct as any).is_on_sale ?? existingProduct.isOnSale
+             const dbOriginalPrice = (existingProduct as any).original_price ?? existingProduct.originalPrice
+             const hasPriceChange = freshProduct.price !== existingProduct.price
+             const hasOfferChange = freshProduct.isOnSale !== dbIsOnSale
+             const hasOriginalPriceChange = freshProduct.originalPrice !== dbOriginalPrice
+             
+             if (hasPriceChange || hasOfferChange || hasOriginalPriceChange) {
           const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
+          // Preserve existing external_id for DB update matching
+          ;(enhancedProduct as any).external_id = (existingProduct as any).external_id || (enhancedProduct as any).external_id
           updated.push(enhancedProduct)
           
-          // Log price corrections
-          if (enhancedProduct.originalPrice !== existingProduct.originalPrice) {
-            console.log(`✅ Fixed original price for ${enhancedProduct.name}: ${existingProduct.originalPrice} → ${enhancedProduct.originalPrice}`)
-          }
-        }
-        await this.delay(150) // Slightly faster for corrections
-      }
-    }
-    
-    // 🎯 PRIORITY 2: Enhanced update logic for high priority products
-    const remainingHighPriority = highPriority.filter(p => 
-      !needsPriceCorrection.some(corrected => corrected.id === p.id)
-    ).slice(0, 10) // Limit remaining high priority updates
-    
-    for (const existingProduct of remainingHighPriority) {
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
-        const freshProduct = await this.fetchProduct(parseInt(productId))
-        
-        if (freshProduct) {
-          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-          updated.push(enhancedProduct)
+               // Log changes
+               if (hasOfferChange) {
+                 console.log(`🏷️ Offer change: ${existingProduct.name} - ${existingProduct.isOnSale} → ${freshProduct.isOnSale}`)
+               }
+               if (hasPriceChange) {
+                 console.log(`💰 Price change: ${existingProduct.name} - ${existingProduct.price} → ${freshProduct.price}`)
+               }
+               if (hasOriginalPriceChange && existingProduct.isOnSale) {
+                 console.log(`🔧 Original price fix: ${existingProduct.name} - ${existingProduct.originalPrice} → ${freshProduct.originalPrice}`)
+               }
+             } else {
+               unchanged.push(existingProduct)
+             }
+           } else {
+             unchanged.push(existingProduct)
+           }
           
-          // Log offer changes
-          if (enhancedProduct.isOnSale !== existingProduct.isOnSale) {
-            console.log(`🏷️ Offer status changed for ${enhancedProduct.name}: ${existingProduct.isOnSale} → ${enhancedProduct.isOnSale}`)
-          }
+          // Small delay between requests
+          await this.delay(opts?.delayMs ?? 100)
+          
+        } catch (error) {
+          console.log(`⚠️ Error checking ${existingProduct.name}:`, error)
+          unchanged.push(existingProduct)
+          await this.delay(100)
         }
-        await this.delay(200) // Rate limiting
+      }
+      
+      processedCount = batchEnd
+      console.log(`✅ Batch ${Math.floor(batchStart / batchSize) + 1} completed: ${updated.length} total updates so far`)
+      
+      // Shorter delay between batches for Vercel
+      if (batchEnd < storeProducts.length) {
+        console.log(`⏳ Waiting ${Math.min(500, opts?.delayMs ? opts.delayMs * 5 : 500)}ms before next batch...`)
+        await this.delay(Math.min(500, opts?.delayMs ? opts.delayMs * 5 : 500))
       }
     }
     
-    // Also update some medium priority products for better coverage
-    const mediumSample = mediumPriority.slice(0, Math.min(10, mediumPriority.length))
-    for (const existingProduct of mediumSample) {
-      if (existingProduct.source === 'rema1000') {
-        const productId = existingProduct.id.replace('rema-', '')
-        const freshProduct = await this.fetchProduct(parseInt(productId))
-        
-        if (freshProduct) {
-          const enhancedProduct = this.enhanceProductWithOfferLogic(existingProduct, freshProduct)
-          updated.push(enhancedProduct)
-        }
-        await this.delay(300)
-      }
-    }
-    
-    console.log(`✅ Delta update completed: ${updated.length} products updated`)
+    // processedCount is already set in the loop
+    console.log(`🎉 Delta update completed! Processed ${processedCount} out of ${storeProducts.length} products`)
+    console.log(`📊 Total updates: ${updated.length}, unchanged: ${unchanged.length}`)
     
     return {
       updated,
       new: [],
       unchanged: existingProducts.filter(p => !updated.find(u => u.id === p.id)),
-      totalChanges: updated.length
+      totalChanges: updated.length,
+      processedCount,
+      totalCount: storeProducts.length
     }
   }
 
@@ -755,6 +843,63 @@ export class Rema1000Scraper implements SupermarketAPI {
     }
     
     return enhancedProduct
+  }
+
+  async scrapeAllProducts(): Promise<{ success: boolean; products?: SupermarketProduct[]; error?: string }> {
+    try {
+      console.log('🚀 Starting full REMA 1000 scrape...')
+      const products = await this.fetchAllProducts()
+      console.log(`✅ Scraped ${products.length} products`)
+      return { success: true, products }
+    } catch (error) {
+      console.error('❌ Full scrape failed:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
+  }
+
+  async uploadToStorage(products: SupermarketProduct[]): Promise<{ success: boolean; jsonUrl?: string; storagePath?: string; error?: string }> {
+    try {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+
+      const jsonData = JSON.stringify(products, null, 2)
+      const fileName = `rema/latest.json`
+      
+      const { data, error } = await supabase.storage
+        .from('scraper-data')
+        .upload(fileName, jsonData, {
+          contentType: 'application/json',
+          upsert: true
+        })
+
+      if (error) {
+        console.error('❌ Storage upload failed:', error)
+        return { success: false, error: error.message }
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from('scraper-data')
+        .getPublicUrl(fileName)
+
+      console.log('✅ Uploaded to Supabase Storage:', publicUrl.publicUrl)
+      return { 
+        success: true, 
+        jsonUrl: publicUrl.publicUrl,
+        storagePath: fileName
+      }
+    } catch (error) {
+      console.error('❌ Storage upload error:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      }
+    }
   }
 }
 

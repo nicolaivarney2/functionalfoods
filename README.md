@@ -104,6 +104,36 @@ for (let i = 0; i < allItems.length; i += batchSize) {
 - [ ] Database query results
 - [ ] Environment variable values
 
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Supabase account
+- OpenAI API key (for AI features)
+
+### Installation
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Copy `.env.local.example` to `.env.local` and fill in your Supabase credentials
+4. Copy `.openai-config.example.json` to `.openai-config.json` and add your OpenAI API key and Assistant ID
+
+### OpenAI Setup
+To use AI features (recipe tips, etc.), you need to:
+
+1. **Get an OpenAI API key** from [OpenAI Platform](https://platform.openai.com/api-keys)
+2. **Create an OpenAI Assistant** from [OpenAI Assistants](https://platform.openai.com/assistants)
+3. **Copy `.openai-config.example.json` to `.openai-config.json`**
+4. **Fill in your credentials:**
+   ```json
+   {
+     "apiKey": "sk-your-actual-api-key-here",
+     "assistantId": "asst-your-actual-assistant-id-here"
+   }
+   ```
+
+**Note:** `.openai-config.json` is gitignored to prevent accidentally committing API keys.
+
 ## 📦 Installation
 
 1. Clone the repository:
@@ -150,3 +180,4 @@ npm run dev
 ## 📄 License
 
 This project is licensed under the MIT License.
+# Test commit for environment variables

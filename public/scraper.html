@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REMA Scraper</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .button { background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; margin: 10px 0; }
+        .button:hover { background: #059669; }
+        .button:disabled { background: #6b7280; cursor: not-allowed; }
+        .log { background: #f3f4f6; padding: 15px; border-radius: 6px; margin: 10px 0; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .success { color: #059669; }
+        .error { color: #dc2626; }
+        .info { color: #2563eb; }
+    </style>
+</head>
+<body>
+    <h1>🚀 REMA Batch Scraper</h1>
+    <p>Denne side kører direkte i browseren og omgår Vercel authentication.</p>
+    
+    <button id="scraperBtn" class="button">Start REMA Scraper</button>
+    <button id="clearBtn" class="button" style="background: #6b7280;">Ryd Log</button>
+    
+    <div id="log" class="log"></div>
+    
+    <script>
+        const log = document.getElementById('log');
+        const scraperBtn = document.getElementById('scraperBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            log.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        function clearLog() {
+            log.innerHTML = '';
+        }
+        
+        function getDepartmentName(deptId) {
+            const departments = {
+                10: 'Brød & Bavinchi',
+                20: 'Frugt & grønt', 
+                30: 'Kød, fisk & fjerkræ',
+                40: 'Køl - kølede madvarer',
+                50: 'Frost',
+                60: 'Mejeri',
+                70: 'Ost m.v.',
+                80: 'Kolonial',
+                90: 'Drikkevarer',
+                100: 'Husholdning',
+                110: 'Baby og småbørn',
+                120: 'Personlig pleje',
+                130: 'Slik',
+                140: 'Kiosk',
+                160: 'Nemt & hurtigt'
+            };
+            return departments[deptId] || 'Ukendt';
+        }
+        
+        clearBtn.onclick = clearLog;
+        
+        scraperBtn.onclick = async () => {
+            if (scraperBtn.disabled) return;
+            
+            scraperBtn.disabled = true;
+            scraperBtn.textContent = 'Running...';
+            clearLog();
+            
+            try {
+                addLog('🚀 Starting REMA Batch Scraper...');
+                
+                // Test med department 20 først
+                addLog('🧪 Testing with department 20 (Frugt & grønt)...');
+                
+                const testResponse = await fetch('/api/proxy/rema?departmentId=20&page=1&limit=5');
+                const testData = await testResponse.json();
+                
+                if (testData.data && testData.data.length > 0) {
+                    addLog(`✅ Test successful! Found ${testData.data.length} products`, 'success');
+                    addLog(`📊 Total products in department 20: ${testData.meta.pagination.total}`);
+                    
+                    // Hvis test virker, kør alle departments
+                    addLog('🔄 Starting full import...');
+                    
+                    const departments = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 160];
+                    let totalFound = 0;
+                    let totalAdded = 0;
+                    let totalUpdated = 0;
+                    
+                    for (const deptId of departments) {
+                        addLog(`\n📦 Processing department ${deptId}...`);
+                        
+                        let page = 1;
+                        let hasMore = true;
+                        let deptFound = 0;
+                        let deptAdded = 0;
+                        let deptUpdated = 0;
+                        
+                        while (hasMore) {
+                            try {
+                                addLog(`  📄 Page ${page}...`);
+                                
+                                const response = await fetch(`/api/proxy/rema?departmentId=${deptId}&page=${page}&limit=100`);
+                                const data = await response.json();
+                                
+                                if (data.data && data.data.length > 0) {
+                                    deptFound += data.data.length;
+                                    
+                                    // Send produkterne til vores import API
+                                    try {
+                                        // Transform REMA data to match import API format
+                                        const transformedProducts = data.data.map(product => ({
+                                            ...product,
+                                            department: { id: deptId, name: getDepartmentName(deptId) }
+                                        }));
+                                        
+                                        const importResponse = await fetch('/api/admin/dagligvarer/import-rema-products', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ 
+                                                products: transformedProducts
+                                            })
+                                        });
+                                        
+                                        const importResult = await importResponse.json();
+                                        
+                                        if (importResult.success) {
+                                            deptAdded += importResult.productsAdded || 0;
+                                            deptUpdated += importResult.productsUpdated || 0;
+                                            addLog(`    💾 Imported: ${importResult.productsAdded} added, ${importResult.productsUpdated} updated`);
+                                        } else {
+                                            addLog(`    ❌ Import failed: ${importResult.message}`, 'error');
+                                        }
+                                    } catch (importError) {
+                                        addLog(`    ❌ Import error: ${importError.message}`, 'error');
+                                    }
+                                    
+                                    addLog(`    ✅ Found ${data.data.length} products (${deptFound} total for department)`);
+                                    
+                                    hasMore = data.meta.pagination.current_page < data.meta.pagination.last_page;
+                                    page++;
+                                    
+                                    // Small delay to avoid rate limiting
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+                                } else {
+                                    hasMore = false;
+                                }
+                            } catch (error) {
+                                addLog(`    ❌ Error on page ${page}: ${error.message}`, 'error');
+                                hasMore = false;
+                            }
+                        }
+                        
+                        totalFound += deptFound;
+                        totalAdded += deptAdded;
+                        totalUpdated += deptUpdated;
+                        
+                        addLog(`✅ Department ${deptId} completed: ${deptFound} found, ${deptAdded} added`, 'success');
+                    }
+                    
+                    addLog(`\n🎉 All departments completed!`, 'success');
+                    addLog(`📊 Total found: ${totalFound}`, 'success');
+                    addLog(`➕ Total added: ${totalAdded}`, 'success');
+                    addLog(`🔄 Total updated: ${totalUpdated}`, 'success');
+                    
+                } else {
+                    addLog('❌ Test failed - no products found', 'error');
+                }
+                
+            } catch (error) {
+                addLog(`❌ Scraper failed: ${error.message}`, 'error');
+            } finally {
+                scraperBtn.disabled = false;
+                scraperBtn.textContent = 'Start REMA Scraper';
+            }
+        };
+        
+        addLog('Ready to start scraping! Click the button above.');
+    </script>
+</body>
+</html>

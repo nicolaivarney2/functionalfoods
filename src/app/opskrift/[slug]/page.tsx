@@ -172,6 +172,8 @@ export default async function RecipePage({ params }: PageProps) {
                     fat={recipe.fat || 0}
                     fiber={recipe.fiber || 0}
                     servings={recipe.servings || 4}
+                    vitamins={recipe.vitamins || {}}
+                    minerals={recipe.minerals || {}}
                   />
                 </div>
 

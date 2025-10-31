@@ -71,13 +71,16 @@ Kategoriser dette produkt i en af følgende kategorier:
 - Frugt & grønt (friske frugter, grøntsager, frisk kød/fisk)
 - Kolonial (tørrede varer, konserves, basis madvarer)
 - Kød, fisk & fjerkræ (frisk kød, fisk, fjerkræ)
-- Mejeri (mælk, ost, yoghurt, fløde)
+- Ost & mejeri (mælk, ost, yoghurt, fløde)
 - Brød & kager (brød, kager, boller)
 - Drikkevarer (drikke, juice, vand, kaffe)
 - Snacks & slik (chips, slik, nødder)
 - Husholdning & rengøring (rengøring, papir, personlig pleje)
-- Baby & børn (babymad, ble, legetøj)
-- Kæledyr (hundemad, kattemad)
+- Baby og småbørn (babymad, ble, legetøj)
+- Færdigretter & takeaway (færdigretter, takeaway)
+- Kiosk (kiosk produkter)
+- Personlig pleje (personlig pleje produkter)
+- Ukategoriseret (hvis produktet ikke passer i andre kategorier)
 
 Returner kun kategorinavnet, intet andet.
 `
@@ -142,7 +145,7 @@ Returner kun kategorinavnet, intet andet.
 const fallbackCategoryMapping = (productName: string) => {
   const name = productName.toLowerCase()
   
-  // Basis kategorisering for kritiske produkter
+  // Basis kategorisering for kritiske produkter - UPDATED TO MATCH USER DEFINED CATEGORIES
   if (name.includes('kikærter') || name.includes('bønner') || name.includes('ris') || name.includes('pasta')) {
     return 'Kolonial'
   }
@@ -150,7 +153,7 @@ const fallbackCategoryMapping = (productName: string) => {
     return 'Frugt & grønt'
   }
   if (name.includes('mælk') || name.includes('ost') || name.includes('yoghurt')) {
-    return 'Mejeri'
+    return 'Ost & mejeri'  // Changed from "Mejeri" to match user categories
   }
   
   return 'Ukategoriseret'
@@ -292,14 +295,54 @@ export async function POST(request: NextRequest) {
     let updatedProducts = 0
     const errors: string[] = []
     
-    // 🔥 NEW: Store the scraped JSON as metadata
-    const scrapedDataMetadata = {
+    // 🔥 NEW: Store the scraped JSON as metadata (and upload a copy to Storage for a stable URL)
+    const scrapedDataMetadata: any = {
       timestamp: new Date().toISOString(),
       store: 'REMA 1000',
       totalProducts: products.length,
       source: 'python-scraper',
-      jsonData: JSON.stringify(products, null, 2), // Store the full JSON
+      jsonData: JSON.stringify(products, null, 2), // Store the full JSON inline as fallback
       version: '1.0'
+    }
+
+    // Try to upload JSON to Supabase Storage for a persistent public URL
+    try {
+      const bucket = 'scraper-data'
+      // Ensure bucket exists and is public
+      try {
+        // Try to create; ignore conflict errors if it already exists
+        const createRes = await supabase.storage.createBucket(bucket, { public: true })
+        if (createRes.error && !String(createRes.error.message || '').toLowerCase().includes('already exists')) {
+          console.warn('⚠️ Bucket creation failed:', createRes.error.message)
+        } else if (!createRes.error) {
+          console.log('✅ Created storage bucket:', bucket)
+        }
+      } catch (e) {
+        console.warn('⚠️ Bucket creation threw error (may already exist):', e instanceof Error ? e.message : e)
+      }
+
+      // Overwrite one stable file per store to avoid storage growth
+      const filePath = `rema/latest.json`
+      const uploadRes = await supabase
+        .storage
+        .from(bucket)
+        .upload(filePath, scrapedDataMetadata.jsonData, {
+          contentType: 'application/json',
+          upsert: true
+        })
+      if (!uploadRes.error) {
+        const { data: pub } = supabase.storage.from(bucket).getPublicUrl(filePath)
+        if (pub?.publicUrl) {
+          scrapedDataMetadata.jsonUrl = pub.publicUrl
+          // Remove inline JSON to keep DB lean when we have a URL
+          delete scrapedDataMetadata.jsonData
+          console.log('✅ Uploaded JSON to storage and set jsonUrl:', pub.publicUrl)
+        }
+      } else {
+        console.warn('⚠️ Storage upload failed:', uploadRes.error.message)
+      }
+    } catch (e) {
+      console.warn('⚠️ Storage upload threw error (continuing with inline jsonData):', e instanceof Error ? e.message : e)
     }
     
     // Store metadata in a separate table or as a special record
@@ -334,23 +377,22 @@ export async function POST(request: NextRequest) {
             const deptId = product.department.id
             const deptName = product.department.name || ''
             
-            // Map department ID to category (same as in scraper)
-            if (deptId === 50) category = "Færdigretter & takeaway"
-            else if (deptId === 70) category = "Ost & mejeri"
-            else if (deptId === 80) category = "Kolonial"
-            else if (deptId === 81) category = "Frugt & grønt"
-            else if (deptId === 82) category = "Kød, fisk & fjerkræ"
-            else if (deptId === 83) category = "Mejeri"
-            else if (deptId === 84) category = "Frost"
-            else if (deptId === 85) category = "Brød & kager"
-            else if (deptId === 86) category = "Drikkevarer"
-            else if (deptId === 87) category = "Snacks & slik"
-            else if (deptId === 88) category = "Husholdning & rengøring"
-            else if (deptId === 89) category = "Baby & børn"
-            else if (deptId === 90) category = "Kæledyr"
-            else if (deptId === 100) category = "Husholdning & rengøring"
-            else if (deptId === 120) category = "Personlig pleje"
-            else if (deptId === 130) category = "Snacks & slik"
+            // Map department ID to category (UPDATED WITH NEW REMA API IDs - September 2025)
+            if (deptId === 10) category = "Brød & kager"  // Brød & Bavinchi
+            else if (deptId === 20) category = "Frugt & grønt"  // Frugt & grønt
+            else if (deptId === 30) category = "Kød, fisk & fjerkræ"  // Kød, fisk & fjerkræ
+            else if (deptId === 40) category = "Kød, fisk & fjerkræ"  // Køl - kølede madvarer
+            else if (deptId === 50) category = "Ukategoriseret"  // Frost - mapped to Uncategorized since not in user list
+            else if (deptId === 60) category = "Ost & mejeri"  // Mejeri - changed from "Mejeri" to match user categories
+            else if (deptId === 70) category = "Ost & mejeri"  // Ost m.v.
+            else if (deptId === 80) category = "Kolonial"  // Kolonial
+            else if (deptId === 90) category = "Drikkevarer"  // Drikkevarer
+            else if (deptId === 100) category = "Husholdning & rengøring"  // Husholdning
+            else if (deptId === 110) category = "Baby og småbørn"  // Baby og småbørn
+            else if (deptId === 120) category = "Personlig pleje"  // Personlig pleje
+            else if (deptId === 130) category = "Snacks & slik"  // Slik
+            else if (deptId === 140) category = "Kiosk"  // Kiosk
+            else if (deptId === 160) category = "Ukategoriseret"  // "Nemt & hurtigt" - mapped to Uncategorized since not in user list
             else category = fallbackCategoryMapping(product.name)
             
             console.log(`✅ Mapped department ${deptId} (${deptName}) to category: ${category}`)
@@ -551,7 +593,9 @@ export async function POST(request: NextRequest) {
         stored: !metadataError,
         timestamp: scrapedDataMetadata.timestamp,
         store: scrapedDataMetadata.store,
-        totalProducts: scrapedDataMetadata.totalProducts
+        totalProducts: scrapedDataMetadata.totalProducts,
+        jsonUrl: scrapedDataMetadata.jsonUrl || null,
+        storagePath: 'scraper-data/rema/latest.json'
       },
       timestamp: new Date().toISOString()
     })
@@ -647,18 +691,27 @@ export async function GET(request: NextRequest) {
       throw metadataError
     }
     
-    // Get statistics from database
+    // First: get exact total count without fetching rows (avoids 1000-row cap)
+    const { count: totalCount, error: countError } = await supabase
+      .from('supermarket_products')
+      .select('*', { count: 'exact', head: true })
+      .or('source.eq.rema1000,source.eq.rema1000-python-scraper,source.ilike.%rema%')
+    if (countError) {
+      throw countError
+    }
+
+    // Then: fetch a sample set for category/avg calculations (regular select is capped by PostgREST)
     const { data: products, error: productsError } = await supabase
       .from('supermarket_products')
       .select('*')
-      .eq('store', 'REMA 1000')
+      .or('source.eq.rema1000,source.eq.rema1000-python-scraper,source.ilike.%rema%')
     
     if (productsError) {
       throw productsError
     }
     
     // Calculate statistics
-    const totalProducts = products?.length || 0
+    const totalProducts = totalCount || 0
     const productsOnSale = products?.filter((p: any) => p.is_on_sale).length || 0
     const categories = products?.reduce((acc: string[], p: any) => {
       if (p.category && !acc.includes(p.category)) {

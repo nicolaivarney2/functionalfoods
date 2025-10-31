@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 import sharp from 'sharp'
-import { createSupabaseClient } from '@/lib/supabase'
+import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Starting image processing...')
+    
     const { imageUrl, recipeSlug } = await request.json()
+    console.log('📥 Received data:', { imageUrl, recipeSlug })
     
     if (!imageUrl || !recipeSlug) {
+      console.log('❌ Missing required data')
       return NextResponse.json({
         success: false,
         error: 'Missing imageUrl or recipeSlug'
@@ -46,7 +50,10 @@ export async function POST(request: NextRequest) {
       headers['Referer'] = 'https://ketoliv.dk'
     }
     
+    console.log('📡 Downloading image with headers:', headers)
     const response = await fetch(imageUrl, { headers })
+    console.log('📡 Download response status:', response.status, response.statusText)
+    
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.status} ${response.statusText}`)
     }
@@ -55,7 +62,9 @@ export async function POST(request: NextRequest) {
     const contentType = response.headers.get('content-type') || 'image/jpeg'
     console.log(`   📋 Detected MIME type: ${contentType}`)
     
+    console.log('📥 Converting response to buffer...')
     const imageBuffer = await response.arrayBuffer()
+    console.log('📥 Buffer size:', imageBuffer.byteLength, 'bytes')
     
     // Convert to WebP with optimization (target: 150-300KB)
     console.log(`   🔧 Optimizing image to WebP format...`)
@@ -89,8 +98,12 @@ export async function POST(request: NextRequest) {
     
     console.log(`   📤 Uploading to Supabase Storage: ${filename}`)
     
-    // Upload to Supabase Storage
-    const supabase = createSupabaseClient()
+    // Upload to Supabase Storage using service role client (bypasses RLS)
+    console.log('🔌 Creating Supabase service client...')
+    const supabase = createSupabaseServiceClient()
+    console.log('🔌 Supabase service client created')
+    
+    console.log('📤 Starting upload...')
     const { data, error } = await supabase.storage
       .from('recipe-images')
       .upload(filename, optimizedBuffer, {
@@ -109,7 +122,10 @@ export async function POST(request: NextRequest) {
       throw error
     }
     
+    console.log('✅ Upload successful, data:', data)
+    
     // Get public URL
+    console.log('🔗 Getting public URL...')
     const { data: { publicUrl } } = supabase.storage
       .from('recipe-images')
       .getPublicUrl(filename)
@@ -123,6 +139,7 @@ export async function POST(request: NextRequest) {
     
   } catch (error) {
     console.error(`❌ Failed to process image:`, error)
+    console.error(`❌ Error stack:`, error instanceof Error ? error.stack : 'No stack trace')
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'

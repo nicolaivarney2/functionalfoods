@@ -3,11 +3,12 @@
 import { useState } from 'react'
 
 interface Props {
-  recipeId: number
+  recipeId: string | number
   recipeName: string
+  onNutritionUpdated?: (nutrition: any) => void
 }
 
-export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Props) {
+export default function RecipeNutritionRecalculator({ recipeId, recipeName, onNutritionUpdated }: Props) {
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   const handleRecalculate = async () => {
@@ -31,10 +32,17 @@ export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Pr
       const data = await response.json()
       
       if (data.success) {
-        alert(`✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g`)
+        const message = `✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g`
         
-        // Reload page to show updated nutrition
-        window.location.reload()
+        alert(message)
+        
+        // Call callback if provided to update parent component
+        if (onNutritionUpdated && data.nutrition) {
+          onNutritionUpdated(data.nutrition)
+        }
+        
+        // No page reload - just show success message
+        console.log('✅ Nutrition updated successfully, no page reload needed')
       } else {
         alert(`❌ Error: ${data.error}\n\nDetails: ${data.details || 'Unknown error'}`)
       }
@@ -47,23 +55,19 @@ export default function RecipeNutritionRecalculator({ recipeId, recipeName }: Pr
   }
 
   return (
-    <div className="mt-4 p-3 bg-gray-50 rounded-lg border">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">Admin Tools</h4>
+    <div className="inline-block">
       <button
         onClick={handleRecalculate}
         disabled={isRecalculating}
-        className={`px-3 py-2 text-sm rounded transition-colors ${
+        className={`px-2 py-1 text-xs rounded transition-colors ${
           isRecalculating
             ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
+            : 'bg-green-600 text-white hover:bg-green-700'
         }`}
+        title="Recalculate nutrition based on ingredient matches"
       >
-        {isRecalculating ? '⏳ Recalculating...' : '🔄 Recalculate Nutrition'}
+        {isRecalculating ? '⏳' : '🔄'}
       </button>
-      
-      <p className="text-xs text-gray-500 mt-2">
-        Use this after updating ingredient matches to refresh nutrition data without re-importing.
-      </p>
     </div>
   )
 }

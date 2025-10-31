@@ -44,6 +44,7 @@ export class IngredientMatcher {
     const processedIngredients: any[] = []
     const matchedIngredients: IngredientMatch[] = []
     let skippedCount = 0
+    const seenNames = new Set<string>()
 
     for (const newIngredient of newIngredients) {
       const exactMatch = this.findExactMatch(newIngredient.name)
@@ -59,7 +60,20 @@ export class IngredientMatcher {
         continue
       }
 
-      processedIngredients.push(newIngredient)
+      // Skip if we've already seen this ingredient name
+      if (seenNames.has(newIngredient.name)) {
+        skippedCount++
+        continue
+      }
+
+      // Generate unique ID for this ingredient
+      const uniqueIngredient = {
+        ...newIngredient,
+        id: `ingredient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      }
+
+      seenNames.add(newIngredient.name)
+      processedIngredients.push(uniqueIngredient)
     }
 
     return {

@@ -5,23 +5,24 @@ import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
   /**
-   * Get all recipes from database (published only) - for frontend use
+   * Get published recipes from database (for frontend use)
    */
   async getRecipes(): Promise<Recipe[]> {
     const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
       .select('*')
+      .eq('status', 'published') // Only show published recipes to frontend
       .order('updatedAt', { ascending: false })
     
     if (error) {
-      console.error('Error fetching recipes:', error)
+      console.error('Error fetching published recipes:', error)
       return []
     }
     
-    console.log(`🔍 Raw database data: ${data?.length || 0} recipes found`)
+    console.log(`🔍 Raw database data: ${data?.length || 0} published recipes found`)
     if (data && data.length > 0) {
-      console.log('📋 First raw recipe from DB:', {
+      console.log('📋 First published recipe from DB:', {
         id: data[0].id,
         title: data[0].title,
         imageUrl: data[0].imageUrl,
@@ -32,7 +33,7 @@ export class DatabaseService {
     }
     
     // Database already uses camelCase, no transformation needed
-    console.log(`✅ Returning ${data?.length || 0} recipes directly from database`)
+    console.log(`✅ Returning ${data?.length || 0} published recipes to frontend`)
     return data || []
   }
 
@@ -190,6 +191,90 @@ export class DatabaseService {
   }
 
   /**
+   * Get ALL supermarket products for delta updates (with pagination to handle Supabase 1000 row limit)
+   */
+  async getAllSupermarketProductsForDelta(): Promise<{products: any[], total: number}> {
+    try {
+      const supabase = createSupabaseClient()
+      const allProducts: any[] = []
+      let offset = 0
+      const limit = 1000 // Supabase max per query
+      let hasMore = true
+      
+      console.log(`🔄 Delta service: Starting paginated fetch of ALL products...`)
+      
+      // Fetch all products in batches of 1000
+      while (hasMore) {
+        const { data, error, count } = await supabase
+          .from('supermarket_products')
+          .select('*', { count: 'exact' })
+          // Process oldest-updated products first so likely-changed items are checked earlier
+          .order('updated_at', { ascending: true })
+          .range(offset, offset + limit - 1)
+        
+        if (error) {
+          console.error(`Error fetching supermarket products batch (offset ${offset}):`, error)
+          break
+        }
+        
+        if (!data || data.length === 0) {
+          hasMore = false
+          break
+        }
+        
+        // Process products with discount logic
+        const processedProducts = data.map(product => {
+          const price = product.price || 0
+          const originalPrice = product.original_price || 0
+          const isMarkedOnSale = product.is_on_sale || false
+          
+          const hasValidPrices = price > 0 && originalPrice > 0
+          const priceDifference = originalPrice - price
+          const isActualDiscount = priceDifference > 0.01
+          
+          // Show offers even if original_price === price (for now)
+          const isRealOffer = isMarkedOnSale && hasValidPrices
+          
+          let discountPercentage = 0
+          if (isRealOffer && originalPrice > 0 && isActualDiscount) {
+            discountPercentage = Math.round((priceDifference / originalPrice) * 100)
+          }
+          
+          return {
+            ...product,
+            is_on_sale: isRealOffer,
+            discount_percentage: isRealOffer ? (isActualDiscount ? discountPercentage : 0) : null,
+            _original_is_on_sale: isMarkedOnSale, // Keep original flag for debugging
+            _has_valid_prices: hasValidPrices,
+            _price_difference: priceDifference,
+            _is_actual_discount: isActualDiscount
+          }
+        })
+        
+        allProducts.push(...processedProducts)
+        offset += limit
+        
+        console.log(`📊 Delta service: Fetched batch ${Math.floor(offset / limit)}: ${data.length} products (total so far: ${allProducts.length})`)
+        
+        // Check if we've reached the end
+        if (data.length < limit) {
+          hasMore = false
+        }
+      }
+      
+      console.log(`🔍 Delta service: Completed! Found ${allProducts.length} total products in database`)
+      
+      return { 
+        products: allProducts, 
+        total: allProducts.length
+      }
+    } catch (error) {
+      console.error('Error in getAllSupermarketProductsForDelta:', error)
+      return { products: [], total: 0 }
+    }
+  }
+
+  /**
    * Get all supermarket products from the database with pagination
    * TEMPORARY: Fetch more products to find offers, then sort and paginate
    */
@@ -203,8 +288,13 @@ export class DatabaseService {
         return this.getProductsWithSimpleQuery(page, limit, categories, true, search, stores)
       }
       
-      // Since offers are now default, we can use a smaller expansion for better performance
-      const expandedLimit = Math.min(500, limit * 10) // Fetch 10x more products (much more reasonable)
+      // For search queries, use simple query directly to avoid complex sorting
+      if (search && search.trim()) {
+        return this.getProductsWithSimpleQuery(page, limit, categories, false, search, stores)
+      }
+      
+      // For regular browsing, use expanded limit for better offer sorting
+      const expandedLimit = Math.min(2000, limit * 20)
       const { products: allProducts, total } = await this.getProductsWithSimpleQuery(1, expandedLimit, categories, false, search, stores)
       
       // Sort processed products so offers come first
@@ -248,7 +338,13 @@ export class DatabaseService {
     let query = supabase
       .from('supermarket_products')
       .select('*', { count: 'exact' })
-      .order('name', { ascending: true })
+      .eq('available', true) // Only show available products (hide discontinued)
+    
+    // For search queries, don't order by name to get better results
+    // For regular queries, order alphabetically
+    if (!search || !search.trim()) {
+      query = query.order('name', { ascending: true })
+    }
     
     if (categories && categories.length > 0) {
       query = query.in('category', categories)
@@ -273,8 +369,32 @@ export class DatabaseService {
       return { products: [], total: 0, hasMore: false }
     }
 
+    // Post-process search results to filter out irrelevant matches
+    let filteredData = data || []
+    if (search && search.trim().toLowerCase() === 'æg') {
+      // For "æg" search, only include products that are actually egg-related
+      // Include: SKRABEÆG, FRILANDSÆG, SLOTSÆG, ØKOLOGISKE ÆG, ÆGGESALAT, etc.
+      // Exclude: KØDKVÆG, JÆGERPØLSE, MELLEMLÆGSPAPIR, LETVÆGTSKATTEGRUS, etc.
+      const includeRegex = /(æg|ægge|æggeblommer|æggehvider|æggesalat|æggestand|skrabeæg|frilandsæg|slotsæg|økologiske æg|helæg|brunchæg)/i
+      const excludeRegex = /(kød|pølse|køb|jæger|ungkvæg|trusseindlæg|pålæg|mellemlægspapir|letvægtskattegrus|ammeindlæg|ægte mayonnaise)/i
+      
+      filteredData = filteredData.filter(product => 
+        includeRegex.test(product.name) && !excludeRegex.test(product.name)
+      )
+      
+      // Sort to prioritize complete word matches first
+      filteredData.sort((a, b) => {
+        const aHasCompleteWord = /(^|[^a-zæøå])æg([^a-zæøå]|$)/i.test(a.name)
+        const bHasCompleteWord = /(^|[^a-zæøå])æg([^a-zæøå]|$)/i.test(b.name)
+        
+        if (aHasCompleteWord && !bHasCompleteWord) return -1
+        if (!aHasCompleteWord && bHasCompleteWord) return 1
+        return 0
+      })
+    }
+
           // Process products with discount logic
-      const processedProducts = (data || []).map(product => {
+      const processedProducts = (filteredData || []).map(product => {
         const price = product.price || 0
         const originalPrice = product.original_price || 0
         const isMarkedOnSale = product.is_on_sale || false
@@ -283,9 +403,9 @@ export class DatabaseService {
         const priceDifference = originalPrice - price
         const isActualDiscount = priceDifference > 0.01
         
-        // 🔥 NEW LOGIC: Show offers even if original_price === price (for now)
-        // This allows products marked as offers to display while we fix their original prices
-        const isRealOffer = isMarkedOnSale && hasValidPrices
+        // 🔥 CORRECT LOGIC: Only show real offers where original_price > price
+        // Products without actual discount should not appear in offers section
+        const isRealOffer = isMarkedOnSale && hasValidPrices && isActualDiscount
         
         let discountPercentage = 0
         if (isRealOffer && originalPrice > 0 && isActualDiscount) {
@@ -377,12 +497,21 @@ export class DatabaseService {
         }
       })
       
-      console.log(`🔧 Updating product ${product.id} with:`, updateData)
+      const supabase = createSupabaseClient()
+      const externalId: string | undefined = (product as any).external_id
+      const identifier = externalId || String(product.id)
+
+      console.log(`🔧 Updating product using ${externalId ? 'external_id' : 'id'}=${identifier} with:`, updateData)
       
-      const { error } = await createSupabaseClient()
+      let query = supabase
         .from('supermarket_products')
         .update(updateData)
-        .eq('id', product.id)
+      if (externalId) {
+        query = query.eq('external_id', externalId)
+      } else {
+        query = query.eq('id', product.id)
+      }
+      const { error } = await query
 
       if (error) {
         console.error('Error updating supermarket product:', error)

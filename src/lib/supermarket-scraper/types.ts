@@ -1,16 +1,19 @@
 // Core interfaces for supermarket scraping system
 
 export interface SupermarketProduct {
-  id: string
+  id: string | number
+  external_id?: string
   name: string
   description: string
   category: string
   subcategory: string
   price: number
   originalPrice: number
+  original_price?: number // Database field name
   unit: string
   unitPrice: number
   isOnSale: boolean
+  is_on_sale?: boolean // Database field name
   saleEndDate: string | null
   imageUrl: string | null
   store: string

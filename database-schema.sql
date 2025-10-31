@@ -17,6 +17,13 @@ CREATE TABLE recipes (
   carbs DECIMAL,
   fat DECIMAL,
   fiber DECIMAL,
+  vitamins JSONB,
+  minerals JSONB,
+  totalCalories INTEGER,
+  totalProtein DECIMAL,
+  totalCarbs DECIMAL,
+  totalFat DECIMAL,
+  totalFiber DECIMAL,
   
   -- SEO
   metaTitle TEXT,

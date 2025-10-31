@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Heart, Plus, ChevronDown } from 'lucide-react'
+import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
 // Types
@@ -291,6 +292,7 @@ export default function DagligvarerPage() {
     )
   }, [])
 
+
   // Fetch products
   const fetchProducts = useCallback(async (page: number = 1, append: boolean = false) => {
     // Prevent concurrent requests
@@ -308,11 +310,17 @@ export default function DagligvarerPage() {
       // Add filters
       if (selectedCategories.length > 0) params.append('categories', selectedCategories.join(','))
       if (selectedStores.length > 0) params.append('stores', selectedStores.join(','))
-      if (searchQuery.trim()) params.append('search', searchQuery.trim())
+      if (searchQuery.trim()) {
+        console.log('🔍 Frontend search query:', searchQuery.trim())
+        params.append('search', searchQuery.trim())
+      }
       if (showOnlyOffers) params.append('offers', 'true')
 
-      const response = await fetch(`/api/supermarket/products?${params}`)
+      const url = `/api/supermarket/products?${params}`
+      console.log('🔍 Frontend API URL:', url)
+      const response = await fetch(url)
       const data = await response.json()
+      console.log('🔍 Frontend API response:', data)
 
       if (data.success && data.products) {
         let newProducts = data.products
@@ -492,7 +500,26 @@ export default function DagligvarerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ComingSoonWrapper
+      modalTitle="Dagligvarer - Kommer snart!"
+      modalContent={
+        <>
+          <p>
+            Vi er ved at udvikle et dagligvarer-setup, der gør, at du kan lave automatiske madplaner ud fra ugens og næste ugens tilbud i alle dagligvarerforretninger.
+          </p>
+          <p>
+            Her på siden vil du kunne se tilbud og priser på alle dagligvarer i Danmark.
+          </p>
+          <p>
+            Både madplaner, vægttabsplaner og meget mere.
+          </p>
+          <p className="font-semibold text-blue-600 mt-4">
+            Færdigt i starten af 2026. Stay tuned!
+          </p>
+        </>
+      }
+    >
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
@@ -522,6 +549,7 @@ export default function DagligvarerPage() {
                   className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
+
 
               {/* Quick toggles */}
               <div className="space-y-3 mb-4">
@@ -889,6 +917,7 @@ export default function DagligvarerPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ComingSoonWrapper>
   )
 }
