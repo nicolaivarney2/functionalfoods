@@ -227,11 +227,12 @@ export default function BlogPostPage() {
         console.log('[Blog Page] Found', widgetNodes.length, 'widget nodes to hydrate')
         for (const node of widgetNodes) {
           try {
-            const type = node.getAttribute('data-widget-type') || ''
+            const typeAttr = node.getAttribute('data-widget-type') || ''
             const configAttr = node.getAttribute('data-widget-config') || '{}'
             const config = JSON.parse(configAttr)
             const widgetId = node.getAttribute('data-widget-id')
             const context = { categorySlug: post?.category?.slug, slug: post?.slug, tags: post?.tags }
+            const type = (config && typeof config.type === 'string' && config.type.trim()) ? config.type : typeAttr
             console.log('[Blog Page] Hydrating widget:', { id: widgetId, type, config, context })
             const res = await fetch('/api/widgets/render', {
               method: 'POST',
