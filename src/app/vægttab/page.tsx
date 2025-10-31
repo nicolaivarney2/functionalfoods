@@ -71,12 +71,12 @@ export default function WeightLossPage() {
             <div className="grid md:grid-cols-2 gap-6">
               {[
                 {
-                  myth: "Du kan tabe dig uden at tænke på kalorier",
+                  myth: "Du kan tabe dig uden at TÆNKE på kalorier",
                   truth: "Kalorier betyder stadig noget – uanset hvilken kostretning du følger. Men næringsrig mad gør dig mere mæt, så du naturligt spiser mindre.",
                   icon: Scale
                 },
                 {
-                  myth: "Du kan snyde kroppen med quick fixes",
+                  myth: "Du kan ikke snyde kroppen med quick fixes",
                   truth: "Du kan ikke snyde kroppen – men du kan forstå den. Mæthedshormoner, stofskifte og vaner styrer alt.",
                   icon: Brain
                 },
@@ -622,7 +622,7 @@ export default function WeightLossPage() {
                       Begge fokuserer på at spise ren og uforarbejdet mad. LCHF reducerer kulhydrater og øger fedt, mens Paleo tager udgangspunkt i mad som før landbruget – kød, grønt, nødder og rene råvarer. Ideelt for dem, der ønsker "ægte mad" uden tilsætninger, hvor vægttab kommer som en bivirkning af sund kost.
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-6">
-                      LCHF og Paleo er effektivt til vægttab, men har, ligesom Keto, nogle faldgrupper, da rigtig mad ofte også har mange kalorier. Maden har en høj densitet (mæthedsfornemmelse), og med den rette vejledning, kan det gøre til stort vægttab og en sund og stærk krop.
+                      LCHF og Paleo er effektivt til vægttab, men har, ligesom Keto, nogle faldgrupper, da rigtig mad ofte også har mange kalorier. Maden har en høj densitet (mæthedsfornemmelse), og med den rette vejledning, kan det føre til stort vægttab og en sund og stærk krop.
                     </p>
                     <Link
                       href="/lchf-paleo"
@@ -645,7 +645,7 @@ export default function WeightLossPage() {
                       Fokuserer på fødevarer, der dæmper inflammation i kroppen – fx grøntsager, fisk, bær, olivenolie og fuldkorn. Kan understøtte energi, restitution og generel sundhed. Handler mere om velvære end vægttab, men bidrager ofte positivt til begge dele.
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-6">
-                      At leve anti-inflammatorisk er et opgør med nogle af nutidens mad-vaner, der er blevet formet globale fødevaregiganter. En anti-inflammatorisk kost er giver som regel vægttab som et afkast, fordi man undgår madvarer der påvirker kroppen negativt. Det giver mere overskud og langt mere velvære, som gør vægttab nemmere.
+                      At leve anti-inflammatorisk er et opgør med nogle af nutidens mad-vaner, der er blevet formet af globale fødevaregiganter. En anti-inflammatorisk kost giver som regel vægttab som et afkast, fordi man undgår madvarer der påvirker kroppen negativt. Det giver mere overskud og langt mere velvære, som gør vægttab nemmere.
                     </p>
                     <Link
                       href="/anti-inflammatory"
