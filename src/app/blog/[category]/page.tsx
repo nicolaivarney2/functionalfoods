@@ -162,6 +162,18 @@ export default function BlogCategoryHubPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Intro copy */}
+      <section className="py-10 border-b border-gray-200 bg-white">
+        <div className="container">
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">Det bedste fra Keto verdenen.</h1>
+          <p className="text-gray-700 text-lg max-w-3xl">
+            Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for Keto. Her finder du vores eksperters
+            uddrag af sundhedsstudier, artikler, Keto opskrifter, og low carb madprodukter vi er vilde med for tiden. Vi dækker
+            hvad der rør sig i det danske (og internationale) keto miljø, og vores videnskabsbaserede journalistik hjælper dig
+            med at træffe mere velinformerede madvalg og tabe dig med Keto.
+          </p>
+        </div>
+      </section>
       {/* Hero Section: First Article + Latest 3-4 */}
       <section className="border-b border-gray-200">
         <div className="container py-8 lg:py-12">
