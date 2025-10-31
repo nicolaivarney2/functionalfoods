@@ -22,13 +22,6 @@ export default function KetoWeightLossPage() {
         
         <div className="container relative">
           <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <Link 
-              href="/keto"
-              className="inline-flex items-center gap-2 text-purple-600 hover:text-purple-700 font-medium mb-6 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Tilbage til keto
-            </Link>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
               Vægttab uden forvirring –<br />
@@ -51,7 +44,7 @@ export default function KetoWeightLossPage() {
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href="/blog/keto"
+                href="/madbudget"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors border-2 border-gray-200"
               >
                 Se næste uges madplaner
@@ -78,8 +71,8 @@ export default function KetoWeightLossPage() {
             <div className="grid md:grid-cols-2 gap-6">
               {[
                 {
-                  myth: "Keto betyder uendelig vægttab uden kalorietælling",
-                  truth: "Kalorier betyder stadig noget – selv på keto. Men fedt og protein gør dig mere mæt, så du naturligt spiser mindre.",
+                  myth: "Du kan tabe dig uden at tænke på kalorier",
+                  truth: "Kalorier betyder stadig noget – uanset hvilken kostretning du følger. Men næringsrig mad gør dig mere mæt, så du naturligt spiser mindre.",
                   icon: Scale
                 },
                 {
@@ -200,8 +193,8 @@ export default function KetoWeightLossPage() {
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 Når du spiser, sender kroppen signaler gennem hormoner, der styrer mæthed, energi og lyst
               </p>
-            </div>
-
+                </div>
+                
             <div className="grid md:grid-cols-2 gap-8 mb-12">
               <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100">
                 <div className="flex items-center gap-4 mb-4">
@@ -224,8 +217,8 @@ export default function KetoWeightLossPage() {
                     <span><strong>Fedt</strong> (på keto) holder dig mæt længe og stabiliserer energi</span>
                   </li>
                 </ul>
-              </div>
-
+                </div>
+                
               <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-8 border border-red-100">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
@@ -265,8 +258,8 @@ export default function KetoWeightLossPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+                    </div>
+                  </div>
       </section>
 
       {/* Find din madniche */}
@@ -280,7 +273,7 @@ export default function KetoWeightLossPage() {
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 Alle kostretninger kan virke – men kun, hvis du kan leve med dem
               </p>
-            </div>
+                    </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
@@ -296,8 +289,7 @@ export default function KetoWeightLossPage() {
                   icon: "🥑",
                   short: "Færre kulhydrater, mere fedt",
                   fits: "Har det godt med struktur og hurtige resultater",
-                  href: "/keto",
-                  highlight: true
+                  href: "/keto"
                 },
                 {
                   name: "LCHF",
@@ -331,11 +323,7 @@ export default function KetoWeightLossPage() {
                 <Link
                   key={idx}
                   href={niche.href}
-                  className={`block bg-white rounded-2xl p-6 border-2 hover:shadow-xl transition-all ${
-                    niche.highlight 
-                      ? 'border-purple-300 bg-gradient-to-br from-purple-50/50 to-white' 
-                      : 'border-gray-200 hover:border-purple-200'
-                  }`}
+                  className="block bg-white rounded-2xl p-6 border-2 border-gray-200 hover:border-green-200 hover:shadow-xl transition-all"
                 >
                   <div className="text-4xl mb-4">{niche.icon}</div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">{niche.name}</h3>
@@ -346,8 +334,8 @@ export default function KetoWeightLossPage() {
                   </div>
                 </Link>
               ))}
-            </div>
-
+                  </div>
+                  
             <div className="mt-12 bg-gradient-to-r from-purple-100 to-green-100 rounded-2xl p-8 text-center border-2 border-purple-200">
               <p className="text-lg font-semibold text-gray-900 mb-2">
                 Det, der virker, er det du kan holde
@@ -356,7 +344,7 @@ export default function KetoWeightLossPage() {
                 De bedste resultater kommer, når din kost passer til dit liv – ikke omvendt. Det kræver ikke perfektion, men konsistens.
               </p>
             </div>
-          </div>
+                    </div>
         </div>
       </section>
 
@@ -371,8 +359,8 @@ export default function KetoWeightLossPage() {
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 Når du forstår principperne, handler det bare om at gøre dem mulige i praksis
               </p>
-            </div>
-
+                  </div>
+                  
             <div className="bg-gradient-to-br from-purple-50 to-green-50 rounded-3xl p-8 md:p-12 border-2 border-purple-200 mb-8">
               <div className="grid md:grid-cols-4 gap-6 mb-8">
                 {[
@@ -406,10 +394,10 @@ export default function KetoWeightLossPage() {
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                   <Link
-                    href="/blog/keto"
+                    href="/opskriftsoversigt"
                     className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors border-2 border-gray-200"
                   >
-                    Se keto guides
+                    Se alle opskrifter
                     <BookOpen className="w-5 h-5" />
                   </Link>
                 </div>
@@ -431,11 +419,11 @@ export default function KetoWeightLossPage() {
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
                 Vægttab handler om mere end mad
-              </h2>
+            </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                 En holistisk tilgang til sund balance
-              </p>
-            </div>
+            </p>
+          </div>
 
             <div className="grid md:grid-cols-2 gap-6">
               {[
@@ -472,7 +460,7 @@ export default function KetoWeightLossPage() {
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
           </div>
         </div>
       </section>
@@ -486,12 +474,12 @@ export default function KetoWeightLossPage() {
                 <HelpCircle className="w-6 h-6 text-purple-600" />
                 <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
                   Ofte stillede spørgsmål
-                </h2>
+            </h2>
               </div>
               <p className="text-lg text-gray-600">
                 Svar på de spørgsmål, du måske har
-              </p>
-            </div>
+            </p>
+          </div>
 
             <div className="space-y-4">
               {[
@@ -500,8 +488,8 @@ export default function KetoWeightLossPage() {
                   a: "Nej – men du skal forstå dem. Det er forskellen. Nogle kan tabe sig uden at tælle, andre har brug for præcision. Find din vej."
                 },
                 {
-                  q: "Er Keto farligt?",
-                  a: "Ikke for raske personer – men det kræver forståelse og planlægning. Sørg for at få nok elektrolytter, vand og næringsstoffer."
+                  q: "Hvilken kostretning er bedst?",
+                  a: "Den, der passer til dit liv. Keto, Sense, LCHF – alle kan virke, hvis du kan leve med dem. Det handler om konsistens, ikke perfektion."
                 },
                 {
                   q: "Hvordan holder jeg vægten bagefter?",
@@ -524,7 +512,7 @@ export default function KetoWeightLossPage() {
                   <p className="mt-4 text-gray-700 leading-relaxed">{faq.a}</p>
                 </details>
               ))}
-            </div>
+              </div>
           </div>
         </div>
       </section>
@@ -548,28 +536,28 @@ export default function KetoWeightLossPage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
               <Link 
-                href="/keto/opskrifter" 
-                className="group bg-white text-purple-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-white/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
-              >
-                Se keto opskrifter
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              
-              <Link 
                 href="/madbudget" 
-                className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
+                className="group bg-white text-green-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-white/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Byg din madplan
                 <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              </Link>
+              
+              <Link 
+                href="/opskriftsoversigt" 
+                className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
+              >
+                Se alle opskrifter
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12">
               {[
-                { label: "Keto opskrifter", href: "/keto/opskrifter" },
+                { label: "Opskrifter", href: "/opskriftsoversigt" },
                 { label: "Dagligvarer", href: "/dagligvarer" },
                 { label: "Madbudget", href: "/madbudget" },
-                { label: "Keto guides", href: "/blog/keto" }
+                { label: "Guides & Blogs", href: "/blog/keto" }
               ].map((link, idx) => (
                 <Link
                   key={idx}
