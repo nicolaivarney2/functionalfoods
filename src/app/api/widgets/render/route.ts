@@ -150,25 +150,83 @@ export async function POST(req: NextRequest) {
 
       if (recipes.length === 0) {
         html = `
-          <div class="widget-related-recipes">
-            <h4 class="text-lg font-semibold mb-3">${cfg.title || 'Relaterede opskrifter'}</h4>
+          <div class="widget-related-recipes mt-8 mb-8">
+            <h4 class="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200">${cfg.title || 'Relaterede opskrifter'}</h4>
             <p class="text-gray-500 text-sm">Ingen relaterede opskrifter fundet.</p>
           </div>
         `
       } else {
+        const formatTime = (minutes: number | undefined) => {
+          if (!minutes) return 'N/A'
+          if (minutes < 60) return `${minutes} min`
+          const hours = Math.floor(minutes / 60)
+          const mins = minutes % 60
+          return mins > 0 ? `${hours}t ${mins}min` : `${hours}t`
+        }
+
+        const escapeHtml = (text: string | undefined | null): string => {
+          if (!text) return ''
+          const div = { textContent: text } as any
+          return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+        }
+
         html = `
-          <div class="widget-related-recipes">
-            <h4 class="text-lg font-semibold mb-3">${cfg.title || 'Relaterede opskrifter'}</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="widget-related-recipes mt-8 mb-8">
+            <h4 class="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200">${escapeHtml(cfg.title) || 'Relaterede opskrifter'}</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               ${recipes
                 .map((r) => {
-                  const img = r.imageUrl || r.image_url || '/images/recipes/placeholder.jpg'
-                  return `<a class="block bg-white rounded shadow hover:shadow-md transition overflow-hidden" href="/opskrift/${r.slug || r.id}">
-                    <img src="${img}" alt="${r.title || 'Opskrift'}" class="w-full h-32 object-cover"/>
-                    <div class="p-3">
-                      <div class="text-sm font-medium text-gray-900">${r.title || 'Opskrift'}</div>
-                    </div>
-                  </a>`
+                  const img = (r.imageUrl || r.image_url || '/images/recipes/placeholder.jpg').replace(/"/g, '&quot;')
+                  const totalTime = r.totalTime || r.cookingTime || r.preparationTime || 0
+                  const servings = r.servings || 1
+                  const shortDesc = escapeHtml(r.shortDescription || r.description || '')
+                  const title = escapeHtml(r.title || 'Opskrift')
+                  const difficulty = escapeHtml(r.difficulty || '')
+                  const slug = (r.slug || r.id || '').replace(/"/g, '&quot;')
+                  const difficultyClass = difficulty === 'Nem' ? 'bg-green-100 text-green-800' :
+                                        difficulty === 'Mellem' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-red-100 text-red-800'
+                  
+                  return `<article class="recipe-card bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-300 overflow-hidden">
+                    <a href="/opskrift/${slug}" class="block">
+                      <div class="relative aspect-[4/3] overflow-hidden bg-gray-200">
+                        <img 
+                          src="${img}" 
+                          alt="${title}" 
+                          class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div class="p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2 line-clamp-2 min-h-[3.5rem]">
+                          ${title}
+                        </h3>
+                        ${shortDesc ? `<p class="text-gray-600 text-sm mb-4 line-clamp-2">${shortDesc}</p>` : ''}
+                        <div class="flex items-center justify-between text-sm text-gray-500 mb-3">
+                          <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-1">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                              </svg>
+                              <span>${formatTime(totalTime)}</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                              </svg>
+                              <span>${servings} pers</span>
+                            </div>
+                          </div>
+                          ${difficulty ? `<span class="px-2 py-1 text-xs font-medium rounded ${difficultyClass}">${difficulty}</span>` : ''}
+                        </div>
+                      </div>
+                    </a>
+                  </article>`
                 })
                 .join('')}
             </div>
