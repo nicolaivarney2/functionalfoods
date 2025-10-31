@@ -157,7 +157,6 @@ export default function WeightLossPage() {
               ].map((principle, idx) => {
                 const colorClasses = {
                   green: "bg-green-100 text-green-600 border-green-200",
-                  green: "bg-green-100 text-green-600 border-green-200",
                   blue: "bg-blue-100 text-blue-600 border-blue-200",
                   orange: "bg-orange-100 text-orange-600 border-orange-200"
                 }
