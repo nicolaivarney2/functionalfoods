@@ -119,20 +119,41 @@ export default function BlogCategoryHubPage() {
             const cat = Array.isArray(p.category) ? p.category[0] : p.category
             return { ...p, category: cat }
           })
-          .slice(0, 8)
+          .slice(0, 5)
         setPopularArticles(popularFiltered)
 
         // Recipes matching dietary category
         const { data: recipesData } = await supabase
           .from('recipes')
-          .select('id,title,slug,imageUrl,image_url,shortDescription,totalTime,servings,difficulty,dietaryCategories,mainCategory,rating')
+          .select('*')
           .order('updatedAt', { ascending: false })
-          .limit(24)
+          .limit(50)
 
         const diet = (categorySlug || '').toLowerCase()
         let filtered = (recipesData || [])
+        
+        // Try multiple matching strategies
         if (diet) {
-          filtered = filtered.filter(r => Array.isArray(r.dietaryCategories) && r.dietaryCategories.map(x => String(x).toLowerCase()).includes(diet))
+          // 1. Check dietaryCategories array
+          const byDietaryCat = filtered.filter(r => {
+            const dc = r.dietaryCategories || r.dietary_categories || []
+            if (!Array.isArray(dc)) return false
+            return dc.map((x: any) => String(x).toLowerCase()).includes(diet)
+          })
+          
+          // 2. Check keywords
+          const byKeywords = filtered.filter(r => {
+            const kw = r.keywords || []
+            if (!Array.isArray(kw)) return false
+            return kw.some((k: any) => String(k).toLowerCase().includes(diet))
+          })
+          
+          // Combine and deduplicate
+          const combined = [...new Set([...byDietaryCat, ...byKeywords].map(r => r.id))].map(id => 
+            filtered.find(r => r.id === id)
+          ).filter(Boolean)
+          
+          filtered = combined.length > 0 ? combined : filtered
         }
         setRecipes(filtered.length > 0 ? filtered.slice(0, 9) : (recipesData || []).slice(0, 9))
       } finally {
@@ -160,18 +181,30 @@ export default function BlogCategoryHubPage() {
     { id: 3, title: 'Guide til vægttab med keto', slug: 'guide-til-vaegttab-med-keto', excerpt: 'Lær hvordan du taber dig effektivt med keto', readTime: 11 }
   ]
 
+  // Category-specific background colors
+  const categoryBgColors: Record<string, string> = {
+    keto: '#F6FCFB',
+    sense: '#F8F9FA',
+    // Add more categories as needed
+  }
+  const categoryBgColor = categoryBgColors[categorySlug.toLowerCase()] || '#FFFFFF'
+
   return (
     <div className="min-h-screen bg-white">
       {/* Intro copy */}
-      <section className="py-10 border-b border-gray-200 bg-white">
+      <section className="py-8 bg-white">
         <div className="container">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">Det bedste fra Keto verdenen.</h1>
-          <p className="text-gray-700 text-lg max-w-3xl">
-            Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for Keto. Her finder du vores eksperters
-            uddrag af sundhedsstudier, artikler, Keto opskrifter, og low carb madprodukter vi er vilde med for tiden. Vi dækker
-            hvad der rør sig i det danske (og internationale) keto miljø, og vores videnskabsbaserede journalistik hjælper dig
-            med at træffe mere velinformerede madvalg og tabe dig med Keto.
-          </p>
+          <div className="text-center max-w-3xl mx-auto">
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3">Det bedste fra {capitalize(categorySlug)} verdenen.</h1>
+            <p className="text-gray-500 text-sm sm:text-base leading-relaxed">
+              Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for {capitalize(categorySlug)}. Her finder du vores eksperters
+              uddrag af sundhedsstudier, artikler, {capitalize(categorySlug)} opskrifter, og low carb madprodukter vi er vilde med for tiden.
+            </p>
+            <p className="text-gray-500 text-xs sm:text-sm leading-relaxed mt-4">
+              Vi dækker hvad der rør sig i det danske (og internationale) {categorySlug.toLowerCase()} miljø, og vores videnskabsbaserede journalistik hjælper dig
+              med at træffe mere velinformerede madvalg og tabe dig med {capitalize(categorySlug)}.
+            </p>
+          </div>
         </div>
       </section>
       {/* Hero Section: First Article + Latest 3-4 */}
@@ -233,7 +266,7 @@ export default function BlogCategoryHubPage() {
 
       {/* Must Reads Section */}
       {mustReads.length > 0 && (
-        <section className="py-12 bg-white">
+        <section className="py-12" style={{ backgroundColor: categoryBgColor }}>
           <div className="container">
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8">Must Reads</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -273,7 +306,7 @@ export default function BlogCategoryHubPage() {
                 ) : latestArticles.length === 0 ? (
                   <div className="text-gray-500">Ingen artikler endnu.</div>
                 ) : (
-                  latestArticles.slice(0, 6).map(p => (
+                  latestArticles.slice(0, 3).map(p => (
                     <Link key={p.id} href={`/blog/${categorySlug}/${p.slug}`} className="group flex gap-4">
                       <div className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-gray-200">
                         {p.header_image_url ? (
@@ -352,8 +385,12 @@ export default function BlogCategoryHubPage() {
           ) : recipes.length === 0 ? (
             <div className="text-gray-500 text-center py-12">Ingen opskrifter fundet.</div>
           ) : (
-            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-hide hover:cursor-grab active:cursor-grabbing">
-              <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="relative">
+              <div 
+                id="hub-recipes-scroll"
+                className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-hide hover:cursor-grab active:cursor-grabbing"
+              >
+                <div className="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {recipes.map(r => {
                   const formatTime = (min?: number) => {
                     if (!min) return 'N/A'
@@ -413,7 +450,33 @@ export default function BlogCategoryHubPage() {
                     </Link>
                   )
                 })}
+                </div>
               </div>
+              {/* Mobile swipe arrows */}
+              <button
+                className="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full shadow-md flex items-center justify-center z-10 opacity-60 hover:opacity-100 transition-opacity"
+                onClick={() => {
+                  const el = document.getElementById('hub-recipes-scroll')
+                  if (el) el.scrollBy({ left: -300, behavior: 'smooth' })
+                }}
+                aria-label="Scroll venstre"
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                className="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full shadow-md flex items-center justify-center z-10 opacity-60 hover:opacity-100 transition-opacity"
+                onClick={() => {
+                  const el = document.getElementById('hub-recipes-scroll')
+                  if (el) el.scrollBy({ left: 300, behavior: 'smooth' })
+                }}
+                aria-label="Scroll højre"
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
           )}
           <style jsx>{`
@@ -431,21 +494,28 @@ export default function BlogCategoryHubPage() {
       {/* 3 Essential Articles Section */}
       <section className="py-12 bg-white border-t border-gray-200">
         <div className="container">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8 text-center">Essentielle artikler</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8 text-center">Praktiske {capitalize(categorySlug)} guides</h2>
+          <div className="grid md:grid-cols-3 gap-6">
             {essentialArticles.map((article, idx) => (
               <Link 
                 key={article.id} 
                 href={`/blog/${categorySlug}/${article.slug}`}
-                className="group text-center"
+                className="group block bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden"
               >
-                <div className="mb-6">
-                  <div className="w-24 h-24 mx-auto bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-4 group-hover:scale-110 transition-transform">
+                <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600">
+                  <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold">
                     {idx + 1}
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-600 transition-colors">{article.title}</h3>
-                  <p className="text-gray-600 mb-4">{article.excerpt}</p>
-                  <div className="text-sm text-gray-500">{article.readTime} min læsetid</div>
+                </div>
+                <div className="p-5">
+                  <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{article.title}</h3>
+                  <p className="text-sm text-gray-600 mb-3">{article.excerpt}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{article.readTime} min læsetid</span>
+                  </div>
                 </div>
               </Link>
             ))}

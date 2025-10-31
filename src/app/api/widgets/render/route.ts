@@ -268,14 +268,28 @@ export async function POST(req: NextRequest) {
           })
           .join('')
 
+        const scrollId = `recipe-scroll-${Math.random().toString(36).substr(2, 9)}`
         html = `
           <div class="widget-related-recipes mt-8 mb-8">
             <h4 class="text-xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200">${escapeHtml(cfg.title) || 'Relaterede opskrifter'}</h4>
-            <!-- Mobile: Horizontal scroll -->
-            <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-hide hover:cursor-grab active:cursor-grabbing">
-              <div class="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                ${recipeCards}
+            <!-- Mobile: Horizontal scroll with arrows -->
+            <div class="relative">
+              <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible scrollbar-hide hover:cursor-grab active:cursor-grabbing" id="${scrollId}">
+                <div class="flex sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  ${recipeCards}
+                </div>
               </div>
+              <!-- Mobile swipe arrows -->
+              <button class="sm:hidden absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full shadow-md flex items-center justify-center z-10 opacity-60 hover:opacity-100 transition-opacity recipe-prev-btn" data-scroll-id="${scrollId}" aria-label="Scroll venstre">
+                <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                </svg>
+              </button>
+              <button class="sm:hidden absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full shadow-md flex items-center justify-center z-10 opacity-60 hover:opacity-100 transition-opacity recipe-next-btn" data-scroll-id="${scrollId}" aria-label="Scroll højre">
+                <svg class="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </button>
             </div>
             <style>
               .scrollbar-hide {
@@ -286,6 +300,23 @@ export async function POST(req: NextRequest) {
                 display: none;
               }
             </style>
+            <script>
+              (function() {
+                const prevBtn = document.querySelector('.recipe-prev-btn[data-scroll-id="${scrollId}"]');
+                const nextBtn = document.querySelector('.recipe-next-btn[data-scroll-id="${scrollId}"]');
+                const scrollEl = document.getElementById('${scrollId}');
+                if (prevBtn && scrollEl) {
+                  prevBtn.addEventListener('click', () => {
+                    scrollEl.scrollBy({left: -300, behavior: 'smooth'});
+                  });
+                }
+                if (nextBtn && scrollEl) {
+                  nextBtn.addEventListener('click', () => {
+                    scrollEl.scrollBy({left: 300, behavior: 'smooth'});
+                  });
+                }
+              })();
+            </script>
           </div>
         `
       }
