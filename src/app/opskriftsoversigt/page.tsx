@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Search, Filter, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Filter, ChevronDown, ChevronUp, Sparkles, Target, ArrowRight } from 'lucide-react'
 import { recipeCategories, dietaryCategories } from '@/lib/sample-data'
 import RecipeCard from '@/components/RecipeCard'
 import { useState, useEffect } from 'react'
@@ -103,7 +103,7 @@ const extendedDietaryCategories = [
     imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
   },
   {
-    id: '1',
+    id: '10',
     name: 'FAMILIEMAD',
     slug: 'familie',
     description: 'Almindelige familiemad opskrifter',
@@ -133,7 +133,7 @@ const extendedDietaryCategories = [
     imageAlt: 'Fleksitariske retter med planter og lidt kød'
   },
   {
-    id: '8',
+    id: '9',
     name: '5:2 DIÆT',
     slug: '5-2-diet',
     description: 'Opskrifter til 5:2 intermittent fasting',
@@ -170,7 +170,8 @@ export default function RecipeOverviewPage() {
         console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
         
         if (response.ok) {
-          const recipes = await response.json()
+          const responseData = await response.json()
+          const recipes = responseData.recipes || responseData // Handle both old and new API formats
           console.log(`✅ Loaded ${recipes.length} recipes from API`)
           console.log('📋 First recipe:', recipes[0])
           setAllRecipes(recipes)
@@ -193,37 +194,53 @@ export default function RecipeOverviewPage() {
   // Apply filters and sorting when dependencies change
   useEffect(() => {
     console.log('🔄 Applying filters and sorting...')
-    console.log(`📊 Total recipes: ${allRecipes.length}`)
+    console.log(`📊 Total recipes: ${allRecipes?.length || 0}`)
     console.log(`🔍 Search query: "${searchQuery}"`)
     console.log(`🥗 Selected dietary: "${selectedDietary}"`)
     console.log(`📂 Selected category: "${selectedCategory}"`)
     
-    let filtered = allRecipes
+    let filtered = allRecipes || []
 
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(recipe =>
-        recipe.title.toLowerCase().includes(query) ||
-        (recipe.description?.toLowerCase().includes(query) || false) ||
-        recipe.ingredients?.some(ingredient =>
-          ingredient.name.toLowerCase().includes(query)
-        ) || false
-      )
-      console.log(`🔍 After search filter: ${filtered.length} recipes`)
+      filtered = filtered.filter(recipe => {
+        // Check title
+        if (recipe.title.toLowerCase().includes(query)) {
+          return true
+        }
+        // Check description
+        if (recipe.description?.toLowerCase().includes(query)) {
+          return true
+        }
+        // Check ingredients (ensure it's an array)
+        if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+          if (recipe.ingredients.some(ingredient =>
+            ingredient.name.toLowerCase().includes(query)
+          )) {
+            return true
+          }
+        }
+        return false
+      })
+      console.log(`🔍 After search filter: ${filtered?.length || 0} recipes`)
     }
 
     // Apply dietary filter
     if (selectedDietary !== 'all') {
-      filtered = filtered.filter(recipe =>
-        recipe.dietaryCategories?.some(cat => {
+      filtered = filtered.filter(recipe => {
+        // Ensure dietaryCategories exists and is an array before filtering
+        if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
+          return false
+        }
+        return recipe.dietaryCategories.some(cat => {
           // Normalize category names by removing brackets for comparison
           const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
           const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
           return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
-        }) || false
-      )
-      console.log(`🥗 After dietary filter: ${filtered.length} recipes`)
+        })
+      })
+      console.log(`🥗 After dietary filter: ${filtered?.length || 0} recipes`)
     }
 
     // Apply category filter
@@ -234,13 +251,13 @@ export default function RecipeOverviewPage() {
         const normalizedSelected = selectedCategory.replace(/[\[\]]/g, '').trim()
         return normalizedRecipeCat.toLowerCase() === normalizedSelected.toLowerCase()
       })
-      console.log(`📂 After category filter: ${filtered.length} recipes`)
+      console.log(`📂 After category filter: ${filtered?.length || 0} recipes`)
     }
 
     setFilteredRecipes(filtered)
 
     // Apply sorting
-    let sorted = [...filtered]
+    let sorted = [...(filtered || [])]
     switch (sortBy) {
       case 'newest':
         sorted.sort((a, b) => {
@@ -273,16 +290,16 @@ export default function RecipeOverviewPage() {
     }
 
     setSortedRecipes(sorted)
-    setDisplayedRecipes(sorted.slice(0, displayCount))
-    console.log(`✅ Final result: ${sorted.length} sorted recipes, ${sorted.slice(0, displayCount).length} displayed`)
-    console.log('📋 Displayed recipes:', sorted.slice(0, displayCount).map(r => r.title))
+    setDisplayedRecipes(sorted?.slice(0, displayCount) || [])
+    console.log(`✅ Final result: ${sorted?.length || 0} sorted recipes, ${sorted?.slice(0, displayCount)?.length || 0} displayed`)
+    console.log('📋 Displayed recipes:', sorted?.slice(0, displayCount)?.map(r => r?.title || 'Unknown') || [])
   }, [allRecipes, searchQuery, selectedDietary, selectedCategory, sortBy, displayCount])
 
   const handleLoadMore = () => {
     setDisplayCount(prev => prev + 8)
   }
 
-  const hasMoreRecipes = displayedRecipes.length < sortedRecipes.length
+  const hasMoreRecipes = displayedRecipes && sortedRecipes ? displayedRecipes.length < sortedRecipes.length : false
 
   if (isLoading) {
     return (
@@ -298,84 +315,92 @@ export default function RecipeOverviewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-white">
+    <main className="min-h-screen bg-white overflow-hidden">
       {/* Hero Section */}
-      <section className="bg-white py-16 border-b border-gray-200">
-        <div className="container">
+      <section className="relative bg-gradient-to-br from-white via-green-50/30 to-blue-50/20 py-24 lg:py-32">
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-blue-500/5"></div>
+        </div>
+        
+        <div className="container relative">
           <div className="text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
-              Opskrifter til en sund livsstil
+            <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-pulse">
+              <Sparkles className="w-4 h-4" />
+              Danmarks mest intelligente opskrifter
+            </div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold mb-8 text-gray-900 leading-tight">
+              Alle opskrifter til<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
+                din sundere livsstil
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-gray-600">
-              Her finder du alle sunde opskrifter fra Functional Foods. 
-              Det er opskrifter der egner sig til vægttab og en sund livsstil, 
-              og kan være alt fra nem hverdagsmad, mad til én, familievenlig og sund mad.
+            
+            <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
+              Udforsk <strong>+2.509 gratis opskrifter</strong> beregnet på vitaminer og næring.<br />
+              Vælg din mad-ideologi eller udforsk alle opskrifter.
             </p>
-            <div className="flex items-center justify-center space-x-4">
-              <div className="bg-gray-100 px-6 py-2">
-                <span className="text-2xl font-bold text-gray-900">+2.509</span>
-                <span className="ml-2 text-gray-600">gratis opskrifter</span>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+              <div className="text-sm text-gray-500 flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                100% gratis • Alle beregnet på næring
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Dietary Categories - Moved to top */}
-      <section className="py-12 bg-white">
+      {/* Dietary Categories Section */}
+      <section className="py-20 bg-white">
         <div className="container">
-          <h2 className="text-2xl font-bold text-center mb-8 text-gray-900">
-            Vælg mad ideologi
-          </h2>
-          <p className="text-gray-600 text-center mb-8">
-            Vælg din foretrukne mad ideologi og find opskrifter der passer til dig{' '}
-            <span className="text-sm italic">
-              ... Eller{' '}
-              <button 
-                onClick={() => document.getElementById('alle-opskrifter')?.scrollIntoView({ behavior: 'smooth' })}
-                className="underline hover:text-gray-800 transition-colors"
-              >
-                spring direkte ned til alle opskrifter
-              </button>
-            </span>
-          </p>
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
+              Vælg din vej
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Udforsk opskrifter, der passer til din livsstil – alle beregnet på vitaminer, mineraler og energi.
+            </p>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {extendedDietaryCategories.map((category) => (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            {extendedDietaryCategories && Array.isArray(extendedDietaryCategories) ? extendedDietaryCategories.map((category, index) => (
               <Link
                 key={category.id}
-                href={`/opskrifter/${category.slug}`}
-                className="group block"
+                href={`/${category.slug}/opskrifter`}
+                className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
+                style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="bg-gray-50 border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors w-full">
-                  {/* Category Image */}
-                  <div className="relative h-48 bg-gray-200">
-                    <Image
-                      src={category.imageUrl}
-                      alt={category.imageAlt}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                      priority={category.id === '1' || category.id === '2'} // Priority for first 2 images
-                      placeholder="blur"
-                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                    />
-                    {/* Overlay with category name */}
-                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-                      <h3 className="text-white text-2xl font-bold text-center px-4">
-                        {category.name}
-                      </h3>
-                    </div>
-                  </div>
-                  
-                  {/* Category Info */}
-                  <div className="p-4">
-                    <p className="text-sm text-gray-600 mb-3">{category.description}</p>
-                    <div className="text-lg font-bold text-gray-900">{category.recipeCount} opskrifter</div>
-                  </div>
+                <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                  {category.name === 'KETO' && '🥑'}
+                  {category.name === 'SENSE' && '🧠'}
+                  {category.name === 'LCHF/PALEO' && '🥩'}
+                  {category.name === 'ANTI-INFLAMMATORISK' && '🌿'}
+                  {category.name === 'FLEKSITARISK' && '🥬'}
+                  {category.name === '5:2 DIÆT' && '⏰'}
+                  {category.name === 'FAMILIEMAD' && '👨‍👩‍👧‍👦'}
+                  {category.name === 'MEAL PREP' && '📦'}
+                  {category.name === 'MIDDELHAVSDIÆTEN' && '🐟'}
+                </div>
+                <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
+                  {category.name}
+                </h3>
+                <p className="text-sm text-gray-500 mb-2">{category.recipeCount} opskrifter</p>
+                <div className="text-xs text-gray-400 group-hover:text-green-500 transition-colors">
+                  Klik for at udforske →
                 </div>
               </Link>
-            ))}
+            )) : null}
+          </div>
+          
+          <div className="text-center mt-12">
+            <button 
+              onClick={() => document.getElementById('alle-opskrifter')?.scrollIntoView({ behavior: 'smooth' })}
+              className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium transition-colors"
+            >
+              Eller udforsk alle opskrifter
+              <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </section>
@@ -383,24 +408,22 @@ export default function RecipeOverviewPage() {
       {/* Divider */}
       <div className="border-b border-gray-200"></div>
 
-      {/* Alle vores opskrifter Section - Moved above search */}
-      <section id="alle-opskrifter" className="py-8 bg-white">
+      {/* Alle opskrifter Section */}
+      <section id="alle-opskrifter" className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
         <div className="container">
-          <div className="text-center mb-4">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Alle vores opskrifter
-            </h1>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Bemærk, at du her søger i alle functionalfoods opskrifter med blandet mad ideologi. 
-              Brug filteret eller vælg mad-ideologi sider ovenover, for at finde lækre opskrifter 
-              inden for en specifik mad ideologi.
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
+              Alle opskrifter
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Søg og filtrer gennem alle vores opskrifter – alle beregnet på vitaminer og næring.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Search and Filter Section - Moved below title/description */}
-      <section className="bg-white py-4">
+      {/* Search and Filter Section */}
+      <section className="bg-white py-8">
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Search */}
@@ -411,7 +434,7 @@ export default function RecipeOverviewPage() {
                 placeholder="Søg i alle opskrifter her"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
               />
             </div>
 
@@ -419,7 +442,7 @@ export default function RecipeOverviewPage() {
             <select
               value={selectedDietary}
               onChange={(e) => setSelectedDietary(e.target.value)}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
             >
               <option value="all">Alle mad ideologier</option>
               <option value="FAMILIEMAD">Familiemad</option>
@@ -494,16 +517,16 @@ export default function RecipeOverviewPage() {
       {/* Recipe Grid Section */}
       <section className="py-8 bg-white">
         <div className="container">
-          {displayedRecipes.length > 0 ? (
+          {displayedRecipes && displayedRecipes.length > 0 ? (
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {displayedRecipes.map((recipe, index) => (
+                {displayedRecipes && Array.isArray(displayedRecipes) ? displayedRecipes.map((recipe, index) => (
                   <RecipeCard 
                     key={recipe.id} 
                     recipe={recipe} 
                     priority={index < 6} // Priority loading for first 6 images
                   />
-                ))}
+                )) : null}
               </div>
               
               {/* Load More Button */}

@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
  * Create a Supabase server client for use in API routes and server components
  * This client respects user authentication via cookies
  */
-export function createClient() {
+export async function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   
@@ -14,7 +14,7 @@ export function createClient() {
     throw new Error('Missing required Supabase environment variables')
   }
   
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   
   return createServerClient(
     supabaseUrl,

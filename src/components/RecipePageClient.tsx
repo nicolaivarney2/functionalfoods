@@ -15,6 +15,7 @@ import FloatingRecipeNavigation from './FloatingRecipeNavigation'
 import RatingModal from './RatingModal'
 import SupermarketProducts from './SupermarketProducts'
 
+
 interface RecipePageClientProps {
   recipe: Recipe
   allRecipes: Recipe[]
@@ -101,17 +102,7 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
         </div>
       </section>
 
-      {/* Supermarket Products */}
-      <section className="bg-white py-12">
-        <div className="container">
-          <SupermarketProducts 
-            recipeTitle={recipe.title}
-            maxProducts={6}
-          />
-        </div>
-      </section>
-
-      {/* Comment System - Moved up */}
+      {/* Comment System */}
       <section id="comments-section" className="bg-gray-50 py-12">
         <div className="container">
           <CommentSystem recipeSlug={recipe.slug} onCommentUpdate={handleCommentUpdate} />
@@ -125,6 +116,17 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
             recipeTitle={recipe.title}
             recipeDescription={recipe.shortDescription || ''}
             recipeUrl={typeof window !== 'undefined' ? window.location.href : ''}
+          />
+        </div>
+      </section>
+
+      {/* Supermarket Products - Moved after share/comments */}
+      <section className="bg-white py-12">
+        <div className="container">
+          <SupermarketProducts 
+            recipeTitle={recipe.title}
+            recipeIngredients={recipe.ingredients || []}
+            maxProducts={6}
           />
         </div>
       </section>
