@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       let recipesData: any[] = []
       const { data, error } = await supabase
         .from('recipes')
-        .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status,keywords')
+        .select('*')
         .order('updatedAt', { ascending: false })
         .limit(100)
 
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         // Try with created_at as fallback
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('recipes')
-          .select('id,title,slug,imageUrl,image_url,dietaryCategories,dietary_categories,mainCategory,status,keywords')
+          .select('*')
           .order('created_at', { ascending: false })
           .limit(100)
         if (fallbackError) {
