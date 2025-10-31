@@ -552,47 +552,180 @@ export default function WeightLossPage() {
         </div>
       </section>
 
-      {/* Vælg din vej til vægttab - All Niches */}
+      {/* Find din madideologi - Detaljeret */}
       <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-1300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="text-center mb-12">
+            <div className="text-center mb-16">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Vælg din vej til vægttab
+                Find din madideologi
               </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Hver mad-ideologi har sin egen tilgang til vægttab. Find den der passer til dig.
+              <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                Hver mad-ideologi har sin egen tilgang til vægttab. Her får du en dybdegående vejledning til de forskellige måder at tabe sig på. Find den der passer til dit liv.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {[
-                { name: 'Keto', icon: '🥑', href: '/keto', description: 'Lav-kulhydrat, høj-fedt' },
-                { name: 'Sense', icon: '🧠', href: '/sense', description: 'Danske kostråd' },
-                { name: 'LCHF/Paleo', icon: '🥩', href: '/lchf-paleo', description: 'Naturlig kost' },
-                { name: 'Anti-inflammatorisk', icon: '🌿', href: '/anti-inflammatory', description: 'Mod inflammation' },
-                { name: 'Fleksitarisk', icon: '🥬', href: '/flexitarian', description: 'Plantebaseret' },
-                { name: '5:2 Diæt', icon: '⏰', href: '/5-2-diet', description: 'Intermittent fasting' },
-                { name: 'Familiemad', icon: '👨‍👩‍👧‍👦', href: '/familie', description: 'Hele familien' },
-                { name: 'Meal Prep', icon: '📦', href: '/opskrifter/meal-prep', description: 'Planlagt mad' }
-              ].map((category, index) => (
-                <Link
-                  key={category.name}
-                  href={category.href}
-                  className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
-                  style={{ transitionDelay: `${index * 100}ms` }}
-                >
-                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                    {category.icon}
+            <div className="space-y-12">
+              {/* Keto */}
+              <div className="bg-gradient-to-br from-green-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">🥑</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Keto – lav kulhydrat, høj fedt (og protein!)</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      En kost, der minimerer kulhydrater og i stedet bruger fedt som primær energikilde. Kroppen går i "ketose", hvor den forbrænder fedt mere effektivt. Effektiv til vægttab og stabilt blodsukker – men kræver struktur og tilpasning.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      Keto er nogle gange radikal, idet nogen ville argumentere, at den er svær at tilpasse i et travlt dansk liv. Vi oplever, at Keto er effektivt til vægttab, særligt hvis det praktisere periodisk og ikke bliver overkompliceret. Hvis du vil prøve Keto, så start i vores keto-sektion.
+                    </p>
+                    <Link
+                      href="/keto"
+                      className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om Keto
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
                   </div>
-                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
-                    {category.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 group-hover:text-green-500 transition-colors">
-                    {category.description}
-                  </p>
-                </Link>
-              ))}
+                </div>
+              </div>
+
+              {/* Sense */}
+              <div className="bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">🧠</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Sense – dansk spiseforståelse</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      Udviklet af Suzy Wengel og baseret på håndflademodellen. Sense handler ikke om forbud, men om balance og portionsstørrelser, der giver mæthed og frihed. Nem at følge i hverdagen og passer til almindelig mad.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      Sense har sine egne spilleregler, du skal sætte dig ind i, for at kunne leve på Sense i en periode. Her er et godt community vigtigt (se vores reddit eller find Suzy's på Facebook). Er Sense noget for dig, så har vi en hel Sense sektion, du er velkommen til at bladre i.
+                    </p>
+                    <Link
+                      href="/sense"
+                      className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:text-blue-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om Sense
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* LCHF & Paleo */}
+              <div className="bg-gradient-to-br from-orange-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">🥩</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">LCHF & Paleo – naturlig kost</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      Begge fokuserer på at spise ren og uforarbejdet mad. LCHF reducerer kulhydrater og øger fedt, mens Paleo tager udgangspunkt i mad som før landbruget – kød, grønt, nødder og rene råvarer. Ideelt for dem, der ønsker "ægte mad" uden tilsætninger, hvor vægttab kommer som en bivirkning af sund kost.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      LCHF og Paleo er effektivt til vægttab, men har, ligesom Keto, nogle faldgrupper, da rigtig mad ofte også har mange kalorier. Maden har en høj densitet (mæthedsfornemmelse), og med den rette vejledning, kan det gøre til stort vægttab og en sund og stærk krop.
+                    </p>
+                    <Link
+                      href="/lchf-paleo"
+                      className="inline-flex items-center gap-2 text-orange-600 font-semibold hover:text-orange-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om LCHF & Paleo
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Anti-inflammatorisk */}
+              <div className="bg-gradient-to-br from-emerald-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">🌿</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Anti-inflammatorisk kost – ro i kroppen</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      Fokuserer på fødevarer, der dæmper inflammation i kroppen – fx grøntsager, fisk, bær, olivenolie og fuldkorn. Kan understøtte energi, restitution og generel sundhed. Handler mere om velvære end vægttab, men bidrager ofte positivt til begge dele.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      At leve anti-inflammatorisk er et opgør med nogle af nutidens mad-vaner, der er blevet formet globale fødevaregiganter. En anti-inflammatorisk kost er giver som regel vægttab som et afkast, fordi man undgår madvarer der påvirker kroppen negativt. Det giver mere overskud og langt mere velvære, som gør vægttab nemmere.
+                    </p>
+                    <Link
+                      href="/anti-inflammatory"
+                      className="inline-flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om anti-inflammatorisk kost
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Fleksitarisk */}
+              <div className="bg-gradient-to-br from-green-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">🥬</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Fleksitarisk – primært plantebaseret</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      Overvejende vegetarisk, men med plads til fisk og kød i mindre mængder. God for både klima og sundhed – og let at tilpasse til forskellige livsstile. Her er fokus på variation, fibre og grøn mæthed.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      Fleksitarisk mad kan derfor både være med kød og uden kød. Vi har opskrifter med begge, men da vi (hos functionalfoods) ser kød som en naturligvis del af en sund kost, har vi fokus på periodisk kød i kosten. Der er plads til alle holdninger hos os, og med vores fleksitariske opskrifter har du mulighed for at leve sundt, billigt og grønt.
+                    </p>
+                    <Link
+                      href="/flexitarian"
+                      className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om fleksitarisk kost
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5:2 Diæt */}
+              <div className="bg-gradient-to-br from-purple-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">⏰</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">5:2 Diæt – spis i rytme</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      En form for intermittent fasting, hvor du spiser normalt fem dage om ugen og reducerer kalorieindtaget markant to dage. 5:2 kuren kan hjælpe med kalorieunderskud og bedre appetitkontrol. Det kræver lidt planlægning, men er fleksibel og enkel i praksis.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      5:2 som koncept er en kur, men er også en metode til bedre vægttab og fasteperioder der styrker sundhed og vægttab generelt. Vi er stor fan af 5:2 som redskab, og for mange, er det også en konkret og simpel måde at smide et par overflødige kilo. Vores madbudget funktion tilbyder madplaner (med indkøbsliste) der er målrettet 5:2.
+                    </p>
+                    <Link
+                      href="/5-2-diet"
+                      className="inline-flex items-center gap-2 text-purple-600 font-semibold hover:text-purple-700 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om 5:2 Diæt
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              {/* Meal Prep */}
+              <div className="bg-gradient-to-br from-gray-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="text-5xl flex-shrink-0">📦</div>
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Meal Prep – planlagt mad, mindre stress</h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">
+                      Kernen er forberedelse: Lav maden én gang, spis flere gange. Generelt sparer du tid, penge og beslutninger i hverdagen – og gør det lettere at holde kursen. Den er velegnet til alle kosttyper og mål, og bruges mest som metode.
+                    </p>
+                    <p className="text-gray-700 leading-relaxed mb-6">
+                      Gennem vores koncept, fokuserer vi på at mindske stress og generelt madlavningen, som kan give tid til træning og andre ting. Vores meal prep funktion fokuserer på familiemad-kategorien, hvorfor der ikke er det samme fokus på vægttab som ved de andre madvaner.
+                    </p>
+                    <Link
+                      href="/opskrifter/meal-prep"
+                      className="inline-flex items-center gap-2 text-gray-700 font-semibold hover:text-gray-900 transition-colors group"
+                    >
+                      Er du interesseret i mere, så læs om Meal Prep
+                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
