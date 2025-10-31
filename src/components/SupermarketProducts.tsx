@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Store, Tag, TrendingUp, Clock, ShoppingCart, ExternalLink } from 'lucide-react'
+import { Store, Tag, TrendingUp, Clock, ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
 
 interface SupermarketProduct {
@@ -28,10 +28,17 @@ interface SupermarketProduct {
 
 interface SupermarketProductsProps {
   recipeTitle?: string
+  recipeIngredients?: Array<{
+    id?: string
+    name: string
+    amount?: number
+    unit?: string
+    notes?: string
+  }>
   maxProducts?: number
 }
 
-export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: SupermarketProductsProps) {
+export default function SupermarketProducts({ recipeTitle, recipeIngredients = [], maxProducts = 6 }: SupermarketProductsProps) {
   const [products, setProducts] = useState<SupermarketProduct[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,18 +47,50 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
 
   useEffect(() => {
     fetchSupermarketProducts()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipeIngredients?.map(ing => ing.name).join(',')])
 
   const fetchSupermarketProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/supermarket/products')
-      const data = await response.json()
       
-      if (data.success) {
-        setProducts(data.products.slice(0, maxProducts))
+      // If we have recipe ingredients, fetch matching products
+      if (recipeIngredients && recipeIngredients.length > 0) {
+        const ingredientNames = recipeIngredients.map(ing => ing.name.toLowerCase().trim())
+        
+        const response = await fetch('/api/supermarket/products')
+        const data = await response.json()
+        
+        if (data.success) {
+          // Match products to recipe ingredients
+          const matchedProducts = data.products
+            .filter((product: SupermarketProduct) => {
+              const productNameLower = product.name.toLowerCase()
+              // Check if product name contains any ingredient name (fuzzy match)
+              return ingredientNames.some(ingName => {
+                // Remove common words and check for keyword matches
+                const keywords = ingName.split(/\s+/).filter(k => k.length > 3)
+                return keywords.some(keyword => productNameLower.includes(keyword)) || 
+                       productNameLower.includes(ingName) ||
+                       ingName.includes(productNameLower.split(' ')[0]) // Match first word
+              })
+            })
+            .slice(0, maxProducts)
+          
+          setProducts(matchedProducts)
+        } else {
+          setError(data.error || 'Failed to fetch products')
+        }
       } else {
-        setError(data.error || 'Failed to fetch products')
+        // Fallback: fetch latest products if no ingredients
+        const response = await fetch('/api/supermarket/products')
+        const data = await response.json()
+        
+        if (data.success) {
+          setProducts(data.products.slice(0, maxProducts))
+        } else {
+          setError(data.error || 'Failed to fetch products')
+        }
       }
     } catch (error) {
       setError('Failed to fetch supermarket products')
@@ -217,16 +256,6 @@ export default function SupermarketProducts({ recipeTitle, maxProducts = 6 }: Su
                     )}
                   </div>
                   
-                  {/* External store link */}
-                  <Link 
-                    href={`https://shop.rema1000.dk/produkt/${product.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gray-400 hover:text-green-600 transition-colors"
-                    title="Åbn i REMA 1000"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
                 </div>
 
                 {/* Price */}

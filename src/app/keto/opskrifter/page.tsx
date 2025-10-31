@@ -54,6 +54,9 @@ export default function KetoRecipesPage() {
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [prepTimeFilter, setPrepTimeFilter] = useState<'all' | 'quick' | 'medium' | 'long'>('all')
+  const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
     setIsVisible(true)
@@ -97,10 +100,11 @@ export default function KetoRecipesPage() {
     loadRecipes()
   }, [])
 
-  // Apply search filter
+  // Apply all filters
   useEffect(() => {
     let filtered = allRecipes || []
 
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(recipe => {
@@ -121,8 +125,41 @@ export default function KetoRecipesPage() {
       })
     }
 
+    // Prep time filter
+    if (prepTimeFilter !== 'all') {
+      filtered = filtered.filter(recipe => {
+        const total = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
+        if (prepTimeFilter === 'quick') return total <= 30
+        if (prepTimeFilter === 'medium') return total > 30 && total <= 60
+        if (prepTimeFilter === 'long') return total > 60
+        return true
+      })
+    }
+
+    // Meal type filter
+    if (mealTypeFilter !== 'all') {
+      filtered = filtered.filter(recipe => {
+        const mainCat = (recipe.mainCategory || '').toLowerCase()
+        const filterLower = mealTypeFilter.toLowerCase()
+        return mainCat.includes(filterLower) || filterLower.includes(mainCat)
+      })
+    }
+
     setFilteredRecipes(filtered)
-  }, [searchQuery, allRecipes])
+  }, [searchQuery, prepTimeFilter, mealTypeFilter, allRecipes])
+
+  // Get unique meal types from recipes
+  const mealTypes = Array.from(
+    new Set(allRecipes.map(r => r.mainCategory).filter(Boolean))
+  ).sort()
+
+  const clearFilters = () => {
+    setPrepTimeFilter('all')
+    setMealTypeFilter('all')
+    setSearchQuery('')
+  }
+
+  const hasActiveFilters = prepTimeFilter !== 'all' || mealTypeFilter !== 'all' || searchQuery !== ''
 
   if (isLoading) {
     return (
@@ -182,19 +219,117 @@ export default function KetoRecipesPage() {
         </div>
       </section>
 
-      {/* Search Section */}
-      <section className="py-8 bg-white">
+      {/* Search and Filters Section */}
+      <section className="py-8 bg-white border-b border-gray-100">
         <div className="container">
-          <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Søg i keto opskrifter..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
-              />
+          <div className="flex flex-col gap-4">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="relative flex-1 max-w-md w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Søg i keto opskrifter..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                  showFilters || hasActiveFilters
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Filter size={20} />
+                Filtre
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                    {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== ''].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-3 text-gray-600 hover:text-gray-900 font-medium transition-colors"
+                >
+                  Ryd filtre
+                </button>
+              )}
+            </div>
+
+            {/* Filters Panel */}
+            {showFilters && (
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Prep Time Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Forbredelsestid
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 'all', label: 'Alle' },
+                        { value: 'quick', label: 'Under 30 min' },
+                        { value: 'medium', label: '30-60 min' },
+                        { value: 'long', label: 'Over 60 min' },
+                      ].map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => setPrepTimeFilter(option.value as any)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            prepTimeFilter === option.value
+                              ? 'bg-purple-600 text-white shadow-md'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Meal Type Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Måltidstype
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setMealTypeFilter('all')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          mealTypeFilter === 'all'
+                            ? 'bg-purple-600 text-white shadow-md'
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                      >
+                        Alle
+                      </button>
+                      {mealTypes.map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setMealTypeFilter(type)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            mealTypeFilter === type
+                              ? 'bg-purple-600 text-white shadow-md'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Results Count */}
+            <div className="text-center text-sm text-gray-600">
+              Viser {filteredRecipes.length} af {allRecipes.length} opskrifter
             </div>
           </div>
         </div>
@@ -219,20 +354,20 @@ export default function KetoRecipesPage() {
             <div className="text-center py-16">
               <div className="text-6xl mb-4">🥑</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                {searchQuery ? 'Ingen opskrifter fundet' : 'Ingen keto opskrifter endnu'}
+                {hasActiveFilters ? 'Ingen opskrifter fundet' : 'Ingen keto opskrifter endnu'}
               </h3>
               <p className="text-gray-600 mb-8">
-                {searchQuery 
-                  ? `Vi kunne ikke finde nogen keto opskrifter der matcher "${searchQuery}"`
+                {hasActiveFilters
+                  ? 'Prøv at justere dine filtre for at se flere opskrifter.'
                   : 'Vi arbejder på at tilføje flere keto opskrifter. Kom snart tilbage!'
                 }
               </p>
-              {searchQuery && (
+              {hasActiveFilters && (
                 <button
-                  onClick={() => setSearchQuery('')}
-                  className="text-purple-600 hover:text-purple-700 font-medium"
+                  onClick={clearFilters}
+                  className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-medium transition-colors"
                 >
-                  Ryd søgning
+                  Ryd alle filtre
                 </button>
               )}
             </div>
