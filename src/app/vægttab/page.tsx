@@ -274,76 +274,164 @@ export default function WeightLossPage() {
               </p>
                     </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                {
-                  name: "Sense",
-                  icon: "🧠",
-                  short: "Bruger håndflader og spiseforståelse",
-                  fits: "Vil spise almindelig mad uden forbud",
-                  href: "/sense"
-                },
                 {
                   name: "Keto",
                   icon: "🥑",
-                  short: "Færre kulhydrater, mere fedt",
-                  fits: "Har det godt med struktur og hurtige resultater",
+                  short: "Lav-kulhydrat, høj-fedt",
                   href: "/keto"
                 },
                 {
-                  name: "LCHF",
+                  name: "Sense",
+                  icon: "🧠",
+                  short: "Danske kostråd",
+                  href: "/sense"
+                },
+                {
+                  name: "LCHF/Paleo",
                   icon: "🥩",
-                  short: "Som Keto, men mere fleksibel",
-                  fits: "Ønsker fedtforbrænding uden at være ekstrem",
+                  short: "Naturlig kost",
                   href: "/lchf-paleo"
                 },
                 {
-                  name: "Paleo",
+                  name: "Anti-inflammatorisk",
                   icon: "🌿",
-                  short: "Naturlig, ren mad – ingen forarbejdede produkter",
-                  fits: "Vil spise 'som kroppen er skabt til'",
-                  href: "/lchf-paleo"
+                  short: "Mod inflammation",
+                  href: "/anti-inflammatory"
+                },
+                {
+                  name: "Fleksitarisk",
+                  icon: "🥬",
+                  short: "Plantebaseret",
+                  href: "/flexitarian"
+                },
+                {
+                  name: "5:2 Diæt",
+                  icon: "⏰",
+                  short: "Intermittent fasting",
+                  href: "/5-2-diet"
+                },
+                {
+                  name: "Familiemad",
+                  icon: "👨‍👩‍👧‍👦",
+                  short: "Hele familien",
+                  href: "/familie"
                 },
                 {
                   name: "Meal Prep",
                   icon: "📦",
-                  short: "Planlægning, struktur og økonomi",
-                  fits: "Vil gøre vægttab praktisk og realistisk",
+                  short: "Planlagt mad",
                   href: "/opskrifter/meal-prep"
-                },
-                {
-                  name: "Budgetmad",
-                  icon: "💰",
-                  short: "Sundt vægttab uden at bruge en formue",
-                  fits: "Vil spise sundt og billigt",
-                  href: "/madbudget"
                 }
               ].map((niche, idx) => (
                 <Link
                   key={idx}
                   href={niche.href}
-                  className="block bg-white rounded-2xl p-6 border-2 border-gray-200 hover:border-green-200 hover:shadow-xl transition-all"
+                  className="block bg-white rounded-2xl p-6 border-2 border-gray-100 text-center hover:border-green-200 hover:shadow-xl transition-all group"
                 >
-                  <div className="text-4xl mb-4">{niche.icon}</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{niche.name}</h3>
-                  <p className="text-sm text-gray-600 mb-3">{niche.short}</p>
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs font-medium text-green-700">Passer til dig, hvis du…</p>
-                    <p className="text-sm text-gray-700 mt-1">{niche.fits}</p>
-                  </div>
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">{niche.icon}</div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">{niche.name}</h3>
+                  <p className="text-sm text-gray-500 group-hover:text-green-500 transition-colors">{niche.short}</p>
                 </Link>
               ))}
-                  </div>
-                  
-            <div className="mt-12 bg-gradient-to-r from-green-100 to-blue-100 rounded-2xl p-8 text-center border-2 border-green-200">
-              <p className="text-lg font-semibold text-gray-900 mb-2">
-                Det, der virker, er det du kan holde
-              </p>
-              <p className="text-gray-700">
-                De bedste resultater kommer, når din kost passer til dit liv – ikke omvendt. Det kræver ikke perfektion, men konsistens.
-              </p>
             </div>
                     </div>
+        </div>
+      </section>
+
+      {/* Sådan taber du dig - Kalorietracker */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+        <div className="container">
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
+                Sådan taber du dig
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Vægttab handler om kalorieunderskud, men også om at spise rigtigt
+              </p>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8 items-start">
+              {/* Left: Calorie Tracker */}
+              <div className="bg-white rounded-2xl p-8 border-2 border-gray-100 shadow-lg">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
+                    <Target className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Kalorieunderskud</h3>
+                </div>
+                <div className="space-y-6">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Kalorier ind</span>
+                      <span className="text-lg font-bold text-red-600">1.800</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="bg-red-500 h-full rounded-full" style={{ width: '82%' }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Kalorier ud</span>
+                      <span className="text-lg font-bold text-green-600">2.200</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="bg-green-500 h-full rounded-full" style={{ width: '100%' }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Underskud</span>
+                      <span className="text-lg font-bold text-blue-600">400</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                      <div className="bg-blue-500 h-full rounded-full" style={{ width: '18%' }}></div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      <strong className="text-gray-900">500 kalorier underskud dagligt = 0,5 kg vægttab om ugen</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Explanations */}
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                    Vægttab handler om <span className="text-green-600">kalorieunderskud</span>
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    Men det handler også om at spise rigtigt – så kroppen får de næringsstoffer den har brug for.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-green-50 border-2 border-green-100 rounded-xl p-6">
+                    <h4 className="font-semibold text-green-800 mb-2">Kalorieunderskud</h4>
+                    <p className="text-green-700 text-sm leading-relaxed">
+                      Spis færre kalorier end du forbrænder. 500 kalorier underskud dagligt = 0,5 kg vægttab om ugen.
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 border-2 border-blue-100 rounded-xl p-6">
+                    <h4 className="font-semibold text-blue-800 mb-2">Næringsrig mad</h4>
+                    <p className="text-blue-700 text-sm leading-relaxed">
+                      Vælg mad der giver dig vitaminer, mineraler og protein – ikke bare tomme kalorier.
+                    </p>
+                  </div>
+                  <div className="bg-purple-50 border-2 border-purple-100 rounded-xl p-6">
+                    <h4 className="font-semibold text-purple-800 mb-2">Bæredygtig tilgang</h4>
+                    <p className="text-purple-700 text-sm leading-relaxed">
+                      Find en mad-ideologi du kan følge resten af livet – ikke bare en hurtig kur.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -464,8 +552,54 @@ export default function WeightLossPage() {
         </div>
       </section>
 
-      {/* FAQ */}
+      {/* Vælg din vej til vægttab - All Niches */}
       <section className="py-20 bg-white">
+        <div className="container">
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-1300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
+                Vælg din vej til vægttab
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Hver mad-ideologi har sin egen tilgang til vægttab. Find den der passer til dig.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { name: 'Keto', icon: '🥑', href: '/keto', description: 'Lav-kulhydrat, høj-fedt' },
+                { name: 'Sense', icon: '🧠', href: '/sense', description: 'Danske kostråd' },
+                { name: 'LCHF/Paleo', icon: '🥩', href: '/lchf-paleo', description: 'Naturlig kost' },
+                { name: 'Anti-inflammatorisk', icon: '🌿', href: '/anti-inflammatory', description: 'Mod inflammation' },
+                { name: 'Fleksitarisk', icon: '🥬', href: '/flexitarian', description: 'Plantebaseret' },
+                { name: '5:2 Diæt', icon: '⏰', href: '/5-2-diet', description: 'Intermittent fasting' },
+                { name: 'Familiemad', icon: '👨‍👩‍👧‍👦', href: '/familie', description: 'Hele familien' },
+                { name: 'Meal Prep', icon: '📦', href: '/opskrifter/meal-prep', description: 'Planlagt mad' }
+              ].map((category, index) => (
+                <Link
+                  key={category.name}
+                  href={category.href}
+                  className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
+                  style={{ transitionDelay: `${index * 100}ms` }}
+                >
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                    {category.icon}
+                  </div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
+                    {category.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 group-hover:text-green-500 transition-colors">
+                    {category.description}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
         <div className="container">
           <div className={`max-w-3xl mx-auto transition-all duration-1000 delay-1400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
