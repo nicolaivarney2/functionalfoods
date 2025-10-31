@@ -149,7 +149,8 @@ export default function BlogCategoryHubPage() {
           })
           
           // Combine and deduplicate
-          const combined = [...new Set([...byDietaryCat, ...byKeywords].map(r => r.id))].map(id => 
+          const uniqueIds = Array.from(new Set([...byDietaryCat, ...byKeywords].map(r => r.id)))
+          const combined = uniqueIds.map(id => 
             filtered.find(r => r.id === id)
           ).filter(Boolean)
           
