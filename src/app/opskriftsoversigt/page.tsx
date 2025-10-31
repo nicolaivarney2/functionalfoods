@@ -367,7 +367,7 @@ export default function RecipeOverviewPage() {
             {extendedDietaryCategories && Array.isArray(extendedDietaryCategories) ? extendedDietaryCategories.map((category, index) => (
               <Link
                 key={category.id}
-                href={`/opskrifter/${category.slug}`}
+                href={`/${category.slug}/opskrifter`}
                 className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
