@@ -224,23 +224,44 @@ export default function BlogPostPage() {
       // Hydrate widgets by calling API to render HTML
       const hydrate = async () => {
         const widgetNodes = Array.from(container.querySelectorAll('.blog-widget')) as HTMLElement[]
+        console.log('[Blog Page] Found', widgetNodes.length, 'widget nodes to hydrate')
         for (const node of widgetNodes) {
           try {
             const type = node.getAttribute('data-widget-type') || ''
             const configAttr = node.getAttribute('data-widget-config') || '{}'
             const config = JSON.parse(configAttr)
+            const widgetId = node.getAttribute('data-widget-id')
+            const context = { categorySlug: post?.category?.slug, slug: post?.slug, tags: post?.tags }
+            console.log('[Blog Page] Hydrating widget:', { id: widgetId, type, config, context })
             const res = await fetch('/api/widgets/render', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: node.getAttribute('data-widget-id'), type, config, context: { categorySlug: post?.category?.slug, slug: post?.slug, tags: post?.tags } })
+              body: JSON.stringify({ id: widgetId, type, config, context })
             })
+            if (!res.ok) {
+              console.error('[Blog Page] Widget API error:', res.status, res.statusText)
+              node.innerHTML = `<div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-md">Fejl ved indlæsning af widget (${res.status}).</div>`
+              continue
+            }
             const data = await res.json()
-            if (data?.html) node.innerHTML = data.html
-          } catch {}
+            console.log('[Blog Page] Widget response:', { success: data.success, hasHtml: !!data.html })
+            if (data?.html) {
+              node.innerHTML = data.html
+            } else {
+              console.warn('[Blog Page] Widget returned no HTML')
+              node.innerHTML = `<div class="p-4 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-md">Widget indhold mangler.</div>`
+            }
+          } catch (e) {
+            console.error('[Blog Page] Error hydrating widget:', e)
+            node.innerHTML = `<div class="p-4 bg-red-50 border border-red-200 text-red-800 rounded-md">Fejl ved indlæsning af widget: ${e instanceof Error ? e.message : 'Ukendt fejl'}</div>`
+          }
         }
         setProcessedContent(container.innerHTML)
       }
-      hydrate().catch(() => setProcessedContent(container.innerHTML))
+      hydrate().catch((e) => {
+        console.error('[Blog Page] Fatal error in widget hydration:', e)
+        setProcessedContent(container.innerHTML)
+      })
     } catch (e) {
       setProcessedContent(post.content)
     }
