@@ -117,7 +117,7 @@ export default function Home() {
             </p>
             
             <p className="text-lg md:text-xl mb-12 text-gray-800 font-medium max-w-3xl mx-auto">
-              Her handler vægttab ikke om at spise mindre – men om at spise rigtigt.
+              Her handler vægttab ikke om at spise færre kalorier – men om at spise rigtig mad.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -204,7 +204,7 @@ export default function Home() {
 
           <div className="grid md:grid-cols-3 gap-8 mb-12">
             {/* Card 1: Gratis opskrifter */}
-            <div className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <Link href="/opskriftsoversigt" className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 block ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-5xl mb-4">🥗</div>
               <h3 className="text-2xl font-bold mb-4 text-gray-900">Gratis opskrifter i alle madnicher</h3>
               <p className="text-gray-600 mb-4 leading-relaxed">
@@ -216,25 +216,37 @@ export default function Home() {
                   </>
                 )}
               </p>
-            </div>
+              <div className="flex items-center gap-2 text-green-600 font-medium mt-4 group">
+                <span>Se alle opskrifter</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
 
             {/* Card 2: Ernæringsberegnet */}
-            <div className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 delay-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <Link href="#vaegttab" className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 delay-100 block ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-5xl mb-4">📊</div>
               <h3 className="text-2xl font-bold mb-4 text-gray-900">Ernæringsberegnet med danske data</h3>
               <p className="text-gray-600 mb-4 leading-relaxed">
                 Alle opskrifter beregnes ud fra Fødevareinstituttets FRIDA-database – med nøjagtige vitaminer, mineraler og makronæringsstoffer.
               </p>
-            </div>
+              <div className="flex items-center gap-2 text-green-600 font-medium mt-4 group">
+                <span>Læs mere om næring</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
 
             {/* Card 3: Guides */}
-            <div className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <Link href="/opskriftsoversigt" className={`bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2 delay-200 block ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-5xl mb-4">🧭</div>
               <h3 className="text-2xl font-bold mb-4 text-gray-900">Guides til sundt vægttab</h3>
               <p className="text-gray-600 mb-4 leading-relaxed">
                 Realistiske strategier, fokus på vaner og forståelse frem for regler.
               </p>
-            </div>
+              <div className="flex items-center gap-2 text-green-600 font-medium mt-4 group">
+                <span>Se guides</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
           </div>
 
           {/* Teaser */}
@@ -345,6 +357,14 @@ export default function Home() {
                 Det bliver lettere, når madplanen forstår din familie
               </h2>
               
+              <p className="text-xl text-gray-600 mb-6 leading-relaxed font-medium">
+                Personlig madplan til alle dage/måltider
+              </p>
+              
+              <p className="text-lg text-gray-600 mb-2 leading-relaxed">
+                Ud fra tilbudsvarer
+              </p>
+              
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
                 Vores system tager højde for:
               </p>
@@ -402,10 +422,23 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {dietaryCategories.map((category, index) => {
               const count = recipeCounts[category.slug] || 0
+              // Map slugs to correct routes
+              const routeMap: {[key: string]: string} = {
+                'keto': '/keto',
+                'sense': '/sense',
+                'lchf-paleo': '/lchf-paleo',
+                'anti-inflammatory': '/anti-inflammatory',
+                'flexitarian': '/flexitarian',
+                '5-2-diet': '/5-2-diet',
+                'familie': '/familie',
+                'meal-prep': '/meal-prep'
+              }
+              const route = routeMap[category.slug] || `/${category.slug}`
+              
               return (
                 <Link
                   key={category.slug}
-                  href={`/opskrifter/${category.slug}`}
+                  href={route}
                   className={`group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                   style={{ transitionDelay: `${800 + index * 100}ms` }}
                 >
@@ -432,12 +465,16 @@ export default function Home() {
         <div className="container">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className={`transition-all duration-1000 delay-1000 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
+              <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900 leading-tight">
                 Mæthed, kvalitet og kalorier –<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
                   det hele tæller
                 </span>
               </h2>
+              
+              <p className="text-xl text-green-600 font-semibold mb-8">
+                Vi udregner det hele for dig!
+              </p>
               
               <p className="text-xl text-gray-600 mb-6 leading-relaxed">
                 FunctionalFoods analyserer hver opskrift ned til vitamin- og næringsniveau, men det handler ikke kun om tal.
