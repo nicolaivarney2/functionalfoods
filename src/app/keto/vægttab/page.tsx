@@ -31,23 +31,22 @@ export default function KetoWeightLossPage() {
             </Link>
             
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
-              Vægttab uden forvirring –<br />
+              Tab kiloerne med Keto –<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-600">
-                find din vej til sund balance
+                state of the art vægttab på en realistisk måde
               </span>
             </h1>
-            
+
             <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8">
-              Der findes mange veje til vægttab. Keto, Sense, LCHF eller noget helt fjerde – men grundprincipperne er altid de samme: 
-              <strong className="text-gray-900"> Kalorier tæller, og kroppen har brug for næring, ikke bare færre kalorier.</strong>
+              Keto kan gøre vægttab enklere, fordi kombinationen af lavere kulhydrater, høj mæthed og mere protein hjælper din krop til naturligt at spise mindre – uden konstant kamp.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link
-                href="#find-din-madstil"
+                href="#keto-essens"
                 className="inline-flex items-center gap-2 px-8 py-4 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-lg hover:shadow-xl"
               >
-                Find din madstil
+                Kom godt i gang
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
@@ -62,59 +61,43 @@ export default function KetoWeightLossPage() {
         </div>
       </section>
 
-      {/* Sandheder om vægttab - Myteknuser */}
-      <section className="py-20 bg-white">
+      {/* Grundessencen for Keto og vægttab */}
+      <section id="keto-essens" className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Hvorfor er vægttab så forvirrende?
+                Grundessencen af Keto for vægttab
               </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Fordi alle siger noget forskelligt. Men i virkeligheden handler vægttab ikke om religion – det handler om forståelse.
+              <p className="text-lg text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                Vægttab bliver nemmere, når maden mætter. Keto hjælper med høj mæthed via protein og fedt, lavere insulin og færre blodsukkersving.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               {[
                 {
-                  myth: "Keto betyder uendelig vægttab uden kalorietælling",
-                  truth: "Kalorier betyder stadig noget – selv på keto. Men fedt og protein gør dig mere mæt, så du naturligt spiser mindre.",
-                  icon: Scale
+                  title: "Mere mæthed",
+                  desc: "Protein og fedt giver stærke mæthedssignaler, så du naturligt spiser mindre uden at tælle kalorier konstant.",
+                  icon: Check
                 },
                 {
-                  myth: "Du kan snyde kroppen med quick fixes",
-                  truth: "Du kan ikke snyde kroppen – men du kan forstå den. Mæthedshormoner, stofskifte og vaner styrer alt.",
-                  icon: Brain
+                  title: "Stabil energi",
+                  desc: "Få kulhydrater = mindre insulin og færre cravings. Du får jævn energi i stedet for toppe og dale.",
+                  icon: Flame
                 },
                 {
-                  myth: "Mindre mad = automatisk vægttab",
-                  truth: "Det handler ikke om at spise mindre – men smartere. 500 kcal fra grøntsager fylder anderledes end 500 kcal fra hvidt brød.",
-                  icon: Leaf
-                },
-                {
-                  myth: "Den bedste kost er den, der virker for alle",
-                  truth: "Den bedste kost er den, du faktisk kan leve med. Konsistens slår perfektion hver gang.",
-                  icon: Heart
+                  title: "Naturlig struktur",
+                  desc: "Keto gør det let at vælge mad, der støtter vægttab: grønt, kød/fisk/æg og sunde fedtkilder.",
+                  icon: Target
                 }
-              ].map((item, idx) => (
-                <div key={idx} className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                        <X className="w-6 h-6 text-red-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2">{item.myth}</h3>
-                      <div className="flex items-start gap-3 mt-3 pt-3 border-t border-gray-200">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Check className="w-5 h-5 text-green-600" />
-                        </div>
-                        <p className="text-gray-700 leading-relaxed">{item.truth}</p>
-                      </div>
-                    </div>
+              ].map((card, idx) => (
+                <div key={idx} className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100">
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                    <card.icon className="w-6 h-6 text-purple-600" />
                   </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{card.title}</h3>
+                  <p className="text-gray-700 leading-relaxed text-sm">{card.desc}</p>
                 </div>
               ))}
             </div>
@@ -122,24 +105,24 @@ export default function KetoWeightLossPage() {
         </div>
       </section>
 
-      {/* De grundlæggende principper */}
+      {/* Principperne bag Keto og vægttab */}
       <section className="py-20 bg-gradient-to-br from-purple-50/50 via-white to-green-50/50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                De grundlæggende principper
+                Principperne bag et vægttab med Keto
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Der findes tusind veje, men de bygger alle på de samme mekanismer
+                Forestil dig at bygge din krop om fra "kulhydratbil" til en effektiv "fedt- og ketonbil". Der er en kort omstillingsperiode – så kører det.
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 {
-                  title: "Kalorier betyder noget",
-                  description: "Kroppen taber sig, når du indtager mindre energi, end du forbruger. Det er fysik, ikke magi.",
+                  title: "Kalorier betyder stadig noget",
+                  description: "Keto fjerner ikke fysikkens love – men øger mæthed, så underskud bliver lettere.",
                   icon: Scale,
                   color: "purple"
                 },
@@ -151,7 +134,7 @@ export default function KetoWeightLossPage() {
                 },
                 {
                   title: "Madens densitet tæller",
-                  description: "500 kcal fra grøntsager og fisk fylder anderledes end 500 kcal fra hvidt brød og olie.",
+                  description: "Grønt + protein mætter mere pr. kalorie end sukker og hvidt brød.",
                   icon: Target,
                   color: "blue"
                 },
@@ -180,181 +163,118 @@ export default function KetoWeightLossPage() {
               })}
             </div>
 
-            {/* Placeholder for illustration */}
-            <div className="mt-12 bg-white rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <div className="text-6xl mb-4">📊</div>
-              <p className="text-gray-500 text-sm">Illustration: Infografik der viser energiindtag vs. energiforbrug, med "madens kvalitet" som balancepunkt</p>
+            {/* Info-boks */}
+            <div className="mt-12 bg-white rounded-2xl p-8 border-2 border-purple-200 text-center">
+              <p className="text-gray-700 text-sm">
+                På keto øges forbrændingen en smule, sult dæmpes af lavere insulin og maden mætter. Det gør det nemmere at holde underskud – uden at det føles som straf.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Hvordan mad påvirker vægten */}
+      {/* 4 faser til vægttab med Keto */}
       <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Hvordan mad påvirker vægten
+                4 faser til vægttab med Keto
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Når du spiser, sender kroppen signaler gennem hormoner, der styrer mæthed, energi og lyst
+                En praktisk ramme, der hjælper dig fra start til optimering
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 mb-12">
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-                    <Check className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Øger mæthed</h3>
-                </div>
-                <ul className="space-y-3 text-gray-700">
-                  <li className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Protein</strong> sender stærke mæthedssignaler og bruger energi til at forbrænde</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Fiber</strong> fylder maven og sænker blodsukkeret langsomt</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Fedt</strong> (på keto) holder dig mæt længe og stabiliserer energi</span>
-                  </li>
+            <div className="space-y-8">
+              <div className="bg-gradient-to-br from-purple-50 to-white rounded-2xl p-6 border border-purple-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">1) Kend til Keto (starten)</h3>
+                <p className="text-gray-700 leading-relaxed">
+                  I starten mister kroppen væske, når glykogendepoter tømmes – vægten flytter sig ofte hurtigt, hvilket motiverer. Lær maden at kende og byg rutiner.
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-yellow-50 to-white rounded-2xl p-6 border border-yellow-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">2) Overgangssymptomerne (midten)</h3>
+                <p className="text-gray-700 leading-relaxed mb-3">
+                  Over 1–3 uger tilpasser kroppen sig ketose. Energi kan svinge – det går over igen. Prioritér elektrolytter, vand, søvn og ro.
+                </p>
+                <ul className="list-disc pl-5 text-gray-700 text-sm space-y-1">
+                  <li>Salt/elektrolytter: bouillon, salt på maden, magnesium</li>
+                  <li>Vand: 2–3 liter dagligt</li>
+                  <li>Søvn og let bevægelse hjælper</li>
                 </ul>
               </div>
 
-              <div className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl p-8 border border-red-100">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
-                    <X className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Reducerer mæthed</h3>
-                </div>
-                <ul className="space-y-3 text-gray-700">
-                  <li className="flex items-start gap-3">
-                    <X className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Sukker</strong> skaber blodsukkertoppe og -daler, der giver sult</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <X className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Ultraforarbejdet mad</strong> er designet til at spise mere af</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <X className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Emotionel spising</strong> ignorerer kroppens mæthedssignaler</span>
-                  </li>
+              <div className="bg-gradient-to-br from-green-50 to-white rounded-2xl p-6 border border-green-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">3) Find ro i det du laver (ny begyndelse)</h3>
+                <p className="text-gray-700 leading-relaxed mb-3">
+                  Når overgangssymptomerne letter, skab stabilitet: Vælg keto-mad, du kan lide, og definér dine mål (fx 300–500 g/uge). Undgå at blive fanget i daglige vægtudsving.
+                </p>
+                <ul className="list-disc pl-5 text-gray-700 text-sm space-y-1">
+                  <li>Grønt + kød/fisk/æg + fedtkilde (olie, nødder/oliven, ost)</li>
+                  <li>Brug madplaner eller en enkel indkøbsliste med keto-venlige basisvarer</li>
+                  <li>Gentag yndlingsopskrifter for mindre friktion</li>
                 </ul>
               </div>
-            </div>
 
-            {/* Placeholder for søvn/stress/motion illustration */}
-            <div className="grid md:grid-cols-4 gap-4">
-              {[
-                { icon: Moon, title: "Søvn", desc: "Påvirker appetit og forbrænding" },
-                { icon: Heart, title: "Mad", desc: "Styrer hormoner og mæthed" },
-                { icon: AlertCircle, title: "Stress", desc: "Øger kortisol og appetit" },
-                { icon: Activity, title: "Bevægelse", desc: "Øger forbrænding og humør" }
-              ].map((item, idx) => (
-                <div key={idx} className="bg-gray-50 rounded-xl p-6 text-center border border-gray-200">
-                  <item.icon className="w-8 h-8 mx-auto mb-3 text-purple-600" />
-                  <h4 className="font-semibold text-gray-900 mb-1">{item.title}</h4>
-                  <p className="text-sm text-gray-600">{item.desc}</p>
+              <div className="bg-gradient-to-br from-emerald-50 to-white rounded-2xl p-6 border border-emerald-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">4) Optimer hvor du kan (ny energi)</h3>
+                <p className="text-gray-700 leading-relaxed mb-3">
+                  Når basen er på plads, kan du optimere i denne rækkefølge. Evaluer efter hvert trin – virker det, behøver du ikke mere.
+                </p>
+                <ol className="list-decimal pl-5 text-gray-700 text-sm space-y-1">
+                  <li><span className="font-semibold">Dyrk motion</span> – 2–4 gange om ugen, hvad som helst du får gjort</li>
+                  <li><span className="font-semibold">Periodisk faste</span> – fx 19–10 (15–16 timers faste)</li>
+                  <li><span className="font-semibold">Spis 2 måltider</span> – brunch/frokost + aftensmad</li>
+                  <li><span className="font-semibold">OMAD</span> – ét måltid dagligt, hvis alt andet fejler (midlertidigt værktøj)</li>
+                </ol>
+                <div className="mt-3 text-gray-600 text-sm">
+                  Andre skruer: mere bevægelse, mindre snacking, lidt mindre portioner, længere faste (24–72 t) efter behov.
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Find din madniche */}
-      <section id="find-din-madstil" className="py-20 bg-gradient-to-br from-gray-50 to-purple-50/30">
+      {/* Hvis du ikke oplever ketose-fordele */}
+      <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="bg-white rounded-2xl p-6 border-2 border-purple-200">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Et lille mente</h3>
+              <p className="text-gray-700 leading-relaxed text-sm">
+                Oplever du ikke mindre sult eller væskeudskillelse, er du formentlig ikke i ketose. Løsningen er næsten altid færre kulhydrater – ikke mere fedt.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Tag det én dag ad gangen */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-purple-50/30">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Find den madstil, der passer til dit liv
-              </h2>
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">Tag det én dag ad gangen</h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+                Fokuser på næste måltid – ikke de næste 3 måneder. Konsistens slår perfektion.
               </p>
             </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                {
-                  name: "Sense",
-                  icon: "🧠",
-                  short: "Bruger håndflader og spiseforståelse",
-                  fits: "Vil spise almindelig mad uden forbud",
-                  href: "/sense"
-                },
-                {
-                  name: "Keto",
-                  icon: "🥑",
-                  short: "Færre kulhydrater, mere fedt",
-                  fits: "Har det godt med struktur og hurtige resultater",
-                  href: "/keto",
-                  highlight: true
-                },
-                {
-                  name: "LCHF",
-                  icon: "🥩",
-                  short: "Som Keto, men mere fleksibel",
-                  fits: "Ønsker fedtforbrænding uden at være ekstrem",
-                  href: "/lchf-paleo"
-                },
-                {
-                  name: "Paleo",
-                  icon: "🌿",
-                  short: "Naturlig, ren mad – ingen forarbejdede produkter",
-                  fits: "Vil spise 'som kroppen er skabt til'",
-                  href: "/lchf-paleo"
-                },
-                {
-                  name: "Meal Prep",
-                  icon: "📦",
-                  short: "Planlægning, struktur og økonomi",
-                  fits: "Vil gøre vægttab praktisk og realistisk",
-                  href: "/opskrifter/meal-prep"
-                },
-                {
-                  name: "Budgetmad",
-                  icon: "💰",
-                  short: "Sundt vægttab uden at bruge en formue",
-                  fits: "Vil spise sundt og billigt",
-                  href: "/madbudget"
-                }
-              ].map((niche, idx) => (
-                <Link
-                  key={idx}
-                  href={niche.href}
-                  className={`block bg-white rounded-2xl p-6 border-2 hover:shadow-xl transition-all ${
-                    niche.highlight 
-                      ? 'border-purple-300 bg-gradient-to-br from-purple-50/50 to-white' 
-                      : 'border-gray-200 hover:border-purple-200'
-                  }`}
-                >
-                  <div className="text-4xl mb-4">{niche.icon}</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">{niche.name}</h3>
-                  <p className="text-sm text-gray-600 mb-3">{niche.short}</p>
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-xs font-medium text-purple-700">Passer til dig, hvis du…</p>
-                    <p className="text-sm text-gray-700 mt-1">{niche.fits}</p>
-                  </div>
-                </Link>
+                { icon: '🍽', title: 'Tænk ét måltid ad gangen', desc: 'Hold fokus tæt på – det gør det nemt at vinde dagen.' },
+                { icon: '😋', title: 'Leg med maden', desc: 'Find keto-opskrifter du kan lide og gentag dem.' },
+                { icon: '👀', title: 'Gentag favoritter', desc: 'Undgå beslutningstræthed ved at have faste go-to måltider.' },
+                { icon: '🗓', title: 'Brug struktur når du vil', desc: 'Madplan eller simpelt indkøbssystem – vælg det, der støtter dig.' }
+              ].map((card, idx) => (
+                <div key={idx} className="bg-white rounded-2xl p-6 border-2 border-gray-100 text-center">
+                  <div className="text-4xl mb-3">{card.icon}</div>
+                  <h3 className="font-semibold text-gray-900 mb-1">{card.title}</h3>
+                  <p className="text-sm text-gray-600">{card.desc}</p>
+                </div>
               ))}
-            </div>
-
-            <div className="mt-12 bg-gradient-to-r from-purple-100 to-green-100 rounded-2xl p-8 text-center border-2 border-purple-200">
-              <p className="text-lg font-semibold text-gray-900 mb-2">
-                Det, der virker, er det du kan holde
-              </p>
-              <p className="text-gray-700">
-                De bedste resultater kommer, når din kost passer til dit liv – ikke omvendt. Det kræver ikke perfektion, men konsistens.
-              </p>
             </div>
           </div>
         </div>
@@ -496,24 +416,20 @@ export default function KetoWeightLossPage() {
             <div className="space-y-4">
               {[
                 {
-                  q: "Skal jeg tælle kalorier for at tabe mig?",
-                  a: "Nej – men du skal forstå dem. Det er forskellen. Nogle kan tabe sig uden at tælle, andre har brug for præcision. Find din vej."
+                  q: "Skal jeg tælle kalorier på Keto?",
+                  a: "Ikke nødvendigvis. Brug kalorier som et fejlfindingsværktøj, ikke som førstevalg. Keto gør det ofte muligt at spise mindre uden at tælle, fordi du er mere mæt."
+                },
+                {
+                  q: "Hvordan kommer jeg hurtigere i ketose?",
+                  a: "Skær kulhydraterne mere ned, prioriter protein, tilfør salt/elektrolytter og gå ture. Søvn hjælper også."
+                },
+                {
+                  q: "Hvad hvis vægten står stille?",
+                  a: "Optimer i rækkefølge: 1) bevægelse, 2) periodisk faste, 3) 2 daglige måltider, 4) OMAD midlertidigt. Evaluer efter hvert skridt."
                 },
                 {
                   q: "Er Keto farligt?",
-                  a: "Ikke for raske personer – men det kræver forståelse og planlægning. Sørg for at få nok elektrolytter, vand og næringsstoffer."
-                },
-                {
-                  q: "Hvordan holder jeg vægten bagefter?",
-                  a: "Ved at lære dine vaner at kende og finde en rytme, du kan leve med. Det er ikke en diæt, det er en livsstil."
-                },
-                {
-                  q: "Hvad hvis jeg ikke kan lide at træne?",
-                  a: "Bevægelse hjælper, men mad er vigtigst. Start med at gå en tur hver dag. Det behøver ikke være hårdt for at virke."
-                },
-                {
-                  q: "Hvordan kombinerer jeg vægttab og familieliv?",
-                  a: "Find en kost, der passer til hele familien. Meal prep, planlægning og at gøre det praktisk er nøglen. Det er ikke perfektion, det er konsistens."
+                  a: "For raske personer er keto ikke farligt, men kræver forståelse og plan. Sørg for elektrolytter, vand og næring – og tal med din læge ved sygdom/medicin."
                 }
               ].map((faq, idx) => (
                 <details key={idx} className="bg-gray-50 rounded-xl p-6 border border-gray-200 group">
@@ -543,7 +459,7 @@ export default function KetoWeightLossPage() {
             </h2>
             
             <p className="text-xl text-purple-100 mb-12 max-w-2xl mx-auto leading-relaxed">
-              Find den kost, der passer til dit liv, og gør vægttab praktisk og realistisk.
+              Spis keto på en jordnær måde: grønt, protein og simple fedtkilder – og optimér først når du er klar.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
