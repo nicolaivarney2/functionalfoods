@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight, Check, X } from 'lucide-react'
-import Image from 'next/image'
+import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight, Check, X, AlertCircle } from 'lucide-react'
 
 export default function KetoPage() {
   const [isVisible, setIsVisible] = useState(false)
