@@ -14,12 +14,15 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('')
   const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([])
   const [isLoadingRecipes, setIsLoadingRecipes] = useState(true)
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([])
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false)
+  const [searchResults, setSearchResults] = useState<Recipe[]>([])
 
   useEffect(() => {
     setIsVisible(true)
   }, [])
 
-  // Load latest recipes
+  // Load all recipes for search
   useEffect(() => {
     const loadRecipes = async () => {
       try {
@@ -27,6 +30,7 @@ export default function Home() {
         if (response.ok) {
           const data = await response.json()
           const recipes = data.recipes || data
+          setAllRecipes(recipes)
           // Get latest 6 recipes
           setLatestRecipes(recipes.slice(0, 6))
         }
@@ -39,12 +43,66 @@ export default function Home() {
     loadRecipes()
   }, [])
 
+  // Handle search input change
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      const filtered = allRecipes.filter(recipe => 
+        recipe.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        recipe.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      ).slice(0, 6)
+      setSearchResults(filtered)
+      setShowSearchDropdown(true)
+    } else {
+      setSearchResults([])
+      setShowSearchDropdown(false)
+    }
+  }, [searchQuery, allRecipes])
+
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
       window.location.href = `/opskriftsoversigt?search=${encodeURIComponent(searchQuery.trim())}`
     }
+  }
+
+  // Get recipe category name
+  const getRecipeCategory = (recipe: Recipe): string => {
+    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
+      const category = recipe.dietaryCategories[0]
+      const categoryMap: { [key: string]: string } = {
+        'keto': 'Keto',
+        'sense': 'Sense',
+        'lchf': 'LCHF/Paleo',
+        'paleo': 'LCHF/Paleo',
+        'anti-inflammatory': 'Anti-inflammatorisk',
+        'flexitarian': 'Fleksitarisk',
+        '5-2-diet': '5:2 Diæt',
+        'family': 'Familiemad',
+        'meal-prep': 'Meal Prep'
+      }
+      return categoryMap[category.toLowerCase()] || category
+    }
+    return 'Opskrifter'
+  }
+
+  const getCategoryHref = (recipe: Recipe): string => {
+    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
+      const category = recipe.dietaryCategories[0].toLowerCase()
+      const hrefMap: { [key: string]: string } = {
+        'keto': '/keto/opskrifter',
+        'sense': '/sense/opskrifter',
+        'lchf': '/lchf-paleo/opskrifter',
+        'paleo': '/lchf-paleo/opskrifter',
+        'anti-inflammatory': '/anti-inflammatory/opskrifter',
+        'flexitarian': '/flexitarian/opskrifter',
+        '5-2-diet': '/5-2-diet/opskrifter',
+        'family': '/familie/opskrifter',
+        'meal-prep': '/meal-prep/opskrifter'
+      }
+      return hrefMap[category] || '/opskriftsoversigt'
+    }
+    return '/opskriftsoversigt'
   }
 
   const faqs = [
@@ -102,29 +160,83 @@ export default function Home() {
           <div className="container relative h-full flex items-center">
             <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 text-white leading-tight drop-shadow-lg">
-                Sunde opskrifter til sundhed og vægttab
+                Sunde opskrifter til vægttab og velvære.
               </h1>
               
               <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-8 max-w-2xl mx-auto drop-shadow-md">
-                Vi planlægger maden ud fra dit liv, ikke omvendt.
+                Tilpas maden til DIT liv. Ikke omvendt.
               </p>
               
-              {/* Search Bar */}
+              {/* Search Bar with Dropdown */}
               <div className="max-w-2xl mx-auto">
                 <form onSubmit={handleSearch} className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Søg efter opskrift eller vælg madfokus herunder"
-                    className="w-full px-6 py-4 pl-14 pr-14 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
-                  />
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => searchQuery.trim().length > 0 && setShowSearchDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                      placeholder="Søg efter opskrift eller vælg madfokus herunder"
+                      className="w-full px-6 py-4 pl-14 pr-14 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
+                    />
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  </div>
+                  
+                  {/* Search Dropdown */}
+                  {showSearchDropdown && searchResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
+                      {searchResults.map((recipe) => (
+                <Link 
+                          key={recipe.id}
+                          href={`/opskrift/${recipe.slug}`}
+                          className="block px-6 py-4 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                          onClick={() => {
+                            setShowSearchDropdown(false)
+                            setSearchQuery('')
+                          }}
+                        >
+                          <div className="flex items-center gap-4">
+                            {recipe.imageUrl && (
+                              <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
+                                <Image
+                                  src={recipe.imageUrl}
+                                  alt={recipe.title}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-gray-900 truncate">{recipe.title}</h3>
+                              {recipe.totalTime && (
+                                <p className="text-sm text-gray-500">{recipe.totalTime} min</p>
+                              )}
+                            </div>
+                          </div>
+                </Link>
+                      ))}
+                      {searchQuery.trim().length > 0 && (
+                        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
+                <Link 
+                            href={`/opskriftsoversigt?search=${encodeURIComponent(searchQuery.trim())}`}
+                            className="text-green-600 font-semibold hover:text-green-700 flex items-center gap-2"
+                            onClick={() => {
+                              setShowSearchDropdown(false)
+                            }}
+                          >
+                            Se alle resultater for "{searchQuery}"
+                            <ArrowRight className="w-4 h-4" />
+                </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </form>
               </div>
             </div>
-          </div>
-        </div>
+                    </div>
+                  </div>
       </section>
 
       {/* Niche Selection Section */}
@@ -143,8 +255,8 @@ export default function Home() {
                   <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors text-sm">{niche.name}</h3>
                 </Link>
               ))}
-            </div>
-
+                  </div>
+                  
             {/* Mobile: Accordion Layout */}
             <div className="md:hidden space-y-2">
               {niches.map((niche, idx) => (
@@ -253,76 +365,102 @@ export default function Home() {
               <div className="md:hidden overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="flex gap-4" style={{ width: 'max-content' }}>
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white rounded-xl p-4 border border-gray-200 animate-pulse flex-shrink-0" style={{ width: '280px' }}>
-                      <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                    <div key={i} className="bg-white rounded-xl border border-gray-200 animate-pulse flex-shrink-0" style={{ width: '280px' }}>
+                      <div className="w-full h-48 bg-gray-200 rounded-t-xl"></div>
+                      <div className="p-4">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2 mb-4"></div>
+                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                </div>
                     </div>
                   ))}
-                </div>
-              </div>
+                    </div>
+                  </div>
             </>
           ) : (
             <>
               {/* Desktop: Grid */}
               <div className="hidden md:grid md:grid-cols-3 gap-6">
-                {latestRecipes.map((recipe) => (
-                  <Link
-                    key={recipe.id}
-                    href={`/opskrift/${recipe.slug}`}
-                    className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all"
-                  >
-                    <div className="relative h-48 overflow-hidden">
-                      <Image
-                        src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
-                        alt={recipe.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                {latestRecipes.map((recipe) => {
+                  const category = getRecipeCategory(recipe)
+                  const categoryHref = getCategoryHref(recipe)
+                  return (
+                    <div key={recipe.id} className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all">
+                      <Link href={`/opskrift/${recipe.slug}`}>
+                        <div className="relative h-48 overflow-hidden">
+                          <Image
+                            src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                            alt={recipe.title}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
-                        {recipe.title}
-                      </h3>
-                      {recipe.totalTime && (
-                        <p className="text-sm text-gray-500">
-                          {recipe.totalTime} min
-                        </p>
-                      )}
+                        <div className="p-4">
+                          <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
+                            {recipe.title}
+                          </h3>
+                          {recipe.totalTime && (
+                            <p className="text-sm text-gray-500 mb-2">
+                              {recipe.totalTime} min
+                            </p>
+                          )}
                     </div>
-                  </Link>
-                ))}
-              </div>
+                      </Link>
+                      <div className="px-4 pb-4">
+                        <Link
+                          href={categoryHref}
+                          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          Find flere {category} opskrifter →
+                        </Link>
+                  </div>
+                    </div>
+                  )
+                })}
+                    </div>
               {/* Mobile: Swipe */}
               <div className="md:hidden overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="flex gap-4" style={{ width: 'max-content' }}>
-                  {latestRecipes.map((recipe) => (
-                    <Link
-                      key={recipe.id}
-                      href={`/opskrift/${recipe.slug}`}
-                      className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all flex-shrink-0"
-                      style={{ width: '280px' }}
-                    >
-                      <div className="relative h-48 overflow-hidden">
-                        <Image
-                          src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
-                          alt={recipe.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <div className="p-4">
-                        <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
-                          {recipe.title}
-                        </h3>
-                        {recipe.totalTime && (
-                          <p className="text-sm text-gray-500">
-                            {recipe.totalTime} min
-                          </p>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
+                  {latestRecipes.map((recipe) => {
+                    const category = getRecipeCategory(recipe)
+                    const categoryHref = getCategoryHref(recipe)
+                    return (
+                      <div
+                        key={recipe.id}
+                        className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all flex-shrink-0"
+                        style={{ width: '280px' }}
+                      >
+                        <Link href={`/opskrift/${recipe.slug}`}>
+                          <div className="relative h-48 overflow-hidden">
+                            <Image
+                              src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                              alt={recipe.title}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                  </div>
+                          <div className="p-4">
+                            <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
+                              {recipe.title}
+                            </h3>
+                            {recipe.totalTime && (
+                              <p className="text-sm text-gray-500 mb-2">
+                                {recipe.totalTime} min
+                              </p>
+                            )}
+                    </div>
+                        </Link>
+                        <div className="px-4 pb-4">
+                          <Link
+                            href={categoryHref}
+                            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                          >
+                            Find flere {category} opskrifter →
+                          </Link>
+                    </div>
+                  </div>
+                    )
+                  })}
                 </div>
               </div>
             </>
@@ -330,14 +468,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Videnskaben bag vægttab */}
+      {/* Functionalfoods vs. klassisk vægttab */}
       <section id="videnskaben" className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-blue-50/20">
         <div className="container">
           <div className="max-w-4xl mx-auto">
             <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
-                Videnskaben bag vægttab hos os
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
+                Functionalfoods vs. klassisk vægttab
               </h2>
+              <p className="text-lg text-gray-600">
+                ... Og hvorfor det virker hos os.
+              </p>
+            </div>
+
+            <div className={`mb-8 transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <p className="text-lg text-gray-700 leading-relaxed mb-6">
+                Vi bilder dig ikke en masse ind fordi det lyder godt eller er trendy. Vægttab er videnskabeligt, og den bedste kost, er den du kan leve med. Disse 3 ting er derfor afgørende for at varigt vægttab:
+              </p>
             </div>
 
             <div className="grid md:grid-cols-3 gap-6 mb-12">
@@ -406,6 +553,9 @@ export default function Home() {
                   </div>
                   <p className="text-sm text-gray-500 mt-2">
                     500 kcal underskud dagligt = 0,5 kg vægttab om ugen
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 mt-3">
+                    ... Men hvilken mad du får kalorierne fra, afgør kvaliteten og succesraten af dit vægttab.
                   </p>
                 </div>
               </div>
