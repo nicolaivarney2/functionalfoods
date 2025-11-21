@@ -4,16 +4,48 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Sparkles, Target, Zap, Brain, TrendingDown, Users, Leaf, FileText, Calculator, Calendar, Building2, HelpCircle, ChevronDown, Search, ChevronRight } from 'lucide-react'
+import { Recipe } from '@/types/recipe'
 
 // Updated hero section with recipe focus and new design
 
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([])
+  const [isLoadingRecipes, setIsLoadingRecipes] = useState(true)
 
   useEffect(() => {
     setIsVisible(true)
   }, [])
+
+  // Load latest recipes
+  useEffect(() => {
+    const loadRecipes = async () => {
+      try {
+        const response = await fetch('/api/recipes')
+        if (response.ok) {
+          const data = await response.json()
+          const recipes = data.recipes || data
+          // Get latest 6 recipes
+          setLatestRecipes(recipes.slice(0, 6))
+        }
+      } catch (error) {
+        console.error('Error loading recipes:', error)
+      } finally {
+        setIsLoadingRecipes(false)
+      }
+    }
+    loadRecipes()
+  }, [])
+
+  // Handle search
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      window.location.href = `/opskriftsoversigt?search=${encodeURIComponent(searchQuery.trim())}`
+    }
+  }
 
   const faqs = [
     {
@@ -60,7 +92,7 @@ export default function Home() {
               src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/jordbaer-header.webp"
               alt="Sunde opskrifter til sundhed og vægttab"
               fill
-              className="object-cover"
+              className="object-cover object-top"
               priority
             />
             <div className="absolute inset-0 bg-black/40"></div>
@@ -79,14 +111,16 @@ export default function Home() {
               
               {/* Search Bar */}
               <div className="max-w-2xl mx-auto">
-                <div className="relative">
+                <form onSubmit={handleSearch} className="relative">
                   <input
                     type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Søg efter opskrift eller vælg madfokus herunder"
                     className="w-full px-6 py-4 pl-14 pr-14 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
                   />
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                </div>
+                </form>
               </div>
             </div>
           </div>
@@ -100,7 +134,7 @@ export default function Home() {
             {/* Desktop: Grid Layout */}
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4">
               {niches.map((niche, idx) => (
-                <Link
+                <Link 
                   key={niche.name}
                   href={niche.href}
                   className="bg-white rounded-xl p-6 border-2 border-gray-100 text-center hover:border-green-200 hover:shadow-lg transition-all group"
@@ -182,219 +216,72 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Find den madstil, der passer til dig */}
-      <section className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-green-50/20">
+      {/* Se hvad andre spiser */}
+      <section className="py-16 lg:py-20 bg-gray-50">
         <div className="container">
-          <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-              Find den madstil, der passer til dig
+          <div className={`mb-8 transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+                Se hvad andre spiser
             </h2>
-            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+              <Link
+                href="/opskriftsoversigt"
+                className="text-green-600 font-semibold hover:text-green-700 transition-colors flex items-center gap-2"
+              >
+                Se alle
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+            <p className="text-sm text-gray-600">
+              Bemærk, opskrifter er blandet madkategori. <Link href="#find-din-madstil" className="text-green-600 hover:text-green-700 underline">Vælg madkategori for at bedre sortering</Link>
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            {[
-              {
-                name: "Sense",
-                icon: "🧠",
-                description: "Bruger håndflader og spiseforståelse",
-                suitsYou: "Vil spise almindelig mad uden forbud",
-                href: "/sense/opskrifter"
-              },
-              {
-                name: "Keto",
-                icon: "🥑",
-                description: "Færre kulhydrater, mere fedt",
-                suitsYou: "Har det godt med struktur og hurtige resultater",
-                href: "/keto/opskrifter"
-              },
-              {
-                name: "LCHF",
-                icon: "🥩",
-                description: "Som Keto, men mere fleksibel",
-                suitsYou: "Ønsker fedtforbrænding uden at være ekstrem",
-                href: "/lchf-paleo/opskrifter"
-              },
-              {
-                name: "Paleo",
-                icon: "🌿",
-                description: "Naturlig, ren mad - ingen forarbejdede produkter",
-                suitsYou: "Vil spise 'som kroppen er skabt til'",
-                href: "/lchf-paleo/opskrifter"
-              },
-              {
-                name: "Meal Prep",
-                icon: "📦",
-                description: "Planlægning, struktur og økonomi",
-                suitsYou: "Vil gøre vægttab praktisk og realistisk",
-                href: "/meal-prep/opskrifter"
-              },
-              {
-                name: "Budgetmad",
-                icon: "💰",
-                description: "Sundt vægttab uden at bruge en formue",
-                suitsYou: "Vil spise sundt og billigt",
-                href: "/opskriftsoversigt"
-              }
-            ].map((niche, index) => (
-              <Link
-                key={niche.name}
-                href={niche.href}
-                className={`group bg-white rounded-xl p-6 border-2 border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                style={{ transitionDelay: `${index * 50}ms` }}
-              >
-                <div className="text-4xl mb-4 text-center group-hover:scale-110 transition-transform duration-300">
-                  {niche.icon}
+          {isLoadingRecipes ? (
+            <div className="grid md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-xl p-4 border border-gray-200 animate-pulse">
+                  <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                 </div>
-                <h3 className="font-bold text-gray-900 text-center mb-2 group-hover:text-green-600 transition-colors">
-                  {niche.name}
-                </h3>
-                <p className="text-sm text-gray-600 text-center mb-4">
-                  {niche.description}
-                </p>
-                <div className="pt-4 border-t border-gray-100">
-                  <p className="text-sm font-medium text-purple-600 mb-2">
-                    Passer til dig, hvis du...
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {niche.suitsYou}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Forstå din mad – helt ned i detaljen */}
-      <section className="py-16 lg:py-20 bg-white">
-        <div className="container">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-              <div className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                    <Target className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900">Næringsprofil</h3>
-                </div>
-                
-                <div className="space-y-5">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600 font-medium">Protein</span>
-                      <span className="text-sm font-semibold text-gray-900">24g</span>
+              ))}
                     </div>
-                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full animate-pulse" style={{ width: '80%' }}></div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600 font-medium">B12</span>
-                      <span className="text-sm font-semibold text-gray-900">120%</span>
-                    </div>
-                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full" style={{ width: '100%' }}></div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600 font-medium">C-vitamin</span>
-                      <span className="text-sm font-semibold text-gray-900">85%</span>
-                    </div>
-                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full" style={{ width: '85%' }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600 font-medium">Omega-3</span>
-                      <span className="text-sm font-semibold text-gray-900">2.1g</span>
-                    </div>
-                    <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-orange-500 to-orange-600 rounded-full" style={{ width: '52%' }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className={`transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900 leading-tight">
-                Forstå din mad –<br />
-                <span className="text-green-600">helt ned i detaljen</span>
-              </h2>
-              
-              <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                Vi viser ikke kun kalorier, men også næringsstoffer, vitaminer og fedtsyrer.
-              </p>
-              
-              <p className="text-base text-gray-600 mb-8">
-                Så du lærer, hvad du egentlig spiser – og hvorfor det betyder noget.
-              </p>
-              
-              <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-                <p className="text-green-900 font-medium">
-                  "Danmarks eneste opskriftsunivers med fuld ernæringsberegning."
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Er du ny på FunctionalFoods? */}
-      <section className="py-20 bg-white">
-        <div className="container">
-          <div className={`max-w-6xl mx-auto transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
-              {/* Image */}
-              <div className="relative h-[400px] md:h-[500px] rounded-2xl overflow-hidden">
-                <Image
-                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/web/web-nicolai.jpg"
-                  alt="Mand i moderne køkken"
-                  fill
-                  className="object-cover"
-                />
-              </div>
-
-              {/* Text Content */}
-              <div className="space-y-6">
-                <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
-                  Er du ny på FunctionalFoods? Så start her.
-                </h2>
-                
-                <div className="space-y-4 text-gray-700 leading-relaxed">
-                  <p>
-                    <strong className="text-gray-900">Komplicerede opskrifter, dyre ingredienser og uholdbare madplaner fylder desværre en del i hverdagsbilledet..</strong>
-                  </p>
-                  
-                  <p>
-                    Derfor handler FunctionalFoods om hverdagsmad, der er hurtig, ukompliceret og lavet af få helt almindelige råvarer, som understøtter sundhed og vægttab. Retter du kan smække sammen på kort tid tid - Og på en måde, der ikke springer dit madbudget!
-                  </p>
-                </div>
-
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {latestRecipes.map((recipe) => (
                 <Link
-                  href="/opskriftsoversigt"
-                  className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
+                  key={recipe.id}
+                  href={`/opskrift/${recipe.slug}`}
+                  className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all"
                 >
-                  Læs mere
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  <div className="relative h-48 overflow-hidden">
+                    <Image
+                      src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                      alt={recipe.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
+                      {recipe.title}
+                    </h3>
+                    {recipe.totalTime && (
+                      <p className="text-sm text-gray-500">
+                        {recipe.totalTime} min
+                      </p>
+                    )}
+                  </div>
                 </Link>
-              </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </section>
 
       {/* Videnskaben bag vægttab */}
-      <section className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-blue-50/20">
+      <section id="videnskaben" className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-blue-50/20">
         <div className="container">
           <div className="max-w-4xl mx-auto">
             <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -477,7 +364,174 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Byg din egen madplan */}
+      {/* De grundlæggende principper */}
+      <section className="py-16 lg:py-20 bg-white">
+        <div className="container">
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
+                De grundlæggende principper
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Der findes tusind veje, men de bygger alle på de samme mekanismer
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              {[
+                {
+                  title: "Kalorier betyder noget",
+                  description: "Kroppen taber sig, når du indtager mindre energi, end du forbruger. Det er fysik, ikke magi.",
+                  icon: Target,
+                  color: "green"
+                },
+                {
+                  title: "Madkvalitet betyder også noget",
+                  description: "Jo mere næringsrig mad, jo nemmere er det at holde kroppen stærk, mæt og stabil.",
+                  icon: Leaf,
+                  color: "green"
+                },
+                {
+                  title: "Madens densitet tæller",
+                  description: "500 kcal fra grøntsager og fisk fylder anderledes end 500 kcal fra hvidt brød og olie.",
+                  icon: Target,
+                  color: "blue"
+                },
+                {
+                  title: "Vaner styrer alt",
+                  description: "Det er ikke de enkelte måltider, men mønstrene over tid, der bestemmer resultatet.",
+                  icon: Zap,
+                  color: "orange"
+                }
+              ].map((principle, idx) => {
+                const colorClasses = {
+                  green: "bg-green-100 text-green-600 border-green-200",
+                  blue: "bg-blue-100 text-blue-600 border-blue-200",
+                  orange: "bg-orange-100 text-orange-600 border-orange-200"
+                }
+                return (
+                  <div key={idx} className="bg-white rounded-2xl p-6 border-2 hover:shadow-lg transition-all">
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 border-2 ${colorClasses[principle.color as keyof typeof colorClasses]}`}>
+                      <principle.icon className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">{principle.title}</h3>
+                    <p className="text-gray-600 text-sm leading-relaxed">{principle.description}</p>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="text-center mt-8">
+              <p className="text-lg font-semibold text-gray-900">
+                Vælg den madideologi der passer til dig, og så hjælper vi dig til varigt vægttab!
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Find den madstil, der passer til dig */}
+      <section id="find-din-madstil" className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-green-50/20">
+        <div className="container">
+          <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
+              Find den madstil, der passer til dig
+            </h2>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {[
+              {
+                name: "KETO",
+                icon: "🥑",
+                description: "Færre kulhydrater, mere fedt",
+                suitsYou: "Har det godt med struktur og hurtige resultater",
+                href: "/keto/opskrifter"
+              },
+              {
+                name: "SENSE",
+                icon: "🧠",
+                description: "Bruger håndflader og spiseforståelse",
+                suitsYou: "Vil spise almindelig mad uden forbud",
+                href: "/sense/opskrifter"
+              },
+              {
+                name: "LCHF/PALEO",
+                icon: "🥩",
+                description: "Som Keto, men mere fleksibel",
+                suitsYou: "Ønsker fedtforbrænding uden at være ekstrem",
+                href: "/lchf-paleo/opskrifter"
+              },
+              {
+                name: "MEAL PREP",
+                icon: "📦",
+                description: "Planlægning, struktur og økonomi",
+                suitsYou: "Vil gøre vægttab praktisk og realistisk",
+                href: "/meal-prep/opskrifter"
+              },
+              {
+                name: "ANTI-INFLAMMATORISK",
+                icon: "🌿",
+                description: "Naturlig, ren mad - ingen forarbejdede produkter",
+                suitsYou: "Vil spise 'som kroppen er skabt til'",
+                href: "/anti-inflammatory/opskrifter"
+              },
+              {
+                name: "FLEKSITARISK",
+                icon: "🥬",
+                description: "Plantebaseret med plads til kød",
+                suitsYou: "Vil spise sundt og fleksibelt",
+                href: "/flexitarian/opskrifter"
+              },
+              {
+                name: "5:2 DIÆT",
+                icon: "⏰",
+                description: "Intermittent fasting",
+                suitsYou: "Vil spise normalt 5 dage, reducere 2 dage",
+                href: "/5-2-diet/opskrifter"
+              },
+              {
+                name: "FAMILIEMAD",
+                icon: "👨‍👩‍👧‍👦",
+                description: "Sunde opskrifter til hele familien",
+                suitsYou: "Vil spise sundt sammen med familien",
+                href: "/familie/opskrifter"
+              }
+            ].map((niche, index) => (
+              <Link
+                key={niche.name}
+                href={niche.href}
+                className={`group bg-white rounded-xl p-6 border-2 border-gray-100 hover:border-green-200 hover:shadow-lg transition-all duration-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                style={{ transitionDelay: `${index * 50}ms` }}
+              >
+                <div className="text-4xl mb-4 text-center group-hover:scale-110 transition-transform duration-300">
+                  {niche.icon}
+                </div>
+                <h3 className="font-bold text-gray-900 text-center mb-2 group-hover:text-green-600 transition-colors">
+                  {niche.name}
+                </h3>
+                <p className="text-sm text-gray-600 text-center mb-4">
+                  {niche.description}
+                </p>
+                <div className="pt-4 border-t border-gray-100">
+                  <p className="text-sm font-medium text-purple-600 mb-2">
+                    Passer til dig, hvis du...
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {niche.suitsYou}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+
+      {/* Få madplan ud fra næste uges tilbud */}
       <section className="py-16 lg:py-20 bg-white">
         <div className="container">
           <div className={`max-w-3xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -487,7 +541,7 @@ export default function Home() {
             </div>
             
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
-              Byg din egen madplan
+              Få madplan ud fra næste uges tilbud!
             </h2>
             
             <p className="text-lg text-gray-600 mb-8 leading-relaxed">
@@ -506,43 +560,6 @@ export default function Home() {
                 Bliv testbruger 2026
               </button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Dem, der former vores madvaner */}
-      <section className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-orange-50/10">
-        <div className="container">
-          <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-              Dem, der former vores madvaner
-            </h2>
-            
-            <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-              I dag styres mange af vores madvalg af få globale koncerner.
-            </p>
-            
-            <p className="text-base text-gray-600 mb-12">
-              FunctionalFoods arbejder for gennemsigtighed, hvor du selv forstår, hvad der havner på tallerkenen.
-            </p>
-
-            {/* Company logos grid */}
-            <div className="grid grid-cols-4 md:grid-cols-4 gap-6 mb-8">
-              {companies.map((company, index) => (
-                <div
-                  key={company}
-                  className={`bg-white rounded-lg p-4 border border-gray-200 text-gray-700 font-medium text-sm hover:shadow-md transition-all ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                  style={{ transitionDelay: `${index * 50}ms` }}
-                >
-                  <Building2 className="w-6 h-6 mx-auto mb-2 text-gray-400" />
-                  {company}
-                </div>
-              ))}
-            </div>
-            
-            <p className="text-lg font-medium text-gray-800">
-              "Jo mere du ved – jo bedre valg kan du træffe."
-            </p>
           </div>
         </div>
       </section>
