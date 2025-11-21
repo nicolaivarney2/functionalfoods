@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Sparkles, Target, Zap, Brain, TrendingDown, Users, Leaf, FileText, Calculator, Calendar, Building2, HelpCircle, ChevronDown, Search, ChevronRight } from 'lucide-react'
 
+// Updated hero section with recipe focus and new design
+
 export default function Home() {
   const [isVisible, setIsVisible] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
