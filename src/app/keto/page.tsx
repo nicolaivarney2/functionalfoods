@@ -23,10 +23,10 @@ export default function KetoPage() {
           <div className={`text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-pulse">
               <Sparkles className="w-4 h-4" />
-              Ketogen diæt til vægttab
+              Keto mad til vægttab
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold mb-8 text-gray-900 leading-tight">
+            <h1 className="text-4xl md:text-6xl font-bold mb-8 text-gray-900 leading-tight">
               Keto –<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-600">
                 lav-kulhydrat, høj-fedt
@@ -34,8 +34,8 @@ export default function KetoPage() {
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Ketogen diæt hjælper kroppen med at forbrænde fedt i stedet for kulhydrater.<br />
-              <strong>Perfekt til hurtigt og effektivt vægttab.</strong>
+              Keto mad hjælper kroppen med at forbrænde fedt i stedet for kulhydrater.<br />
+              <strong>Perfekt til hurtigt og effektivt vægttab - uden at savne dine favoritopskrifter.</strong>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -120,12 +120,12 @@ export default function KetoPage() {
               <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
                 Hvad er 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-600">
-                  ketogen diæt?
+                  keto diæt?
                 </span>
               </h2>
               
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Ketogen diæt er en lav-kulhydrat, høj-fedt diæt der hjælper kroppen med at forbrænde fedt i stedet for kulhydrater.
+                Keto diæt er en kost med et lavt antal kulhydrater, et moderat mængde protein og en høj mængde fedt, der hjælper kroppen med at forbrænde fedt i stedet for kulhydrater som energikilde.
               </p>
               
               <div className="space-y-6">
@@ -136,12 +136,12 @@ export default function KetoPage() {
                 
                 <div className="bg-green-100 border border-green-200 rounded-2xl p-6">
                   <h4 className="font-semibold text-green-800 mb-2">Vægttab</h4>
-                  <p className="text-green-700">Keto kan hjælpe med hurtigt vægttab, især i starten, da kroppen tømmer glykogenlagerne.</p>
+                  <p className="text-green-700">Keto kan hjælpe med hurtigt vægttab, især i starten, da kroppen tømmer glykogenlagerne der binder vand. Så du taber 2-3 kg på de første par uger.</p>
                 </div>
                 
                 <div className="bg-blue-100 border border-blue-200 rounded-2xl p-6">
                   <h4 className="font-semibold text-blue-800 mb-2">Stabil energi</h4>
-                  <p className="text-blue-700">Mange oplever mere stabil energi og færre sultfølelser på keto.</p>
+                  <p className="text-blue-700">Mange oplever mere stabil energi og mindre sultfølelser på keto. Du er derfor ikke sulten hele tiden, og har alligevel godt med energi.</p>
                 </div>
               </div>
             </div>
@@ -160,9 +160,9 @@ export default function KetoPage() {
                     <span className="text-gray-600">Fedt</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-20 h-2 bg-purple-500 rounded-full"></div>
+                        <div className="w-[62px] h-2 bg-purple-500 rounded-full"></div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">70-80%</span>
+                      <span className="text-sm font-medium text-gray-900">65%</span>
                     </div>
                   </div>
                   
@@ -170,9 +170,9 @@ export default function KetoPage() {
                     <span className="text-gray-600">Protein</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-16 h-2 bg-green-500 rounded-full"></div>
+                        <div className="w-[26px] h-2 bg-green-500 rounded-full"></div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">15-25%</span>
+                      <span className="text-sm font-medium text-gray-900">25-30%</span>
                     </div>
                   </div>
                   
@@ -180,7 +180,7 @@ export default function KetoPage() {
                     <span className="text-gray-600">Kulhydrater</span>
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-4 h-2 bg-blue-500 rounded-full"></div>
+                        <div className="w-[7px] h-2 bg-blue-500 rounded-full"></div>
                       </div>
                       <span className="text-sm font-medium text-gray-900">5-10%</span>
                     </div>
@@ -208,8 +208,8 @@ export default function KetoPage() {
             {[
               {
                 icon: <TrendingDown className="w-8 h-8" />,
-                title: "Hurtigt vægttab",
-                description: "Keto kan hjælpe med hurtigt vægttab, især i de første uger, da kroppen tømmer glykogenlagerne.",
+                title: "God mad",
+                description: "På Keto kan du spise mad, der er sundt og lækkert. Kød, gryderetter, bacon, æg og grøntsager, er eksempler på mad du gerne må spise.",
                 color: "bg-purple-500"
               },
               {
@@ -237,6 +237,65 @@ export default function KetoPage() {
                 <p className="text-gray-600 leading-relaxed">{item.description}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* New Section: Tror du Keto er noget for dig? */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-purple-50/30">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <h2 className="text-3xl md:text-4xl font-bold mb-8 text-gray-900 text-center">
+              Tror du Keto som vægttabskost er noget for dig?
+            </h2>
+            
+            <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 mb-8">
+              <div className="space-y-6 text-gray-700 leading-relaxed">
+                <p>
+                  Så anbefaler vi, at du start med at sætte dig mere ind i Keto gennem vores Vægttabs-sektion, og bagefter undersøger nogle opskrifter gennem vores Keto opskrifter sektion.
+                </p>
+                <p>
+                  Når du er klar, så anbefaler vi, at du laver en bruger og udfylder lidt om dig - Så sørger vi for, at lave en madplan der passer dig og dit liv.
+                </p>
+                <p>
+                  I 2026 kan vi også lave madplaner ud fra næste uges tilbud i dagligvarebutikker, så du sparer masser af penge.
+                </p>
+                <p className="font-semibold text-gray-900">
+                  Prøv vores premium i 7 dage gratis.
+                </p>
+                <p className="text-sm text-gray-600">
+                  Premium gælder alle madkategorier.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
+              <Link 
+                href="/premium" 
+                className="group bg-gradient-to-r from-purple-600 to-green-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                Prøv gratis i 7 dage
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              
+              <Link 
+                href="/keto/vægttab" 
+                className="group bg-white border-2 border-purple-200 text-purple-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-purple-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                Lær om Keto
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+
+            <div className="text-center">
+              <Link 
+                href="/keto/opskrifter" 
+                className="text-gray-600 hover:text-purple-600 transition-colors inline-flex items-center gap-2"
+              >
+                Eller udforsk vores Keto opskrifter
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
