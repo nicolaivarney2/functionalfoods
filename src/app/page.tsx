@@ -179,7 +179,7 @@ export default function Home() {
             {[
               {
                 icon: FileText,
-                title: 'Gratis opskrifter i alle nicher',
+                title: 'Gratis opskrifter inden for alle mad kategorier',
                 description: 'Keto, Sense, LCHF, Paleo, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og klar til brug.',
                 color: 'from-green-500 to-green-600'
               },
@@ -238,44 +238,94 @@ export default function Home() {
           </div>
 
           {isLoadingRecipes ? (
-            <div className="grid md:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-xl p-4 border border-gray-200 animate-pulse">
-                  <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                </div>
-              ))}
+            <>
+              {/* Desktop: Grid */}
+              <div className="hidden md:grid md:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-white rounded-xl p-4 border border-gray-200 animate-pulse">
+                    <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+              {/* Mobile: Swipe */}
+              <div className="md:hidden overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex gap-4" style={{ width: 'max-content' }}>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-xl p-4 border border-gray-200 animate-pulse flex-shrink-0" style={{ width: '280px' }}>
+                      <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
+                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                     </div>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {latestRecipes.map((recipe) => (
-                <Link
-                  key={recipe.id}
-                  href={`/opskrift/${recipe.slug}`}
-                  className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all"
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <Image
-                      src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
-                      alt={recipe.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
-                      {recipe.title}
-                    </h3>
-                    {recipe.totalTime && (
-                      <p className="text-sm text-gray-500">
-                        {recipe.totalTime} min
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              ))}
-            </div>
+            <>
+              {/* Desktop: Grid */}
+              <div className="hidden md:grid md:grid-cols-3 gap-6">
+                {latestRecipes.map((recipe) => (
+                  <Link
+                    key={recipe.id}
+                    href={`/opskrift/${recipe.slug}`}
+                    className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all"
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <Image
+                        src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                        alt={recipe.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
+                        {recipe.title}
+                      </h3>
+                      {recipe.totalTime && (
+                        <p className="text-sm text-gray-500">
+                          {recipe.totalTime} min
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              {/* Mobile: Swipe */}
+              <div className="md:hidden overflow-x-auto pb-4 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex gap-4" style={{ width: 'max-content' }}>
+                  {latestRecipes.map((recipe) => (
+                    <Link
+                      key={recipe.id}
+                      href={`/opskrift/${recipe.slug}`}
+                      className="group bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all flex-shrink-0"
+                      style={{ width: '280px' }}
+                    >
+                      <div className="relative h-48 overflow-hidden">
+                        <Image
+                          src={recipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                          alt={recipe.title}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2 line-clamp-2">
+                          {recipe.title}
+                        </h3>
+                        {recipe.totalTime && (
+                          <p className="text-sm text-gray-500">
+                            {recipe.totalTime} min
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </section>
@@ -286,7 +336,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto">
             <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
-                Videnskaben bag vægttab
+                Videnskaben bag vægttab hos os
               </h2>
             </div>
 
@@ -431,14 +481,15 @@ export default function Home() {
       </section>
 
       {/* Find den madstil, der passer til dig */}
-      <section id="find-din-madstil" className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-green-50/20">
+      <section id="find-din-madstil" className="py-16 lg:py-20 bg-green-50">
         <div className="container">
           <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
               Find den madstil, der passer til dig
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+              Alle kostretninger kan virke – men kun, hvis du kan leve med dem.<br />
+              Vælg din madstil, og udforsk vægttabsguides og opskrifter
             </p>
           </div>
 
