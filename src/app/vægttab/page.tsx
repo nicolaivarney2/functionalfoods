@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
+  const [openNiche, setOpenNiche] = useState<string | null>(null)
 
   useEffect(() => {
     setIsVisible(true)
@@ -13,7 +15,106 @@ export default function WeightLossPage() {
 
   return (
     <main className="min-h-screen bg-white overflow-hidden">
-      {/* Hero / Intro */}
+      {/* New Hero Section with Image */}
+      <section className="relative bg-white">
+        <div className="relative h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
+          {/* Background Image */}
+          <div className="absolute inset-0">
+            <Image
+              src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/jordbaer-header.webp"
+              alt="Sunde opskrifter til en travl hverdag"
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-black/40"></div>
+          </div>
+          
+          {/* Content Overlay */}
+          <div className="container relative h-full flex items-center">
+            <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 text-white leading-tight drop-shadow-lg">
+                Sunde opskrifter til en travl hverdag
+              </h1>
+              
+              <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-8 max-w-2xl mx-auto drop-shadow-md">
+                Til vægttab og sundhed - på budget.
+              </p>
+              
+              {/* Search Bar */}
+              <div className="max-w-2xl mx-auto">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Søg efter opskrift eller vælg madfokus"
+                    className="w-full px-6 py-4 pl-14 pr-14 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
+                  />
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Niche Selection Section */}
+      <section className="py-12 bg-white">
+        <div className="container">
+          <div className={`max-w-6xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            {/* Desktop: Grid Layout */}
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { name: "KETO", icon: "🥑", href: "/keto" },
+                { name: "SENSE", icon: "🧠", href: "/sense" },
+                { name: "LCHF/PALEO", icon: "🥩", href: "/lchf-paleo" },
+                { name: "MEAL PREP", icon: "📦", href: "/opskrifter/meal-prep" },
+                { name: "ANTI-INFLAMMATORISK", icon: "🌿", href: "/anti-inflammatory" },
+                { name: "FLEKSITARISK", icon: "🥬", href: "/flexitarian" },
+                { name: "5:2 DIÆT", icon: "⏰", href: "/5-2-diet" },
+                { name: "FAMILIEMAD", icon: "👨‍👩‍👧‍👦", href: "/familie" }
+              ].map((niche, idx) => (
+                <Link
+                  key={idx}
+                  href={niche.href}
+                  className="bg-white rounded-xl p-6 border-2 border-gray-100 text-center hover:border-green-200 hover:shadow-lg transition-all group"
+                >
+                  <div className="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">{niche.icon}</div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors text-sm">{niche.name}</h3>
+                </Link>
+              ))}
+            </div>
+
+            {/* Mobile: Accordion Layout */}
+            <div className="md:hidden space-y-2">
+              {[
+                { name: "KETO", icon: "🥑", href: "/keto" },
+                { name: "SENSE", icon: "🧠", href: "/sense" },
+                { name: "LCHF/PALEO", icon: "🥩", href: "/lchf-paleo" },
+                { name: "MEAL PREP", icon: "📦", href: "/opskrifter/meal-prep" },
+                { name: "ANTI-INFLAMMATORISK", icon: "🌿", href: "/anti-inflammatory" },
+                { name: "FLEKSITARISK", icon: "🥬", href: "/flexitarian" },
+                { name: "5:2 DIÆT", icon: "⏰", href: "/5-2-diet" },
+                { name: "FAMILIEMAD", icon: "👨‍👩‍👧‍👦", href: "/familie" }
+              ].map((niche, idx) => (
+                <div key={idx} className="border-b border-gray-200">
+                  <Link
+                    href={niche.href}
+                    className="flex items-center justify-between py-2 px-3 text-sm text-gray-700 hover:text-green-600 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{niche.icon}</span>
+                      <span>{niche.name}</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Original Hero Content - Moved Down */}
       <section className="relative bg-gradient-to-br from-gray-50 via-green-50/30 to-blue-50/20 py-20 lg:py-28">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
@@ -21,14 +122,14 @@ export default function WeightLossPage() {
         </div>
         
         <div className="container relative">
-          <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
               Vægttab uden forvirring –<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
                 find din vej til sund balance
               </span>
-            </h1>
+            </h2>
             
             <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8">
               Der findes mange veje til vægttab. Keto, Sense, LCHF eller noget helt fjerde – men grundprincipperne er altid de samme: 
@@ -55,8 +156,52 @@ export default function WeightLossPage() {
         </div>
       </section>
 
-      {/* Sandheder om vægttab - Myteknuser */}
+      {/* Er du ny på FunctionalFoods? */}
       <section className="py-20 bg-white">
+        <div className="container">
+          <div className={`max-w-6xl mx-auto transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-center">
+              {/* Image */}
+              <div className="relative h-[400px] md:h-[500px] rounded-2xl overflow-hidden">
+                <Image
+                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/web/web-nicolai.jpg"
+                  alt="Mand i moderne køkken"
+                  fill
+                  className="object-cover"
+                />
+              </div>
+
+              {/* Text Content */}
+              <div className="space-y-6">
+                <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">
+                  Er du ny på FunctionalFoods? Så start her.
+                </h2>
+                
+                <div className="space-y-4 text-gray-700 leading-relaxed">
+                  <p>
+                    Komplicerede opskrifter, dyre ingredienser og uholdbare madplaner fylder desværre en del i hverdagsbilledet..
+                  </p>
+                  
+                  <p>
+                    Derfor handler FunctionalFoods om hverdagsmad, der er hurtig, ukompliceret og lavet af få helt almindelige råvarer, som understøtter sundhed og vægttab. Retter du kan smække sammen på kort tid tid - Og på en måde, der ikke springer dit madbudget!
+                  </p>
+                </div>
+
+                <Link
+                  href="/opskriftsoversigt"
+                  className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
+                >
+                  Læs mere
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Sandheder om vægttab - Myteknuser */}
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -116,7 +261,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* De grundlæggende principper */}
-      <section className="py-20 bg-gradient-to-br from-green-50/50 via-white to-blue-50/50">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -182,7 +327,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Hvordan mad påvirker vægten */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -262,7 +407,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Find din madniche */}
-      <section id="find-din-madstil" className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      <section id="find-din-madstil" className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -341,7 +486,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Sådan taber du dig - Kalorietracker */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -436,7 +581,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* FunctionalFoods positioning */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -500,7 +645,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Vægttab handler om mere end mad */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -553,7 +698,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Find din madideologi - Detaljeret */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-1300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-16">
@@ -732,7 +877,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-3xl mx-auto transition-all duration-1000 delay-1400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
