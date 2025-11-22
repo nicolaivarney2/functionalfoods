@@ -406,12 +406,15 @@ export default function Home() {
                           )}
                     </div>
                       </Link>
-                      <div className="px-4 pb-4">
+                      <div className="px-4 pb-4 space-y-2">
+                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                          Madkategori: {category}
+                        </p>
                         <Link
                           href={categoryHref}
-                          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                          className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium"
                         >
-                          Find flere {category} opskrifter →
+                          Find flere opskrifter →
                         </Link>
                   </div>
                     </div>
@@ -450,12 +453,15 @@ export default function Home() {
                             )}
                     </div>
                         </Link>
-                        <div className="px-4 pb-4">
+                        <div className="px-4 pb-4 space-y-2">
+                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                            Madkategori: {category}
+                          </p>
                           <Link
                             href={categoryHref}
-                            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                            className="text-sm text-gray-600 hover:text-green-600 transition-colors font-medium"
                           >
-                            Find flere {category} opskrifter →
+                            Find flere opskrifter →
                           </Link>
                     </div>
                   </div>
@@ -465,102 +471,6 @@ export default function Home() {
               </div>
             </>
           )}
-        </div>
-      </section>
-
-      {/* Functionalfoods vs. klassisk vægttab */}
-      <section id="videnskaben" className="py-16 lg:py-20 bg-gradient-to-br from-gray-50 to-blue-50/20">
-        <div className="container">
-          <div className="max-w-4xl mx-auto">
-            <div className={`text-center mb-12 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-                Functionalfoods vs. klassisk vægttab
-              </h2>
-              <p className="text-lg text-gray-600">
-                ... Og hvorfor det virker hos os.
-              </p>
-            </div>
-
-            <div className={`mb-8 transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <p className="text-lg text-gray-700 leading-relaxed mb-6">
-                Vi bilder dig ikke en masse ind fordi det lyder godt eller er trendy. Vægttab er videnskabeligt, og den bedste kost, er den du kan leve med. Disse 3 ting er derfor afgørende for at varigt vægttab:
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 mb-12">
-              {[
-                {
-                  title: 'Kalorier betyder stadig noget',
-                  description: 'Kroppen taber sig, når du indtager mindre energi end du forbruger. Det er grundprincippet.',
-                  icon: TrendingDown,
-                  color: 'text-red-600'
-                },
-                {
-                  title: 'Madens kvalitet er afgørende',
-                  description: '500 kcal fra grøntsager fylder anderledes end 500 kcal fra hvidt brød. Mæthed og næring tæller.',
-                  icon: Leaf,
-                  color: 'text-green-600'
-                },
-                {
-                  title: 'Find den, du kan holde',
-                  description: 'Den bedste kost er den, du faktisk kan leve med resten af livet – ikke bare en hurtig kur.',
-                  icon: Target,
-                  color: 'text-blue-600'
-                }
-              ].map((principle, index) => (
-                <div
-                  key={index}
-                  className={`bg-white rounded-xl p-6 border border-gray-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
-                  style={{ transitionDelay: `${index * 100}ms` }}
-                >
-                  <principle.icon className={`w-8 h-8 ${principle.color} mb-4`} />
-                  <h3 className="font-bold text-gray-900 mb-3">
-                    {principle.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {principle.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Simple infographic */}
-            <div className={`bg-white rounded-2xl p-8 border border-gray-100 shadow-sm ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">Energiindtag vs. Energiforbrug</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 font-medium">Kalorier ind</span>
-                    <span className="text-sm font-semibold text-gray-900">1.800 kcal</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-400 rounded-full" style={{ width: '75%' }}></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600 font-medium">Kalorier ud</span>
-                    <span className="text-sm font-semibold text-gray-900">2.200 kcal</span>
-                  </div>
-                  <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: '92%' }}></div>
-                  </div>
-                </div>
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600 font-medium">Underskud</span>
-                    <span className="text-lg font-bold text-blue-600">400 kcal</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    500 kcal underskud dagligt = 0,5 kg vægttab om ugen
-                  </p>
-                  <p className="text-sm font-semibold text-gray-900 mt-3">
-                    ... Men hvilken mad du får kalorierne fra, afgør kvaliteten og succesraten af dit vægttab.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -621,10 +531,91 @@ export default function Home() {
               })}
             </div>
 
-            <div className="text-center mt-8">
+            <div className="text-center mt-8 mb-12">
               <p className="text-lg font-semibold text-gray-900">
                 Vælg den madideologi der passer til dig, og så hjælper vi dig til varigt vægttab!
               </p>
+            </div>
+
+            {/* Time-based impact visualization */}
+            <div className={`bg-gradient-to-br from-blue-50 to-green-50 rounded-3xl p-8 md:p-12 border-2 border-blue-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 text-center">
+                Ét måltid betyder ikke noget – men over tid betyder det alt
+              </h3>
+              <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
+                Det er ikke de enkelte måltider, men mønstrene over tid, der bestemmer resultatet. Se hvordan små valg akkumuleres:
+              </p>
+              
+              <div className="space-y-6 max-w-4xl mx-auto">
+                {/* Single meal */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-semibold text-gray-700">1 måltid</span>
+                    <span className="text-xs text-gray-500">+50 kcal overskud</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-300 rounded-full" style={{ width: '2%' }}></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">Næsten ingenting</p>
+                </div>
+
+                {/* One day */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-semibold text-gray-700">1 dag (3 måltider)</span>
+                    <span className="text-xs text-gray-500">+150 kcal overskud</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-400 rounded-full" style={{ width: '5%' }}></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">Bare lidt</p>
+                </div>
+
+                {/* One week */}
+                <div className="bg-white rounded-xl p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-semibold text-gray-700">1 uge (21 måltider)</span>
+                    <span className="text-xs text-gray-500">+1.050 kcal overskud</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 rounded-full" style={{ width: '35%' }}></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 text-center">Begynder at tælle</p>
+                </div>
+
+                {/* One month */}
+                <div className="bg-white rounded-xl p-6 border-2 border-orange-200 shadow-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-semibold text-gray-900">1 måned (90 måltider)</span>
+                    <span className="text-xs font-bold text-orange-600">+4.500 kcal overskud</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-600 rounded-full" style={{ width: '75%' }}></div>
+                  </div>
+                  <p className="text-xs font-semibold text-orange-600 mt-2 text-center">≈ +0,6 kg vægt</p>
+                </div>
+
+                {/* One year */}
+                <div className="bg-white rounded-xl p-6 border-2 border-red-300 shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-bold text-gray-900">1 år (1.095 måltider)</span>
+                    <span className="text-xs font-bold text-red-600">+54.750 kcal overskud</span>
+                  </div>
+                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-red-500 rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                  <p className="text-sm font-bold text-red-600 mt-2 text-center">≈ +7-8 kg vægt</p>
+                </div>
+              </div>
+
+              <div className="mt-8 text-center">
+                <p className="text-lg text-gray-700 font-medium">
+                  Det samme gælder for <span className="text-green-600 font-bold">gode valg</span> – de akkumuleres også over tid
+                </p>
+                <p className="text-sm text-gray-600 mt-2">
+                  Én sund ret om dagen = 365 sunde valg om året = varigt vægttab
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -731,6 +722,100 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Hvad kan du NU på FunctionalFoods? */}
+      <section className="py-16 lg:py-20 bg-gradient-to-br from-white to-green-50/30">
+        <div className="container">
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
+                Hvad kan du NU på FunctionalFoods?
+              </h2>
+              <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+                Udfyld profil om madønsker, vægttab og familievaner, og lav AI madplaner hver uge
+              </p>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border-2 border-green-100 mb-8">
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                    Personlige AI madplaner
+                  </h3>
+                  <p className="text-gray-700 leading-relaxed mb-6">
+                    Vores AI skaber madplaner der er skræddersyet til dig og din familie. Baseret på dine præferencer, vægttabsmål og livsstil.
+                  </p>
+                  <Link
+                    href="/premium"
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all transform hover:-translate-y-1"
+                  >
+                    Prøv gratis i 7 dage
+                    <ArrowRight className="w-5 h-5" />
+                  </Link>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-200">
+                  <div className="text-6xl text-center mb-4">📋</div>
+                  <p className="text-center text-gray-600 font-medium">
+                    AI-genererede madplaner<br />
+                    hver uge
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                {
+                  title: "Maden tilpasset dit liv, ikke omvendt",
+                  description: "Madplaner der passer til din hverdag, arbejdstider og familievaner",
+                  icon: Calendar,
+                  color: "bg-green-100 text-green-600 border-green-200"
+                },
+                {
+                  title: "Vægttabs-optimeret",
+                  description: "Hver madplan er beregnet til at understøtte dit vægttabsmål",
+                  icon: TrendingDown,
+                  color: "bg-blue-100 text-blue-600 border-blue-200"
+                },
+                {
+                  title: "Personlig ud fra madønsker",
+                  description: "Vælg din madstil, allergier og præferencer – vi tilpasser alt",
+                  icon: Target,
+                  color: "bg-purple-100 text-purple-600 border-purple-200"
+                },
+                {
+                  title: "Fuld ernæringsberegnet",
+                  description: "Vitaminer, omega-3, protein og alle næringsstoffer er optimeret",
+                  icon: Leaf,
+                  color: "bg-orange-100 text-orange-600 border-orange-200"
+                },
+                {
+                  title: "Indkøbsliste",
+                  description: "Få automatisk genereret indkøbsliste til hele ugen",
+                  icon: FileText,
+                  color: "bg-pink-100 text-pink-600 border-pink-200"
+                },
+                {
+                  title: "Lavet ud fra tilbud",
+                  description: "Funktion kommer i 2026: Madplaner baseret på næste uges tilbud i valgte dagligvarerbutikker",
+                  icon: Building2,
+                  color: "bg-gray-100 text-gray-600 border-gray-200"
+                }
+              ].map((benefit, index) => (
+                <div
+                  key={index}
+                  className="bg-white rounded-xl p-6 border-2 hover:shadow-lg transition-all"
+                >
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 border-2 ${benefit.color}`}>
+                    <benefit.icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">{benefit.title}</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed">{benefit.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Få madplan ud fra næste uges tilbud */}
       <section className="py-16 lg:py-20 bg-white">
