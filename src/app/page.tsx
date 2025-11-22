@@ -537,84 +537,95 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Time-based impact visualization */}
-            <div className={`bg-gradient-to-br from-blue-50 to-green-50 rounded-3xl p-8 md:p-12 border-2 border-blue-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 text-center">
-                Ét måltid betyder ikke noget – men over tid betyder det alt
-              </h3>
-              <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
-                Det er ikke de enkelte måltider, men mønstrene over tid, der bestemmer resultatet. Se hvordan små valg akkumuleres:
-              </p>
-              
-              <div className="space-y-6 max-w-4xl mx-auto">
-                {/* Single meal */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-700">1 måltid</span>
-                    <span className="text-xs text-gray-500">+50 kcal overskud</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-300 rounded-full" style={{ width: '2%' }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 text-center">Næsten ingenting</p>
-                </div>
-
-                {/* One day */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-700">1 dag (3 måltider)</span>
-                    <span className="text-xs text-gray-500">+150 kcal overskud</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-400 rounded-full" style={{ width: '5%' }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 text-center">Bare lidt</p>
-                </div>
-
-                {/* One week */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-700">1 uge (21 måltider)</span>
-                    <span className="text-xs text-gray-500">+1.050 kcal overskud</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-500 rounded-full" style={{ width: '35%' }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 text-center">Begynder at tælle</p>
-                </div>
-
-                {/* One month */}
-                <div className="bg-white rounded-xl p-6 border-2 border-orange-200 shadow-md">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-semibold text-gray-900">1 måned (90 måltider)</span>
-                    <span className="text-xs font-bold text-orange-600">+4.500 kcal overskud</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-600 rounded-full" style={{ width: '75%' }}></div>
-                  </div>
-                  <p className="text-xs font-semibold text-orange-600 mt-2 text-center">≈ +0,6 kg vægt</p>
-                </div>
-
-                {/* One year */}
-                <div className="bg-white rounded-xl p-6 border-2 border-red-300 shadow-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm font-bold text-gray-900">1 år (1.095 måltider)</span>
-                    <span className="text-xs font-bold text-red-600">+54.750 kcal overskud</span>
-                  </div>
-                  <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-500 rounded-full" style={{ width: '100%' }}></div>
-                  </div>
-                  <p className="text-sm font-bold text-red-600 mt-2 text-center">≈ +7-8 kg vægt</p>
-                </div>
-              </div>
-
-              <div className="mt-8 text-center">
-                <p className="text-lg text-gray-700 font-medium">
-                  Det samme gælder for <span className="text-green-600 font-bold">gode valg</span> – de akkumuleres også over tid
+            {/* Vægttab gennem små valg */}
+            <div className={`bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 md:p-12 border-2 border-green-100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="max-w-4xl mx-auto">
+                <h3 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 text-center">
+                  Vægttab handler ikke om et stort skift én gang
+                </h3>
+                <p className="text-lg text-gray-700 text-center mb-6 max-w-2xl mx-auto">
+                  Det handler om de valg, du tager ved hvert eneste måltid.
                 </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  Én sund ret om dagen = 365 sunde valg om året = varigt vægttab
+                <p className="text-gray-600 text-center mb-10 max-w-2xl mx-auto">
+                  Når du vælger bedre løsninger igen og igen, så bygger du et kalorieunderskud op, måltid for måltid — og det er sådan vægttab sker i virkeligheden.
                 </p>
+
+                {/* Tre kort */}
+                <div className="grid md:grid-cols-3 gap-6 mb-10">
+                  {/* Kort 1 */}
+                  <div className="bg-white rounded-xl p-6 border-2 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                      <Target className="w-6 h-6 text-green-600" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-3">
+                      10 kg = mange måltider
+                    </h4>
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      Når du taber dig 10 kg, er det resultatet af mange måltider. Du behøver ikke ramme plet hver gang – men jo flere gange om ugen du rammer nogenlunde rigtigt, jo mere rykker vægten sig.
+                    </p>
+                  </div>
+
+                  {/* Kort 2 */}
+                  <div className="bg-white rounded-xl p-6 border-2 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                      <ArrowRight className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-3">
+                      Dit næste måltid er vigtigere end din sidste fejl
+                    </h4>
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      Vi laver alle fejl, og et varigt vægttab går sjældent den lige vej nedad. Det er oftest to skridt frem og ét tilbage. Hos os, er vaner og mentale strategier en stor del af et varigt vægttab, og vi hjælper dig med at forstå dine madvaner - så du kan styre dem.
+                    </p>
+                  </div>
+
+                  {/* Kort 3 */}
+                  <div className="bg-white rounded-xl p-6 border-2 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+                      <Sparkles className="w-6 h-6 text-orange-600" />
+                    </div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-3">
+                      Vi gør de gode valg til standard
+                    </h4>
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      Du skal ikke bruge viljestyrke til hvert eneste valg. FunctionalFoods giver dig konkrete opskrifter, madplaner og indkøbslister, så de sunde løsninger er det nemmeste at vælge i hverdagen. I stedet for standardiserede madplaner, kobler vi ind på livet af dine madvalg, og hjælper dig fremad.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Illustration */}
+                <div className="bg-white rounded-xl p-8 border-2 border-gray-200">
+                  <div className="flex flex-col md:flex-row items-center justify-center gap-8">
+                    <div className="flex-1 text-center md:text-left">
+                      <p className="text-sm font-semibold text-gray-700 mb-4">
+                        Vi giver dig opskrifter og madplaner, der gør det nemt at tage det gode valg — ikke én gang, men hundrede gange.
+                      </p>
+                      <p className="text-base font-bold text-green-600">
+                        Det er sådan du taber 5, 10 eller 20 kg uden at "starte forfra" hele tiden.
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      <div className="relative w-48 h-48 bg-gradient-to-br from-green-100 to-blue-100 rounded-full flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="grid grid-cols-3 gap-2 p-4">
+                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                              <div 
+                                key={i} 
+                                className="w-8 h-8 bg-green-500 rounded-lg opacity-80"
+                                style={{ 
+                                  animationDelay: `${i * 0.1}s`,
+                                  animation: 'pulse 2s ease-in-out infinite'
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-4xl font-bold text-green-600">-10kg</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
