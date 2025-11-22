@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabaseServer'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     
     const category = searchParams.get('category')
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 // Get available categories
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createSupabaseServerClient()
+    const supabase = await createClient()
     
     const { data: categories, error } = await supabase
       .from('supermarket_products')
@@ -61,9 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get unique categories
-    const categoryNames = categories.map(item => item.category)
-    const uniqueCategoryNames = Array.from(new Set(categoryNames))
-    const uniqueCategories = uniqueCategoryNames
+    const uniqueCategories = Array.from(new Set(categories.map(item => item.category)))
       .sort()
       .map(category => ({
         name: category,

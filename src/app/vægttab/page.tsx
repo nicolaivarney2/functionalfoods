@@ -1,11 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
+  const [openNiche, setOpenNiche] = useState<string | null>(null)
 
   useEffect(() => {
     setIsVisible(true)
@@ -13,7 +15,7 @@ export default function WeightLossPage() {
 
   return (
     <main className="min-h-screen bg-white overflow-hidden">
-      {/* Hero / Intro */}
+      {/* Hero Content */}
       <section className="relative bg-gradient-to-br from-gray-50 via-green-50/30 to-blue-50/20 py-20 lg:py-28">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(34,197,94,0.1),transparent_50%)]"></div>
@@ -21,14 +23,14 @@ export default function WeightLossPage() {
         </div>
         
         <div className="container relative">
-          <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold mb-6 text-gray-900 leading-tight">
               Vægttab uden forvirring –<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
                 find din vej til sund balance
               </span>
-            </h1>
+            </h2>
             
             <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8">
               Der findes mange veje til vægttab. Keto, Sense, LCHF eller noget helt fjerde – men grundprincipperne er altid de samme: 
@@ -56,7 +58,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Sandheder om vægttab - Myteknuser */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -116,7 +118,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* De grundlæggende principper */}
-      <section className="py-20 bg-gradient-to-br from-green-50/50 via-white to-blue-50/50">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -182,7 +184,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Hvordan mad påvirker vægten */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -262,7 +264,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Find din madniche */}
-      <section id="find-din-madstil" className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      <section id="find-din-madstil" className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -341,7 +343,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Sådan taber du dig - Kalorietracker */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -436,7 +438,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* FunctionalFoods positioning */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -500,7 +502,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Vægttab handler om mere end mad */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
@@ -553,7 +555,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* Find din madideologi - Detaljeret */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-1300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-16">
@@ -732,7 +734,7 @@ export default function WeightLossPage() {
       </section>
 
       {/* FAQ */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+      <section className="py-20 bg-white">
         <div className="container">
           <div className={`max-w-3xl mx-auto transition-all duration-1000 delay-1400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
