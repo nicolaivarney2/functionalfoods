@@ -29,25 +29,43 @@ export async function POST() {
     
     console.log(`⏰ Current time: ${currentTime}, date: ${currentDate}`)
     
-    // Find alle planlagte opskrifter der skal udgives nu
-    const { data: scheduledRecipes, error: fetchError } = await supabase
+    // Find alle planlagte opskrifter der skal udgives nu eller er forsinkede
+    // 1) Opskrifter planlagt til i dag hvor tidspunktet er passeret
+    const { data: dueToday, error: fetchTodayError } = await supabase
       .from('recipes')
       .select('id, title, slug, "scheduledDate", "scheduledTime"')
       .eq('status', 'scheduled')
       .eq('scheduledDate', currentDate)
       .lte('scheduledTime', currentTime)
     
-    if (fetchError) {
-      console.error('❌ Error fetching scheduled recipes:', fetchError)
-      return NextResponse.json({ error: 'Failed to fetch scheduled recipes' }, { status: 500 })
+    if (fetchTodayError) {
+      console.error('❌ Error fetching today\'s scheduled recipes:', fetchTodayError)
+      return NextResponse.json({ error: 'Failed to fetch today\'s scheduled recipes' }, { status: 500 })
     }
+    
+    // 2) Alle opskrifter der var planlagt til tidligere datoer (backlog)
+    const { data: overduePast, error: fetchPastError } = await supabase
+      .from('recipes')
+      .select('id, title, slug, "scheduledDate", "scheduledTime"')
+      .eq('status', 'scheduled')
+      .lt('scheduledDate', currentDate)
+    
+    if (fetchPastError) {
+      console.error('❌ Error fetching overdue past recipes:', fetchPastError)
+      return NextResponse.json({ error: 'Failed to fetch overdue recipes' }, { status: 500 })
+    }
+    
+    const scheduledRecipes = [
+      ...(dueToday || []),
+      ...(overduePast || [])
+    ]
     
     if (!scheduledRecipes || scheduledRecipes.length === 0) {
       console.log('✅ No recipes to publish at this time')
       return NextResponse.json({ message: 'No recipes to publish', published: 0 })
     }
     
-    console.log(`📅 Found ${scheduledRecipes.length} recipes to publish`)
+    console.log(`📅 Found ${scheduledRecipes.length} recipes to publish (today: ${dueToday?.length || 0}, overdue: ${overduePast?.length || 0})`)
     
     // Opdater status til 'published' for alle planlagte opskrifter
     const recipeIds = scheduledRecipes.map(recipe => recipe.id)
