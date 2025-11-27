@@ -40,12 +40,16 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
     <div className="relative h-40 bg-white flex items-center justify-center p-3 cursor-pointer" onClick={() => onOpenModal(product)}>
       {product.image_url ? (
         <img 
-          src={product.image_url} 
+          src={product.image_url.startsWith('http') 
+            ? `/api/images/proxy?url=${encodeURIComponent(product.image_url)}`
+            : product.image_url
+          } 
           alt={product.name}
           className="max-w-full max-h-full object-contain transition-transform duration-200 group-hover:scale-105"
           onError={(e) => {
             e.currentTarget.style.display = 'none';
           }}
+          loading="lazy"
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
@@ -77,6 +81,13 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
         product.store === 'Nemlig' ? 'border-orange-600' :
         product.store === 'MENY' ? 'border-red-800' :
         product.store === 'Spar' ? 'border-red-600' :
+        product.store === '365 Discount' ? 'border-green-400' :
+        product.store === 'Lidl' ? 'border-yellow-500' :
+        product.store === 'Kvickly' ? 'border-red-500' :
+        product.store === 'Super Brugsen' ? 'border-red-700' :
+        product.store === 'Brugsen' ? 'border-red-400' :
+        product.store === 'Løvbjerg' ? 'border-emerald-500' :
+        product.store === 'ABC Lavpris' ? 'border-purple-500' :
         'border-gray-300'
       }`}>
         {product.store}
@@ -220,13 +231,20 @@ const CATEGORIES = [
 
 // Available stores
 const STORES = [
-  { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
   { id: 'Netto', name: 'Netto', icon: '🟨' },
+  { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
+  { id: '365 Discount', name: '365 Discount', icon: '3️⃣' },
+  { id: 'Lidl', name: 'Lidl', icon: '🟡' },
   { id: 'Føtex', name: 'Føtex', icon: '🔵' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
   { id: 'Nemlig', name: 'Nemlig', icon: '🟠' },
   { id: 'MENY', name: 'MENY', icon: '🔴' },
-  { id: 'Spar', name: 'Spar', icon: '🔺' }
+  { id: 'Spar', name: 'Spar', icon: '🔺' },
+  { id: 'Kvickly', name: 'Kvickly', icon: '🟥' },
+  { id: 'Super Brugsen', name: 'Super Brugsen', icon: '🧺' },
+  { id: 'Brugsen', name: 'Brugsen', icon: '🧺' },
+  { id: 'Løvbjerg', name: 'Løvbjerg', icon: '💚' },
+  { id: 'ABC Lavpris', name: 'ABC Lavpris', icon: '🔤' }
 ]
 
 export default function DagligvarerPage() {
@@ -789,7 +807,10 @@ export default function DagligvarerPage() {
               <div className="relative h-56 bg-white rounded-xl mb-4 flex items-center justify-center p-4 border border-gray-100">
                 {selectedProduct.image_url ? (
                   <img 
-                    src={selectedProduct.image_url} 
+                    src={selectedProduct.image_url.startsWith('http') 
+                      ? `/api/images/proxy?url=${encodeURIComponent(selectedProduct.image_url)}`
+                      : selectedProduct.image_url
+                    } 
                     alt={selectedProduct.name}
                     className="max-w-full max-h-full object-contain"
                   />
@@ -808,6 +829,13 @@ export default function DagligvarerPage() {
                   selectedProduct.store === 'Nemlig' ? 'border-orange-600' :
                   selectedProduct.store === 'MENY' ? 'border-red-800' :
                   selectedProduct.store === 'Spar' ? 'border-red-600' :
+                  selectedProduct.store === '365 Discount' ? 'border-green-400' :
+                  selectedProduct.store === 'Lidl' ? 'border-yellow-500' :
+                  selectedProduct.store === 'Kvickly' ? 'border-red-500' :
+                  selectedProduct.store === 'Super Brugsen' ? 'border-red-700' :
+                  selectedProduct.store === 'Brugsen' ? 'border-red-400' :
+                  selectedProduct.store === 'Løvbjerg' ? 'border-emerald-500' :
+                  selectedProduct.store === 'ABC Lavpris' ? 'border-purple-500' :
                   'border-gray-300'
                 }`}>
                   {selectedProduct.store}

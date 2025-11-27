@@ -125,8 +125,18 @@ export async function importGomaProducts(options: ImportOptions) {
         break
       }
 
-      // Upsert global products
-      const productRows = products.map((p) => ({
+      // Upsert global products (dedupe by base_product_id to avoid ON CONFLICT issues)
+      const productMap = new Map<string, GomaProduct>()
+      for (const p of products) {
+        if (!p.base_product_id) continue
+        if (!productMap.has(p.base_product_id)) {
+          productMap.set(p.base_product_id, p)
+        }
+      }
+
+      const nowIso = new Date().toISOString()
+
+      const productRows = Array.from(productMap.values()).map((p) => ({
         id: p.base_product_id,
         name_generic: p.product_name,
         brand: p.brand,
@@ -139,7 +149,7 @@ export async function importGomaProducts(options: ImportOptions) {
         metadata: {
           goma_store_product_id: p.product_id,
         } as unknown as Record<string, unknown>,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso,
       }))
 
       const { error: productError } = await supabase.from('products').upsert(productRows, {
@@ -150,9 +160,19 @@ export async function importGomaProducts(options: ImportOptions) {
         throw productError
       }
 
-      // Upsert offers
+      // Upsert offers (dedupe by store_id + store_product_id within this batch)
       const storeId = storeName.toLowerCase().replace(/\s+/g, '-')
-      const offerRows = products.map((p) => ({
+      const offerMap = new Map<string, GomaProduct>()
+      for (const p of products) {
+        // Skip products without a global/base id – we can't link them korrekt til products-tabellen
+        if (!p.base_product_id) continue
+        const key = `${storeId}:${p.product_id}`
+        if (!offerMap.has(key)) {
+          offerMap.set(key, p)
+        }
+      }
+
+      const offerRows = Array.from(offerMap.values()).map((p) => ({
         product_id: p.base_product_id,
         store_id: storeId,
         store_product_id: p.product_id,
@@ -164,12 +184,14 @@ export async function importGomaProducts(options: ImportOptions) {
         discount_percentage: p.discount_percentage,
         price_per_unit: p.price_per_unit,
         price_per_kilogram: p.price_per_kilogram,
+        amount: p.amount,
+        unit: p.unit,
         is_available: p.is_available,
         sale_valid_from: p.sale_valid_from,
         sale_valid_to: p.sale_valid_to,
         source: 'goma',
-        last_seen_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        last_seen_at: nowIso,
+        updated_at: nowIso,
       }))
 
       const { error: offerError } = await supabase.from('product_offers').upsert(offerRows, {

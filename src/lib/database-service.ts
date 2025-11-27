@@ -101,23 +101,25 @@ export class DatabaseService {
   }
 
   /**
-   * Get optimized product counts and category breakdown without fetching full products
+   * NEW: Get product counts from new structure (product_offers + products)
    */
-  async getProductCounts(): Promise<{total: number, categories: {[key: string]: number}, offers: number}> {
+  async getProductCountsV2(): Promise<{total: number, categories: {[key: string]: number}, offers: number}> {
     try {
       const supabase = createSupabaseClient()
       
-      // Get total count efficiently
+      // Get total count of available offers
       const { count: totalCount, error: totalError } = await supabase
-        .from('supermarket_products')
+        .from('product_offers')
         .select('*', { count: 'exact', head: true })
+        .eq('is_available', true)
       
       if (totalError) {
-        console.error('Error getting total count:', totalError)
+        console.error('Error getting total count (V2):', totalError)
         return { total: 0, categories: {}, offers: 0 }
       }
       
-      // Get ALL categories using pagination to avoid 1000 row limit
+      // Get category counts by joining with products table
+      // Use pagination to handle large datasets
       let allCategoryData: any[] = []
       let start = 0
       const batchSize = 1000
@@ -126,8 +128,14 @@ export class DatabaseService {
       while (start < total) {
         const end = Math.min(start + batchSize - 1, total - 1)
         const { data: batchData, error: batchError } = await supabase
-          .from('supermarket_products')
-          .select('category')
+          .from('product_offers')
+          .select(`
+            products:product_id (
+              department,
+              category
+            )
+          `)
+          .eq('is_available', true)
           .range(start, end)
         
         if (batchError) {
@@ -142,52 +150,282 @@ export class DatabaseService {
         start += batchSize
         
         // Safety break
-        if (start > 10000) {
-          console.warn('Breaking category fetch at 10000 to prevent infinite loop')
+        if (start > 50000) {
+          console.warn('Breaking category fetch at 50000 to prevent infinite loop')
           break
         }
       }
       
-      console.log(`🔍 Fetched ${allCategoryData.length} product categories out of ${total} total products`)
+      console.log(`🔍 Fetched ${allCategoryData.length} product categories out of ${total} total offers`)
       
-      // Count categories
-      const categoryCounts = allCategoryData.reduce((acc: {[key: string]: number}, product: any) => {
-        const category = product.category || 'Ukategoriseret'
+      // Count categories (use department first, fallback to category)
+      const categoryCounts = allCategoryData.reduce((acc: {[key: string]: number}, offer: any) => {
+        const product = offer.products || {}
+        const category = product.department || product.category || 'Ukategoriseret'
         acc[category] = (acc[category] || 0) + 1
         return acc
       }, {})
       
-      // Get offers count efficiently - but we need to process them to get real offers
-      // For now, get a sample to count real offers
-      const { data: sampleOffers, error: offersError } = await supabase
-        .from('supermarket_products')
-        .select('price, original_price, is_on_sale')
+      // Get real offers count (where is_on_sale = true AND current_price < normal_price)
+      const { count: offersCount, error: offersError } = await supabase
+        .from('product_offers')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_available', true)
         .eq('is_on_sale', true)
-        .limit(1000)
+        .lt('current_price', supabase.raw('normal_price'))
       
-      // Count real offers (where price < original_price)
-      let realOffersCount = 0
-      if (sampleOffers) {
-        realOffersCount = sampleOffers.filter(product => {
-          const price = product.price || 0
-          const originalPrice = product.original_price || 0
-          const priceDifference = originalPrice - price
-          return priceDifference > 0.01 // Real discount
-        }).length
+      if (offersError) {
+        console.error('Error getting offers count:', offersError)
+        // Fallback: count all is_on_sale = true
+        const { count: fallbackCount } = await supabase
+          .from('product_offers')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_available', true)
+          .eq('is_on_sale', true)
+        
+        console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Offers: ${fallbackCount || 0}, Categories: ${Object.keys(categoryCounts).length}`)
+        
+        return {
+          total: totalCount || 0,
+          categories: categoryCounts,
+          offers: fallbackCount || 0
+        }
       }
       
-      console.log(`🔍 Product counts - Total: ${totalCount}, Real Offers: ${realOffersCount}, Categories: ${Object.keys(categoryCounts).length}`)
+      console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Real Offers: ${offersCount || 0}, Categories: ${Object.keys(categoryCounts).length}`)
       console.log(`🔍 Category breakdown:`, categoryCounts)
       
       return {
         total: totalCount || 0,
         categories: categoryCounts,
-        offers: realOffersCount
+        offers: offersCount || 0
       }
     } catch (error) {
-      console.error('Error in getProductCounts:', error)
+      console.error('Error in getProductCountsV2:', error)
       return { total: 0, categories: {}, offers: 0 }
     }
+  }
+
+  /**
+   * Get optimized product counts and category breakdown without fetching full products
+   * @deprecated Use getProductCountsV2() instead
+   */
+  async getProductCounts(): Promise<{total: number, categories: {[key: string]: number}, offers: number}> {
+    // Use new V2 method
+    return this.getProductCountsV2()
+  }
+
+  /**
+   * NEW: Get supermarket products from new global product structure (products + product_offers)
+   * This is the source for /dagligvarer i fremtiden.
+   */
+  async getSupermarketProductsV2(
+    page: number = 1,
+    limit: number = 100,
+    categories?: string[],
+    offersOnly?: boolean,
+    search?: string,
+    stores?: string[]
+  ): Promise<{products: any[]; total: number; hasMore: boolean}> {
+    try {
+      const supabase = createSupabaseClient()
+
+      const offset = (page - 1) * limit
+
+      // Base query: offers + join til products
+      let query = supabase
+        .from('product_offers')
+        .select(
+          `
+          id,
+          product_id,
+          store_id,
+          store_product_id,
+          name_store,
+          product_url,
+          current_price,
+          normal_price,
+          currency,
+          is_on_sale,
+          discount_percentage,
+          price_per_unit,
+          price_per_kilogram,
+          is_available,
+          sale_valid_from,
+          sale_valid_to,
+          products:product_id (
+            id,
+            name_generic,
+            brand,
+            category,
+            subcategory,
+            department,
+            unit,
+            amount,
+            image_url
+          )
+        `,
+          { count: 'exact' }
+        )
+        .eq('is_available', true)
+
+      if (stores && stores.length > 0) {
+        query = query.in('store_id', this.mapStoreFilterToIds(stores))
+      }
+
+      if (offersOnly) {
+        query = query.eq('is_on_sale', true)
+      }
+
+      if (categories && categories.length > 0) {
+        // First, find all product_ids that match the categories
+        const { data: matchingProducts, error: productError } = await supabase
+          .from('products')
+          .select('id')
+          .in('department', categories)
+        
+        if (productError) {
+          console.error('Error finding products by category:', productError)
+        } else if (matchingProducts && matchingProducts.length > 0) {
+          const productIds = matchingProducts.map(p => p.id)
+          query = query.in('product_id', productIds)
+        } else {
+          // No products match this category, return empty result
+          return { products: [], total: 0, hasMore: false }
+        }
+      }
+
+      if (search && search.trim()) {
+        // Simpel tekstsøgning i butiksnavn + globalt navn + brand
+        const term = search.trim()
+        query = query.or(
+          `name_store.ilike.%${term}%,products.name_generic.ilike.%${term}%,products.brand.ilike.%${term}%`
+        )
+      }
+
+      query = query
+        .order('is_on_sale', { ascending: false }) // tilbud først
+        .order('discount_percentage', { ascending: false, nullsFirst: false })
+        .order('current_price', { ascending: true })
+        .range(offset, offset + limit - 1)
+
+      const { data, error, count } = await query
+
+      if (error) {
+        console.error('Error fetching supermarket products (V2):', error)
+        return { products: [], total: 0, hasMore: false }
+      }
+
+      const total = count || 0
+      const hasMore = offset + limit < total
+
+      const mapped = (data || []).map((row: any) => {
+        const p = row.products || {}
+        
+        // Debug: Log if products object is missing
+        if (!row.products && categories && categories.length > 0) {
+          console.warn(`⚠️ Missing products object for offer ${row.id}, product_id: ${row.product_id}`)
+        }
+
+        const price = row.current_price || 0
+        const originalPrice = row.normal_price || row.current_price || 0
+        const isOnSale = !!row.is_on_sale && originalPrice > price
+        const priceDiff = originalPrice - price
+        const discountPct =
+          isOnSale && originalPrice > 0 && priceDiff > 0.01
+            ? Math.round((priceDiff / originalPrice) * 100)
+            : null
+
+        return {
+          // id bruges af /dagligvarer
+          id: row.id,
+          name: row.name_store || p.name_generic,
+          description: null,
+          category: p.department || p.category,
+          price,
+          original_price: originalPrice,
+          unit: p.unit || 'stk',
+          unit_price: row.price_per_unit || row.price_per_kilogram || null,
+          is_on_sale: isOnSale,
+          discount_percentage: discountPct,
+          image_url: p.image_url || null, // Explicit null instead of undefined
+          store: this.mapStoreIdToDisplayName(row.store_id),
+          amount: p.amount ? String(p.amount) : null,
+        }
+      })
+
+      return { products: mapped, total, hasMore }
+    } catch (error) {
+      console.error('Error in getSupermarketProductsV2:', error)
+      return { products: [], total: 0, hasMore: false }
+    }
+  }
+
+  /**
+   * Simple mapping fra store_id i DB til visningsnavn
+   */
+  private mapStoreIdToDisplayName(storeId: string | null): string {
+    if (!storeId) return 'Ukendt butik'
+    const id = storeId.toLowerCase()
+    switch (id) {
+      case 'netto':
+        return 'Netto'
+      case 'rema-1000':
+      case 'rema':
+        return 'REMA 1000'
+      case '365-discount':
+        return '365 Discount'
+      case 'lidl':
+        return 'Lidl'
+      case 'føtex':
+        return 'Føtex'
+      case 'bilka':
+        return 'Bilka'
+      case 'nemlig':
+        return 'Nemlig'
+      case 'menu':
+      case 'meny':
+        return 'MENY'
+      case 'spar':
+        return 'Spar'
+      case 'kvickly':
+        return 'Kvickly'
+      case 'super-brugsen':
+        return 'Super Brugsen'
+      case 'brugsen':
+        return 'Brugsen'
+      case 'løvbjerg':
+        return 'Løvbjerg'
+      case 'abc-lavpris':
+        return 'ABC Lavpris'
+      default:
+        return storeId
+    }
+  }
+
+  /**
+   * Map store-navne fra frontend-filtre til store_id-slugs i databasen
+   */
+  private mapStoreFilterToIds(stores: string[]): string[] {
+    const mapping: Record<string, string> = {
+      'Netto': 'netto',
+      'REMA 1000': 'rema-1000',
+      '365 Discount': '365-discount',
+      'Lidl': 'lidl',
+      'Føtex': 'føtex',
+      'Bilka': 'bilka',
+      'Nemlig': 'nemlig',
+      'MENU': 'menu',
+      'MENY': 'menu',
+      'Spar': 'spar',
+      'Kvickly': 'kvickly',
+      'Super Brugsen': 'super-brugsen',
+      'Brugsen': 'brugsen',
+      'Løvbjerg': 'løvbjerg',
+      'ABC Lavpris': 'abc-lavpris',
+    }
+
+    return stores.map((s) => mapping[s] || s.toLowerCase().replace(/\s+/g, '-'))
   }
 
   /**

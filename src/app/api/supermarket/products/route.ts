@@ -33,11 +33,11 @@ export async function GET(request: NextRequest) {
       })
     }
     
-    // Get products with pagination and filters
+    // Get products from new global structure
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
-    const result = await databaseService.getSupermarketProducts(page, limit, finalCategory, offers, search, stores)
+    const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores)
     
-    console.log(`✅ Found ${result.products.length} supermarket products (total: ${result.total})`)
+    console.log(`✅ Found ${result.products.length} supermarket products (V2, total: ${result.total})`)
     
     return NextResponse.json({
       success: true,

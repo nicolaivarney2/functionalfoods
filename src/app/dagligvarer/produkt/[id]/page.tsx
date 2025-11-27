@@ -284,33 +284,22 @@ export default function ProductPage() {
   const [priceLoading, setPriceLoading] = useState(false)
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
   const [similarProducts, setSimilarProducts] = useState<Product[]>([])
+  const [otherSizeProducts, setOtherSizeProducts] = useState<Product[]>([])
   const [similarLoading, setSimilarLoading] = useState(false)
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true)
-        const response = await fetch(`/api/admin/dagligvarer/test-rema`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'fetchProduct',
-            productId: params.id
-          })
-        })
-
+        const response = await fetch(`/api/supermarket/product/${params.id}`)
         const data = await response.json()
         if (data.success && data.product) {
           setProduct(data.product)
-          // Also fetch price history and similar products
-          fetchPriceHistory(params.id as string)
-          // Fetch similar products but don't let it block the page if it fails
-          try {
-            fetchSimilarProducts(data.product.name, data.product.store)
-          } catch (err) {
-            console.warn('⚠️ Failed to fetch similar products, but continuing with page load:', err)
+          if (data.similarProducts) {
+            setSimilarProducts(data.similarProducts)
+          }
+          if (data.otherSizeProducts) {
+            setOtherSizeProducts(data.otherSizeProducts)
           }
         } else {
           setError('Produkt ikke fundet')
@@ -327,66 +316,6 @@ export default function ProductPage() {
       fetchProduct()
     }
   }, [params.id])
-
-  const fetchPriceHistory = async (productId: string) => {
-    try {
-      setPriceLoading(true)
-      const response = await fetch(`/api/admin/dagligvarer/test-rema`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'fetchPriceHistory',
-          productId: productId
-        })
-      })
-
-      const data = await response.json()
-      if (data.success && data.priceHistory) {
-        setPriceHistory(data.priceHistory)
-      }
-    } catch (err) {
-      console.error('Error fetching price history:', err)
-    } finally {
-      setPriceLoading(false)
-    }
-  }
-
-  const fetchSimilarProducts = async (productName: string, excludeStore: string) => {
-    try {
-      setSimilarLoading(true)
-      
-      // Create URL with proper encoding
-      const url = new URL('/api/supermarket/similar-products', window.location.origin)
-      url.searchParams.set('name', productName)
-      url.searchParams.set('excludeStore', excludeStore)
-      
-      console.log('🔍 Fetching similar products from:', url.toString())
-      const response = await fetch(url.toString())
-      
-      if (!response.ok) {
-        console.error('❌ Similar products API failed:', response.status, response.statusText)
-        const errorText = await response.text()
-        console.error('❌ Error details:', errorText)
-        return
-      }
-      
-      const data = await response.json()
-      console.log('✅ Similar products response:', data)
-      
-      if (data.success && data.products) {
-        setSimilarProducts(data.products)
-      } else {
-        console.warn('⚠️ No similar products found or API error:', data)
-      }
-    } catch (err) {
-      console.error('❌ Error fetching similar products:', err)
-      // Don't let this error crash the page - just log and continue
-    } finally {
-      setSimilarLoading(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -423,6 +352,15 @@ export default function ProductPage() {
       </div>
     )
   }
+
+  // Filtrer andre størrelser så vi ikke viser samme butik i begge lister
+  const storesShownInSameSize = new Set<string>([
+    product.store,
+    ...similarProducts.map((p) => p.store),
+  ])
+  const filteredOtherSizeProducts = otherSizeProducts.filter(
+    (p) => !storesShownInSameSize.has(p.store)
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -469,12 +407,16 @@ export default function ProductPage() {
             <div className="flex justify-center">
               {product.image_url ? (
                 <img 
-                  src={product.image_url} 
+                  src={product.image_url.startsWith('http') 
+                    ? `/api/images/proxy?url=${encodeURIComponent(product.image_url)}`
+                    : product.image_url
+                  } 
                   alt={product.name}
                   className="w-80 h-80 object-cover rounded-lg shadow-lg"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-80 h-80 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -570,7 +512,7 @@ export default function ProductPage() {
                       </div>
                     </div>
 
-                    {/* Similar products from other stores */}
+                    {/* Similar products from other stores (samme størrelse) */}
                     {similarLoading ? (
                       <div className="text-sm text-gray-500">Indlæser andre butikker...</div>
                     ) : (
@@ -625,6 +567,42 @@ export default function ProductPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Andre størrelser af samme produkt */}
+                {filteredOtherSizeProducts.length > 0 && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <span className="text-gray-600">Andre størrelser af denne vare:</span>
+                    <div className="mt-2 space-y-2">
+                      {filteredOtherSizeProducts.map((p) => (
+                        <Link
+                          key={p.id}
+                          href={`/dagligvarer/produkt/${p.id}`}
+                          className="flex justify-between items-center text-sm hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-gray-900">
+                              {p.store} · {p.amount && p.unit ? `${p.amount} ${p.unit}` : 'Anden størrelse'}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">
+                              {p.is_on_sale ? (
+                                <span className="text-red-600">{(p.price || 0).toFixed(2)} kr</span>
+                              ) : (
+                                <span>{(p.price || 0).toFixed(2)} kr</span>
+                              )}
+                            </div>
+                            {p.is_on_sale && p.discount_percentage && (
+                              <div className="text-xs text-green-600 font-semibold">
+                                SPAR {p.discount_percentage}%
+                              </div>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {product.available !== undefined && (
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
