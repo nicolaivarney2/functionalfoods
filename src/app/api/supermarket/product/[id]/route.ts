@@ -39,6 +39,8 @@ export async function GET(
         is_available,
         sale_valid_from,
         sale_valid_to,
+        updated_at,
+        last_seen_at,
         products:product_id (
           id,
           name_generic,
