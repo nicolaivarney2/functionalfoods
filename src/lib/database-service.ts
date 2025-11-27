@@ -228,10 +228,6 @@ export class DatabaseService {
         categories: categoryCounts,
         offers: realOffersCount
       }
-        total: totalCount || 0,
-        categories: categoryCounts,
-        offers: offersCount || 0
-      }
     } catch (error) {
       console.error('Error in getProductCountsV2:', error)
       return { total: 0, categories: {}, offers: 0 }
