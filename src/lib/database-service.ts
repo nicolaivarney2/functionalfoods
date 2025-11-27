@@ -167,15 +167,19 @@ export class DatabaseService {
       }, {})
       
       // Get real offers count (where is_on_sale = true AND current_price < normal_price)
-      const { count: offersCount, error: offersError } = await supabase
+      // Supabase doesn't support direct column comparison, so we fetch a sample and count
+      // For efficiency, we'll use a reasonable sample size and extrapolate
+      const sampleSize = Math.min(5000, total)
+      const { data: offersSample, error: offersError } = await supabase
         .from('product_offers')
-        .select('*', { count: 'exact', head: true })
+        .select('current_price, normal_price, is_on_sale')
         .eq('is_available', true)
         .eq('is_on_sale', true)
-        .lt('current_price', supabase.raw('normal_price'))
+        .limit(sampleSize)
       
+      let realOffersCount = 0
       if (offersError) {
-        console.error('Error getting offers count:', offersError)
+        console.error('Error getting offers sample:', offersError)
         // Fallback: count all is_on_sale = true
         const { count: fallbackCount } = await supabase
           .from('product_offers')
@@ -183,19 +187,47 @@ export class DatabaseService {
           .eq('is_available', true)
           .eq('is_on_sale', true)
         
-        console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Offers: ${fallbackCount || 0}, Categories: ${Object.keys(categoryCounts).length}`)
+        realOffersCount = fallbackCount || 0
+      } else if (offersSample && offersSample.length > 0) {
+        // Count real offers (where current_price < normal_price)
+        const realOffersInSample = offersSample.filter(offer => {
+          const currentPrice = offer.current_price || 0
+          const normalPrice = offer.normal_price || 0
+          return normalPrice > currentPrice && (normalPrice - currentPrice) > 0.01
+        }).length
         
-        return {
-          total: totalCount || 0,
-          categories: categoryCounts,
-          offers: fallbackCount || 0
+        // If we sampled less than total, extrapolate
+        if (sampleSize < total) {
+          const ratio = realOffersInSample / offersSample.length
+          const { count: totalOnSale } = await supabase
+            .from('product_offers')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_available', true)
+            .eq('is_on_sale', true)
+          
+          realOffersCount = Math.round((totalOnSale || 0) * ratio)
+        } else {
+          realOffersCount = realOffersInSample
         }
+      } else {
+        // No offers in sample, count all is_on_sale = true as fallback
+        const { count: fallbackCount } = await supabase
+          .from('product_offers')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_available', true)
+          .eq('is_on_sale', true)
+        
+        realOffersCount = fallbackCount || 0
       }
       
-      console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Real Offers: ${offersCount || 0}, Categories: ${Object.keys(categoryCounts).length}`)
+      console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Real Offers: ${realOffersCount}, Categories: ${Object.keys(categoryCounts).length}`)
       console.log(`🔍 Category breakdown:`, categoryCounts)
       
       return {
+        total: totalCount || 0,
+        categories: categoryCounts,
+        offers: realOffersCount
+      }
         total: totalCount || 0,
         categories: categoryCounts,
         offers: offersCount || 0
