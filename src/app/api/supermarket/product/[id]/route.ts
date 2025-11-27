@@ -63,7 +63,19 @@ export async function GET(
       )
     }
 
-    const p = offer.products || {}
+    // Handle products as array (Supabase foreign table joins return arrays, not single objects)
+    const productsArray = Array.isArray(offer.products) ? offer.products : (offer.products ? [offer.products] : [])
+    const p: {
+      id?: string
+      name_generic?: string
+      brand?: string
+      category?: string
+      subcategory?: string
+      department?: string
+      unit?: string
+      amount?: number
+      image_url?: string
+    } = productsArray[0] || {}
 
     const price = offer.current_price || 0
     const originalPrice = offer.normal_price || offer.current_price || 0
