@@ -1,4 +1,28 @@
 import { createClient } from '@supabase/supabase-js'
+import { createHash } from 'crypto'
+
+// Deterministic hash function as fallback if crypto fails
+// Uses a combination of character codes to create a 32-char hex string
+function simpleHash(str: string): string {
+  let hash1 = 0
+  let hash2 = 0
+  
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash1 = ((hash1 << 5) - hash1) + char
+    hash1 = hash1 & hash1 // Convert to 32bit integer
+    
+    hash2 = ((hash2 << 7) - hash2) + char + i
+    hash2 = hash2 & hash2
+  }
+  
+  // Combine both hashes and convert to hex
+  const combined = Math.abs(hash1).toString(16).padStart(8, '0') + 
+                   Math.abs(hash2).toString(16).padStart(8, '0')
+  
+  // Pad or truncate to exactly 32 chars
+  return (combined + combined + combined + combined).substring(0, 32)
+}
 
 type GomaProduct = {
   unit: string | null
@@ -58,6 +82,23 @@ export type ImportOptions = {
   pages?: number
   onProgress?: (info: { store: string; page: number; imported: number; total: number }) => void
 }
+
+/**
+ * ⚠️ IMPORTANT: Product ID Generation Strategy
+ * 
+ * We generate unique product IDs based on: brand + normalized name + amount + unit
+ * This prevents different products (different brands/sizes) from being incorrectly grouped together.
+ * 
+ * Previously, we used Goma's `base_product_id` directly, which was too broad and grouped
+ * products that should be separate (e.g., Libresse 58 stk vs. generic 8 stk, or 600g vs. 500g).
+ * 
+ * ⚠️ BREAKING CHANGE: This means existing products in the database will have old IDs.
+ * To fix this, you need to:
+ * 1. Clear all data from `products` and `product_offers` tables
+ * 2. Re-import all products using this new logic
+ * 
+ * The old `base_product_id` is still stored in `metadata.goma_base_product_id` for reference.
+ */
 
 export async function importGomaProducts(options: ImportOptions) {
   const supabase = getSupabaseAdminClient()
@@ -121,23 +162,107 @@ export async function importGomaProducts(options: ImportOptions) {
       const data = (await res.json()) as GomaSearchResponse
       const products = data.products || []
 
+      console.log(`📦 Fetched ${products.length} products from Goma for ${storeName} page ${page}`)
+
       if (products.length === 0) {
+        console.log(`⚠️ No products returned for ${storeName} page ${page}, stopping`)
         break
       }
 
-      // Upsert global products (dedupe by base_product_id to avoid ON CONFLICT issues)
-      const productMap = new Map<string, GomaProduct>()
-      for (const p of products) {
-        if (!p.base_product_id) continue
-        if (!productMap.has(p.base_product_id)) {
-          productMap.set(p.base_product_id, p)
+      // Generate unique product IDs based on brand + normalized name + amount + unit
+      // This prevents different products (different brands/sizes) from being grouped together
+      const generateProductId = (p: GomaProduct): string => {
+        // Normalize brand (handle null/empty)
+        const brand = (p.brand || '').trim().toLowerCase()
+        
+        // Normalize product name (remove extra whitespace, lowercase)
+        const name = (p.product_name || '').trim().toLowerCase().replace(/\s+/g, ' ')
+        
+        // Get amount and unit (handle null)
+        const amount = p.amount != null ? String(p.amount) : ''
+        const unit = (p.unit || '').trim().toLowerCase()
+        
+        // Create a unique key: brand + name + amount + unit
+        // This ensures Libresse 58 stk ≠ generic 8 stk, and 600g ≠ 500g
+        const key = `${brand}|${name}|${amount}|${unit}`
+        
+        // Use SHA-256 hash to create a deterministic, fixed-length ID
+        // Take first 32 characters for a reasonable length
+        try {
+          // Try Node.js crypto module first (should work in Next.js API routes)
+          const hash = createHash('sha256').update(key).digest('hex').substring(0, 32)
+          
+          // Validate hash format (should be 32 hex characters, no dashes, lowercase)
+          const isValidHash = hash && 
+            hash.length === 32 && 
+            !hash.includes('-') && 
+            /^[a-f0-9]{32}$/.test(hash)
+          
+          if (isValidHash) {
+            return hash
+          }
+          
+          // If hash is invalid, try fallback
+          console.warn(`⚠️ Invalid crypto hash, using fallback for: ${p.product_name}`)
+          const fallbackHash = simpleHash(key)
+          console.log(`✅ Fallback hash generated: ${fallbackHash.substring(0, 8)}... for ${p.product_name}`)
+          return fallbackHash
+        } catch (error) {
+          // If crypto fails completely, use fallback hash
+          console.warn(`⚠️ Crypto hash failed, using fallback for: ${p.product_name}`, error)
+          const fallbackHash = simpleHash(key)
+          console.log(`✅ Fallback hash generated: ${fallbackHash.substring(0, 8)}... for ${p.product_name}`)
+          return fallbackHash
         }
+      }
+
+      // Upsert global products (dedupe by our generated product ID)
+      const productMap = new Map<string, { productId: string; product: GomaProduct }>()
+      let skippedNoBaseId = 0
+      let hashErrors = 0
+      for (const p of products) {
+        if (!p.base_product_id) {
+          skippedNoBaseId++
+          continue // Skip products without base_product_id
+        }
+        
+        try {
+          const productId = generateProductId(p)
+          if (!productId || productId.length === 0) {
+            console.error(`❌ Generated empty productId for: ${p.product_name}`)
+            hashErrors++
+            continue
+          }
+          if (!productMap.has(productId)) {
+            productMap.set(productId, { productId, product: p })
+          } else {
+            // If we already have this product, prefer the one with an image if current doesn't have one
+            const existing = productMap.get(productId)!
+            if (!existing.product.image_url && p.image_url) {
+              productMap.set(productId, { productId, product: p })
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error generating productId for ${p.product_name}:`, error)
+          hashErrors++
+          // Continue with next product instead of failing entire import
+        }
+      }
+      
+      if (hashErrors > 0) {
+        console.error(`❌ Failed to generate productId for ${hashErrors} products`)
+      }
+
+      if (skippedNoBaseId > 0) {
+        console.log(`⚠️ Skipped ${skippedNoBaseId} products without base_product_id for ${storeName} page ${page}`)
       }
 
       const nowIso = new Date().toISOString()
 
-      const productRows = Array.from(productMap.values()).map((p) => ({
-        id: p.base_product_id,
+      console.log(`🔄 Processing ${productMap.size} unique products for ${storeName} page ${page}`)
+
+      const productRows = Array.from(productMap.values()).map(({ productId, product: p }) => ({
+        id: productId,
         name_generic: p.product_name,
         brand: p.brand,
         category: p.category,
@@ -147,59 +272,121 @@ export async function importGomaProducts(options: ImportOptions) {
         amount: p.amount,
         image_url: p.image_url,
         metadata: {
+          goma_base_product_id: p.base_product_id, // Store original for reference
           goma_store_product_id: p.product_id,
         } as unknown as Record<string, unknown>,
         updated_at: nowIso,
       }))
 
-      const { error: productError } = await supabase.from('products').upsert(productRows, {
-        onConflict: 'id',
-      })
+      if (productRows.length === 0) {
+        console.log(`⚠️ No product rows to insert for ${storeName} page ${page}`)
+      } else {
+        console.log(`💾 Attempting to upsert ${productRows.length} products for ${storeName} page ${page}`)
+        console.log(`💾 Sample product ID: ${productRows[0].id} (length: ${productRows[0].id.length}, is UUID: ${productRows[0].id.includes('-')})`)
+        
+        const { error: productError, data: productData, count: productCount } = await supabase
+          .from('products')
+          .upsert(productRows, {
+            onConflict: 'id',
+          })
+          .select('id')
 
-      if (productError) {
-        throw productError
+        if (productError) {
+          console.error(`❌ Error upserting products for ${storeName} page ${page}:`, productError)
+          console.error(`❌ Product error details:`, JSON.stringify(productError, null, 2))
+          console.error(`❌ Sample product row:`, JSON.stringify(productRows[0], null, 2))
+          throw productError
+        }
+
+        console.log(`✅ Upserted ${productRows.length} products for ${storeName} page ${page}`)
+        if (productData) {
+          console.log(`✅ Upsert returned ${productData.length} products`)
+        }
+        
+        // Verify products were actually inserted
+        if (productRows.length > 0) {
+          const sampleIds = productRows.slice(0, 5).map(r => r.id)
+          const { data: verifyData, error: verifyError, count: verifyCount } = await supabase
+            .from('products')
+            .select('id', { count: 'exact' })
+            .in('id', sampleIds)
+          
+          if (verifyError) {
+            console.error(`⚠️ Error verifying products:`, verifyError)
+          } else {
+            console.log(`✅ Verified: ${verifyData?.length || 0}/${sampleIds.length} sample products exist in database (count: ${verifyCount})`)
+          }
+        }
       }
 
       // Upsert offers (dedupe by store_id + store_product_id within this batch)
       const storeId = storeName.toLowerCase().replace(/\s+/g, '-')
-      const offerMap = new Map<string, GomaProduct>()
+      const offerMap = new Map<string, { productId: string; product: GomaProduct }>()
       for (const p of products) {
         // Skip products without a global/base id – we can't link them korrekt til products-tabellen
         if (!p.base_product_id) continue
+        
+        const productId = generateProductId(p)
         const key = `${storeId}:${p.product_id}`
         if (!offerMap.has(key)) {
-          offerMap.set(key, p)
+          offerMap.set(key, { productId, product: p })
         }
       }
 
-      const offerRows = Array.from(offerMap.values()).map((p) => ({
-        product_id: p.base_product_id,
-        store_id: storeId,
-        store_product_id: p.product_id,
-        name_store: p.product_name,
-        product_url: p.product_url,
-        current_price: p.current_price,
-        normal_price: p.normal_price,
-        is_on_sale: p.is_on_sale,
-        discount_percentage: p.discount_percentage,
-        price_per_unit: p.price_per_unit,
-        price_per_kilogram: p.price_per_kilogram,
-        amount: p.amount,
-        unit: p.unit,
-        is_available: p.is_available,
-        sale_valid_from: p.sale_valid_from,
-        sale_valid_to: p.sale_valid_to,
-        source: 'goma',
-        last_seen_at: nowIso,
-        updated_at: nowIso,
-      }))
+      const offerRows = Array.from(offerMap.values()).map(({ productId, product: p }) => {
+        // Log if we're using fallback (UUID format indicates old base_product_id)
+        if (productId.length === 36 && productId.includes('-')) {
+          console.warn(`⚠️ Using fallback base_product_id for offer: ${p.product_name} (productId: ${productId})`)
+        }
+        return {
+          product_id: productId, // Use our generated product ID, not base_product_id
+          store_id: storeId,
+          store_product_id: p.product_id,
+          name_store: p.product_name,
+          product_url: p.product_url,
+          current_price: p.current_price,
+          normal_price: p.normal_price,
+          is_on_sale: p.is_on_sale,
+          discount_percentage: p.discount_percentage,
+          price_per_unit: p.price_per_unit,
+          price_per_kilogram: p.price_per_kilogram,
+          amount: p.amount,
+          unit: p.unit,
+          is_available: p.is_available,
+          sale_valid_from: p.sale_valid_from,
+          sale_valid_to: p.sale_valid_to,
+          source: 'goma',
+          last_seen_at: nowIso,
+          updated_at: nowIso,
+        }
+      })
 
-      const { error: offerError } = await supabase.from('product_offers').upsert(offerRows, {
+      console.log(`🔄 Processing ${offerRows.length} offers for ${storeName} page ${page}`)
+
+      const { error: offerError, data: offerData } = await supabase.from('product_offers').upsert(offerRows, {
         onConflict: 'store_id,store_product_id',
       })
 
       if (offerError) {
+        console.error(`❌ Error upserting offers for ${storeName} page ${page}:`, offerError)
+        console.error(`❌ Offer error details:`, JSON.stringify(offerError, null, 2))
         throw offerError
+      }
+
+      console.log(`✅ Upserted ${offerRows.length} offers for ${storeName} page ${page}`)
+      
+      // Verify that products were actually inserted
+      if (productRows.length > 0) {
+        const { count: productCount, error: countError } = await supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .in('id', productRows.map(r => r.id))
+        
+        if (countError) {
+          console.error(`⚠️ Error counting products:`, countError)
+        } else {
+          console.log(`✅ Verified: ${productCount} products exist in database (expected ${productRows.length})`)
+        }
       }
 
       totalImported += products.length
@@ -221,5 +408,4 @@ export async function importGomaProducts(options: ImportOptions) {
 
   return { totalImported }
 }
-
 
