@@ -4,6 +4,43 @@ import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
+  private readonly FOOD_ONLY_CATEGORY_LIST = [
+    'Frugt og grønt',
+    'Brød og kager',
+    'Drikkevarer',
+    'Kød og fisk',
+    'Kolonial',
+    'Mejeri og køl',
+    'Nemt og hurtigt',
+    'Slik og snacks'
+  ]
+
+  private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
+    'frugt & grønt': 'Frugt og grønt',
+    'frugt og grønt': 'Frugt og grønt',
+    'brød & kager': 'Brød og kager',
+    'brød og kager': 'Brød og kager',
+    'drikkevarer': 'Drikkevarer',
+    'kød, fisk & fjerkræ': 'Kød og fisk',
+    'kød og fisk': 'Kød og fisk',
+    'kolonial': 'Kolonial',
+    'mejeri': 'Mejeri og køl',
+    'mejeri og køl': 'Mejeri og køl',
+    'ost & mejeri': 'Mejeri og køl',
+    'nemt & hurtigt': 'Nemt og hurtigt',
+    'nemt og hurtigt': 'Nemt og hurtigt',
+    'snacks & slik': 'Slik og snacks',
+    'slik og snacks': 'Slik og snacks',
+    'personlig pleje': 'Personlig pleje',
+    'husholdning & rengøring': 'Husholdning',
+    'husholdning': 'Husholdning',
+    'baby og småbørn': 'Baby og familie',
+    'baby og familie': 'Baby og familie',
+    'frost': 'Frost',
+    'kiosk': 'Kiosk',
+    'dyr': 'Dyr'
+  }
+
   /**
    * Get published recipes from database (for frontend use)
    */
@@ -253,7 +290,8 @@ export class DatabaseService {
     categories?: string[],
     offersOnly?: boolean,
     search?: string,
-    stores?: string[]
+    stores?: string[],
+    foodOnly?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
@@ -281,7 +319,7 @@ export class DatabaseService {
           is_available,
           sale_valid_from,
           sale_valid_to,
-          products:product_id (
+          products:product_id!inner (
             id,
             name_generic,
             brand,
@@ -305,29 +343,27 @@ export class DatabaseService {
         query = query.eq('is_on_sale', true)
       }
 
-      if (categories && categories.length > 0) {
-        // First, find all product_ids that match the categories
-        const { data: matchingProducts, error: productError } = await supabase
-          .from('products')
-          .select('id')
-          .in('department', categories)
-        
-        if (productError) {
-          console.error('Error finding products by category:', productError)
-        } else if (matchingProducts && matchingProducts.length > 0) {
-          const productIds = matchingProducts.map(p => p.id)
-          query = query.in('product_id', productIds)
-        } else {
-          // No products match this category, return empty result
-          return { products: [], total: 0, hasMore: false }
-        }
+      let normalizedCategoryFilters = this.buildCategoryFilterList(categories, foodOnly)
+
+      if (foodOnly && categories && categories.length > 0 && normalizedCategoryFilters.length === 0) {
+        return { products: [], total: 0, hasMore: false }
+      }
+
+      if (normalizedCategoryFilters.length > 0) {
+        query = query.in('products.category', normalizedCategoryFilters)
       }
 
       if (search && search.trim()) {
-        // Simpel tekstsøgning i butiksnavn + globalt navn + brand
-        const term = search.trim()
+        const likeTerm = `%${this.escapeIlikeTerm(search.trim())}%`
+        query = query.or(`name_store.ilike.${likeTerm}`)
         query = query.or(
-          `name_store.ilike.%${term}%,products.name_generic.ilike.%${term}%,products.brand.ilike.%${term}%`
+          [
+            `name_generic.ilike.${likeTerm}`,
+            `brand.ilike.${likeTerm}`,
+            `category.ilike.${likeTerm}`,
+            `subcategory.ilike.${likeTerm}`
+          ].join(','),
+          { foreignTable: 'products' }
         )
       }
 
@@ -369,14 +405,14 @@ export class DatabaseService {
           id: row.id,
           name: row.name_store || p.name_generic,
           description: null,
-          category: p.department || p.category,
+          category: p.category || p.department,
           price,
           original_price: originalPrice,
           unit: p.unit || 'stk',
           unit_price: row.price_per_unit || row.price_per_kilogram || null,
           is_on_sale: isOnSale,
           discount_percentage: discountPct,
-          image_url: p.image_url || null, // Explicit null instead of undefined
+          image_url: p.image_url || this.getProductPlaceholderImage(),
           store: this.mapStoreIdToDisplayName(row.store_id),
           amount: p.amount ? String(p.amount) : null,
         }
@@ -454,6 +490,45 @@ export class DatabaseService {
     }
 
     return stores.map((s) => mapping[s] || s.toLowerCase().replace(/\s+/g, '-'))
+  }
+
+  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
+    const normalized = (categories || [])
+      .map((cat) => this.normalizeCategoryInput(cat))
+      .filter((cat): cat is string => Boolean(cat))
+
+    const unique = Array.from(new Set(normalized))
+
+    if (foodOnly) {
+      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
+      if (unique.length === 0) {
+        return Array.from(allowedSet)
+      }
+      return unique.filter((cat) => allowedSet.has(cat))
+    }
+
+    return unique
+  }
+
+  private normalizeCategoryInput(category?: string | null): string | null {
+    if (!category) return null
+    const trimmed = category.trim()
+    if (!trimmed) return null
+    const key = trimmed.toLowerCase()
+    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
+  }
+
+  private escapeIlikeTerm(value: string): string {
+    return value
+      .replace(/\\/g, '\\')
+      .replace(/%/g, '\%')
+      .replace(/_/g, '\_')
+      .replace(/,/g, '\,')
+  }
+
+
+  private getProductPlaceholderImage(): string {
+    return '/images/recipe-placeholder.jpg'
   }
 
   /**

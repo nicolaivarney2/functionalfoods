@@ -15,8 +15,9 @@ export async function GET(request: NextRequest) {
     const offers = searchParams.get('offers') === 'true'
     const search = searchParams.get('search') || undefined
     const countsOnly = searchParams.get('counts') === 'true'
+    const foodOnly = searchParams.get('foodOnly') === 'true'
     
-    console.log(`📋 Query params: page=${page}, limit=${limit}, categories=${categories}, stores=${stores}, offers=${offers}, search=${search}, countsOnly=${countsOnly}`)
+    console.log(`📋 Query params: page=${page}, limit=${limit}, categories=${categories}, stores=${stores}, offers=${offers}, search=${search}, countsOnly=${countsOnly}, foodOnly=${foodOnly}`)
     if (search) {
       console.log(`🔍 Search term details: "${search}" (length: ${search.length}, char codes: ${search.split('').map(c => c.charCodeAt(0)).join(',')})`)
     }
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
     
     // Get products from new global structure
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
-    const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores)
+    const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly)
     
     console.log(`✅ Found ${result.products.length} supermarket products (V2, total: ${result.total})`)
     

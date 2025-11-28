@@ -332,6 +332,7 @@ export default function DagligvarerPage() {
         params.append('search', searchQuery.trim())
       }
       if (showOnlyOffers) params.append('offers', 'true')
+      if (showOnlyFoodProducts) params.append('foodOnly', 'true')
 
       const url = `/api/supermarket/products?${params}`
       console.log('🔍 Frontend API URL:', url)
@@ -365,7 +366,7 @@ export default function DagligvarerPage() {
       setLoading(false)
       loadingRef.current = false
     }
-  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, sortBy])
+  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyFoodProducts, sortBy])
 
   // Sort products function - ALWAYS prioritize offers first
   const sortProducts = (products: Product[], sortBy: string): Product[] => {
@@ -454,7 +455,7 @@ export default function DagligvarerPage() {
   useEffect(() => {
     setCurrentPage(1)
     fetchProducts(1, false)
-  }, [showOnlyOffers, selectedCategories, selectedStores, fetchProducts])
+  }, [showOnlyOffers, showOnlyFoodProducts, selectedCategories, selectedStores, fetchProducts])
 
 
 
