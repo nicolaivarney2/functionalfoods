@@ -40,7 +40,42 @@ export class DatabaseService {
     'kiosk': 'Kiosk',
     'dyr': 'Dyr'
   }
+  private readonly FOOD_ONLY_CATEGORY_LIST = [
+    'Frugt og grønt',
+    'Brød og kager',
+    'Drikkevarer',
+    'Kød og fisk',
+    'Kolonial',
+    'Mejeri og køl',
+    'Nemt og hurtigt',
+    'Slik og snacks'
+  ]
 
+  private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
+    'frugt & grønt': 'Frugt og grønt',
+    'frugt og grønt': 'Frugt og grønt',
+    'brød & kager': 'Brød og kager',
+    'brød og kager': 'Brød og kager',
+    'drikkevarer': 'Drikkevarer',
+    'kød, fisk & fjerkræ': 'Kød og fisk',
+    'kød og fisk': 'Kød og fisk',
+    'kolonial': 'Kolonial',
+    'mejeri': 'Mejeri og køl',
+    'mejeri og køl': 'Mejeri og køl',
+    'ost & mejeri': 'Mejeri og køl',
+    'nemt & hurtigt': 'Nemt og hurtigt',
+    'nemt og hurtigt': 'Nemt og hurtigt',
+    'snacks & slik': 'Slik og snacks',
+    'slik og snacks': 'Slik og snacks',
+    'personlig pleje': 'Personlig pleje',
+    'husholdning & rengøring': 'Husholdning',
+    'husholdning': 'Husholdning',
+    'baby og småbørn': 'Baby og familie',
+    'baby og familie': 'Baby og familie',
+    'frost': 'Frost',
+    'kiosk': 'Kiosk',
+    'dyr': 'Dyr'
+  }
   /**
    * Get published recipes from database (for frontend use)
    */
@@ -343,28 +378,57 @@ export class DatabaseService {
         query = query.eq('is_on_sale', true)
       }
 
-      let normalizedCategoryFilters = this.buildCategoryFilterList(categories, foodOnly)
-
-      if (foodOnly && categories && categories.length > 0 && normalizedCategoryFilters.length === 0) {
-        return { products: [], total: 0, hasMore: false }
-      }
-
-      if (normalizedCategoryFilters.length > 0) {
-        query = query.in('products.category', normalizedCategoryFilters)
+      if (categories && categories.length > 0) {
+        // Robust two-step approach:
+        // 1) Find matching product_ids in products using iterative ilike queries
+        // 2) Filter offers by those product_ids
+        const productIds = await this.findProductIdsForCategories(categories)
+        if (productIds.length === 0) {
+          return { products: [], total: 0, hasMore: false }
+        }
+        // Avoid extremely large IN lists: cap to a reasonable number
+        const MAX_IDS = 10000
+        const limitedIds = productIds.slice(0, MAX_IDS)
+        query = query.in('product_id', limitedIds)
       }
 
       if (search && search.trim()) {
-        const likeTerm = `%${this.escapeIlikeTerm(search.trim())}%`
-        query = query.or(`name_store.ilike.${likeTerm}`)
-        query = query.or(
-          [
-            `name_generic.ilike.${likeTerm}`,
-            `brand.ilike.${likeTerm}`,
-            `category.ilike.${likeTerm}`,
-            `subcategory.ilike.${likeTerm}`
-          ].join(','),
-          { foreignTable: 'products' }
-        )
+        // Forbedret tekstsøgning i butiksnavn + globalt navn + brand + kategori-felter
+        const term = search.trim()
+        console.log(`🔍 Searching for: "${term}"`)
+        
+        // Find products matching the search term in name/brand fields
+        const { data: nameMatches, error: nameErr } = await supabase
+          .from('product_offers')
+          .select('product_id')
+          .or(`name_store.ilike.%${term}%`)
+          .limit(1000)
+        
+        // Also find products matching in category fields
+        const { data: categoryMatches, error: catSearchErr } = await supabase
+          .from('products')
+          .select('id')
+          .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
+          .limit(1000)
+        
+        const matchingProductIds = new Set<string>()
+        
+        if (!nameErr && nameMatches) {
+          nameMatches.forEach((m: any) => m?.product_id && matchingProductIds.add(m.product_id))
+        }
+        
+        if (!catSearchErr && categoryMatches) {
+          categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(m.id))
+        }
+        
+        if (matchingProductIds.size > 0) {
+          console.log(`🔍 Found ${matchingProductIds.size} unique products matching search term`)
+          query = query.in('product_id', Array.from(matchingProductIds))
+        } else {
+          // No matches found, return empty result
+          console.log(`🔍 No products found matching search term`)
+          return { products: [], total: 0, hasMore: false }
+        }
       }
 
       query = query
@@ -405,7 +469,7 @@ export class DatabaseService {
           id: row.id,
           name: row.name_store || p.name_generic,
           description: null,
-          category: p.category || p.department,
+          category: p.category || p.department || null,
           price,
           original_price: originalPrice,
           unit: p.unit || 'stk',
@@ -426,6 +490,93 @@ export class DatabaseService {
   }
 
   /**
+   * Helper: find product_ids whose department/category matches any of the provided categories.
+   * Uses iterative ilike to avoid brittle OR strings and supports URL-decoded variants.
+   */
+  private async findProductIdsForCategories(categories: string[]): Promise<string[]> {
+    const supabase = createSupabaseClient()
+    const seen = new Set<string>()
+
+    const expandedVariants = (cat: string): string[] => {
+      const variants = new Set<string>()
+      const raw = cat || ''
+      const decoded = (() => { try { return decodeURIComponent(raw) } catch { return raw } })()
+      const normalized = decoded.trim().replace(/\s+/g, ' ')
+      variants.add(normalized)
+      variants.add(normalized.toLowerCase())
+      // Replace & with og and vice versa - be more aggressive
+      variants.add(normalized.replace(/&/g, ' og ').replace(/\s+/g, ' ').trim())
+      variants.add(normalized.replace(/\s+og\s+/g, ' & ').replace(/\s+/g, ' ').trim())
+      // Also try without spaces around &
+      variants.add(normalized.replace(/&/g, 'og'))
+      variants.add(normalized.replace(/\s+og\s+/g, '&'))
+      // Replace commas with space
+      variants.add(normalized.replace(/,/g, ' '))
+      // Remove common suffixes
+      variants.add(normalized.replace(/\s+og\s+grøntsager?$/i, ''))
+      variants.add(normalized.replace(/\s+grøntsager?$/i, ''))
+      return Array.from(variants).filter(Boolean)
+    }
+
+    console.log(`🔍 Finding product IDs for categories: ${categories.join(', ')}`)
+
+    for (const cat of categories) {
+      const variants = expandedVariants(cat)
+      console.log(`🔍 Expanded variants for "${cat}":`, variants)
+      
+      for (const v of variants) {
+        // Search department
+        const { data: depRows, error: depErr } = await supabase
+          .from('products')
+          .select('id')
+          .ilike('department', `%${v}%`)
+          .limit(5000)
+        if (!depErr && depRows) {
+          depRows.forEach(r => r?.id && seen.add(r.id))
+          if (depRows.length > 0) {
+            console.log(`  ✅ Found ${depRows.length} products in department matching "${v}"`)
+          }
+        } else if (depErr) {
+          console.error(`  ❌ Error searching department for "${v}":`, depErr)
+        }
+        
+        // Search category
+        const { data: catRows, error: catErr } = await supabase
+          .from('products')
+          .select('id')
+          .ilike('category', `%${v}%`)
+          .limit(5000)
+        if (!catErr && catRows) {
+          catRows.forEach(r => r?.id && seen.add(r.id))
+          if (catRows.length > 0) {
+            console.log(`  ✅ Found ${catRows.length} products in category matching "${v}"`)
+          }
+        } else if (catErr) {
+          console.error(`  ❌ Error searching category for "${v}":`, catErr)
+        }
+        
+        // Search subcategory
+        const { data: subcatRows, error: subcatErr } = await supabase
+          .from('products')
+          .select('id')
+          .ilike('subcategory', `%${v}%`)
+          .limit(5000)
+        if (!subcatErr && subcatRows) {
+          subcatRows.forEach(r => r?.id && seen.add(r.id))
+          if (subcatRows.length > 0) {
+            console.log(`  ✅ Found ${subcatRows.length} products in subcategory matching "${v}"`)
+          }
+        } else if (subcatErr) {
+          console.error(`  ❌ Error searching subcategory for "${v}":`, subcatErr)
+        }
+      }
+    }
+
+    console.log(`🔍 Total unique product IDs found: ${seen.size}`)
+    return Array.from(seen)
+  }
+
+  /**
    * Simple mapping fra store_id i DB til visningsnavn
    */
   private mapStoreIdToDisplayName(storeId: string | null): string {
@@ -441,8 +592,6 @@ export class DatabaseService {
         return '365 Discount'
       case 'lidl':
         return 'Lidl'
-      case 'føtex':
-        return 'Føtex'
       case 'bilka':
         return 'Bilka'
       case 'nemlig':
@@ -474,22 +623,63 @@ export class DatabaseService {
     const mapping: Record<string, string> = {
       'Netto': 'netto',
       'REMA 1000': 'rema-1000',
-      '365 Discount': '365-discount',
+      '365discount': '365-discount', // Goma uses "365discount" (no space)
+      '365 Discount': '365-discount', // Also support display name
       'Lidl': 'lidl',
-      'Føtex': 'føtex',
       'Bilka': 'bilka',
       'Nemlig': 'nemlig',
-      'MENU': 'menu',
-      'MENY': 'menu',
+      'MENY': 'meny', // Goma uses "MENY" (not "MENU")
+      'MENU': 'meny', // Also support old name for backwards compatibility
       'Spar': 'spar',
       'Kvickly': 'kvickly',
-      'Super Brugsen': 'super-brugsen',
+      'superbrugsen': 'super-brugsen', // Goma uses "superbrugsen" (no space, lowercase)
+      'Super Brugsen': 'super-brugsen', // Also support display name
       'Brugsen': 'brugsen',
       'Løvbjerg': 'løvbjerg',
       'ABC Lavpris': 'abc-lavpris',
+      // Note: Føtex removed - Goma has no products for this store
     }
 
     return stores.map((s) => mapping[s] || s.toLowerCase().replace(/\s+/g, '-'))
+  }
+
+  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
+    const normalized = (categories || [])
+      .map((cat) => this.normalizeCategoryInput(cat))
+      .filter((cat): cat is string => Boolean(cat))
+
+    const unique = Array.from(new Set(normalized))
+
+    if (foodOnly) {
+      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
+      if (unique.length === 0) {
+        console.log('🍽️ foodOnly active with no explicit categories, defaulting to food list', this.FOOD_ONLY_CATEGORY_LIST)
+        return Array.from(allowedSet)
+      }
+      return unique.filter((cat) => allowedSet.has(cat))
+    }
+
+    return unique
+  }
+
+  private normalizeCategoryInput(category?: string | null): string | null {
+    if (!category) return null
+    const trimmed = category.trim()
+    if (!trimmed) return null
+    const key = trimmed.toLowerCase()
+    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
+  }
+
+  private escapeIlikeTerm(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_')
+      .replace(/,/g, '\\,')
+  }
+
+  private getProductPlaceholderImage(): string {
+    return '/images/recipe-placeholder.jpg'
   }
 
   private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
@@ -520,12 +710,92 @@ export class DatabaseService {
 
   private escapeIlikeTerm(value: string): string {
     return value
-      .replace(/\\/g, '\\')
-      .replace(/%/g, '\%')
-      .replace(/_/g, '\_')
-      .replace(/,/g, '\,')
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_')
+      .replace(/,/g, '\\,')
   }
 
+  private getProductPlaceholderImage(): string {
+    return '/images/recipe-placeholder.jpg'
+  }
+
+  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
+    const normalized = (categories || [])
+      .map((cat) => this.normalizeCategoryInput(cat))
+      .filter((cat): cat is string => Boolean(cat))
+
+    const unique = Array.from(new Set(normalized))
+
+    if (foodOnly) {
+      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
+      if (unique.length === 0) {
+        return Array.from(allowedSet)
+      }
+      return unique.filter((cat) => allowedSet.has(cat))
+    }
+
+    return unique
+  }
+
+  private normalizeCategoryInput(category?: string | null): string | null {
+    if (!category) return null
+    const trimmed = category.trim()
+    if (!trimmed) return null
+    const key = trimmed.toLowerCase()
+    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
+  }
+
+  private escapeIlikeTerm(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_')
+      .replace(/,/g, '\\,')
+  }
+
+  private getProductPlaceholderImage(): string {
+    return '/images/recipe-placeholder.jpg'
+  }
+
+  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
+    const normalized = (categories || [])
+      .map(cat => this.normalizeCategoryInput(cat))
+      .filter((cat): cat is string => Boolean(cat))
+
+    const unique = Array.from(new Set(normalized))
+
+    if (foodOnly) {
+      const allowed = this.getFoodOnlyCategories()
+      const allowedSet = new Set(allowed)
+      if (unique.length === 0) {
+        return allowed
+      }
+      return unique.filter(cat => allowedSet.has(cat))
+    }
+
+    return unique
+  }
+
+  private normalizeCategoryInput(category?: string | null): string | null {
+    if (!category) return null
+    const trimmed = category.trim()
+    if (!trimmed) return null
+    const key = trimmed.toLowerCase()
+    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
+  }
+
+  private getFoodOnlyCategories(): string[] {
+    return [...this.FOOD_ONLY_CATEGORY_LIST]
+  }
+
+  private escapeIlikeTerm(value: string): string {
+    return value
+      .replace(/\\/g, '\\\\')
+      .replace(/%/g, '\\%')
+      .replace(/_/g, '\\_')
+      .replace(/,/g, '\\,')
+  }
 
   private getProductPlaceholderImage(): string {
     return '/images/recipe-placeholder.jpg'

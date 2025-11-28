@@ -76,7 +76,6 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
       <div className={`absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm border-2 ${
         product.store === 'Netto' ? 'border-yellow-400' :
         product.store === 'REMA 1000' ? 'border-blue-900' :
-        product.store === 'Føtex' ? 'border-blue-950' :
         product.store === 'Bilka' ? 'border-blue-400' :
         product.store === 'Nemlig' ? 'border-orange-600' :
         product.store === 'MENY' ? 'border-red-800' :
@@ -211,6 +210,8 @@ const SORT_OPTIONS = [
 ]
 
 // Categories - ALL categories from database with appropriate icons
+// NOTE: Category names must match exactly what's in the database (products.department or products.category)
+// Updated to match database: Frugt og grønt, Brød og kager, Kød og fisk, Mejeri og køl, etc.
 const CATEGORIES = [
   { id: 'Frugt og grønt', name: 'Frugt og grønt', icon: '🍎' },
   { id: 'Brød og kager', name: 'Brød og kager', icon: '🍞' },
@@ -228,22 +229,22 @@ const CATEGORIES = [
   { id: 'Dyr', name: 'Dyr', icon: '🐾' }
 ]
 
-// Available stores
+// Available stores - using Goma's exact store names for API calls
 const STORES = [
   { id: 'Netto', name: 'Netto', icon: '🟨' },
   { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
-  { id: '365 Discount', name: '365 Discount', icon: '3️⃣' },
+  { id: '365discount', name: '365 Discount', icon: '3️⃣' }, // Goma uses "365discount" (no space)
   { id: 'Lidl', name: 'Lidl', icon: '🟡' },
-  { id: 'Føtex', name: 'Føtex', icon: '🔵' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
   { id: 'Nemlig', name: 'Nemlig', icon: '🟠' },
-  { id: 'MENY', name: 'MENY', icon: '🔴' },
+  { id: 'MENY', name: 'MENY', icon: '🔴' }, // Goma uses "MENY" (not "MENU")
   { id: 'Spar', name: 'Spar', icon: '🔺' },
   { id: 'Kvickly', name: 'Kvickly', icon: '🟥' },
-  { id: 'Super Brugsen', name: 'Super Brugsen', icon: '🧺' },
+  { id: 'superbrugsen', name: 'Super Brugsen', icon: '🧺' }, // Goma uses "superbrugsen" (no space, lowercase)
   { id: 'Brugsen', name: 'Brugsen', icon: '🧺' },
   { id: 'Løvbjerg', name: 'Løvbjerg', icon: '💚' },
   { id: 'ABC Lavpris', name: 'ABC Lavpris', icon: '🔤' }
+  // Note: Føtex removed - Goma has no products for this store
 ]
 
 export default function DagligvarerPage() {
@@ -489,11 +490,12 @@ export default function DagligvarerPage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [hasMore, loading, currentPage, fetchProducts])
 
-  // Initial load
+  // Initial load - only run once on mount
   useEffect(() => {
     fetchCounts()
     fetchProducts(1, false)
-  }, [fetchCounts, fetchProducts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - only run on mount
 
   // Get filter summary text
   const getFilterSummary = () => {
@@ -824,7 +826,6 @@ export default function DagligvarerPage() {
                 <div className={`absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium shadow-sm border-2 ${
                   selectedProduct.store === 'Netto' ? 'border-yellow-400' :
                   selectedProduct.store === 'REMA 1000' ? 'border-blue-900' :
-                  selectedProduct.store === 'Føtex' ? 'border-blue-950' :
                   selectedProduct.store === 'Bilka' ? 'border-blue-400' :
                   selectedProduct.store === 'Nemlig' ? 'border-orange-600' :
                   selectedProduct.store === 'MENY' ? 'border-red-800' :

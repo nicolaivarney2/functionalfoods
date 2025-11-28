@@ -487,7 +487,6 @@ export default function ProductPage() {
                         <div className={`w-3 h-3 rounded border-2 ${
                           product.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
                           product.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
-                          product.store === 'Føtex' ? 'border-blue-950 bg-blue-100' :
                           product.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
                           product.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
                           product.store === 'MENY' ? 'border-red-800 bg-red-100' :
@@ -522,7 +521,6 @@ export default function ProductPage() {
                             <div className={`w-3 h-3 rounded border-2 ${
                               similarProduct.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
                               similarProduct.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
-                              similarProduct.store === 'Føtex' ? 'border-blue-950 bg-blue-100' :
                               similarProduct.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
                               similarProduct.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
                               similarProduct.store === 'MENY' ? 'border-red-800 bg-red-100' :
