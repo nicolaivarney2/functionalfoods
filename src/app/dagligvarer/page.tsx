@@ -212,19 +212,19 @@ const SORT_OPTIONS = [
 
 // Categories - ALL categories from database with appropriate icons
 const CATEGORIES = [
-  { id: 'Frugt & grønt', name: 'Frugt & grønt', icon: '🍎' },
-  { id: 'Brød & kager', name: 'Brød & kager', icon: '🍞' },
+  { id: 'Frugt og grønt', name: 'Frugt og grønt', icon: '🍎' },
+  { id: 'Brød og kager', name: 'Brød og kager', icon: '🍞' },
   { id: 'Drikkevarer', name: 'Drikkevarer', icon: '🥤' },
   { id: 'Færdigretter & takeaway', name: 'Færdigretter & takeaway', icon: '🍱' },
   { id: 'Husholdning & rengøring', name: 'Husholdning & rengøring', icon: '🧽' },
   { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
-  { id: 'Kød, fisk & fjerkræ', name: 'Kød, fisk & fjerkræ', icon: '🥩' },
+  { id: 'Kød og fisk', name: 'Kød og fisk', icon: '🥩' },
   { id: 'Kolonial', name: 'Kolonial', icon: '🌾' },
-  { id: 'Mejeri', name: 'Mejeri', icon: '🥛' },
-  { id: 'Nemt & hurtigt', name: 'Nemt & hurtigt', icon: '⚡' },
+  { id: 'Mejeri og køl', name: 'Mejeri og køl', icon: '🥛' },
+  { id: 'Nemt og hurtigt', name: 'Nemt og hurtigt', icon: '⚡' },
   { id: 'Ost & mejeri', name: 'Ost & mejeri', icon: '🧀' },
   { id: 'Personlig pleje', name: 'Personlig pleje', icon: '🧴' },
-  { id: 'Snacks & slik', name: 'Snacks & slik', icon: '🍿' },
+  { id: 'Slik og snacks', name: 'Slik og snacks', icon: '🍿' },
   { id: 'Ukategoriseret', name: 'Ukategoriseret', icon: '📦' },
   { id: 'Ukategoriseret (dept 110: Baby og småbørn)', name: 'Baby og småbørn', icon: '👶' }
 ]
