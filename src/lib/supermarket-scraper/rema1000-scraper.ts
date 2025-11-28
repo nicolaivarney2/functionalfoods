@@ -52,8 +52,8 @@ interface RemaDepartment {
 
 // REMA 1000 specific categories we want to scrape
 const REMA_CATEGORIES = {
-  'Frugt & grønt': 20,
-  'Kød, fisk & fjerkræ': 30,
+  'Frugt og grønt': 20,
+  'Kød og fisk': 30,
   'Køl': 40,
   'Ost m.v.': 50,
   'Frost': 60,
@@ -90,7 +90,7 @@ export class Rema1000Scraper implements SupermarketAPI {
     // Method 1: Sequential search around known working product IDs
     // OPTIMIZED: Use realistic ID ranges based on known products
     const searchRanges = [
-      { name: 'Frugt & grønt', start: 304000, end: 305000, step: 50, limit: 100 },
+      { name: 'Frugt og grønt', start: 304000, end: 305000, step: 50, limit: 100 },
       { name: 'Kød & fisk', start: 440000, end: 441000, step: 50, limit: 100 },
       { name: 'Køl', start: 410000, end: 411000, step: 50, limit: 100 },
       { name: 'Ost m.v.', start: 500000, end: 501000, step: 50, limit: 100 },
@@ -322,8 +322,8 @@ export class Rema1000Scraper implements SupermarketAPI {
    */
   private getSubcategory(departmentName: string): string {
     const subcategories: Record<string, string[]> = {
-      'Frugt & grønt': ['Frugt', 'Grøntsager', 'Krydderurter'],
-      'Kød, fisk & fjerkræ': ['Kød', 'Fisk', 'Fjerkræ', 'Pålæg'],
+      'Frugt og grønt': ['Frugt', 'Grøntsager', 'Krydderurter'],
+      'Kød og fisk': ['Kød', 'Fisk', 'Fjerkræ', 'Pålæg'],
       'Køl': ['Kødpålæg', 'Ost', 'Mælkeprodukter'],
       'Ost m.v.': ['Fast ost', 'Rasp', 'Frisk ost'],
       'Frost': ['Frosne grøntsager', 'Frosne retter', 'Is'],

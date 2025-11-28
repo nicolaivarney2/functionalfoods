@@ -16,8 +16,8 @@ from pathlib import Path
 # Food department IDs (excluding "Husholdning" which is non-food)
 FOOD_DEPARTMENTS = [
     1,   # Brød & Bavinchi
-    2,   # Frugt & grønt  
-    3,   # Kød, fisk & fjerkræ
+    2,   # Frugt og grønt  
+    3,   # Kød og fisk
     4,   # Køl
     5,   # Frost
     6,   # Mejeri
@@ -234,21 +234,21 @@ async def enrich_details(products: list, client: httpx.AsyncClient, test_mode: b
     # Department ID to category name mapping - UPDATED WITH NEW REMA API IDs (2025)
     department_mapping = {
         # NEW REMA API department IDs (September 2025)
-        10: "Brød & kager",  # Brød & Bavinchi
-        20: "Frugt & grønt",  # Frugt & grønt
-        30: "Kød, fisk & fjerkræ",  # Kød, fisk & fjerkræ
-        40: "Kød, fisk & fjerkræ",  # Køl - kølede madvarer som leverpostej, sild, etc.
+        10: "Brød og kager",  # Brød & Bavinchi
+        20: "Frugt og grønt",  # Frugt og grønt
+        30: "Kød og fisk",  # Kød og fisk
+        40: "Kød og fisk",  # Køl - kølede madvarer som leverpostej, sild, etc.
         50: "Ukategoriseret",  # Frost - mapped to Uncategorized since not in user list
-        60: "Ost & mejeri",  # Mejeri - changed from "Mejeri" to match user categories
-        70: "Ost & mejeri",  # Ost m.v. - already correct
+        60: "Mejeri og køl",  # Mejeri - changed from "Mejeri" to match user categories
+        70: "Mejeri og køl",  # Ost m.v. - already correct
         80: "Kolonial",  # Kolonial
         90: "Drikkevarer",  # Drikkevarer
-        100: "Husholdning & rengøring",  # Husholdning
-        110: "Baby og småbørn",  # Baby og småbørn
+        100: "Husholdning",  # Husholdning
+        110: "Baby og familie",  # Baby og familie
         120: "Personlig pleje",  # Personlig pleje
-        130: "Snacks & slik",  # Slik
+        130: "Slik og snacks",  # Slik
         140: "Kiosk",  # Kiosk
-        160: "Ukategoriseret"  # "Nemt & hurtigt" - mapped to Uncategorized since not in user list
+        160: "Ukategoriseret"  # "Nemt og hurtigt" - mapped to Uncategorized since not in user list
         
         # OLD MAPPINGS (no longer valid):
         # 81, 82, 83, 84, 85, 86, 87, 88, 89 - these IDs no longer exist in REMA API
@@ -290,15 +290,15 @@ async def enrich_details(products: list, client: httpx.AsyncClient, test_mode: b
                         if 'kolonial' in dept_name_lower:
                             category_name = "Kolonial"
                         elif 'frugt' in dept_name_lower or 'grønt' in dept_name_lower:
-                            category_name = "Frugt & grønt"
+                            category_name = "Frugt og grønt"
                         elif 'kød' in dept_name_lower or 'fisk' in dept_name_lower:
-                            category_name = "Kød, fisk & fjerkræ"
+                            category_name = "Kød og fisk"
                         elif 'mejeri' in dept_name_lower or 'ost' in dept_name_lower:
                             category_name = "Mejeri"
                         elif 'frost' in dept_name_lower:
                             category_name = "Frost"
                         elif 'brød' in dept_name_lower or 'kage' in dept_name_lower:
-                            category_name = "Brød & kager"
+                            category_name = "Brød og kager"
                         elif 'drikke' in dept_name_lower:
                             category_name = "Drikkevarer"
                         else:

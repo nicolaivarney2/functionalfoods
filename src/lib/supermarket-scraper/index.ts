@@ -7,7 +7,7 @@ const STORE_CONFIGS: Record<string, StoreConfig> = {
     name: 'REMA 1000',
     enabled: true,
     baseUrl: 'https://api.digital.rema1000.dk/api/v3',
-    categories: ['Frugt & grønt', 'Kød, fisk & fjerkræ', 'Køl', 'Ost m.v.', 'Frost', 'Mejeri', 'Kolonial'],
+    categories: ['Frugt og grønt', 'Kød og fisk', 'Køl', 'Ost m.v.', 'Frost', 'Mejeri', 'Kolonial'],
     scrapingConfig: {
       enabled: true,
       schedule: '0 2 * * *', // Every night at 2 AM

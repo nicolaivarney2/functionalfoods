@@ -47,19 +47,19 @@ function transformProduct(productData: any): any {
     let category = 'Ukategoriseret'
     if (product.department && product.department.id) {
       const deptId = product.department.id
-      if (deptId === 10) category = "Brød & kager"
-      else if (deptId === 20) category = "Frugt & grønt"
-      else if (deptId === 30) category = "Kød, fisk & fjerkræ"
-      else if (deptId === 40) category = "Kød, fisk & fjerkræ"
+      if (deptId === 10) category = "Brød og kager"
+      else if (deptId === 20) category = "Frugt og grønt"
+      else if (deptId === 30) category = "Kød og fisk"
+      else if (deptId === 40) category = "Kød og fisk"
       else if (deptId === 50) category = "Ukategoriseret"
-      else if (deptId === 60) category = "Ost & mejeri"
-      else if (deptId === 70) category = "Ost & mejeri"
+      else if (deptId === 60) category = "Mejeri og køl"
+      else if (deptId === 70) category = "Mejeri og køl"
       else if (deptId === 80) category = "Kolonial"
       else if (deptId === 90) category = "Drikkevarer"
-      else if (deptId === 100) category = "Husholdning & rengøring"
-      else if (deptId === 110) category = "Baby og småbørn"
+      else if (deptId === 100) category = "Husholdning"
+      else if (deptId === 110) category = "Baby og familie"
       else if (deptId === 120) category = "Personlig pleje"
-      else if (deptId === 130) category = "Snacks & slik"
+      else if (deptId === 130) category = "Slik og snacks"
       else if (deptId === 140) category = "Kiosk"
       else if (deptId === 160) category = "Ukategoriseret"
     }

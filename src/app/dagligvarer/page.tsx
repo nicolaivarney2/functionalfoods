@@ -215,18 +215,17 @@ const CATEGORIES = [
   { id: 'Frugt og grønt', name: 'Frugt og grønt', icon: '🍎' },
   { id: 'Brød og kager', name: 'Brød og kager', icon: '🍞' },
   { id: 'Drikkevarer', name: 'Drikkevarer', icon: '🥤' },
-  { id: 'Færdigretter & takeaway', name: 'Færdigretter & takeaway', icon: '🍱' },
-  { id: 'Husholdning & rengøring', name: 'Husholdning & rengøring', icon: '🧽' },
-  { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
   { id: 'Kød og fisk', name: 'Kød og fisk', icon: '🥩' },
   { id: 'Kolonial', name: 'Kolonial', icon: '🌾' },
   { id: 'Mejeri og køl', name: 'Mejeri og køl', icon: '🥛' },
   { id: 'Nemt og hurtigt', name: 'Nemt og hurtigt', icon: '⚡' },
-  { id: 'Ost & mejeri', name: 'Ost & mejeri', icon: '🧀' },
-  { id: 'Personlig pleje', name: 'Personlig pleje', icon: '🧴' },
   { id: 'Slik og snacks', name: 'Slik og snacks', icon: '🍿' },
-  { id: 'Ukategoriseret', name: 'Ukategoriseret', icon: '📦' },
-  { id: 'Ukategoriseret (dept 110: Baby og småbørn)', name: 'Baby og småbørn', icon: '👶' }
+  { id: 'Personlig pleje', name: 'Personlig pleje', icon: '🧴' },
+  { id: 'Husholdning', name: 'Husholdning', icon: '🧽' },
+  { id: 'Baby og familie', name: 'Baby og familie', icon: '👶' },
+  { id: 'Frost', name: 'Frost', icon: '❄️' },
+  { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
+  { id: 'Dyr', name: 'Dyr', icon: '🐾' }
 ]
 
 // Available stores

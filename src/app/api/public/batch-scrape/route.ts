@@ -48,19 +48,19 @@ function transformProduct(productData: any, departmentId: number): any {
     console.log(`🏷️ Product: ${product.name}, Department ID from API call: ${departmentId}`)
     
     // Use the departmentId from the API call since REMA doesn't include it in product data
-    if (departmentId === 10) category = "Brød & kager"
-    else if (departmentId === 20) category = "Frugt & grønt"
-    else if (departmentId === 30) category = "Kød, fisk & fjerkræ"
-    else if (departmentId === 40) category = "Kød, fisk & fjerkræ"
+    if (departmentId === 10) category = "Brød og kager"
+    else if (departmentId === 20) category = "Frugt og grønt"
+    else if (departmentId === 30) category = "Kød og fisk"
+    else if (departmentId === 40) category = "Kød og fisk"
     else if (departmentId === 50) category = "Ukategoriseret"
-    else if (departmentId === 60) category = "Ost & mejeri"
-    else if (departmentId === 70) category = "Ost & mejeri"
+    else if (departmentId === 60) category = "Mejeri og køl"
+    else if (departmentId === 70) category = "Mejeri og køl"
     else if (departmentId === 80) category = "Kolonial"
     else if (departmentId === 90) category = "Drikkevarer"
-    else if (departmentId === 100) category = "Husholdning & rengøring"
-    else if (departmentId === 110) category = "Baby og småbørn"
+    else if (departmentId === 100) category = "Husholdning"
+    else if (departmentId === 110) category = "Baby og familie"
     else if (departmentId === 120) category = "Personlig pleje"
-    else if (departmentId === 130) category = "Snacks & slik"
+    else if (departmentId === 130) category = "Slik og snacks"
     else if (departmentId === 140) category = "Kiosk"
     else if (departmentId === 160) category = "Ukategoriseret"
     
