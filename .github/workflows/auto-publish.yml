@@ -1,3 +1,33 @@
+name: Auto Publish Recipes
+
+on:
+  schedule:
+    # Kør tæt på de 4 daglige publish-slots.
+    # Tiderne er i UTC – justér hvis dine slots skal matche dansk lokal tid præcist.
+    - cron: '1 7 * * *'   # ca. 07:01
+    - cron: '1 12 * * *'  # ca. 12:01
+    - cron: '31 15 * * *' # ca. 15:31
+    - cron: '31 20 * * *' # ca. 20:31
+  workflow_dispatch:
+
+jobs:
+  auto-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call auto-publish endpoint
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$SITE_URL" ]; then
+            echo "SITE_URL GitHub variable is not set. Please set it to your production URL (e.g. https://functionalfoods.dk)."
+            exit 1
+          fi
+
+          echo "Triggering auto-publish on $SITE_URL ..."
+          curl --fail -X POST \
+            -H "Content-Type: application/json" \
+            "$SITE_URL/api/admin/auto-publish"
+
 name: Auto publish recipes
 
 on:

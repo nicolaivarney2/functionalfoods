@@ -1,0 +1,34 @@
+name: Goma Scheduled Sync
+
+on:
+  schedule:
+    # Daily at 23:50 (UTC). Adjust if you need exact Danish local time.
+    - cron: '50 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  goma-scheduled-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call scheduled Goma sync endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$SITE_URL" ]; then
+            echo "SITE_URL GitHub variable is not set. Please set it to your production URL (e.g. https://functionalfoods.dk)."
+            exit 1
+          fi
+
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET GitHub secret is not set. Please add it and keep it in sync with the Vercel env CRON_SECRET."
+            exit 1
+          fi
+
+          echo "Calling scheduled Goma sync on $SITE_URL ..."
+          curl --fail -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$SITE_URL/api/admin/goma/scheduled-sync"
+
+

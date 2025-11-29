@@ -312,10 +312,21 @@ export default function AdminDagligvarerPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Store size={24} />
-            Dagligvare Scraper Admin
-          </h1>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Store size={24} />
+              Dagligvare Scraper Admin
+            </h1>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/admin/dagligvarer/goma"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 hover:border-indigo-300 transition-colors"
+              >
+                <Store size={16} />
+                GOMA sync
+              </a>
+            </div>
+          </div>
 
           {/* Shop Selector */}
           <div className="mb-6">

@@ -561,39 +561,39 @@ export default function MadbudgetPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                  {/* Show first 3-5 items */}
-        {basisvarer.slice(0, 4).map(item => (
-          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
-              <div className="text-xs text-gray-500 flex items-center space-x-2">
-                <span>{item.quantity} {item.unit}</span>
-                {item.notes && (
-                  <>
-                    <span>•</span>
-                    <span>{item.notes}</span>
-                  </>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
-                className="text-green-500 hover:text-green-700 p-1"
-                title="Øg antal"
-              >
-                <Plus size={16} />
-              </button>
-              <button
-                onClick={() => removeFromBasisvarer(item.id)}
-                className="text-red-500 hover:text-red-700 p-1"
-                title="Fjern fra basisvarer"
-              >
-                <Minus size={16} />
-              </button>
-            </div>
-          </div>
-        ))}
+                      {/* Show first 3-5 items */}
+                      {basisvarer.slice(0, 4).map(item => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+                            <div className="text-xs text-gray-500 flex items-center space-x-2">
+                              <span>{item.quantity} {item.unit}</span>
+                              {item.notes && (
+                                <>
+                                  <span>•</span>
+                                  <span>{item.notes}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
+                              className="text-green-500 hover:text-green-700 p-1"
+                              title="Øg antal"
+                            >
+                              <Plus size={16} />
+                            </button>
+                            <button
+                              onClick={() => removeFromBasisvarer(item.id)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                              title="Fjern fra basisvarer"
+                            >
+                              <Minus size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                       
                       {/* Show "show more" if there are more items */}
                       {basisvarer.length > 4 && (
@@ -605,6 +605,12 @@ export default function MadbudgetPage() {
                       )}
                     </div>
                   )}
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <p className="text-xs text-gray-500">
+                      <span className="font-semibold mr-1">(i)</span>
+                      Basisvarer tilføjes altid til indkøbslisten
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
@@ -1243,7 +1249,10 @@ export default function MadbudgetPage() {
                 />
               </div>
               <p className="text-sm text-gray-500 mt-2">
-                Skriv navnet på ingrediensen du altid køber (fx. "Skyr", "Mælk", "Brød")
+                Skriv navnet på ingrediensen du altid køber (fx. "Skyr", "Mælk", "Brød").
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                Klik her, hvis det er en bestemt varer til basislisten (fx. Cheasy vanilje skyr).
               </p>
             </div>
             
