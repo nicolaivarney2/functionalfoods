@@ -213,8 +213,12 @@ export default function MadbudgetPage() {
   // Basisvarer state
   const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
-  const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [productSearchQuery, setProductSearchQuery] = useState('') // generisk ingrediensnavn
+  const [basisTab, setBasisTab] = useState<'ingredient' | 'product'>('ingredient')
+  const [productSearchText, setProductSearchText] = useState('') // søgning efter konkrete produkter
+  const [productSearchResults, setProductSearchResults] = useState<Product[]>([])
   const [loadingBasisvarer, setLoadingBasisvarer] = useState(false)
+  const [loadingProductSearch, setLoadingProductSearch] = useState(false)
 
   // Load basisvarer on component mount
   useEffect(() => {
@@ -260,7 +264,41 @@ export default function MadbudgetPage() {
 
   // Removed loadCategories and loadProducts - not needed for ingredient-based basisvarer
 
-  const addToBasisvarer = async (ingredientName: string) => {
+  // Søg efter konkrete produkter til basisvarer (GOMA / supermarket API)
+  useEffect(() => {
+    const search = async () => {
+      if (!productSearchText || productSearchText.trim().length < 2) {
+        setProductSearchResults([])
+        return
+      }
+
+      setLoadingProductSearch(true)
+      try {
+        const params = new URLSearchParams({
+          page: '1',
+          limit: '20',
+          search: productSearchText.trim()
+        })
+        const res = await fetch(`/api/supermarket/products?${params.toString()}`)
+        const data = await res.json()
+        if (data.success && Array.isArray(data.products)) {
+          setProductSearchResults(data.products)
+        } else {
+          setProductSearchResults([])
+        }
+      } catch (error) {
+        console.error('Error searching products for basisvarer:', error)
+        setProductSearchResults([])
+      } finally {
+        setLoadingProductSearch(false)
+      }
+    }
+
+    const timeout = setTimeout(search, 300)
+    return () => clearTimeout(timeout)
+  }, [productSearchText])
+
+  const addToBasisvarer = async (ingredientName: string, notes?: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -277,7 +315,8 @@ export default function MadbudgetPage() {
         body: JSON.stringify({ 
           ingredient_name: ingredientName,
           quantity: 1,
-          unit: 'stk'
+          unit: 'stk',
+          notes
         })
       })
       
@@ -286,6 +325,8 @@ export default function MadbudgetPage() {
         setBasisvarer(prev => [data.basisvarer, ...prev])
         setShowBasisvarerModal(false)
         setProductSearchQuery('')
+        setProductSearchText('')
+        setProductSearchResults([])
       }
     } catch (error) {
       console.error('Error adding to basisvarer:', error)
@@ -541,7 +582,10 @@ export default function MadbudgetPage() {
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-gray-600 text-sm">Produkter du altid køber</p>
                     <button
-                      onClick={() => setShowBasisvarerModal(true)}
+                      onClick={() => {
+                        setBasisTab('ingredient')
+                        setShowBasisvarerModal(true)
+                      }}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
                     >
                       <Plus size={16} />
@@ -561,40 +605,95 @@ export default function MadbudgetPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {/* Show first 3-5 items */}
-                      {basisvarer.slice(0, 4).map(item => (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
-                            <div className="text-xs text-gray-500 flex items-center space-x-2">
-                              <span>{item.quantity} {item.unit}</span>
-                              {item.notes && (
-                                <>
-                                  <span>•</span>
-                                  <span>{item.notes}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <button
-                              onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
-                              className="text-green-500 hover:text-green-700 p-1"
-                              title="Øg antal"
-                            >
-                              <Plus size={16} />
-                            </button>
-                            <button
-                              onClick={() => removeFromBasisvarer(item.id)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                              title="Fjern fra basisvarer"
-                            >
-                              <Minus size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      
+                      {/* Split i generiske ingredienser vs. produkter (baseret på notes) */}
+                      {(() => {
+                        const productPrefix = 'Produkt:'
+                        const productItems = basisvarer.filter(b => b.notes && b.notes.startsWith(productPrefix))
+                        const ingredientItems = basisvarer.filter(b => !b.notes || !b.notes.startsWith(productPrefix))
+
+                        return (
+                          <>
+                            {/* Ingredienser */}
+                            {ingredientItems.length > 0 && (
+                              <div className="space-y-3">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  Ingredienser
+                                </p>
+                                {ingredientItems.slice(0, 4).map(item => (
+                                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+                                      <div className="text-xs text-gray-500 flex items-center space-x-2">
+                                        <span>{item.quantity} {item.unit}</span>
+                                        {item.notes && !item.notes.startsWith(productPrefix) && (
+                                          <>
+                                            <span>•</span>
+                                            <span>{item.notes}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                      <button
+                                        onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
+                                        className="text-green-500 hover:text-green-700 p-1"
+                                        title="Øg antal"
+                                      >
+                                        <Plus size={16} />
+                                      </button>
+                                      <button
+                                        onClick={() => removeFromBasisvarer(item.id)}
+                                        className="text-red-500 hover:text-red-700 p-1"
+                                        title="Fjern fra basisvarer"
+                                      >
+                                        <Minus size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Produkter */}
+                            {productItems.length > 0 && (
+                              <div className="space-y-3 pt-3 border-t border-gray-100">
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                  Produkter
+                                </p>
+                                {productItems.slice(0, 4).map(item => (
+                                  <div key={item.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+                                    <div className="flex-1">
+                                      <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
+                                      <div className="text-xs text-indigo-700 flex flex-col">
+                                        {item.notes && (
+                                          <span>{item.notes.replace(productPrefix, '').trim()}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                      <button
+                                        onClick={() => updateBasisvarerQuantity(item.id, item.quantity + 1)}
+                                        className="text-green-600 hover:text-green-800 p-1"
+                                        title="Øg antal"
+                                      >
+                                        <Plus size={16} />
+                                      </button>
+                                      <button
+                                        onClick={() => removeFromBasisvarer(item.id)}
+                                        className="text-red-500 hover:text-red-700 p-1"
+                                        title="Fjern fra basisvarer"
+                                      >
+                                        <Minus size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+
                       {/* Show "show more" if there are more items */}
                       {basisvarer.length > 4 && (
                         <div className="text-center">
@@ -1219,11 +1318,13 @@ export default function MadbudgetPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-semibold text-gray-900">Tilføj ingrediens til basisvarer</h3>
+              <h3 className="text-2xl font-semibold text-gray-900">Tilføj til basisvarer</h3>
               <button
                 onClick={() => {
                   setShowBasisvarerModal(false)
                   setProductSearchQuery('')
+                  setProductSearchText('')
+                  setProductSearchResults([])
                 }}
                 className="text-gray-400 hover:text-gray-600 p-2"
               >
@@ -1231,45 +1332,136 @@ export default function MadbudgetPage() {
               </button>
             </div>
 
-            {/* Simple ingredient input */}
-            <div className="mb-6">
-              <div className="relative">
-                <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Skriv ingrediens navn (fx. Skyr, Mælk, Brød)..."
-                  value={productSearchQuery}
-                  onChange={(e) => setProductSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && productSearchQuery.trim()) {
-                      addToBasisvarer(productSearchQuery.trim())
-                    }
-                  }}
-                />
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Skriv navnet på ingrediensen du altid køber (fx. "Skyr", "Mælk", "Brød").
-              </p>
-              <p className="text-sm text-gray-500 mt-1">
-                Klik her, hvis det er en bestemt varer til basislisten (fx. Cheasy vanilje skyr).
-              </p>
-            </div>
-            
-            {/* Add ingredient button */}
-            <div className="text-center">
+            {/* Tabs: ingrediens vs. produkt */}
+            <div className="mb-4 flex rounded-full bg-gray-100 p-1 text-sm">
               <button
-                onClick={() => {
-                  if (productSearchQuery.trim()) {
-                    addToBasisvarer(productSearchQuery.trim())
-                  }
-                }}
-                disabled={!productSearchQuery.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg text-sm font-medium transition-colors"
+                type="button"
+                onClick={() => setBasisTab('ingredient')}
+                className={`flex-1 px-3 py-1 rounded-full ${
+                  basisTab === 'ingredient'
+                    ? 'bg-white shadow text-gray-900 font-medium'
+                    : 'text-gray-500'
+                }`}
               >
-                Tilføj "{productSearchQuery || 'ingrediens'}" til basisvarer
+                Ingrediens
+              </button>
+              <button
+                type="button"
+                onClick={() => setBasisTab('product')}
+                className={`flex-1 px-3 py-1 rounded-full ${
+                  basisTab === 'product'
+                    ? 'bg-white shadow text-gray-900 font-medium'
+                    : 'text-gray-500'
+                }`}
+              >
+                Bestemt produkt
               </button>
             </div>
+
+            {/* Indhold for valgt tab */}
+            {basisTab === 'ingredient' ? (
+              <>
+                <div className="mb-6">
+                  <div className="relative">
+                    <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Skriv ingrediens navn (fx. Skyr, Mælk, Brød)..."
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && productSearchQuery.trim()) {
+                          addToBasisvarer(productSearchQuery.trim())
+                        }
+                      }}
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Brug dette til generiske varer familien altid køber (fx. "Skyr", "Havregryn", "Toiletpapir").
+                  </p>
+                </div>
+
+                <div className="text-center">
+                  <button
+                    onClick={() => {
+                      if (productSearchQuery.trim()) {
+                        addToBasisvarer(productSearchQuery.trim())
+                      }
+                    }}
+                    disabled={!productSearchQuery.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Tilføj "{productSearchQuery || 'ingrediens'}" til basisvarer
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <div className="relative">
+                    <Search size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder='Søg efter et produkt (fx. "Cheasy vanilje skyr")...'
+                      value={productSearchText}
+                      onChange={(e) => setProductSearchText(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Her kan du vælge et helt specifikt produkt (mærke + variant), som altid skal med på indkøbslisten.
+                  </p>
+                </div>
+
+                {/* Produkt-resultater */}
+                <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg">
+                  {loadingProductSearch ? (
+                    <div className="py-6 text-center text-gray-500 text-sm">
+                      Søger efter produkter...
+                    </div>
+                  ) : !productSearchText.trim() ? (
+                    <div className="py-6 text-center text-gray-400 text-sm">
+                      Skriv mindst 2–3 bogstaver for at søge efter et produkt.
+                    </div>
+                  ) : productSearchResults.length === 0 ? (
+                    <div className="py-6 text-center text-gray-500 text-sm">
+                      Ingen produkter fundet – prøv med et andet søgeord.
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-gray-100">
+                      {productSearchResults.map((p) => (
+                        <li key={p.id} className="p-3 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 line-clamp-2">
+                              {p.name}
+                            </div>
+                            <div className="text-xs text-gray-500 flex items-center gap-2 mt-1">
+                              <span>{p.store}</span>
+                              {typeof p.price === 'number' && (
+                                <>
+                                  <span>•</span>
+                                  <span>{p.price.toFixed(2)} kr</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              addToBasisvarer(p.name, `Produkt: ${p.name} (${p.store})`)
+                            }
+                            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium"
+                          >
+                            Tilføj
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
