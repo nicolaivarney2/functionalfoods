@@ -642,7 +642,13 @@ export default function MadbudgetPage() {
                                         <Plus size={16} />
                                       </button>
                                       <button
-                                        onClick={() => removeFromBasisvarer(item.id)}
+                              onClick={() => {
+                                if (item.quantity > 1) {
+                                  updateBasisvarerQuantity(item.id, item.quantity - 1)
+                                } else {
+                                  removeFromBasisvarer(item.id)
+                                }
+                              }}
                                         className="text-red-500 hover:text-red-700 p-1"
                                         title="Fjern fra basisvarer"
                                       >
@@ -664,10 +670,8 @@ export default function MadbudgetPage() {
                                   <div key={item.id} className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
                                     <div className="flex-1">
                                       <div className="text-sm font-medium text-gray-900">{item.ingredient_name}</div>
-                                      <div className="text-xs text-indigo-700 flex flex-col">
-                                        {item.notes && (
-                                          <span>{item.notes.replace(productPrefix, '').trim()}</span>
-                                        )}
+                                      <div className="text-xs text-indigo-700">
+                                        Antal: {item.quantity} {item.unit}
                                       </div>
                                     </div>
                                     <div className="flex items-center space-x-1">
@@ -679,7 +683,13 @@ export default function MadbudgetPage() {
                                         <Plus size={16} />
                                       </button>
                                       <button
-                                        onClick={() => removeFromBasisvarer(item.id)}
+                                        onClick={() => {
+                                          if (item.quantity > 1) {
+                                            updateBasisvarerQuantity(item.id, item.quantity - 1)
+                                          } else {
+                                            removeFromBasisvarer(item.id)
+                                          }
+                                        }}
                                         className="text-red-500 hover:text-red-700 p-1"
                                         title="Fjern fra basisvarer"
                                       >
@@ -1449,7 +1459,7 @@ export default function MadbudgetPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              addToBasisvarer(p.name, `Produkt: ${p.name} (${p.store})`)
+                              addToBasisvarer(p.name, `Produkt: ${p.name}`)
                             }
                             className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg font-medium"
                           >
