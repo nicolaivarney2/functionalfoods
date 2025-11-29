@@ -609,83 +609,6 @@ export class DatabaseService {
 
   private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
     const normalized = (categories || [])
-      .map((cat) => this.normalizeCategoryInput(cat))
-      .filter((cat): cat is string => Boolean(cat))
-
-    const unique = Array.from(new Set(normalized))
-
-    if (foodOnly) {
-      const allowedSet = new Set(this.FOOD_ONLY_CATEGORIES)
-      if (unique.length === 0) {
-        console.log('🍽️ foodOnly active with no explicit categories, defaulting to food list', this.FOOD_ONLY_CATEGORY_LIST)
-        return Array.from(allowedSet)
-      }
-      return unique.filter((cat) => allowedSet.has(cat))
-    }
-
-    return unique
-  }
-
-  private normalizeCategoryInput(category?: string | null): string | null {
-    if (!category) return null
-    const trimmed = category.trim()
-    if (!trimmed) return null
-    const key = trimmed.toLowerCase()
-    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
-  }
-
-  private escapeIlikeTerm(value: string): string {
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/%/g, '\\%')
-      .replace(/_/g, '\\_')
-      .replace(/,/g, '\\,')
-  }
-
-  private getProductPlaceholderImage(): string {
-    return '/images/recipe-placeholder.jpg'
-  }
-
-  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
-    const normalized = (categories || [])
-      .map((cat) => this.normalizeCategoryInput(cat))
-      .filter((cat): cat is string => Boolean(cat))
-
-    const unique = Array.from(new Set(normalized))
-
-    if (foodOnly) {
-      const allowedSet = new Set(this.FOOD_ONLY_CATEGORIES)
-      if (unique.length === 0) {
-        return Array.from(allowedSet)
-      }
-      return unique.filter((cat) => allowedSet.has(cat))
-    }
-
-    return unique
-  }
-
-  private normalizeCategoryInput(category?: string | null): string | null {
-    if (!category) return null
-    const trimmed = category.trim()
-    if (!trimmed) return null
-    const key = trimmed.toLowerCase()
-    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
-  }
-
-  private escapeIlikeTerm(value: string): string {
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/%/g, '\\%')
-      .replace(/_/g, '\\_')
-      .replace(/,/g, '\\,')
-  }
-
-  private getProductPlaceholderImage(): string {
-    return '/images/recipe-placeholder.jpg'
-  }
-
-  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
-    const normalized = (categories || [])
       .map(cat => this.normalizeCategoryInput(cat))
       .filter((cat): cat is string => Boolean(cat))
 
@@ -725,6 +648,9 @@ export class DatabaseService {
 
   private getProductPlaceholderImage(): string {
     return '/images/recipe-placeholder.jpg'
+  }
+
+    return [...this.FOOD_ONLY_CATEGORIES]
   }
 
   /**
