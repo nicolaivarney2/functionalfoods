@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown } from 'lucide-react'
+import { Search, Heart, Plus, ChevronDown, Filter, X, Clock } from 'lucide-react'
 import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
@@ -209,6 +209,23 @@ const SORT_OPTIONS = [
   { value: 'name_z_to_a', label: 'Navn: Å til A' }
 ]
 
+// Store update schedule - when each store updates their offers
+const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
+  'Netto': 'Fredag',
+  'REMA 1000': 'Lørdag',
+  '365 Discount': 'Onsdag',
+  'Lidl': 'Lørdag',
+  'Bilka': 'Fredag',
+  'Nemlig': 'Søndag',
+  'MENY': 'Torsdag',
+  'Spar': 'Torsdag',
+  'Kvickly': 'Torsdag',
+  'Super Brugsen': 'Torsdag',
+  'Brugsen': 'Fredag',
+  'Løvbjerg': 'Torsdag',
+  'ABC Lavpris': 'Tirsdag'
+}
+
 // Categories - ALL categories from database with appropriate icons
 // NOTE: Category names must match exactly what's in the database (products.department or products.category)
 // Updated to match database: Frugt og grønt, Brød og kager, Kød og fisk, Mejeri og køl, etc.
@@ -266,8 +283,9 @@ export default function DagligvarerPage() {
   
   // UI state
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
-  const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true)
-  const [storeAccordionOpen, setStoreAccordionOpen] = useState(true)
+  const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true) // Open by default on desktop
+  const [storeAccordionOpen, setStoreAccordionOpen] = useState(true) // Open by default on desktop
+  const [filtersOpen, setFiltersOpen] = useState(false) // Mobile filters drawer state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -325,21 +343,20 @@ export default function DagligvarerPage() {
         limit: '50'
       })
 
-      // Add filters
-      if (selectedCategories.length > 0) params.append('categories', selectedCategories.join(','))
+      // Add filters - URLSearchParams will automatically encode category names
+      if (selectedCategories.length > 0) {
+        params.append('categories', selectedCategories.join(','))
+      }
       if (selectedStores.length > 0) params.append('stores', selectedStores.join(','))
       if (searchQuery.trim()) {
-        console.log('🔍 Frontend search query:', searchQuery.trim())
         params.append('search', searchQuery.trim())
       }
       if (showOnlyOffers) params.append('offers', 'true')
       if (showOnlyFoodProducts) params.append('foodOnly', 'true')
 
       const url = `/api/supermarket/products?${params}`
-      console.log('🔍 Frontend API URL:', url)
       const response = await fetch(url)
       const data = await response.json()
-      console.log('🔍 Frontend API response:', data)
 
       if (data.success && data.products) {
         let newProducts = data.products
@@ -552,11 +569,42 @@ export default function DagligvarerPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6">
+        {/* Mobile Filter Button */}
+        <button
+          onClick={() => setFiltersOpen(true)}
+          className="lg:hidden flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors mb-4 w-full"
+        >
+          <Filter size={18} />
+          <span>Filtre</span>
+          {(selectedCategories.length > 0 || selectedStores.length > 0) && (
+            <span className="bg-white text-blue-600 rounded-full px-2 py-0.5 text-xs font-bold ml-auto">
+              {selectedCategories.length + selectedStores.length}
+            </span>
+          )}
+        </button>
+
         <div className="flex flex-col lg:flex-row gap-6">
+          {/* Mobile Filter Overlay */}
+          {filtersOpen && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+              onClick={() => setFiltersOpen(false)}
+            />
+          )}
+
           {/* Left Sidebar - Filters */}
-          <div className="w-full lg:w-64 flex-shrink-0">
-            <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtre</h2>
+          <div className={`w-full lg:w-64 flex-shrink-0 ${filtersOpen ? 'fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-80 lg:w-64 bg-white lg:bg-transparent overflow-y-auto lg:overflow-visible shadow-xl lg:shadow-none' : 'hidden lg:block'}`}>
+            <div className="bg-white rounded-lg lg:shadow-sm border p-4 lg:sticky lg:top-6 h-full lg:h-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Filtre</h2>
+                <button
+                  onClick={() => setFiltersOpen(false)}
+                  className="lg:hidden p-1 hover:bg-gray-100 rounded"
+                  aria-label="Luk filtre"
+                >
+                  <X size={20} className="text-gray-500" />
+                </button>
+              </div>
               
               {/* Search */}
               <div className="relative mb-4">
@@ -605,17 +653,17 @@ export default function DagligvarerPage() {
                 </button>
                 
                 {categoryAccordionOpen && (
-                  <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+                  <div className="mt-3 space-y-1 max-h-64 overflow-y-auto">
                     {CATEGORIES.map(category => (
-                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
+                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded text-sm">
                         <input
                           type="checkbox"
                           checked={selectedCategories.includes(category.id)}
                           onChange={() => handleCategoryToggle(category.id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-xs">{category.icon}</span>
-                        <span className="text-xs flex-1 truncate">{category.name}</span>
+                        <span className="text-sm">{category.icon}</span>
+                        <span className="text-sm flex-1 truncate">{category.name}</span>
                         <span className="text-xs text-gray-500">
                           ({counts.categories[category.id] || 0})
                         </span>
@@ -636,27 +684,39 @@ export default function DagligvarerPage() {
                 </button>
                 
                 {storeAccordionOpen && (
-                  <div className="mt-3 space-y-2">
-                    {STORES.map(store => (
-                      <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedStores.includes(store.id)}
-                          onChange={() => handleStoreToggle(store.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-xs">{store.icon}</span>
-                        <span className="text-xs">{store.name}</span>
-                      </label>
-                    ))}
+                  <div className="mt-3 space-y-1">
+                    {STORES.map(store => {
+                      const updateDay = STORE_UPDATE_SCHEDULE[store.name]
+                      return (
+                        <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded text-sm group">
+                          <input
+                            type="checkbox"
+                            checked={selectedStores.includes(store.id)}
+                            onChange={() => handleStoreToggle(store.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm">{store.icon}</span>
+                          <span className="text-sm flex-1">{store.name}</span>
+                          {updateDay && (
+                            <span className="text-xs text-gray-400 inline-flex items-center gap-0.5 ml-1">
+                              <Clock size={9} />
+                              {updateDay}
+                            </span>
+                          )}
+                        </label>
+                      )
+                    })}
                   </div>
                 )}
               </div>
 
               {/* Reset button */}
               <button
-                onClick={resetFilters}
-                className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-4"
+                onClick={() => {
+                  resetFilters()
+                  setFiltersOpen(false)
+                }}
+                className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-4 mt-4"
               >
                 Nulstil alle filtre
               </button>
@@ -718,13 +778,13 @@ export default function DagligvarerPage() {
             {/* Product Grid */}
             {loading && products.length === 0 ? (
               // Loading skeleton
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Array.from({ length: 20 }, (_, i) => (
                   <ProductSkeleton key={i} />
                 ))}
               </div>
             ) : products.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}
