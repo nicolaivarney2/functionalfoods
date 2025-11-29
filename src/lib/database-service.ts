@@ -650,8 +650,6 @@ export class DatabaseService {
     return '/images/recipe-placeholder.jpg'
   }
 
-    return [...this.FOOD_ONLY_CATEGORIES]
-  }
 
   /**
    * Get ALL supermarket products for delta updates (with pagination to handle Supabase 1000 row limit)
