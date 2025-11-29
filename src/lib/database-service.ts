@@ -4,17 +4,6 @@ import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
-  private readonly FOOD_ONLY_CATEGORY_LIST = [
-    'Frugt og grønt',
-    'Brød og kager',
-    'Drikkevarer',
-    'Kød og fisk',
-    'Kolonial',
-    'Mejeri og køl',
-    'Nemt og hurtigt',
-    'Slik og snacks'
-  ]
-
   private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
     'frugt & grønt': 'Frugt og grønt',
     'frugt og grønt': 'Frugt og grønt',
@@ -40,7 +29,8 @@ export class DatabaseService {
     'kiosk': 'Kiosk',
     'dyr': 'Dyr'
   }
-  private readonly FOOD_ONLY_CATEGORY_LIST = [
+
+  private readonly FOOD_ONLY_CATEGORIES = [
     'Frugt og grønt',
     'Brød og kager',
     'Drikkevarer',
@@ -50,32 +40,6 @@ export class DatabaseService {
     'Nemt og hurtigt',
     'Slik og snacks'
   ]
-
-  private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
-    'frugt & grønt': 'Frugt og grønt',
-    'frugt og grønt': 'Frugt og grønt',
-    'brød & kager': 'Brød og kager',
-    'brød og kager': 'Brød og kager',
-    'drikkevarer': 'Drikkevarer',
-    'kød, fisk & fjerkræ': 'Kød og fisk',
-    'kød og fisk': 'Kød og fisk',
-    'kolonial': 'Kolonial',
-    'mejeri': 'Mejeri og køl',
-    'mejeri og køl': 'Mejeri og køl',
-    'ost & mejeri': 'Mejeri og køl',
-    'nemt & hurtigt': 'Nemt og hurtigt',
-    'nemt og hurtigt': 'Nemt og hurtigt',
-    'snacks & slik': 'Slik og snacks',
-    'slik og snacks': 'Slik og snacks',
-    'personlig pleje': 'Personlig pleje',
-    'husholdning & rengøring': 'Husholdning',
-    'husholdning': 'Husholdning',
-    'baby og småbørn': 'Baby og familie',
-    'baby og familie': 'Baby og familie',
-    'frost': 'Frost',
-    'kiosk': 'Kiosk',
-    'dyr': 'Dyr'
-  }
   /**
    * Get published recipes from database (for frontend use)
    */
@@ -651,7 +615,7 @@ export class DatabaseService {
     const unique = Array.from(new Set(normalized))
 
     if (foodOnly) {
-      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
+      const allowedSet = new Set(this.FOOD_ONLY_CATEGORIES)
       if (unique.length === 0) {
         console.log('🍽️ foodOnly active with no explicit categories, defaulting to food list', this.FOOD_ONLY_CATEGORY_LIST)
         return Array.from(allowedSet)
@@ -690,45 +654,7 @@ export class DatabaseService {
     const unique = Array.from(new Set(normalized))
 
     if (foodOnly) {
-      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
-      if (unique.length === 0) {
-        return Array.from(allowedSet)
-      }
-      return unique.filter((cat) => allowedSet.has(cat))
-    }
-
-    return unique
-  }
-
-  private normalizeCategoryInput(category?: string | null): string | null {
-    if (!category) return null
-    const trimmed = category.trim()
-    if (!trimmed) return null
-    const key = trimmed.toLowerCase()
-    return this.CATEGORY_NORMALIZATION_MAP[key] || trimmed
-  }
-
-  private escapeIlikeTerm(value: string): string {
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/%/g, '\\%')
-      .replace(/_/g, '\\_')
-      .replace(/,/g, '\\,')
-  }
-
-  private getProductPlaceholderImage(): string {
-    return '/images/recipe-placeholder.jpg'
-  }
-
-  private buildCategoryFilterList(categories?: string[], foodOnly?: boolean): string[] {
-    const normalized = (categories || [])
-      .map((cat) => this.normalizeCategoryInput(cat))
-      .filter((cat): cat is string => Boolean(cat))
-
-    const unique = Array.from(new Set(normalized))
-
-    if (foodOnly) {
-      const allowedSet = new Set(this.FOOD_ONLY_CATEGORY_LIST)
+      const allowedSet = new Set(this.FOOD_ONLY_CATEGORIES)
       if (unique.length === 0) {
         return Array.from(allowedSet)
       }
@@ -786,7 +712,7 @@ export class DatabaseService {
   }
 
   private getFoodOnlyCategories(): string[] {
-    return [...this.FOOD_ONLY_CATEGORY_LIST]
+    return [...this.FOOD_ONLY_CATEGORIES]
   }
 
   private escapeIlikeTerm(value: string): string {
