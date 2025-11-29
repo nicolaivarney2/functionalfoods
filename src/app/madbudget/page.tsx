@@ -1354,7 +1354,7 @@ export default function MadbudgetPage() {
                     : 'text-gray-500'
                 }`}
               >
-                Bestemt produkt
+                Bestemt vare
               </button>
             </div>
 
