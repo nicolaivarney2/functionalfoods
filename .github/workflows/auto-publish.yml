@@ -28,25 +28,3 @@ jobs:
             -H "Content-Type: application/json" \
             "$SITE_URL/api/admin/auto-publish"
 
-name: Auto publish recipes
-
-on:
-  # Kør automatisk 4 gange i døgnet ved dine slot-tidspunkter (UTC-tid)
-  # 07:00, 12:00, 15:30, 20:30
-  schedule:
-    - cron: '0 7,12,20 * * *'
-    - cron: '30 15 * * *'
-  # Mulighed for at køre manuelt fra GitHub UI
-  workflow_dispatch:
-
-jobs:
-  auto-publish:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call auto-publish endpoint
-        run: |
-          curl -X POST https://functionalfoods.dk/api/admin/auto-publish \
-            -H "Accept: application/json" \
-            -sS || exit 1
-
-
