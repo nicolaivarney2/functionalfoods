@@ -192,8 +192,6 @@ export class DatabaseService {
         }
       }
       
-      console.log(`🔍 Fetched ${allCategoryData.length} product categories out of ${total} total offers`)
-      
       // Count categories (use department first, fallback to category)
       const categoryCounts = allCategoryData.reduce((acc: {[key: string]: number}, offer: any) => {
         const product = offer.products || {}
@@ -255,9 +253,6 @@ export class DatabaseService {
         
         realOffersCount = fallbackCount || 0
       }
-      
-      console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Real Offers: ${realOffersCount}, Categories: ${Object.keys(categoryCounts).length}`)
-      console.log(`🔍 Category breakdown:`, categoryCounts)
       
       return {
         total: totalCount || 0,
@@ -343,23 +338,197 @@ export class DatabaseService {
       }
 
       if (categories && categories.length > 0) {
-        // Robust two-step approach:
-        // 1) Find matching product_ids in products using iterative ilike queries
-        // 2) Filter offers by those product_ids
+        // Efficient approach: Query products table first to get matching IDs
+        // Then filter product_offers by those IDs
+        // This is more reliable than trying to filter on joined tables
         const productIds = await this.findProductIdsForCategories(categories)
+        
         if (productIds.length === 0) {
           return { products: [], total: 0, hasMore: false }
         }
-        // Avoid extremely large IN lists: cap to a reasonable number
-        const MAX_IDS = 10000
-        const limitedIds = productIds.slice(0, MAX_IDS)
-        query = query.in('product_id', limitedIds)
+        
+        // Use the product IDs to filter offers
+        // Supabase has limits on IN clause size (typically 100 items max)
+        // We need to chunk the product IDs and fetch offers separately, then combine
+        const CHUNK_SIZE = 50 // Use 50 to be safe
+        const chunks: string[][] = []
+        
+        for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
+          chunks.push(productIds.slice(i, i + CHUNK_SIZE))
+        }
+        
+        // Fetch all matching offer IDs from chunks (with current filters applied)
+        const allMatchingOfferIds = new Set<string>()
+        
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i]
+          
+          // Build query for this chunk with all filters
+          let chunkQuery = supabase
+            .from('product_offers')
+            .select('id')
+            .eq('is_available', true)
+            .in('product_id', chunk)
+          
+          if (stores && stores.length > 0) {
+            chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+          }
+          
+          if (offersOnly) {
+            chunkQuery = chunkQuery.eq('is_on_sale', true)
+          }
+          
+          const { data: chunkOffers, error: chunkError } = await chunkQuery
+          
+          if (chunkError) {
+            console.error('Error fetching category filter chunk:', chunkError)
+            continue
+          }
+          
+          if (chunkOffers) {
+            chunkOffers.forEach(offer => offer?.id && allMatchingOfferIds.add(offer.id))
+          }
+        }
+        
+        const matchingOfferIdsArray = Array.from(allMatchingOfferIds)
+        
+        if (matchingOfferIdsArray.length === 0) {
+          return { products: [], total: 0, hasMore: false }
+        }
+        
+        // Now we need to fetch the full offer data for the current page
+        // Since we have all matching offer IDs, we can paginate them in memory
+        const pageStart = offset
+        const pageEnd = Math.min(offset + limit, matchingOfferIdsArray.length)
+        const pageOfferIds = matchingOfferIdsArray.slice(pageStart, pageEnd)
+        
+        if (pageOfferIds.length === 0) {
+          return { 
+            products: [], 
+            total: matchingOfferIdsArray.length, 
+            hasMore: pageEnd < matchingOfferIdsArray.length 
+          }
+        }
+        
+        // Fetch full data for this page's offer IDs
+        // Chunk the offer IDs if needed (shouldn't be more than limit, but be safe)
+        const OFFER_CHUNK_SIZE = 100
+        const allPageData: any[] = []
+        
+        for (let i = 0; i < pageOfferIds.length; i += OFFER_CHUNK_SIZE) {
+          const offerChunk = pageOfferIds.slice(i, i + OFFER_CHUNK_SIZE)
+          
+          const chunkQuery = supabase
+            .from('product_offers')
+            .select(
+              `
+              id,
+              product_id,
+              store_id,
+              store_product_id,
+              name_store,
+              product_url,
+              current_price,
+              normal_price,
+              currency,
+              is_on_sale,
+              discount_percentage,
+              price_per_unit,
+              price_per_kilogram,
+              is_available,
+              sale_valid_from,
+              sale_valid_to,
+              products:product_id!inner (
+                id,
+                name_generic,
+                brand,
+                category,
+                subcategory,
+                department,
+                unit,
+                amount,
+                image_url
+              )
+            `,
+              { count: i === 0 ? 'exact' : undefined }
+            )
+            .in('id', offerChunk)
+            .eq('is_available', true)
+          
+          if (stores && stores.length > 0) {
+            chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+          }
+          
+          if (offersOnly) {
+            chunkQuery.eq('is_on_sale', true)
+          }
+          
+          const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
+          
+          if (chunkError) {
+            console.error('Error fetching category filter offer data:', chunkError)
+            continue
+          }
+          
+          if (chunkData) {
+            allPageData.push(...chunkData)
+          }
+        }
+        
+        // Sort the combined results
+        allPageData.sort((a, b) => {
+          // Offers first
+          if (a.is_on_sale && !b.is_on_sale) return -1
+          if (!a.is_on_sale && b.is_on_sale) return 1
+          // Then by discount
+          if (a.is_on_sale && b.is_on_sale) {
+            const aDiscount = a.discount_percentage || 0
+            const bDiscount = b.discount_percentage || 0
+            if (bDiscount !== aDiscount) return bDiscount - aDiscount
+          }
+          // Then by price
+          return (a.current_price || 0) - (b.current_price || 0)
+        })
+        
+        // Map the data
+        const mapped = allPageData.map((row: any) => {
+          const p = row.products || {}
+          const price = row.current_price || 0
+          const originalPrice = row.normal_price || row.current_price || 0
+          const isOnSale = !!row.is_on_sale && originalPrice > price
+          const priceDiff = originalPrice - price
+          const discountPct =
+            isOnSale && originalPrice > 0 && priceDiff > 0.01
+              ? Math.round((priceDiff / originalPrice) * 100)
+              : null
+
+          return {
+            id: row.id,
+            name: row.name_store || p.name_generic,
+            description: null,
+            category: p.category || p.department || null,
+            price,
+            original_price: originalPrice,
+            unit: p.unit || 'stk',
+            unit_price: row.price_per_unit || row.price_per_kilogram || null,
+            is_on_sale: isOnSale,
+            discount_percentage: discountPct,
+            image_url: p.image_url || this.getProductPlaceholderImage(),
+            store: this.mapStoreIdToDisplayName(row.store_id),
+            amount: p.amount ? String(p.amount) : null,
+          }
+        })
+        
+        return { 
+          products: mapped, 
+          total: matchingOfferIdsArray.length, 
+          hasMore: pageEnd < matchingOfferIdsArray.length 
+        }
       }
 
       if (search && search.trim()) {
         // Forbedret tekstsøgning i butiksnavn + globalt navn + brand + kategori-felter
         const term = search.trim()
-        console.log(`🔍 Searching for: "${term}"`)
         
         // Find products matching the search term in name/brand fields
         const { data: nameMatches, error: nameErr } = await supabase
@@ -386,11 +555,9 @@ export class DatabaseService {
         }
         
         if (matchingProductIds.size > 0) {
-          console.log(`🔍 Found ${matchingProductIds.size} unique products matching search term`)
           query = query.in('product_id', Array.from(matchingProductIds))
         } else {
           // No matches found, return empty result
-          console.log(`🔍 No products found matching search term`)
           return { products: [], total: 0, hasMore: false }
         }
       }
@@ -466,77 +633,123 @@ export class DatabaseService {
       const raw = cat || ''
       const decoded = (() => { try { return decodeURIComponent(raw) } catch { return raw } })()
       const normalized = decoded.trim().replace(/\s+/g, ' ')
+      
+      // Try exact match first (case-insensitive)
       variants.add(normalized)
       variants.add(normalized.toLowerCase())
-      // Replace & with og and vice versa - be more aggressive
+      variants.add(normalized.toUpperCase())
+      
+      // Replace & with og and vice versa
       variants.add(normalized.replace(/&/g, ' og ').replace(/\s+/g, ' ').trim())
       variants.add(normalized.replace(/\s+og\s+/g, ' & ').replace(/\s+/g, ' ').trim())
-      // Also try without spaces around &
       variants.add(normalized.replace(/&/g, 'og'))
       variants.add(normalized.replace(/\s+og\s+/g, '&'))
+      
       // Replace commas with space
       variants.add(normalized.replace(/,/g, ' '))
+      
       // Remove common suffixes
       variants.add(normalized.replace(/\s+og\s+grøntsager?$/i, ''))
       variants.add(normalized.replace(/\s+grøntsager?$/i, ''))
+      
       return Array.from(variants).filter(Boolean)
     }
 
     console.log(`🔍 Finding product IDs for categories: ${categories.join(', ')}`)
 
+    // First, let's check what category values actually exist in the database
+    // Get ALL unique values to see what's actually stored
+    const { data: allProducts, error: sampleErr } = await supabase
+      .from('products')
+      .select('department, category, subcategory')
+      .limit(10000) // Get a large sample to see all category values
+    
+    if (!sampleErr && allProducts) {
+      const uniqueDepartments = new Set(allProducts.map(p => p.department).filter(Boolean))
+      const uniqueCategories = new Set(allProducts.map(p => p.category).filter(Boolean))
+      const uniqueSubcategories = new Set(allProducts.map(p => p.subcategory).filter(Boolean))
+      
+      console.log(`🔍 ALL unique departments in DB (${uniqueDepartments.size}):`, Array.from(uniqueDepartments).sort())
+      console.log(`🔍 ALL unique categories in DB (${uniqueCategories.size}):`, Array.from(uniqueCategories).sort())
+      console.log(`🔍 ALL unique subcategories in DB (${uniqueSubcategories.size}):`, Array.from(uniqueSubcategories).sort().slice(0, 20))
+      
+      // Check if our search term matches anything
+      for (const cat of categories) {
+        const normalized = cat.trim().toLowerCase()
+        const deptMatch = Array.from(uniqueDepartments).find(d => d && d.toLowerCase().includes(normalized))
+        const catMatch = Array.from(uniqueCategories).find(c => c && c.toLowerCase().includes(normalized))
+        if (deptMatch) console.log(`  ✅ Found department match for "${cat}": "${deptMatch}"`)
+        if (catMatch) console.log(`  ✅ Found category match for "${cat}": "${catMatch}"`)
+        if (!deptMatch && !catMatch) {
+          console.warn(`  ⚠️ No exact match found for "${cat}" in database`)
+        }
+      }
+    } else if (sampleErr) {
+      console.error(`❌ Error fetching sample categories:`, sampleErr)
+    }
+
     for (const cat of categories) {
       const variants = expandedVariants(cat)
-      console.log(`🔍 Expanded variants for "${cat}":`, variants)
+      console.log(`🔍 Expanded variants for "${cat}":`, variants.slice(0, 5), `... (${variants.length} total)`)
       
-      for (const v of variants) {
+      // Search with all variants - try each variant individually for better error handling
+      const allVariants = Array.from(new Set(variants)).filter(Boolean)
+      console.log(`  🔍 Searching with ${allVariants.length} variants for "${cat}"`)
+      
+      // Try each variant individually (more reliable than OR with many conditions)
+      for (const variant of allVariants.slice(0, 20)) { // Limit to first 20 variants to avoid too many queries
         // Search department
         const { data: depRows, error: depErr } = await supabase
           .from('products')
           .select('id')
-          .ilike('department', `%${v}%`)
+          .ilike('department', `%${variant}%`)
           .limit(5000)
         if (!depErr && depRows) {
           depRows.forEach(r => r?.id && seen.add(r.id))
-          if (depRows.length > 0) {
-            console.log(`  ✅ Found ${depRows.length} products in department matching "${v}"`)
+          if (depRows.length > 0 && allVariants.indexOf(variant) < 3) { // Only log first few matches
+            console.log(`    ✅ Found ${depRows.length} products in department with variant "${variant}"`)
           }
         } else if (depErr) {
-          console.error(`  ❌ Error searching department for "${v}":`, depErr)
+          console.error(`    ❌ Error searching department with variant "${variant}":`, depErr)
         }
         
         // Search category
         const { data: catRows, error: catErr } = await supabase
           .from('products')
           .select('id')
-          .ilike('category', `%${v}%`)
+          .ilike('category', `%${variant}%`)
           .limit(5000)
         if (!catErr && catRows) {
           catRows.forEach(r => r?.id && seen.add(r.id))
-          if (catRows.length > 0) {
-            console.log(`  ✅ Found ${catRows.length} products in category matching "${v}"`)
+          if (catRows.length > 0 && allVariants.indexOf(variant) < 3) {
+            console.log(`    ✅ Found ${catRows.length} products in category with variant "${variant}"`)
           }
         } else if (catErr) {
-          console.error(`  ❌ Error searching category for "${v}":`, catErr)
+          console.error(`    ❌ Error searching category with variant "${variant}":`, catErr)
         }
         
         // Search subcategory
         const { data: subcatRows, error: subcatErr } = await supabase
           .from('products')
           .select('id')
-          .ilike('subcategory', `%${v}%`)
+          .ilike('subcategory', `%${variant}%`)
           .limit(5000)
         if (!subcatErr && subcatRows) {
           subcatRows.forEach(r => r?.id && seen.add(r.id))
-          if (subcatRows.length > 0) {
-            console.log(`  ✅ Found ${subcatRows.length} products in subcategory matching "${v}"`)
+          if (subcatRows.length > 0 && allVariants.indexOf(variant) < 3) {
+            console.log(`    ✅ Found ${subcatRows.length} products in subcategory with variant "${variant}"`)
           }
         } else if (subcatErr) {
-          console.error(`  ❌ Error searching subcategory for "${v}":`, subcatErr)
+          console.error(`    ❌ Error searching subcategory with variant "${variant}":`, subcatErr)
         }
       }
     }
 
     console.log(`🔍 Total unique product IDs found: ${seen.size}`)
+    if (seen.size === 0) {
+      console.warn(`⚠️ No products found for categories: ${categories.join(', ')}`)
+      console.warn(`⚠️ Check browser console for sample category values from database`)
+    }
     return Array.from(seen)
   }
 
