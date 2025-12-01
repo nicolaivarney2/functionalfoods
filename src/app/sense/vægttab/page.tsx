@@ -473,6 +473,11 @@ export default function SenseWeightLossTheoryPage() {
                       </div>
                     </div>
                     <p className="text-gray-600 text-sm mt-4 italic">Hold fx snacks på et minimum i starten, så du lige får styr på strukturen.</p>
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-xl p-4">
+                      <p className="text-sm text-gray-700">
+                        <strong>Tip:</strong> Brug vores Sense-optimeret opskrifter til at bygge din madplan. Alle opskrifterne er allerede bygget op efter Sense-principperne, så du kan lave en komplet Sense madplan med os.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -705,7 +710,7 @@ export default function SenseWeightLossTheoryPage() {
             Find dine næste <span className="text-green-200">Sense opskrifter</span>
           </h2>
           <p className="text-xl text-green-100 mb-12 max-w-3xl mx-auto">
-            Udforsk vores store samling af lækre og nemme Sense-opskrifter, der understøtter dit vægttab.
+            Udforsk vores store samling af lækre og nemme Sense-opskrifter, der alle er optimeret til Sense-principperne. Byg din Sense madplan med opskrifter, der automatisk passer til spisekasse-modellen.
           </p>
           <Link
             href="/sense/opskrifter"

@@ -37,6 +37,9 @@ export default function SensePage() {
               Vi hjælper dig med at forstå Sense-metoden og giver dig de værktøjer,<br />
               <strong>du har brug for til at implementere den i din hverdag.</strong>
             </p>
+            <p className="text-lg text-gray-500 max-w-3xl mx-auto mb-8">
+              Alle vores Sense opskrifter er optimeret til Sense-principperne, så du kan lave en komplet Sense madplan med os.
+            </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <div className="text-sm text-gray-500 flex items-center gap-2">
@@ -101,7 +104,7 @@ export default function SensePage() {
                 </div>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Find praktisk inspiration med vores samling af Sense opskrifter, der alle følger danske kostråd og er nemme at lave.
+                Find praktisk inspiration med vores samling af Sense opskrifter, der alle er optimeret til Sense-principperne og følger danske kostråd. Byg din Sense madplan med opskrifter, der automatisk passer til spisekasse-modellen.
               </p>
               <div className="flex items-center text-blue-600 group-hover:text-blue-700 font-medium">
                 Se alle Sense opskrifter
@@ -295,6 +298,27 @@ export default function SensePage() {
                 </ul>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Recipes Section */}
+      <section className="py-20 bg-white">
+        <div className="container max-w-4xl mx-auto">
+          <div className={`bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 md:p-12 border border-gray-100 transition-all duration-1000 delay-850 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">Sense-optimeret opskrifter</h3>
+              <p className="text-lg text-gray-700 max-w-2xl mx-auto">
+                Alle vores Sense opskrifter er bygget op efter Sense-principperne, så du kan lave en komplet Sense madplan med os. Hver opskrift passer automatisk til spisekasse-modellen – ingen gætteri, bare sunde og lækre måltider.
+              </p>
+            </div>
+            <Link
+              href="/sense/opskrifter"
+              className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-semibold justify-center w-full md:w-auto"
+            >
+              Se alle Sense opskrifter
+              <ChevronRight className="w-5 h-5" />
+            </Link>
           </div>
         </div>
       </section>
