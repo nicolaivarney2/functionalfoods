@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown, Filter, X, Clock } from 'lucide-react'
+import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
 import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
@@ -285,7 +285,6 @@ export default function DagligvarerPage() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
   const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true) // Open by default on desktop
   const [storeAccordionOpen, setStoreAccordionOpen] = useState(true) // Open by default on desktop
-  const [filtersOpen, setFiltersOpen] = useState(false) // Mobile filters drawer state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -556,55 +555,107 @@ export default function DagligvarerPage() {
         </>
       }
     >
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Dagligvarer</h1>
           <p className="text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 mt-2 mb-4">
             {counts.total.toLocaleString()} produkter tilgængelige
           </p>
+          
+          {/* Mobile Search */}
+          <div className="lg:hidden relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Søg produkter..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* Mobile Filter Button */}
-        <button
-          onClick={() => setFiltersOpen(true)}
-          className="lg:hidden flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-colors mb-4 w-full"
-        >
-          <Filter size={18} />
-          <span>Filtre</span>
-          {(selectedCategories.length > 0 || selectedStores.length > 0) && (
-            <span className="bg-white text-blue-600 rounded-full px-2 py-0.5 text-xs font-bold ml-auto">
-              {selectedCategories.length + selectedStores.length}
-            </span>
-          )}
-        </button>
+      <div className="container mx-auto px-4 py-6 pb-12 lg:pb-6">
+        {/* Active Filters Bar - Mobile & Desktop */}
+        {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers) && (
+          <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-medium text-gray-500 mr-1">Aktive filtre:</span>
+              
+              {/* Active Categories */}
+              {selectedCategories.map(categoryId => {
+                const category = CATEGORIES.find(c => c.id === categoryId)
+                return (
+                  <button
+                    key={categoryId}
+                    onClick={() => handleCategoryToggle(categoryId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
+                  >
+                    <span>{category?.icon}</span>
+                    <span>{category?.name}</span>
+                    <X size={12} className="ml-0.5" />
+                  </button>
+                )
+              })}
+              
+              {/* Active Stores */}
+              {selectedStores.map(storeId => {
+                const store = STORES.find(s => s.id === storeId)
+                return (
+                  <button
+                    key={storeId}
+                    onClick={() => handleStoreToggle(storeId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-colors"
+                  >
+                    <span>{store?.icon}</span>
+                    <span>{store?.name}</span>
+                    <X size={12} className="ml-0.5" />
+                  </button>
+                )
+              })}
+              
+              {/* Offers Toggle Indicator */}
+              {!showOnlyOffers && (
+                <button
+                  onClick={handleOffersToggle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors"
+                >
+                  <span>Alle produkter</span>
+                  <X size={12} className="ml-0.5" />
+                </button>
+              )}
+              
+              {/* Clear All Button */}
+              {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers) && (
+                <button
+                  onClick={resetFilters}
+                  className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline font-medium"
+                >
+                  Ryd alle
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Mobile Filter Overlay */}
-          {filtersOpen && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-              onClick={() => setFiltersOpen(false)}
-            />
-          )}
-
-          {/* Left Sidebar - Filters */}
-          <div className={`w-full lg:w-64 flex-shrink-0 ${filtersOpen ? 'fixed lg:relative inset-y-0 left-0 z-50 lg:z-auto w-80 lg:w-64 bg-white lg:bg-transparent overflow-y-auto lg:overflow-visible shadow-xl lg:shadow-none' : 'hidden lg:block'}`}>
-            <div className="bg-white rounded-lg lg:shadow-sm border p-4 lg:sticky lg:top-6 h-full lg:h-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">Filtre</h2>
-                <button
-                  onClick={() => setFiltersOpen(false)}
-                  className="lg:hidden p-1 hover:bg-gray-100 rounded"
-                  aria-label="Luk filtre"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
-              </div>
+          {/* Left Sidebar - Filters (Desktop Only) */}
+          <div className="hidden lg:block w-64 flex-shrink-0">
+            <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtre</h2>
               
               {/* Search */}
               <div className="relative mb-4">
@@ -710,16 +761,68 @@ export default function DagligvarerPage() {
                 )}
               </div>
 
-              {/* Reset button */}
-              <button
-                onClick={() => {
-                  resetFilters()
-                  setFiltersOpen(false)
-                }}
-                className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-4 mt-4"
-              >
-                Nulstil alle filtre
-              </button>
+            </div>
+          </div>
+
+          {/* Mobile Filter Bar - Fixed at Bottom - Ultra Compact */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg z-50">
+            <div className="px-2 py-1">
+              {/* Compact Offers Toggle + Combined Scrollable Filters */}
+              <div className="flex items-center gap-1.5">
+                {/* Compact Offers Toggle */}
+                <button
+                  onClick={handleOffersToggle}
+                  className={`flex-shrink-0 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    showOnlyOffers
+                      ? 'bg-red-500 text-white'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}
+                  title={showOnlyOffers ? 'Kun tilbud' : 'Alle produkter'}
+                >
+                  {showOnlyOffers ? '✓' : '○'}
+                </button>
+
+                {/* Combined Scrollable Filters - Categories + Stores */}
+                <div className="flex-1 flex gap-1 overflow-x-auto scrollbar-hide">
+                  {/* Categories */}
+                  {CATEGORIES.map(category => {
+                    const isSelected = selectedCategories.includes(category.id)
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => handleCategoryToggle(category.id)}
+                        className={`flex-shrink-0 px-2 py-1 rounded text-xs transition-all ${
+                          isSelected
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                        title={category.name}
+                      >
+                        {category.icon}
+                      </button>
+                    )
+                  })}
+                  
+                  {/* Stores */}
+                  {STORES.map(store => {
+                    const isSelected = selectedStores.includes(store.id)
+                    return (
+                      <button
+                        key={store.id}
+                        onClick={() => handleStoreToggle(store.id)}
+                        className={`flex-shrink-0 px-2 py-1 rounded text-xs transition-all ${
+                          isSelected
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                        title={store.name}
+                      >
+                        {store.icon}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
