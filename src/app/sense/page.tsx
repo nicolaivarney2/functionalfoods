@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight, Hand, UtensilsCrossed, Ban, CheckCircle2, XCircle } from 'lucide-react'
 
 export default function SensePage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -34,8 +34,8 @@ export default function SensePage() {
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Sense opskrifter følger danske kostråd og fokuserer på balance,<br />
-              <strong>variation og næringsrig mad til hele familien.</strong>
+              Vi hjælper dig med at forstå Sense-metoden og giver dig de værktøjer,<br />
+              <strong>du har brug for til at implementere den i din hverdag.</strong>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -56,7 +56,7 @@ export default function SensePage() {
               Udforsk Sense
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Lær om Sense vægttab og find opskrifter der følger danske kostråd.
+              Udforsk vores ressourcer om Sense vægttab og find opskrifter der kan hjælpe dig på din rejse.
             </p>
           </div>
 
@@ -77,7 +77,7 @@ export default function SensePage() {
                 </div>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Lær hvordan Sense opskrifter hjælper med vægttab gennem balance og næringsrig mad der følger danske kostråd.
+                Få en dybere forståelse af hvordan Sense-principperne fungerer i praksis og hvordan de kan støtte dit vægttab.
               </p>
               <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
                 Læs mere om Sense vægttab
@@ -101,7 +101,7 @@ export default function SensePage() {
                 </div>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Udforsk vores samling af Sense opskrifter – alle baseret på danske kostråd og beregnet på næring.
+                Find praktisk inspiration med vores samling af Sense opskrifter, der alle følger danske kostråd og er nemme at lave.
               </p>
               <div className="flex items-center text-blue-600 group-hover:text-blue-700 font-medium">
                 Se alle Sense opskrifter
@@ -112,119 +112,271 @@ export default function SensePage() {
         </div>
       </section>
 
-      {/* What is Sense Section */}
+      {/* What is Sense Section - Intro */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
         <div className="container">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
-                Hvad er 
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
-                  Sense?
-                </span>
-              </h2>
-              
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Sense opskrifter følger danske kostråd og fokuserer på balance, variation og næringsrig mad til hele familien.
+          <div className={`text-center mb-16 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 leading-tight">
+              Hvad er 
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
+                Sense?
+              </span>
+            </h2>
+            
+            <p className="text-xl md:text-2xl text-gray-700 max-w-4xl mx-auto leading-relaxed mb-4">
+              Sense er en meget simpel måde at spise på, hvor du bruger <strong>hænderne som mål</strong> — ikke kalorietælling, ikke stramme regler.
+            </p>
+            <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+              Du spiser almindelig mad, og strukturen hjælper dig automatisk med at spise i passende mængder.
+            </p>
+          </div>
+
+          {/* Three Core Ideas */}
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className={`bg-white rounded-3xl p-8 shadow-lg border-2 border-green-100 hover:border-green-300 transition-all duration-500 transform hover:-translate-y-2 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ transitionDelay: '400ms' }}>
+              <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mb-6">
+                <UtensilsCrossed className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">3 måltider om dagen</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Du spiser tre hovedmåltider, og det er dét. Ingen snacks, ingen konstant småspisning.
               </p>
-              
-              <div className="space-y-6">
-                <div className="bg-green-100 border border-green-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-green-800 mb-2">Danske kostråd</h4>
-                  <p className="text-green-700">Alle opskrifter følger de officielle danske kostråd for sund og varieret kost.</p>
+            </div>
+
+            <div className={`bg-white rounded-3xl p-8 shadow-lg border-2 border-blue-100 hover:border-blue-300 transition-all duration-500 transform hover:-translate-y-2 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ transitionDelay: '500ms' }}>
+              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-6">
+                <Hand className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Hænderne bestemmer portionerne</h3>
+              <p className="text-gray-600 leading-relaxed mb-4">
+                Hvert måltid består af <strong>3–4 håndfulde</strong> mad:
+              </p>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 mt-1">•</span>
+                  <span>1–2 håndfulde grønt</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-1">•</span>
+                  <span>1 håndfuld protein</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-600 mt-1">•</span>
+                  <span>1 håndfuld stivelse/frugt</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 mt-1">•</span>
+                  <span>Evt. 1–3 spsk fedt (olie, dressing, ost, nødder)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className={`bg-white rounded-3xl p-8 shadow-lg border-2 border-emerald-100 hover:border-emerald-300 transition-all duration-500 transform hover:-translate-y-2 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`} style={{ transitionDelay: '600ms' }}>
+              <div className="w-16 h-16 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl flex items-center justify-center mb-6">
+                <Ban className="w-8 h-8 text-white rotate-45" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Intet forbudt</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Du må spise <strong>ALT</strong> — metoden handler kun om mængder. Det gør systemet ret nemt at følge i den virkelige verden (familiespisning, restaurantbesøg, sociale ting osv.).
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Sense Works Section */}
+      <section className="py-20 bg-white">
+        <div className="container">
+          <div className="max-w-4xl mx-auto">
+            <div className={`text-center mb-12 transition-all duration-1000 delay-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 leading-tight">
+                Virker Sense til <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">vægttab?</span>
+              </h2>
+              <p className="text-2xl text-gray-700 font-semibold mb-4">
+                For rigtig mange <span className="text-green-600">JA</span>.
+              </p>
+            </div>
+
+            <div className={`bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 md:p-12 mb-12 transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Det virker primært fordi:</h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <UtensilsCrossed className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Portionskontrol uden at tælle noget</h4>
+                    <p className="text-gray-600 text-sm">Hænderne er dit mål – ingen apps eller vægte nødvendige.</p>
+                  </div>
                 </div>
                 
-                <div className="bg-blue-100 border border-blue-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-blue-800 mb-2">Balance</h4>
-                  <p className="text-blue-700">Rigtige mængder af kulhydrater, protein og fedt for optimal sundhed.</p>
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Stabilt blodsukker → færre cravings</h4>
+                    <p className="text-gray-600 text-sm">Tre strukturede måltider holder blodsukkeret stabilt.</p>
+                  </div>
                 </div>
                 
-                <div className="bg-emerald-100 border border-emerald-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-emerald-800 mb-2">Familievenlig</h4>
-                  <p className="text-emerald-700">Opskrifter der passer til hele familien – både børn og voksne.</p>
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Leaf className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Mere grønt og protein → bedre mæthed</h4>
+                    <p className="text-gray-600 text-sm">Strukturen sikrer automatisk næringsrige valg.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Let at gentage hver dag → vaner bliver stabile</h4>
+                    <p className="text-gray-600 text-sm">Simpelt system der er nemt at følge i hverdagen.</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className={`transition-all duration-1000 delay-700 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
-              <div className="bg-white rounded-3xl p-8 shadow-2xl shadow-green-500/10 border border-green-100">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-2xl flex items-center justify-center">
-                    <Brain className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Sense makronæringsstoffer</h3>
+            {/* Who is Sense for */}
+            <div className={`grid md:grid-cols-2 gap-8 transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="bg-green-50 rounded-3xl p-8 border-2 border-green-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                  <h3 className="text-2xl font-bold text-gray-900">Sense er bedst til dig, hvis du:</h3>
                 </div>
-                
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Kulhydrater</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-16 h-2 bg-green-500 rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">45-60%</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Fedt</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-12 h-2 bg-blue-500 rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">25-35%</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Protein</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 bg-gray-200 rounded-full">
-                        <div className="w-16 h-2 bg-emerald-500 rounded-full"></div>
-                      </div>
-                      <span className="text-sm font-medium text-gray-900">15-20%</span>
-                    </div>
-                  </div>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">gerne vil spise almindelig mad</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">bliver træt af apps, vægte og kalorietælling</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">vil have et system der er nemt nok til også at fungere på travle dage</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">har brug for klare rammer, men ikke forbud</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="bg-red-50 rounded-3xl p-8 border-2 border-red-200">
+                <div className="flex items-center gap-3 mb-6">
+                  <XCircle className="w-8 h-8 text-red-600" />
+                  <h3 className="text-2xl font-bold text-gray-900">Hvornår er Sense måske ikke for dig?</h3>
                 </div>
+                <p className="text-sm text-gray-600 mb-4 italic">Bare så du får det ærligt:</p>
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">du hader faste måltidsstrukturer</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">du har et meget uregelmæssigt arbejdsliv (fx nattevagter)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">du trives bedre med at tracke præcist (fx kalorietælling eller makroer)</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <XCircle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-gray-700">du vil have et meget hurtigt vægttab</span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-green-600 to-blue-600 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5"></div>
-        </div>
-        
-        <div className="container relative">
-          <div className={`text-center transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-4xl md:text-5xl font-bold mb-8 text-white leading-tight">
-              Start din Sense-rejse i dag –<br />
-              <span className="text-green-200">helt gratis</span>
+      {/* Next Steps Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+        <div className="container">
+          <div className={`text-center mb-12 transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 leading-tight">
+              Interesseret i <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">Sense?</span>
             </h2>
-            
-            <p className="text-xl text-green-100 mb-12 max-w-3xl mx-auto">
-              Udforsk vores 445 Sense opskrifter baseret på danske kostråd.
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              Vi hjælper dig med at forstå Sense og støtter dig på din rejse mod en sundere livsstil.
             </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link 
-                href="/sense/opskrifter" 
-                className="group bg-white text-green-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-white/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
-              >
-                Se Sense opskrifter
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
-              
-              <Link 
-                href="/sense/vægttab" 
-                className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
-              >
-                Lær om Sense vægttab
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Link>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            <Link
+              href="/sense/vægttab"
+              className="group bg-white rounded-3xl p-8 shadow-lg border-2 border-gray-100 hover:border-green-300 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center">
+                  <TrendingDown className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">
+                    Læs mere dybdegående om Sense vægttab
+                  </h3>
+                  <p className="text-gray-500 text-sm">Teori og praksis</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Få en dybere forståelse af hvordan Sense-principperne fungerer, og hvordan de kan hjælpe dig med at opnå dine mål på en bæredygtig måde.
+              </p>
+              <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
+                Læs mere om Sense vægttab
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/sense/opskrifter"
+              className="group bg-white rounded-3xl p-8 shadow-lg border-2 border-gray-100 hover:border-blue-300 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center">
+                  <Target className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                    Udforsk Sense opskrifter
+                  </h3>
+                  <p className="text-gray-500 text-sm">Praktisk inspiration</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Se vores samling af Sense opskrifter, der alle følger danske kostråd og gør det nemt at lave sunde måltider der passer til Sense-metoden.
+              </p>
+              <div className="flex items-center text-blue-600 group-hover:text-blue-700 font-medium">
+                Se alle Sense opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Support Section */}
+      <section className="py-20 bg-white">
+        <div className="container">
+          <div className={`max-w-3xl mx-auto text-center transition-all duration-1000 delay-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-12 border border-green-100">
+              <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                Vi er her for at hjælpe dig
+              </h3>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Sense er en rejse, ikke en destination. Vi har samlet viden, opskrifter og vejledning, der kan støtte dig på vejen mod en sundere livsstil – helt gratis og uden skjulte agendaer.
+              </p>
+              <p className="text-gray-500 text-sm">
+                Alle vores ressourcer er baseret på danske kostråd og er designet til at være praktiske og nemme at følge i hverdagen.
+              </p>
             </div>
           </div>
         </div>
