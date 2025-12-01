@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
+import { Search, Heart, Plus, ChevronDown, X, Clock, ChevronUp } from 'lucide-react'
 import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
@@ -272,6 +272,7 @@ export default function DagligvarerPage() {
   const [sortBy, setSortBy] = useState('discount')
   const [showOnlyOffers, setShowOnlyOffers] = useState(true)
   const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(false)
+  const [showOnlyOrganic, setShowOnlyOrganic] = useState(false)
   const [groupByCategory, setGroupByCategory] = useState(false)
   
   // Data state
@@ -285,12 +286,16 @@ export default function DagligvarerPage() {
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
   const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true) // Open by default on desktop
   const [storeAccordionOpen, setStoreAccordionOpen] = useState(true) // Open by default on desktop
+  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(true) // Mobile filter bar expanded state - starts open
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
   // Refs
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
   const loadingRef = useRef(false)
+  const filterBarRef = useRef<HTMLDivElement>(null)
+  const startY = useRef(0)
+  const isDragging = useRef(false)
 
   // Fetch product counts
   const fetchCounts = useCallback(async () => {
@@ -352,6 +357,7 @@ export default function DagligvarerPage() {
       }
       if (showOnlyOffers) params.append('offers', 'true')
       if (showOnlyFoodProducts) params.append('foodOnly', 'true')
+      if (showOnlyOrganic) params.append('organic', 'true')
 
       const url = `/api/supermarket/products?${params}`
       const response = await fetch(url)
@@ -468,11 +474,47 @@ export default function DagligvarerPage() {
     setCurrentPage(1)
   }
 
+  const handleOrganicToggle = () => {
+    setShowOnlyOrganic(!showOnlyOrganic)
+    setCurrentPage(1)
+  }
+
+  // Swipe handlers for mobile filter bar
+  const onTouchStart = (e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY
+    isDragging.current = false
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!startY.current) return
+    const currentY = e.touches[0].clientY
+    const diffY = startY.current - currentY
+    if (Math.abs(diffY) > 10) {
+      isDragging.current = true
+    }
+  }
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging.current || !startY.current) return
+    const endY = e.changedTouches[0].clientY
+    const diffY = startY.current - endY
+    
+    // Swipe up to expand, swipe down to collapse
+    if (diffY > 50) {
+      setMobileFiltersExpanded(true)
+    } else if (diffY < -50) {
+      setMobileFiltersExpanded(false)
+    }
+    
+    startY.current = 0
+    isDragging.current = false
+  }
+
   // Re-fetch when filters change
   useEffect(() => {
     setCurrentPage(1)
     fetchProducts(1, false)
-  }, [showOnlyOffers, showOnlyFoodProducts, selectedCategories, selectedStores, fetchProducts])
+  }, [showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, selectedCategories, selectedStores, fetchProducts])
 
 
 
@@ -484,6 +526,7 @@ export default function DagligvarerPage() {
     setSortBy('discount')
     setShowOnlyOffers(true) // Keep offers active by default
     setShowOnlyFoodProducts(false)
+    setShowOnlyOrganic(false)
     setGroupByCategory(false)
     setCurrentPage(1)
     fetchProducts(1, false)
@@ -588,9 +631,9 @@ export default function DagligvarerPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 pb-12 lg:pb-6">
+      <div className="container mx-auto px-4 py-6 pb-16 lg:pb-6">
         {/* Active Filters Bar - Mobile & Desktop */}
-        {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers) && (
+        {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers || showOnlyOrganic) && (
           <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-medium text-gray-500 mr-1">Aktive filtre:</span>
@@ -634,6 +677,17 @@ export default function DagligvarerPage() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors"
                 >
                   <span>Alle produkter</span>
+                  <X size={12} className="ml-0.5" />
+                </button>
+              )}
+              
+              {/* Organic Toggle Indicator */}
+              {showOnlyOrganic && (
+                <button
+                  onClick={handleOrganicToggle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-colors"
+                >
+                  <span>Økologi</span>
                   <X size={12} className="ml-0.5" />
                 </button>
               )}
@@ -690,6 +744,16 @@ export default function DagligvarerPage() {
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm">Kun fødevarer</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyOrganic}
+                    onChange={handleOrganicToggle}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="text-sm">Økologi</span>
                 </label>
               </div>
 
@@ -764,66 +828,145 @@ export default function DagligvarerPage() {
             </div>
           </div>
 
-          {/* Mobile Filter Bar - Fixed at Bottom - Ultra Compact */}
-          <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg z-50">
-            <div className="px-2 py-1">
-              {/* Compact Offers Toggle + Combined Scrollable Filters */}
-              <div className="flex items-center gap-1.5">
-                {/* Compact Offers Toggle */}
-                <button
-                  onClick={handleOffersToggle}
-                  className={`flex-shrink-0 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    showOnlyOffers
-                      ? 'bg-red-500 text-white'
-                      : 'bg-gray-100 text-gray-700'
-                  }`}
-                  title={showOnlyOffers ? 'Kun tilbud' : 'Alle produkter'}
-                >
-                  {showOnlyOffers ? '✓' : '○'}
-                </button>
-
-                {/* Combined Scrollable Filters - Categories + Stores */}
-                <div className="flex-1 flex gap-1 overflow-x-auto scrollbar-hide">
-                  {/* Categories */}
-                  {CATEGORIES.map(category => {
-                    const isSelected = selectedCategories.includes(category.id)
-                    return (
-                      <button
-                        key={category.id}
-                        onClick={() => handleCategoryToggle(category.id)}
-                        className={`flex-shrink-0 px-2 py-1 rounded text-xs transition-all ${
-                          isSelected
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                        title={category.name}
-                      >
-                        {category.icon}
-                      </button>
-                    )
-                  })}
-                  
-                  {/* Stores */}
-                  {STORES.map(store => {
-                    const isSelected = selectedStores.includes(store.id)
-                    return (
-                      <button
-                        key={store.id}
-                        onClick={() => handleStoreToggle(store.id)}
-                        className={`flex-shrink-0 px-2 py-1 rounded text-xs transition-all ${
-                          isSelected
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}
-                        title={store.name}
-                      >
-                        {store.icon}
-                      </button>
-                    )
-                  })}
+          {/* Mobile Filter Bar - Fixed at Bottom - Swipe Solution */}
+          <div
+            ref={filterBarRef}
+            className={`lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg z-50 transition-all duration-300 ease-in-out ${
+              mobileFiltersExpanded ? 'max-h-[70vh]' : 'h-[60px]'
+            } overflow-hidden`}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {/* Collapsible Header - Always Visible */}
+            <div 
+              className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between cursor-pointer"
+              onClick={() => setMobileFiltersExpanded(!mobileFiltersExpanded)}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {/* Active Filters Count */}
+                {(selectedCategories.length > 0 || selectedStores.length > 0 || showOnlyOrganic) && (
+                  <span className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {selectedCategories.length + selectedStores.length + (showOnlyOrganic ? 1 : 0)}
+                  </span>
+                )}
+                
+                {/* Quick Toggles - Tilbud + Økologi on same line */}
+                <div className="flex flex-row gap-1.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOffersToggle()
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                      showOnlyOffers
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {showOnlyOffers ? '✓ Tilbud' : 'Alle'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOrganicToggle()
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                      showOnlyOrganic
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {showOnlyOrganic ? '✓ Økologi' : 'Økologi'}
+                  </button>
                 </div>
               </div>
+              
+              {/* Expand/Collapse Icon */}
+              <ChevronDown 
+                size={18} 
+                className={`flex-shrink-0 ml-2 text-gray-500 transition-transform duration-300 ${
+                  mobileFiltersExpanded ? 'rotate-180' : ''
+                }`}
+              />
             </div>
+
+            {/* Expandable Content - Swipe Sections */}
+            {mobileFiltersExpanded && (
+              <div className="px-3 py-2 overflow-y-auto max-h-[calc(70vh-60px)]">
+                {/* Categories - Horizontal Swipe */}
+                <div className="mb-2">
+                  <div className="text-xs font-medium text-gray-500 mb-1.5 px-1">Kategorier</div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    {CATEGORIES.map(category => {
+                      const isSelected = selectedCategories.includes(category.id)
+                      const count = counts.categories[category.id] || 0
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => handleCategoryToggle(category.id)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <span className="text-sm">{category.icon}</span>
+                          <span>{category.name}</span>
+                          {count > 0 && (
+                            <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                              ({count})
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Stores - Horizontal Swipe */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1.5 px-1">Butikker</div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    {STORES.map(store => {
+                      const isSelected = selectedStores.includes(store.id)
+                      const updateDay = STORE_UPDATE_SCHEDULE[store.name]
+                      return (
+                        <button
+                          key={store.id}
+                          onClick={() => handleStoreToggle(store.id)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <span className="text-sm">{store.icon}</span>
+                          <span>{store.name}</span>
+                          {updateDay && (
+                            <span className={`ml-1 text-xs ${isSelected ? 'text-green-100' : 'text-gray-400'}`}>
+                              • {updateDay}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Reset button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    resetFilters()
+                    setMobileFiltersExpanded(false)
+                  }}
+                  className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-3 mt-3"
+                >
+                  Nulstil alle filtre
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Content Area */}

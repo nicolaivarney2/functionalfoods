@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') ? decodeURIComponent(searchParams.get('search')!) : undefined
     const countsOnly = searchParams.get('counts') === 'true'
     const foodOnly = searchParams.get('foodOnly') === 'true'
+    const organic = searchParams.get('organic') === 'true'
     
     
     // If only counts are requested, return optimized count data
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     
     // Get products from new global structure
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
-    const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly)
+    const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly, organic)
     
     return NextResponse.json({
       success: true,

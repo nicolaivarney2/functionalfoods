@@ -285,7 +285,8 @@ export class DatabaseService {
     offersOnly?: boolean,
     search?: string,
     stores?: string[],
-    foodOnly?: boolean
+    foodOnly?: boolean,
+    organicOnly?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
@@ -337,11 +338,38 @@ export class DatabaseService {
         query = query.eq('is_on_sale', true)
       }
 
+      // Filter by organic - find product IDs with organic labels first
+      let organicProductIds: string[] | undefined
+      if (organicOnly) {
+        const { data: organicProducts, error: organicError } = await supabase
+          .from('products')
+          .select('id')
+          .contains('labels', ['Økologi'])
+          .limit(10000) // Should be enough for all organic products
+        
+        if (organicError) {
+          console.error('Error fetching organic products:', organicError)
+        } else if (organicProducts) {
+          organicProductIds = organicProducts.map((p: any) => String(p.id))
+        }
+        
+        // If no organic products found, return empty result
+        if (!organicProductIds || organicProductIds.length === 0) {
+          return { products: [], total: 0, hasMore: false }
+        }
+      }
+
       if (categories && categories.length > 0) {
         // Efficient approach: Query products table first to get matching IDs
         // Then filter product_offers by those IDs
         // This is more reliable than trying to filter on joined tables
-        const productIds = await this.findProductIdsForCategories(categories)
+        let productIds = await this.findProductIdsForCategories(categories)
+        
+        // If organic filter is active, intersect with organic product IDs
+        if (organicProductIds) {
+          const productIdsSet = new Set(productIds)
+          productIds = organicProductIds.filter(id => productIdsSet.has(id))
+        }
         
         if (productIds.length === 0) {
           return { products: [], total: 0, hasMore: false }
@@ -377,6 +405,8 @@ export class DatabaseService {
           if (offersOnly) {
             chunkQuery = chunkQuery.eq('is_on_sale', true)
           }
+          
+          // Organic filter already applied via productIds intersection above
           
           const { data: chunkOffers, error: chunkError } = await chunkQuery
           
@@ -447,7 +477,8 @@ export class DatabaseService {
                 department,
                 unit,
                 amount,
-                image_url
+                image_url,
+                labels
               )
             `,
               { count: i === 0 ? 'exact' : undefined }
@@ -462,6 +493,8 @@ export class DatabaseService {
           if (offersOnly) {
             chunkQuery.eq('is_on_sale', true)
           }
+          
+          // Organic filter already applied via productIds intersection above
           
           const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
           
@@ -531,18 +564,26 @@ export class DatabaseService {
         const term = search.trim()
         
         // Find products matching the search term in name/brand fields
-        const { data: nameMatches, error: nameErr } = await supabase
+        let nameQuery = supabase
           .from('product_offers')
           .select('product_id')
           .or(`name_store.ilike.%${term}%`)
           .limit(1000)
         
         // Also find products matching in category fields
-        const { data: categoryMatches, error: catSearchErr } = await supabase
+        let categoryQuery = supabase
           .from('products')
           .select('id')
           .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
           .limit(1000)
+        
+        // Apply organic filter to product search if needed
+        if (organicOnly) {
+          categoryQuery = categoryQuery.contains('labels', ['Økologi'])
+        }
+        
+        const { data: nameMatches, error: nameErr } = await nameQuery
+        const { data: categoryMatches, error: catSearchErr } = await categoryQuery
         
         const matchingProductIds = new Set<string>()
         
@@ -554,12 +595,23 @@ export class DatabaseService {
           categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(m.id))
         }
         
-        if (matchingProductIds.size > 0) {
-          query = query.in('product_id', Array.from(matchingProductIds))
+        let finalProductIds = Array.from(matchingProductIds)
+        
+        // If organic filter is active, intersect with organic product IDs
+        if (organicProductIds) {
+          const matchingSet = new Set(finalProductIds)
+          finalProductIds = organicProductIds.filter(id => matchingSet.has(id))
+        }
+        
+        if (finalProductIds.length > 0) {
+          query = query.in('product_id', finalProductIds)
         } else {
           // No matches found, return empty result
           return { products: [], total: 0, hasMore: false }
         }
+      } else if (organicProductIds) {
+        // No search, but organic filter is active - filter by organic product IDs
+        query = query.in('product_id', organicProductIds)
       }
 
       query = query
