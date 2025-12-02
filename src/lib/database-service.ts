@@ -293,6 +293,23 @@ export class DatabaseService {
 
       const offset = (page - 1) * limit
 
+      // TEMPORARY FALLBACK:
+      // Category-filtrering via den nye product_offers-struktur giver pt. Supabase-fejl
+      // (\"column products_1.labels does not exist\") når vi kombinerer mange product_ids.
+      // For at få kategorierne til at virke stabilt nu, falder vi tilbage til det simple query
+      // mod `supermarket_products`, som allerede er gennemtestet med kategorier.
+      if (categories && categories.length > 0) {
+        const normalizedCategories = this.buildCategoryFilterList(categories, foodOnly)
+        return this.getProductsWithSimpleQuery(
+          page,
+          limit,
+          normalizedCategories,
+          offersOnly,
+          search,
+          stores
+        )
+      }
+
       // Base query: offers + join til products
       let query = supabase
         .from('product_offers')
@@ -477,8 +494,7 @@ export class DatabaseService {
                 department,
                 unit,
                 amount,
-                image_url,
-                labels
+                image_url
               )
             `,
               { count: i === 0 ? 'exact' : undefined }
