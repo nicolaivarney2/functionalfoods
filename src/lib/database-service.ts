@@ -365,15 +365,32 @@ export class DatabaseService {
         // Efficient approach: Query products table first to get matching IDs
         // Then filter product_offers by those IDs
         // This is more reliable than trying to filter on joined tables
-        let productIds = await this.findProductIdsForCategories(categories)
+        let productIds: string[] = []
         
-        // If organic filter is active, intersect with organic product IDs
-        if (organicProductIds) {
-          const productIdsSet = new Set(productIds)
-          productIds = organicProductIds.filter(id => productIdsSet.has(id))
-        }
-        
-        if (productIds.length === 0) {
+        try {
+          productIds = await this.findProductIdsForCategories(categories)
+          
+          if (!productIds || productIds.length === 0) {
+            console.error(`[CATEGORY FILTER] No product IDs found for categories: ${categories.join(', ')}`)
+            return { products: [], total: 0, hasMore: false }
+          }
+          
+          // If organic filter is active, intersect with organic product IDs
+          if (organicProductIds) {
+            const productIdsSet = new Set(productIds)
+            productIds = organicProductIds.filter(id => productIdsSet.has(id))
+            if (productIds.length === 0) {
+              console.warn(`[CATEGORY FILTER] No products after organic filter intersection`)
+              return { products: [], total: 0, hasMore: false }
+            }
+          }
+        } catch (error) {
+          console.error(`[CATEGORY FILTER] Error finding product IDs:`, error)
+          // Log full error details for Vercel debugging
+          if (error instanceof Error) {
+            console.error(`[CATEGORY FILTER] Error message: ${error.message}`)
+            console.error(`[CATEGORY FILTER] Error stack: ${error.stack}`)
+          }
           return { products: [], total: 0, hasMore: false }
         }
         
@@ -389,37 +406,59 @@ export class DatabaseService {
         
         // Fetch all matching offer IDs from chunks (with current filters applied)
         const allMatchingOfferIds = new Set<string>()
+        let chunkErrors = 0
         
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i]
           
-          // Build query for this chunk with all filters
-          let chunkQuery = supabase
-            .from('product_offers')
-            .select('id')
-            .eq('is_available', true)
-            .in('product_id', chunk)
-          
-          if (stores && stores.length > 0) {
-            chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+          try {
+            // Build query for this chunk with all filters
+            let chunkQuery = supabase
+              .from('product_offers')
+              .select('id')
+              .eq('is_available', true)
+              .in('product_id', chunk)
+            
+            if (stores && stores.length > 0) {
+              chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+            }
+            
+            if (offersOnly) {
+              chunkQuery = chunkQuery.eq('is_on_sale', true)
+            }
+            
+            // Organic filter already applied via productIds intersection above
+            
+            const { data: chunkOffers, error: chunkError } = await chunkQuery
+            
+            if (chunkError) {
+              chunkErrors++
+              console.error(`[CATEGORY FILTER] Error fetching chunk ${i + 1}/${chunks.length}:`, chunkError)
+              // Log full error details for Vercel
+              if (chunkError.message) {
+                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
+              }
+              if (chunkError.code) {
+                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
+              }
+              continue
+            }
+            
+            if (chunkOffers && chunkOffers.length > 0) {
+              chunkOffers.forEach(offer => offer?.id && allMatchingOfferIds.add(offer.id))
+            }
+          } catch (error) {
+            chunkErrors++
+            console.error(`[CATEGORY FILTER] Exception in chunk ${i + 1}/${chunks.length}:`, error)
+            if (error instanceof Error) {
+              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
+              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
+            }
           }
-          
-          if (offersOnly) {
-            chunkQuery = chunkQuery.eq('is_on_sale', true)
-          }
-          
-          // Organic filter already applied via productIds intersection above
-          
-          const { data: chunkOffers, error: chunkError } = await chunkQuery
-          
-          if (chunkError) {
-            console.error('Error fetching category filter chunk:', chunkError)
-            continue
-          }
-          
-          if (chunkOffers) {
-            chunkOffers.forEach(offer => offer?.id && allMatchingOfferIds.add(offer.id))
-          }
+        }
+        
+        if (chunkErrors > 0) {
+          console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
         }
         
         const matchingOfferIdsArray = Array.from(allMatchingOfferIds)
@@ -450,62 +489,80 @@ export class DatabaseService {
         for (let i = 0; i < pageOfferIds.length; i += OFFER_CHUNK_SIZE) {
           const offerChunk = pageOfferIds.slice(i, i + OFFER_CHUNK_SIZE)
           
-          const chunkQuery = supabase
-            .from('product_offers')
-            .select(
-              `
-              id,
-              product_id,
-              store_id,
-              store_product_id,
-              name_store,
-              product_url,
-              current_price,
-              normal_price,
-              currency,
-              is_on_sale,
-              discount_percentage,
-              price_per_unit,
-              price_per_kilogram,
-              is_available,
-              sale_valid_from,
-              sale_valid_to,
-              products:product_id!inner (
+          try {
+            const chunkQuery = supabase
+              .from('product_offers')
+              .select(
+                `
                 id,
-                name_generic,
-                brand,
-                category,
-                subcategory,
-                department,
-                unit,
-                amount,
-                image_url
+                product_id,
+                store_id,
+                store_product_id,
+                name_store,
+                product_url,
+                current_price,
+                normal_price,
+                currency,
+                is_on_sale,
+                discount_percentage,
+                price_per_unit,
+                price_per_kilogram,
+                is_available,
+                sale_valid_from,
+                sale_valid_to,
+                products:product_id!inner (
+                  id,
+                  name_generic,
+                  brand,
+                  category,
+                  subcategory,
+                  department,
+                  unit,
+                  amount,
+                  image_url
+                )
+              `,
+                { count: i === 0 ? 'exact' : undefined }
               )
-            `,
-              { count: i === 0 ? 'exact' : undefined }
-            )
-            .in('id', offerChunk)
-            .eq('is_available', true)
-          
-          if (stores && stores.length > 0) {
-            chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
-          }
-          
-          if (offersOnly) {
-            chunkQuery.eq('is_on_sale', true)
-          }
-          
-          // Organic filter already applied via productIds intersection above
-          
-          const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
-          
-          if (chunkError) {
-            console.error('Error fetching category filter offer data:', chunkError)
-            continue
-          }
-          
-          if (chunkData) {
-            allPageData.push(...chunkData)
+              .in('id', offerChunk)
+              .eq('is_available', true)
+            
+            if (stores && stores.length > 0) {
+              chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+            }
+            
+            if (offersOnly) {
+              chunkQuery.eq('is_on_sale', true)
+            }
+            
+            // Organic filter already applied via productIds intersection above
+            
+            const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
+            
+            if (chunkError) {
+              console.error(`[CATEGORY FILTER] Error fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, chunkError)
+              // Log full error details for Vercel
+              if (chunkError.message) {
+                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
+              }
+              if (chunkError.code) {
+                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
+              }
+              if (chunkError.details) {
+                console.error(`[CATEGORY FILTER] Error details: ${chunkError.details}`)
+              }
+              continue
+            }
+            
+            if (chunkData && chunkData.length > 0) {
+              allPageData.push(...chunkData)
+            }
+          } catch (error) {
+            console.error(`[CATEGORY FILTER] Exception fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, error)
+            if (error instanceof Error) {
+              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
+              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
+            }
           }
         }
         
@@ -708,8 +765,6 @@ export class DatabaseService {
       return Array.from(variants).filter(Boolean)
     }
 
-    console.log(`🔍 Finding product IDs for categories: ${categories.join(', ')}`)
-
     // First, let's check what category values actually exist in the database
     // Get ALL unique values to see what's actually stored
     const { data: allProducts, error: sampleErr } = await supabase
@@ -717,91 +772,73 @@ export class DatabaseService {
       .select('department, category, subcategory')
       .limit(10000) // Get a large sample to see all category values
     
+    if (sampleErr) {
+      console.error(`[CATEGORY FILTER] Error fetching sample categories:`, sampleErr)
+      // Don't fail completely, try to continue with direct queries
+    }
+    
+    let uniqueDepartments = new Set<string>()
+    let uniqueCategories = new Set<string>()
+    
     if (!sampleErr && allProducts) {
-      const uniqueDepartments = new Set(allProducts.map(p => p.department).filter(Boolean))
-      const uniqueCategories = new Set(allProducts.map(p => p.category).filter(Boolean))
-      const uniqueSubcategories = new Set(allProducts.map(p => p.subcategory).filter(Boolean))
-      
-      console.log(`🔍 ALL unique departments in DB (${uniqueDepartments.size}):`, Array.from(uniqueDepartments).sort())
-      console.log(`🔍 ALL unique categories in DB (${uniqueCategories.size}):`, Array.from(uniqueCategories).sort())
-      console.log(`🔍 ALL unique subcategories in DB (${uniqueSubcategories.size}):`, Array.from(uniqueSubcategories).sort().slice(0, 20))
-      
-      // Check if our search term matches anything
-      for (const cat of categories) {
-        const normalized = cat.trim().toLowerCase()
-        const deptMatch = Array.from(uniqueDepartments).find(d => d && d.toLowerCase().includes(normalized))
-        const catMatch = Array.from(uniqueCategories).find(c => c && c.toLowerCase().includes(normalized))
-        if (deptMatch) console.log(`  ✅ Found department match for "${cat}": "${deptMatch}"`)
-        if (catMatch) console.log(`  ✅ Found category match for "${cat}": "${catMatch}"`)
-        if (!deptMatch && !catMatch) {
-          console.warn(`  ⚠️ No exact match found for "${cat}" in database`)
-        }
-      }
-    } else if (sampleErr) {
-      console.error(`❌ Error fetching sample categories:`, sampleErr)
+      uniqueDepartments = new Set(allProducts.map(p => p.department).filter(Boolean))
+      uniqueCategories = new Set(allProducts.map(p => p.category).filter(Boolean))
     }
 
     for (const cat of categories) {
       const variants = expandedVariants(cat)
-      console.log(`🔍 Expanded variants for "${cat}":`, variants.slice(0, 5), `... (${variants.length} total)`)
-      
-      // Search with all variants - try each variant individually for better error handling
       const allVariants = Array.from(new Set(variants)).filter(Boolean)
-      console.log(`  🔍 Searching with ${allVariants.length} variants for "${cat}"`)
       
       // Try each variant individually (more reliable than OR with many conditions)
-      for (const variant of allVariants.slice(0, 20)) { // Limit to first 20 variants to avoid too many queries
-        // Search department
-        const { data: depRows, error: depErr } = await supabase
-          .from('products')
-          .select('id')
-          .ilike('department', `%${variant}%`)
-          .limit(5000)
-        if (!depErr && depRows) {
-          depRows.forEach(r => r?.id && seen.add(r.id))
-          if (depRows.length > 0 && allVariants.indexOf(variant) < 3) { // Only log first few matches
-            console.log(`    ✅ Found ${depRows.length} products in department with variant "${variant}"`)
+      // Limit to first 10 variants to avoid timeout on Vercel
+      for (const variant of allVariants.slice(0, 10)) {
+        try {
+          // Search department
+          const { data: depRows, error: depErr } = await supabase
+            .from('products')
+            .select('id')
+            .ilike('department', `%${variant}%`)
+            .limit(5000)
+          
+          if (depErr) {
+            console.error(`[CATEGORY FILTER] Error searching department with variant "${variant}":`, depErr)
+          } else if (depRows) {
+            depRows.forEach(r => r?.id && seen.add(r.id))
           }
-        } else if (depErr) {
-          console.error(`    ❌ Error searching department with variant "${variant}":`, depErr)
-        }
-        
-        // Search category
-        const { data: catRows, error: catErr } = await supabase
-          .from('products')
-          .select('id')
-          .ilike('category', `%${variant}%`)
-          .limit(5000)
-        if (!catErr && catRows) {
-          catRows.forEach(r => r?.id && seen.add(r.id))
-          if (catRows.length > 0 && allVariants.indexOf(variant) < 3) {
-            console.log(`    ✅ Found ${catRows.length} products in category with variant "${variant}"`)
+          
+          // Search category
+          const { data: catRows, error: catErr } = await supabase
+            .from('products')
+            .select('id')
+            .ilike('category', `%${variant}%`)
+            .limit(5000)
+          
+          if (catErr) {
+            console.error(`[CATEGORY FILTER] Error searching category with variant "${variant}":`, catErr)
+          } else if (catRows) {
+            catRows.forEach(r => r?.id && seen.add(r.id))
           }
-        } else if (catErr) {
-          console.error(`    ❌ Error searching category with variant "${variant}":`, catErr)
-        }
-        
-        // Search subcategory
-        const { data: subcatRows, error: subcatErr } = await supabase
-          .from('products')
-          .select('id')
-          .ilike('subcategory', `%${variant}%`)
-          .limit(5000)
-        if (!subcatErr && subcatRows) {
-          subcatRows.forEach(r => r?.id && seen.add(r.id))
-          if (subcatRows.length > 0 && allVariants.indexOf(variant) < 3) {
-            console.log(`    ✅ Found ${subcatRows.length} products in subcategory with variant "${variant}"`)
+          
+          // Search subcategory
+          const { data: subcatRows, error: subcatErr } = await supabase
+            .from('products')
+            .select('id')
+            .ilike('subcategory', `%${variant}%`)
+            .limit(5000)
+          
+          if (subcatErr) {
+            console.error(`[CATEGORY FILTER] Error searching subcategory with variant "${variant}":`, subcatErr)
+          } else if (subcatRows) {
+            subcatRows.forEach(r => r?.id && seen.add(r.id))
           }
-        } else if (subcatErr) {
-          console.error(`    ❌ Error searching subcategory with variant "${variant}":`, subcatErr)
+        } catch (error) {
+          console.error(`[CATEGORY FILTER] Exception searching variant "${variant}":`, error)
         }
       }
     }
 
-    console.log(`🔍 Total unique product IDs found: ${seen.size}`)
     if (seen.size === 0) {
-      console.warn(`⚠️ No products found for categories: ${categories.join(', ')}`)
-      console.warn(`⚠️ Check browser console for sample category values from database`)
+      console.warn(`[CATEGORY FILTER] No products found for categories: ${categories.join(', ')}`)
     }
     return Array.from(seen)
   }

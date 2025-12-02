@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
     
     // Get products from new global structure
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
+    
+    console.log(`[API] Fetching products - page: ${page}, limit: ${limit}, categories: ${finalCategory?.join(', ') || 'none'}, offers: ${offers}, stores: ${stores?.join(', ') || 'none'}, organic: ${organic}`)
+    
     const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly, organic)
+    
+    console.log(`[API] Returning ${result.products.length} products (total: ${result.total})`)
     
     return NextResponse.json({
       success: true,
@@ -53,12 +58,20 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
-    console.error('❌ Error fetching supermarket products:', error)
+    console.error('❌ [API] Error fetching supermarket products:', error)
+    
+    // Log full error details for Vercel debugging
+    if (error instanceof Error) {
+      console.error(`❌ [API] Error message: ${error.message}`)
+      console.error(`❌ [API] Error stack: ${error.stack}`)
+    }
     
     return NextResponse.json(
       { 
+        success: false,
         error: 'Failed to fetch supermarket products',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     )
