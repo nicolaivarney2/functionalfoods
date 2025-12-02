@@ -397,7 +397,7 @@ export class DatabaseService {
         // Use the product IDs to filter offers
         // Supabase has limits on IN clause size (typically 100 items max)
         // We need to chunk the product IDs and fetch offers separately, then combine
-        const CHUNK_SIZE = 50 // Use 50 to be safe
+        const CHUNK_SIZE = 100 // Increased from 50 to reduce number of queries (Supabase supports up to 100)
         const chunks: string[][] = []
         
         for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
@@ -765,74 +765,53 @@ export class DatabaseService {
       return Array.from(variants).filter(Boolean)
     }
 
-    // First, let's check what category values actually exist in the database
-    // Get ALL unique values to see what's actually stored
-    const { data: allProducts, error: sampleErr } = await supabase
-      .from('products')
-      .select('department, category, subcategory')
-      .limit(10000) // Get a large sample to see all category values
-    
-    if (sampleErr) {
-      console.error(`[CATEGORY FILTER] Error fetching sample categories:`, sampleErr)
-      // Don't fail completely, try to continue with direct queries
-    }
-    
-    let uniqueDepartments = new Set<string>()
-    let uniqueCategories = new Set<string>()
-    
-    if (!sampleErr && allProducts) {
-      uniqueDepartments = new Set(allProducts.map(p => p.department).filter(Boolean))
-      uniqueCategories = new Set(allProducts.map(p => p.category).filter(Boolean))
-    }
-
+    // OPTIMIZED: Try exact matches first (much faster), then fall back to partial matches
     for (const cat of categories) {
-      const variants = expandedVariants(cat)
-      const allVariants = Array.from(new Set(variants)).filter(Boolean)
+      const normalized = cat.trim()
+      const normalizedLower = normalized.toLowerCase()
       
-      // Try each variant individually (more reliable than OR with many conditions)
-      // Limit to first 10 variants to avoid timeout on Vercel
-      for (const variant of allVariants.slice(0, 10)) {
-        try {
-          // Search department
-          const { data: depRows, error: depErr } = await supabase
-            .from('products')
-            .select('id')
-            .ilike('department', `%${variant}%`)
-            .limit(5000)
-          
-          if (depErr) {
-            console.error(`[CATEGORY FILTER] Error searching department with variant "${variant}":`, depErr)
-          } else if (depRows) {
-            depRows.forEach(r => r?.id && seen.add(r.id))
-          }
-          
-          // Search category
-          const { data: catRows, error: catErr } = await supabase
-            .from('products')
-            .select('id')
-            .ilike('category', `%${variant}%`)
-            .limit(5000)
-          
-          if (catErr) {
-            console.error(`[CATEGORY FILTER] Error searching category with variant "${variant}":`, catErr)
-          } else if (catRows) {
-            catRows.forEach(r => r?.id && seen.add(r.id))
-          }
-          
-          // Search subcategory
-          const { data: subcatRows, error: subcatErr } = await supabase
-            .from('products')
-            .select('id')
-            .ilike('subcategory', `%${variant}%`)
-            .limit(5000)
-          
-          if (subcatErr) {
-            console.error(`[CATEGORY FILTER] Error searching subcategory with variant "${variant}":`, subcatErr)
-          } else if (subcatRows) {
-            subcatRows.forEach(r => r?.id && seen.add(r.id))
-          }
-        } catch (error) {
-          console.error(`[CATEGORY FILTER] Exception searching variant "${variant}":`, error)
+      // STEP 1: Try exact match on department first (most common and fastest)
+      const { data: exactDept, error: deptErr } = await supabase
+        .from('products')
+        .select('id')
+        .ilike('department', normalized)
+        .limit(10000)
+      
+      if (!deptErr && exactDept && exactDept.length > 0) {
+        exactDept.forEach(r => r?.id && seen.add(r.id))
+        continue // Found exact match, skip to next category
+      }
+      
+      // STEP 2: Try exact match on category
+      const { data: exactCat, error: catErr } = await supabase
+        .from('products')
+        .select('id')
+        .ilike('category', normalized)
+        .limit(10000)
+      
+      if (!catErr && exactCat && exactCat.length > 0) {
+        exactCat.forEach(r => r?.id && seen.add(r.id))
+        continue // Found exact match, skip to next category
+      }
+      
+      // STEP 3: If no exact match, try a few key variants with OR query (faster than multiple separate queries)
+      const variants = expandedVariants(cat)
+      const keyVariants = Array.from(new Set(variants)).filter(Boolean).slice(0, 3) // Only top 3 variants
+      
+      if (keyVariants.length > 0) {
+        // Use OR query to search all fields at once (much faster than separate queries)
+        const orConditions = keyVariants.map(v => 
+          `department.ilike.%${v}%,category.ilike.%${v}%,subcategory.ilike.%${v}%`
+        ).join(',')
+        
+        const { data: variantRows, error: variantErr } = await supabase
+          .from('products')
+          .select('id')
+          .or(orConditions)
+          .limit(10000)
+        
+        if (!variantErr && variantRows) {
+          variantRows.forEach(r => r?.id && seen.add(r.id))
         }
       }
     }
