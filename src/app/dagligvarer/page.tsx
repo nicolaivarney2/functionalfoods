@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown } from 'lucide-react'
+import { Search, Heart, Plus, ChevronDown, X, Clock, ChevronUp } from 'lucide-react'
 import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
@@ -209,6 +209,23 @@ const SORT_OPTIONS = [
   { value: 'name_z_to_a', label: 'Navn: Å til A' }
 ]
 
+// Store update schedule - when each store updates their offers
+const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
+  'Netto': 'Fredag',
+  'REMA 1000': 'Lørdag',
+  '365 Discount': 'Onsdag',
+  'Lidl': 'Lørdag',
+  'Bilka': 'Fredag',
+  'Nemlig': 'Søndag',
+  'MENY': 'Torsdag',
+  'Spar': 'Torsdag',
+  'Kvickly': 'Torsdag',
+  'Super Brugsen': 'Torsdag',
+  'Brugsen': 'Fredag',
+  'Løvbjerg': 'Torsdag',
+  'ABC Lavpris': 'Tirsdag'
+}
+
 // Categories - ALL categories from database with appropriate icons
 // NOTE: Category names must match exactly what's in the database (products.department or products.category)
 // Updated to match database: Frugt og grønt, Brød og kager, Kød og fisk, Mejeri og køl, etc.
@@ -255,6 +272,7 @@ export default function DagligvarerPage() {
   const [sortBy, setSortBy] = useState('discount')
   const [showOnlyOffers, setShowOnlyOffers] = useState(true)
   const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(false)
+  const [showOnlyOrganic, setShowOnlyOrganic] = useState(false)
   const [groupByCategory, setGroupByCategory] = useState(false)
   
   // Data state
@@ -266,14 +284,18 @@ export default function DagligvarerPage() {
   
   // UI state
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
-  const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true)
-  const [storeAccordionOpen, setStoreAccordionOpen] = useState(true)
+  const [categoryAccordionOpen, setCategoryAccordionOpen] = useState(true) // Open by default on desktop
+  const [storeAccordionOpen, setStoreAccordionOpen] = useState(true) // Open by default on desktop
+  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(true) // Mobile filter bar expanded state - starts open
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
   // Refs
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
   const loadingRef = useRef(false)
+  const filterBarRef = useRef<HTMLDivElement>(null)
+  const startY = useRef(0)
+  const isDragging = useRef(false)
 
   // Fetch product counts
   const fetchCounts = useCallback(async () => {
@@ -325,21 +347,21 @@ export default function DagligvarerPage() {
         limit: '50'
       })
 
-      // Add filters
-      if (selectedCategories.length > 0) params.append('categories', selectedCategories.join(','))
+      // Add filters - URLSearchParams will automatically encode category names
+      if (selectedCategories.length > 0) {
+        params.append('categories', selectedCategories.join(','))
+      }
       if (selectedStores.length > 0) params.append('stores', selectedStores.join(','))
       if (searchQuery.trim()) {
-        console.log('🔍 Frontend search query:', searchQuery.trim())
         params.append('search', searchQuery.trim())
       }
       if (showOnlyOffers) params.append('offers', 'true')
       if (showOnlyFoodProducts) params.append('foodOnly', 'true')
+      if (showOnlyOrganic) params.append('organic', 'true')
 
       const url = `/api/supermarket/products?${params}`
-      console.log('🔍 Frontend API URL:', url)
       const response = await fetch(url)
       const data = await response.json()
-      console.log('🔍 Frontend API response:', data)
 
       if (data.success && data.products) {
         let newProducts = data.products
@@ -452,11 +474,47 @@ export default function DagligvarerPage() {
     setCurrentPage(1)
   }
 
+  const handleOrganicToggle = () => {
+    setShowOnlyOrganic(!showOnlyOrganic)
+    setCurrentPage(1)
+  }
+
+  // Swipe handlers for mobile filter bar
+  const onTouchStart = (e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY
+    isDragging.current = false
+  }
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!startY.current) return
+    const currentY = e.touches[0].clientY
+    const diffY = startY.current - currentY
+    if (Math.abs(diffY) > 10) {
+      isDragging.current = true
+    }
+  }
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (!isDragging.current || !startY.current) return
+    const endY = e.changedTouches[0].clientY
+    const diffY = startY.current - endY
+    
+    // Swipe up to expand, swipe down to collapse
+    if (diffY > 50) {
+      setMobileFiltersExpanded(true)
+    } else if (diffY < -50) {
+      setMobileFiltersExpanded(false)
+    }
+    
+    startY.current = 0
+    isDragging.current = false
+  }
+
   // Re-fetch when filters change
   useEffect(() => {
     setCurrentPage(1)
     fetchProducts(1, false)
-  }, [showOnlyOffers, showOnlyFoodProducts, selectedCategories, selectedStores, fetchProducts])
+  }, [showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, selectedCategories, selectedStores, fetchProducts])
 
 
 
@@ -468,6 +526,7 @@ export default function DagligvarerPage() {
     setSortBy('discount')
     setShowOnlyOffers(true) // Keep offers active by default
     setShowOnlyFoodProducts(false)
+    setShowOnlyOrganic(false)
     setGroupByCategory(false)
     setCurrentPage(1)
     fetchProducts(1, false)
@@ -539,22 +598,116 @@ export default function DagligvarerPage() {
         </>
       }
     >
+      <style jsx>{`
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Dagligvarer</h1>
           <p className="text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
-          <p className="text-sm text-gray-500 mt-2">
+          <p className="text-sm text-gray-500 mt-2 mb-4">
             {counts.total.toLocaleString()} produkter tilgængelige
           </p>
+          
+          {/* Mobile Search */}
+          <div className="lg:hidden relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="Søg produkter..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 pb-16 lg:pb-6">
+        {/* Active Filters Bar - Mobile & Desktop */}
+        {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers || showOnlyOrganic) && (
+          <div className="bg-white rounded-lg shadow-sm border p-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-medium text-gray-500 mr-1">Aktive filtre:</span>
+              
+              {/* Active Categories */}
+              {selectedCategories.map(categoryId => {
+                const category = CATEGORIES.find(c => c.id === categoryId)
+                return (
+                  <button
+                    key={categoryId}
+                    onClick={() => handleCategoryToggle(categoryId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium hover:bg-blue-200 transition-colors"
+                  >
+                    <span>{category?.icon}</span>
+                    <span>{category?.name}</span>
+                    <X size={12} className="ml-0.5" />
+                  </button>
+                )
+              })}
+              
+              {/* Active Stores */}
+              {selectedStores.map(storeId => {
+                const store = STORES.find(s => s.id === storeId)
+                return (
+                  <button
+                    key={storeId}
+                    onClick={() => handleStoreToggle(storeId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-colors"
+                  >
+                    <span>{store?.icon}</span>
+                    <span>{store?.name}</span>
+                    <X size={12} className="ml-0.5" />
+                  </button>
+                )
+              })}
+              
+              {/* Offers Toggle Indicator */}
+              {!showOnlyOffers && (
+                <button
+                  onClick={handleOffersToggle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs font-medium hover:bg-gray-200 transition-colors"
+                >
+                  <span>Alle produkter</span>
+                  <X size={12} className="ml-0.5" />
+                </button>
+              )}
+              
+              {/* Organic Toggle Indicator */}
+              {showOnlyOrganic && (
+                <button
+                  onClick={handleOrganicToggle}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-medium hover:bg-green-200 transition-colors"
+                >
+                  <span>Økologi</span>
+                  <X size={12} className="ml-0.5" />
+                </button>
+              )}
+              
+              {/* Clear All Button */}
+              {(selectedCategories.length > 0 || selectedStores.length > 0 || !showOnlyOffers) && (
+                <button
+                  onClick={resetFilters}
+                  className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline font-medium"
+                >
+                  Ryd alle
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Sidebar - Filters */}
-          <div className="w-full lg:w-64 flex-shrink-0">
+          {/* Left Sidebar - Filters (Desktop Only) */}
+          <div className="hidden lg:block w-64 flex-shrink-0">
             <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtre</h2>
               
@@ -592,6 +745,16 @@ export default function DagligvarerPage() {
                   />
                   <span className="text-sm">Kun fødevarer</span>
                 </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyOrganic}
+                    onChange={handleOrganicToggle}
+                    className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="text-sm">Økologi</span>
+                </label>
               </div>
 
               {/* Categories Accordion */}
@@ -605,17 +768,17 @@ export default function DagligvarerPage() {
                 </button>
                 
                 {categoryAccordionOpen && (
-                  <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+                  <div className="mt-3 space-y-1 max-h-64 overflow-y-auto">
                     {CATEGORIES.map(category => (
-                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
+                      <label key={category.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded text-sm">
                         <input
                           type="checkbox"
                           checked={selectedCategories.includes(category.id)}
                           onChange={() => handleCategoryToggle(category.id)}
                           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-xs">{category.icon}</span>
-                        <span className="text-xs flex-1 truncate">{category.name}</span>
+                        <span className="text-sm">{category.icon}</span>
+                        <span className="text-sm flex-1 truncate">{category.name}</span>
                         <span className="text-xs text-gray-500">
                           ({counts.categories[category.id] || 0})
                         </span>
@@ -636,31 +799,174 @@ export default function DagligvarerPage() {
                 </button>
                 
                 {storeAccordionOpen && (
-                  <div className="mt-3 space-y-2">
-                    {STORES.map(store => (
-                      <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedStores.includes(store.id)}
-                          onChange={() => handleStoreToggle(store.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-xs">{store.icon}</span>
-                        <span className="text-xs">{store.name}</span>
-                      </label>
-                    ))}
+                  <div className="mt-3 space-y-1">
+                    {STORES.map(store => {
+                      const updateDay = STORE_UPDATE_SCHEDULE[store.name]
+                      return (
+                        <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded text-sm group">
+                          <input
+                            type="checkbox"
+                            checked={selectedStores.includes(store.id)}
+                            onChange={() => handleStoreToggle(store.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm">{store.icon}</span>
+                          <span className="text-sm flex-1">{store.name}</span>
+                          {updateDay && (
+                            <span className="text-xs text-gray-400 inline-flex items-center gap-0.5 ml-1">
+                              <Clock size={9} />
+                              {updateDay}
+                            </span>
+                          )}
+                        </label>
+                      )
+                    })}
                   </div>
                 )}
               </div>
 
-              {/* Reset button */}
-              <button
-                onClick={resetFilters}
-                className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-4"
-              >
-                Nulstil alle filtre
-              </button>
             </div>
+          </div>
+
+          {/* Mobile Filter Bar - Fixed at Bottom - Swipe Solution */}
+          <div
+            ref={filterBarRef}
+            className={`lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg z-50 transition-all duration-300 ease-in-out ${
+              mobileFiltersExpanded ? 'max-h-[70vh]' : 'h-[60px]'
+            } overflow-hidden`}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {/* Collapsible Header - Always Visible */}
+            <div 
+              className="px-3 py-2.5 border-b border-gray-100 flex items-center justify-between cursor-pointer"
+              onClick={() => setMobileFiltersExpanded(!mobileFiltersExpanded)}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {/* Active Filters Count */}
+                {(selectedCategories.length > 0 || selectedStores.length > 0 || showOnlyOrganic) && (
+                  <span className="flex-shrink-0 bg-blue-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {selectedCategories.length + selectedStores.length + (showOnlyOrganic ? 1 : 0)}
+                  </span>
+                )}
+                
+                {/* Quick Toggles - Tilbud + Økologi on same line */}
+                <div className="flex flex-row gap-1.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOffersToggle()
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                      showOnlyOffers
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {showOnlyOffers ? '✓ Tilbud' : 'Alle'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleOrganicToggle()
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                      showOnlyOrganic
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {showOnlyOrganic ? '✓ Økologi' : 'Økologi'}
+                  </button>
+                </div>
+              </div>
+              
+              {/* Expand/Collapse Icon */}
+              <ChevronDown 
+                size={18} 
+                className={`flex-shrink-0 ml-2 text-gray-500 transition-transform duration-300 ${
+                  mobileFiltersExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </div>
+
+            {/* Expandable Content - Swipe Sections */}
+            {mobileFiltersExpanded && (
+              <div className="px-3 py-2 overflow-y-auto max-h-[calc(70vh-60px)]">
+                {/* Categories - Horizontal Swipe */}
+                <div className="mb-2">
+                  <div className="text-xs font-medium text-gray-500 mb-1.5 px-1">Kategorier</div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    {CATEGORIES.map(category => {
+                      const isSelected = selectedCategories.includes(category.id)
+                      const count = counts.categories[category.id] || 0
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => handleCategoryToggle(category.id)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <span className="text-sm">{category.icon}</span>
+                          <span>{category.name}</span>
+                          {count > 0 && (
+                            <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                              ({count})
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Stores - Horizontal Swipe */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 mb-1.5 px-1">Butikker</div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+                    {STORES.map(store => {
+                      const isSelected = selectedStores.includes(store.id)
+                      const updateDay = STORE_UPDATE_SCHEDULE[store.name]
+                      return (
+                        <button
+                          key={store.id}
+                          onClick={() => handleStoreToggle(store.id)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${
+                            isSelected
+                              ? 'bg-green-600 text-white'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <span className="text-sm">{store.icon}</span>
+                          <span>{store.name}</span>
+                          {updateDay && (
+                            <span className={`ml-1 text-xs ${isSelected ? 'text-green-100' : 'text-gray-400'}`}>
+                              • {updateDay}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Reset button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    resetFilters()
+                    setMobileFiltersExpanded(false)
+                  }}
+                  className="w-full text-sm text-blue-600 hover:text-blue-700 underline border-t pt-3 mt-3"
+                >
+                  Nulstil alle filtre
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Content Area */}
@@ -718,13 +1024,13 @@ export default function DagligvarerPage() {
             {/* Product Grid */}
             {loading && products.length === 0 ? (
               // Loading skeleton
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {Array.from({ length: 20 }, (_, i) => (
                   <ProductSkeleton key={i} />
                 ))}
               </div>
             ) : products.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {products.map((product) => (
                   <ProductCard
                     key={product.id}

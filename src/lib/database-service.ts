@@ -192,8 +192,6 @@ export class DatabaseService {
         }
       }
       
-      console.log(`🔍 Fetched ${allCategoryData.length} product categories out of ${total} total offers`)
-      
       // Count categories (use department first, fallback to category)
       const categoryCounts = allCategoryData.reduce((acc: {[key: string]: number}, offer: any) => {
         const product = offer.products || {}
@@ -256,9 +254,6 @@ export class DatabaseService {
         realOffersCount = fallbackCount || 0
       }
       
-      console.log(`🔍 Product counts (V2) - Total: ${totalCount}, Real Offers: ${realOffersCount}, Categories: ${Object.keys(categoryCounts).length}`)
-      console.log(`🔍 Category breakdown:`, categoryCounts)
-      
       return {
         total: totalCount || 0,
         categories: categoryCounts,
@@ -290,12 +285,15 @@ export class DatabaseService {
     offersOnly?: boolean,
     search?: string,
     stores?: string[],
-    foodOnly?: boolean
+    foodOnly?: boolean,
+    organicOnly?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
 
       const offset = (page - 1) * limit
+
+      // Category filtering using the new product_offers structure
 
       // Base query: offers + join til products
       let query = supabase
@@ -342,38 +340,308 @@ export class DatabaseService {
         query = query.eq('is_on_sale', true)
       }
 
-      if (categories && categories.length > 0) {
-        // Robust two-step approach:
-        // 1) Find matching product_ids in products using iterative ilike queries
-        // 2) Filter offers by those product_ids
-        const productIds = await this.findProductIdsForCategories(categories)
-        if (productIds.length === 0) {
+      // Filter by organic - find product IDs with organic labels first
+      let organicProductIds: string[] | undefined
+      if (organicOnly) {
+        const { data: organicProducts, error: organicError } = await supabase
+          .from('products')
+          .select('id')
+          .contains('labels', ['Økologi'])
+          .limit(10000) // Should be enough for all organic products
+        
+        if (organicError) {
+          console.error('Error fetching organic products:', organicError)
+        } else if (organicProducts) {
+          organicProductIds = organicProducts.map((p: any) => String(p.id))
+        }
+        
+        // If no organic products found, return empty result
+        if (!organicProductIds || organicProductIds.length === 0) {
           return { products: [], total: 0, hasMore: false }
         }
-        // Avoid extremely large IN lists: cap to a reasonable number
-        const MAX_IDS = 10000
-        const limitedIds = productIds.slice(0, MAX_IDS)
-        query = query.in('product_id', limitedIds)
+      }
+
+      if (categories && categories.length > 0) {
+        // Efficient approach: Query products table first to get matching IDs
+        // Then filter product_offers by those IDs
+        // This is more reliable than trying to filter on joined tables
+        let productIds: string[] = []
+        
+        try {
+          productIds = await this.findProductIdsForCategories(categories)
+          
+          if (!productIds || productIds.length === 0) {
+            console.error(`[CATEGORY FILTER] No product IDs found for categories: ${categories.join(', ')}`)
+            return { products: [], total: 0, hasMore: false }
+          }
+          
+          // If organic filter is active, intersect with organic product IDs
+          if (organicProductIds) {
+            const productIdsSet = new Set(productIds)
+            productIds = organicProductIds.filter(id => productIdsSet.has(id))
+            if (productIds.length === 0) {
+              console.warn(`[CATEGORY FILTER] No products after organic filter intersection`)
+              return { products: [], total: 0, hasMore: false }
+            }
+          }
+        } catch (error) {
+          console.error(`[CATEGORY FILTER] Error finding product IDs:`, error)
+          // Log full error details for Vercel debugging
+          if (error instanceof Error) {
+            console.error(`[CATEGORY FILTER] Error message: ${error.message}`)
+            console.error(`[CATEGORY FILTER] Error stack: ${error.stack}`)
+          }
+          return { products: [], total: 0, hasMore: false }
+        }
+        
+        // Use the product IDs to filter offers
+        // Supabase has limits on IN clause size (typically 100 items max)
+        // We need to chunk the product IDs and fetch offers separately, then combine
+        const CHUNK_SIZE = 100 // Increased from 50 to reduce number of queries (Supabase supports up to 100)
+        const chunks: string[][] = []
+        
+        for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
+          chunks.push(productIds.slice(i, i + CHUNK_SIZE))
+        }
+        
+        // Fetch all matching offer IDs from chunks (with current filters applied)
+        const allMatchingOfferIds = new Set<string>()
+        let chunkErrors = 0
+        
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i]
+          
+          try {
+            // Build query for this chunk with all filters
+            let chunkQuery = supabase
+              .from('product_offers')
+              .select('id')
+              .eq('is_available', true)
+              .in('product_id', chunk)
+            
+            if (stores && stores.length > 0) {
+              chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+            }
+            
+            if (offersOnly) {
+              chunkQuery = chunkQuery.eq('is_on_sale', true)
+            }
+            
+            // Organic filter already applied via productIds intersection above
+            
+            const { data: chunkOffers, error: chunkError } = await chunkQuery
+            
+            if (chunkError) {
+              chunkErrors++
+              console.error(`[CATEGORY FILTER] Error fetching chunk ${i + 1}/${chunks.length}:`, chunkError)
+              // Log full error details for Vercel
+              if (chunkError.message) {
+                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
+              }
+              if (chunkError.code) {
+                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
+              }
+              continue
+            }
+            
+            if (chunkOffers && chunkOffers.length > 0) {
+              chunkOffers.forEach(offer => offer?.id && allMatchingOfferIds.add(offer.id))
+            }
+          } catch (error) {
+            chunkErrors++
+            console.error(`[CATEGORY FILTER] Exception in chunk ${i + 1}/${chunks.length}:`, error)
+            if (error instanceof Error) {
+              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
+              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
+            }
+          }
+        }
+        
+        if (chunkErrors > 0) {
+          console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
+        }
+        
+        const matchingOfferIdsArray = Array.from(allMatchingOfferIds)
+        
+        if (matchingOfferIdsArray.length === 0) {
+          return { products: [], total: 0, hasMore: false }
+        }
+        
+        // Now we need to fetch the full offer data for the current page
+        // Since we have all matching offer IDs, we can paginate them in memory
+        const pageStart = offset
+        const pageEnd = Math.min(offset + limit, matchingOfferIdsArray.length)
+        const pageOfferIds = matchingOfferIdsArray.slice(pageStart, pageEnd)
+        
+        if (pageOfferIds.length === 0) {
+          return { 
+            products: [], 
+            total: matchingOfferIdsArray.length, 
+            hasMore: pageEnd < matchingOfferIdsArray.length 
+          }
+        }
+        
+        // Fetch full data for this page's offer IDs
+        // Chunk the offer IDs if needed (shouldn't be more than limit, but be safe)
+        const OFFER_CHUNK_SIZE = 100
+        const allPageData: any[] = []
+        
+        for (let i = 0; i < pageOfferIds.length; i += OFFER_CHUNK_SIZE) {
+          const offerChunk = pageOfferIds.slice(i, i + OFFER_CHUNK_SIZE)
+          
+          try {
+            const chunkQuery = supabase
+              .from('product_offers')
+              .select(
+                `
+                id,
+                product_id,
+                store_id,
+                store_product_id,
+                name_store,
+                product_url,
+                current_price,
+                normal_price,
+                currency,
+                is_on_sale,
+                discount_percentage,
+                price_per_unit,
+                price_per_kilogram,
+                is_available,
+                sale_valid_from,
+                sale_valid_to,
+                products:product_id!inner (
+                  id,
+                  name_generic,
+                  brand,
+                  category,
+                  subcategory,
+                  department,
+                  unit,
+                  amount,
+                  image_url
+                )
+              `,
+                { count: i === 0 ? 'exact' : undefined }
+              )
+              .in('id', offerChunk)
+              .eq('is_available', true)
+            
+            if (stores && stores.length > 0) {
+              chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
+            }
+            
+            if (offersOnly) {
+              chunkQuery.eq('is_on_sale', true)
+            }
+            
+            // Organic filter already applied via productIds intersection above
+            
+            const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
+            
+            if (chunkError) {
+              console.error(`[CATEGORY FILTER] Error fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, chunkError)
+              // Log full error details for Vercel
+              if (chunkError.message) {
+                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
+              }
+              if (chunkError.code) {
+                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
+              }
+              if (chunkError.details) {
+                console.error(`[CATEGORY FILTER] Error details: ${chunkError.details}`)
+              }
+              continue
+            }
+            
+            if (chunkData && chunkData.length > 0) {
+              allPageData.push(...chunkData)
+            }
+          } catch (error) {
+            console.error(`[CATEGORY FILTER] Exception fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, error)
+            if (error instanceof Error) {
+              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
+              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
+            }
+          }
+        }
+        
+        // Sort the combined results
+        allPageData.sort((a, b) => {
+          // Offers first
+          if (a.is_on_sale && !b.is_on_sale) return -1
+          if (!a.is_on_sale && b.is_on_sale) return 1
+          // Then by discount
+          if (a.is_on_sale && b.is_on_sale) {
+            const aDiscount = a.discount_percentage || 0
+            const bDiscount = b.discount_percentage || 0
+            if (bDiscount !== aDiscount) return bDiscount - aDiscount
+          }
+          // Then by price
+          return (a.current_price || 0) - (b.current_price || 0)
+        })
+        
+        // Map the data
+        const mapped = allPageData.map((row: any) => {
+          const p = row.products || {}
+          const price = row.current_price || 0
+          const originalPrice = row.normal_price || row.current_price || 0
+          const isOnSale = !!row.is_on_sale && originalPrice > price
+          const priceDiff = originalPrice - price
+          const discountPct =
+            isOnSale && originalPrice > 0 && priceDiff > 0.01
+              ? Math.round((priceDiff / originalPrice) * 100)
+              : null
+
+          return {
+            id: row.id,
+            name: row.name_store || p.name_generic,
+            description: null,
+            category: p.category || p.department || null,
+            price,
+            original_price: originalPrice,
+            unit: p.unit || 'stk',
+            unit_price: row.price_per_unit || row.price_per_kilogram || null,
+            is_on_sale: isOnSale,
+            discount_percentage: discountPct,
+            image_url: p.image_url || this.getProductPlaceholderImage(),
+            store: this.mapStoreIdToDisplayName(row.store_id),
+            amount: p.amount ? String(p.amount) : null,
+          }
+        })
+        
+        return { 
+          products: mapped, 
+          total: matchingOfferIdsArray.length, 
+          hasMore: pageEnd < matchingOfferIdsArray.length 
+        }
       }
 
       if (search && search.trim()) {
         // Forbedret tekstsøgning i butiksnavn + globalt navn + brand + kategori-felter
         const term = search.trim()
-        console.log(`🔍 Searching for: "${term}"`)
         
         // Find products matching the search term in name/brand fields
-        const { data: nameMatches, error: nameErr } = await supabase
+        let nameQuery = supabase
           .from('product_offers')
           .select('product_id')
           .or(`name_store.ilike.%${term}%`)
           .limit(1000)
         
         // Also find products matching in category fields
-        const { data: categoryMatches, error: catSearchErr } = await supabase
+        let categoryQuery = supabase
           .from('products')
           .select('id')
           .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
           .limit(1000)
+        
+        // Apply organic filter to product search if needed
+        if (organicOnly) {
+          categoryQuery = categoryQuery.contains('labels', ['Økologi'])
+        }
+        
+        const { data: nameMatches, error: nameErr } = await nameQuery
+        const { data: categoryMatches, error: catSearchErr } = await categoryQuery
         
         const matchingProductIds = new Set<string>()
         
@@ -385,14 +653,23 @@ export class DatabaseService {
           categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(m.id))
         }
         
-        if (matchingProductIds.size > 0) {
-          console.log(`🔍 Found ${matchingProductIds.size} unique products matching search term`)
-          query = query.in('product_id', Array.from(matchingProductIds))
+        let finalProductIds = Array.from(matchingProductIds)
+        
+        // If organic filter is active, intersect with organic product IDs
+        if (organicProductIds) {
+          const matchingSet = new Set(finalProductIds)
+          finalProductIds = organicProductIds.filter(id => matchingSet.has(id))
+        }
+        
+        if (finalProductIds.length > 0) {
+          query = query.in('product_id', finalProductIds)
         } else {
           // No matches found, return empty result
-          console.log(`🔍 No products found matching search term`)
           return { products: [], total: 0, hasMore: false }
         }
+      } else if (organicProductIds) {
+        // No search, but organic filter is active - filter by organic product IDs
+        query = query.in('product_id', organicProductIds)
       }
 
       query = query
@@ -466,77 +743,82 @@ export class DatabaseService {
       const raw = cat || ''
       const decoded = (() => { try { return decodeURIComponent(raw) } catch { return raw } })()
       const normalized = decoded.trim().replace(/\s+/g, ' ')
+      
+      // Try exact match first (case-insensitive)
       variants.add(normalized)
       variants.add(normalized.toLowerCase())
-      // Replace & with og and vice versa - be more aggressive
+      variants.add(normalized.toUpperCase())
+      
+      // Replace & with og and vice versa
       variants.add(normalized.replace(/&/g, ' og ').replace(/\s+/g, ' ').trim())
       variants.add(normalized.replace(/\s+og\s+/g, ' & ').replace(/\s+/g, ' ').trim())
-      // Also try without spaces around &
       variants.add(normalized.replace(/&/g, 'og'))
       variants.add(normalized.replace(/\s+og\s+/g, '&'))
+      
       // Replace commas with space
       variants.add(normalized.replace(/,/g, ' '))
+      
       // Remove common suffixes
       variants.add(normalized.replace(/\s+og\s+grøntsager?$/i, ''))
       variants.add(normalized.replace(/\s+grøntsager?$/i, ''))
+      
       return Array.from(variants).filter(Boolean)
     }
 
-    console.log(`🔍 Finding product IDs for categories: ${categories.join(', ')}`)
-
+    // OPTIMIZED: Try exact matches first (much faster), then fall back to partial matches
     for (const cat of categories) {
-      const variants = expandedVariants(cat)
-      console.log(`🔍 Expanded variants for "${cat}":`, variants)
+      const normalized = cat.trim()
+      const normalizedLower = normalized.toLowerCase()
       
-      for (const v of variants) {
-        // Search department
-        const { data: depRows, error: depErr } = await supabase
-          .from('products')
-          .select('id')
-          .ilike('department', `%${v}%`)
-          .limit(5000)
-        if (!depErr && depRows) {
-          depRows.forEach(r => r?.id && seen.add(r.id))
-          if (depRows.length > 0) {
-            console.log(`  ✅ Found ${depRows.length} products in department matching "${v}"`)
-          }
-        } else if (depErr) {
-          console.error(`  ❌ Error searching department for "${v}":`, depErr)
-        }
+      // STEP 1: Try exact match on department first (most common and fastest)
+      const { data: exactDept, error: deptErr } = await supabase
+        .from('products')
+        .select('id')
+        .ilike('department', normalized)
+        .limit(10000)
+      
+      if (!deptErr && exactDept && exactDept.length > 0) {
+        exactDept.forEach(r => r?.id && seen.add(r.id))
+        continue // Found exact match, skip to next category
+      }
+      
+      // STEP 2: Try exact match on category
+      const { data: exactCat, error: catErr } = await supabase
+        .from('products')
+        .select('id')
+        .ilike('category', normalized)
+        .limit(10000)
+      
+      if (!catErr && exactCat && exactCat.length > 0) {
+        exactCat.forEach(r => r?.id && seen.add(r.id))
+        continue // Found exact match, skip to next category
+      }
+      
+      // STEP 3: If no exact match, try a few key variants with OR query (faster than multiple separate queries)
+      const variants = expandedVariants(cat)
+      const keyVariants = Array.from(new Set(variants)).filter(Boolean).slice(0, 3) // Only top 3 variants
+      
+      if (keyVariants.length > 0) {
+        // Use OR query to search all fields at once (much faster than separate queries)
+        const orConditions = keyVariants.map(v => 
+          `department.ilike.%${v}%,category.ilike.%${v}%,subcategory.ilike.%${v}%`
+        ).join(',')
         
-        // Search category
-        const { data: catRows, error: catErr } = await supabase
+        const { data: variantRows, error: variantErr } = await supabase
           .from('products')
           .select('id')
-          .ilike('category', `%${v}%`)
-          .limit(5000)
-        if (!catErr && catRows) {
-          catRows.forEach(r => r?.id && seen.add(r.id))
-          if (catRows.length > 0) {
-            console.log(`  ✅ Found ${catRows.length} products in category matching "${v}"`)
-          }
-        } else if (catErr) {
-          console.error(`  ❌ Error searching category for "${v}":`, catErr)
-        }
+          .or(orConditions)
+          .limit(10000)
         
-        // Search subcategory
-        const { data: subcatRows, error: subcatErr } = await supabase
-          .from('products')
-          .select('id')
-          .ilike('subcategory', `%${v}%`)
-          .limit(5000)
-        if (!subcatErr && subcatRows) {
-          subcatRows.forEach(r => r?.id && seen.add(r.id))
-          if (subcatRows.length > 0) {
-            console.log(`  ✅ Found ${subcatRows.length} products in subcategory matching "${v}"`)
-          }
-        } else if (subcatErr) {
-          console.error(`  ❌ Error searching subcategory for "${v}":`, subcatErr)
+        if (!variantErr && variantRows) {
+          variantRows.forEach(r => r?.id && seen.add(r.id))
         }
       }
     }
 
-    console.log(`🔍 Total unique product IDs found: ${seen.size}`)
+    if (seen.size === 0) {
+      console.warn(`[CATEGORY FILTER] No products found for categories: ${categories.join(', ')}`)
+    }
     return Array.from(seen)
   }
 
