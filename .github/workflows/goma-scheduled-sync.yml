@@ -2,8 +2,10 @@ name: Goma Scheduled Sync
 
 on:
   schedule:
-    # Daily at 23:50 (UTC). Adjust if you need exact Danish local time.
-    - cron: '50 23 * * *'
+    # Daily at 02:00 UTC (04:00 Danish time in summer, 03:00 in winter)
+    # This ensures we're still on the correct day when checking getUTCDay()
+    # and catches store updates that typically happen during the day
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 jobs:

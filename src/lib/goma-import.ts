@@ -338,6 +338,19 @@ export async function importGomaProducts(options: ImportOptions) {
         if (productId.length === 36 && productId.includes('-')) {
           console.warn(`⚠️ Using fallback base_product_id for offer: ${p.product_name} (productId: ${productId})`)
         }
+        
+        // Check if offer has expired - if sale_valid_to is in the past, mark as not on sale
+        let isOnSale = p.is_on_sale
+        if (p.is_on_sale && p.sale_valid_to) {
+          const saleEndDate = new Date(p.sale_valid_to)
+          const now = new Date()
+          if (saleEndDate < now) {
+            // Offer has expired - mark as not on sale
+            isOnSale = false
+            console.log(`⏰ Offer expired for ${p.product_name}: sale_valid_to was ${p.sale_valid_to}`)
+          }
+        }
+        
         return {
           product_id: productId, // Use our generated product ID, not base_product_id
           store_id: storeId,
@@ -346,8 +359,8 @@ export async function importGomaProducts(options: ImportOptions) {
           product_url: p.product_url,
           current_price: p.current_price,
           normal_price: p.normal_price,
-          is_on_sale: p.is_on_sale,
-          discount_percentage: p.discount_percentage,
+          is_on_sale: isOnSale, // Use checked value
+          discount_percentage: isOnSale ? p.discount_percentage : null, // Clear discount if not on sale
           price_per_unit: p.price_per_unit,
           price_per_kilogram: p.price_per_kilogram,
           amount: p.amount,

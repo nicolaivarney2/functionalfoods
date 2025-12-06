@@ -21,12 +21,48 @@ interface Product {
   store: string
   amount?: string
   isFavorite?: boolean
+  sale_end_date?: string | null
 }
 
 interface ProductCounts {
   total: number
   categories: {[key: string]: number}
   offers: number
+}
+
+// Helper function to format offer expiration date
+const formatOfferExpiration = (saleEndDate: string | null | undefined, store?: string): string | null => {
+  if (!saleEndDate) return null
+  
+  const endDate = new Date(saleEndDate)
+  const now = new Date()
+  
+  // Don't show expiration for expired offers (they shouldn't be displayed anyway)
+  if (endDate < now) return null
+  
+  // Calculate days until expiration
+  const daysUntilExpiration = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  
+  // If expiring today or tomorrow, show day name
+  if (daysUntilExpiration <= 1) {
+    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
+    const dayName = dayNames[endDate.getDay()]
+    return daysUntilExpiration === 0 ? `Tilbud udløber i dag` : `Tilbud udløber ${dayName}`
+  }
+  
+  // If within a week, show day name
+  if (daysUntilExpiration <= 7) {
+    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
+    const dayName = dayNames[endDate.getDay()]
+    return `Tilbud udløber ${dayName}`
+  }
+  
+  // Otherwise show formatted date
+  const dateFormatter = new Intl.DateTimeFormat('da-DK', { 
+    day: 'numeric', 
+    month: 'long' 
+  })
+  return `Tilbud udløber ${dateFormatter.format(endDate)}`
 }
 
 // Product Card Component
@@ -120,6 +156,13 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
                 TILBUD
               </span>
             </div>
+            
+            {/* Offer expiration notice */}
+            {formatOfferExpiration(product.sale_end_date, product.store) && (
+              <div className="text-xs text-gray-600 mt-1">
+                {formatOfferExpiration(product.sale_end_date, product.store)}
+              </div>
+            )}
             
             {/* Normal Price (crossed out) */}
             <div className="flex items-center gap-2">
@@ -708,7 +751,7 @@ export default function DagligvarerPage() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Sidebar - Filters (Desktop Only) */}
           <div className="hidden lg:block w-64 flex-shrink-0">
-            <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6">
+            <div className="bg-white rounded-lg shadow-sm border p-4 sticky top-6 max-h-[calc(100vh-6rem)] overflow-y-auto">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtre</h2>
               
               {/* Search */}
@@ -1177,6 +1220,13 @@ export default function DagligvarerPage() {
                           TILBUD
                         </div>
                       </div>
+                      
+                      {/* Offer expiration notice */}
+                      {formatOfferExpiration(selectedProduct.sale_end_date, selectedProduct.store) && (
+                        <div className="text-sm text-gray-600 mt-2">
+                          {formatOfferExpiration(selectedProduct.sale_end_date, selectedProduct.store)}
+                        </div>
+                      )}
                       
                       {/* Normal Price (crossed out) */}
                       {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (

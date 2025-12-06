@@ -34,6 +34,41 @@ interface Product {
   discount_percentage?: number
 }
 
+// Helper function to format offer expiration date
+const formatOfferExpiration = (saleEndDate: string | null | undefined, store?: string): string | null => {
+  if (!saleEndDate) return null
+  
+  const endDate = new Date(saleEndDate)
+  const now = new Date()
+  
+  // Don't show expiration for expired offers (they shouldn't be displayed anyway)
+  if (endDate < now) return null
+  
+  // Calculate days until expiration
+  const daysUntilExpiration = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  
+  // If expiring today or tomorrow, show day name
+  if (daysUntilExpiration <= 1) {
+    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
+    const dayName = dayNames[endDate.getDay()]
+    return daysUntilExpiration === 0 ? `Tilbud udløber i dag` : `Tilbud udløber ${dayName}`
+  }
+  
+  // If within a week, show day name
+  if (daysUntilExpiration <= 7) {
+    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
+    const dayName = dayNames[endDate.getDay()]
+    return `Tilbud udløber ${dayName}`
+  }
+  
+  // Otherwise show formatted date
+  const dateFormatter = new Intl.DateTimeFormat('da-DK', { 
+    day: 'numeric', 
+    month: 'long' 
+  })
+  return `Tilbud udløber ${dateFormatter.format(endDate)}`
+}
+
 // 🚀 STATE-OF-THE-ART PRICE CHART COMPONENT
 interface PriceChartProps {
   data: any[]
@@ -429,7 +464,7 @@ export default function ProductPage() {
             <div className="space-y-6">
               {/* Price section */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-baseline gap-3 mb-2">
+                <div className="flex items-baseline gap-3 mb-2 flex-wrap">
                   <span className="text-3xl font-bold text-gray-900">
                     {product.price?.toFixed(2)} kr
                   </span>
@@ -441,8 +476,15 @@ export default function ProductPage() {
                 </div>
                 
                 {product.unit_price && product.unit_price > 0 && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 mb-2">
                     Pris pr. {product.unit || 'enhed'}: {product.unit_price.toFixed(2)} kr
+                  </p>
+                )}
+                
+                {/* Offer expiration notice */}
+                {formatOfferExpiration(product.sale_end_date, product.store) && (
+                  <p className="text-sm text-gray-600 mt-2">
+                    {formatOfferExpiration(product.sale_end_date, product.store)}
                   </p>
                 )}
               </div>

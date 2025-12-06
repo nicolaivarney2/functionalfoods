@@ -20,9 +20,12 @@ type GomaStoreId =
   | 'ABC Lavpris'
 
 function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
-  // Use UTC day index – GitHub Actions schedule should be configured accordingly
+  // Use Danish time zone (Europe/Copenhagen) to match when stores actually update their offers
+  // This ensures we sync the correct stores on the correct day regardless of UTC time
   const now = new Date()
-  const dayIndex = now.getUTCDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  // Convert to Danish time zone
+  const danishTime = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Copenhagen" }))
+  const dayIndex = danishTime.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
   let stores: GomaStoreId[] = []
 

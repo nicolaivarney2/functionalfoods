@@ -290,6 +290,7 @@ export class DatabaseService {
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
+      const now = new Date().toISOString() // Current time for filtering expired offers
 
       const offset = (page - 1) * limit
 
@@ -331,6 +332,8 @@ export class DatabaseService {
           { count: 'exact' }
         )
         .eq('is_available', true)
+        // Filter out expired offers: either no sale_valid_to OR sale_valid_to is in the future
+        .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
 
       if (stores && stores.length > 0) {
         query = query.in('store_id', this.mapStoreFilterToIds(stores))
@@ -418,6 +421,8 @@ export class DatabaseService {
               .select('id')
               .eq('is_available', true)
               .in('product_id', chunk)
+              // Filter out expired offers
+              .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
             
             if (stores && stores.length > 0) {
               chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
@@ -526,6 +531,8 @@ export class DatabaseService {
               )
               .in('id', offerChunk)
               .eq('is_available', true)
+              // Filter out expired offers
+              .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
             
             if (stores && stores.length > 0) {
               chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
@@ -607,6 +614,7 @@ export class DatabaseService {
             image_url: p.image_url || this.getProductPlaceholderImage(),
             store: this.mapStoreIdToDisplayName(row.store_id),
             amount: p.amount ? String(p.amount) : null,
+            sale_end_date: row.sale_valid_to || null,
           }
         })
         
@@ -673,6 +681,7 @@ export class DatabaseService {
       }
 
       query = query
+        .or('sale_valid_to.is.null,sale_valid_to.gte.' + now) // Filter out expired offers
         .order('is_on_sale', { ascending: false }) // tilbud først
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
@@ -720,6 +729,7 @@ export class DatabaseService {
           image_url: p.image_url || this.getProductPlaceholderImage(),
           store: this.mapStoreIdToDisplayName(row.store_id),
           amount: p.amount ? String(p.amount) : null,
+          sale_end_date: row.sale_valid_to || null,
         }
       })
 

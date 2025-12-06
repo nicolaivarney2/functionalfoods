@@ -46,6 +46,7 @@ export default function AdminGomaDagligvarerPage() {
   const [syncingStore, setSyncingStore] = useState<GomaStoreId | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [statusType, setStatusType] = useState<'success' | 'error' | null>(null)
+  const [cleaningUp, setCleaningUp] = useState(false)
 
   if (checking) {
     return (
@@ -105,6 +106,42 @@ export default function AdminGomaDagligvarerPage() {
       setStatusType('error')
     } finally {
       setSyncingStore(null)
+    }
+  }
+
+  const handleCleanupExpired = async () => {
+    setCleaningUp(true)
+    setStatusMessage(null)
+    setStatusType(null)
+
+    try {
+      const res = await fetch('/api/admin/dagligvarer/cleanup-expired-offers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await res.json()
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Ukendt fejl ved cleanup')
+      }
+
+      setStatusMessage(
+        `Ryddet op i ${data.cleaned || 0} udløbne tilbud. ${data.byStore ? Object.entries(data.byStore).map(([store, count]) => `${store}: ${count}`).join(', ') : ''}`
+      )
+      setStatusType('success')
+    } catch (error) {
+      console.error('Cleanup fejl:', error)
+      setStatusMessage(
+        `Kunne ikke rydde op: ${
+          error instanceof Error ? error.message : 'Ukendt fejl'
+        }`
+      )
+      setStatusType('error')
+    } finally {
+      setCleaningUp(false)
     }
   }
 
@@ -210,6 +247,35 @@ export default function AdminGomaDagligvarerPage() {
                 </button>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Vedligeholdelse</h3>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-yellow-800 mb-3">
+                <strong>Ryd op i udløbne tilbud:</strong> Finder og deaktiverer alle tilbud hvor 
+                <code className="bg-yellow-100 px-1 rounded">sale_valid_to</code> er i fortiden, 
+                men stadig er markeret som aktive. Dette sikrer at udløbne tilbud ikke vises på siden.
+              </p>
+              <button
+                type="button"
+                onClick={handleCleanupExpired}
+                disabled={cleaningUp || !!syncingStore}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {cleaningUp ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Rydder op...</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Ryd op i udløbne tilbud</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="mt-6 text-xs text-gray-500">
