@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">
@@ -7,12 +9,12 @@ export default function NotFound() {
         <p className="text-gray-500 mb-8">
           Beklager, men siden du leder efter eksisterer ikke.
         </p>
-        <a
+        <Link
           href="/"
           className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
         >
           Gå tilbage til forsiden
-        </a>
+        </Link>
       </div>
     </div>
   )

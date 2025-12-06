@@ -622,7 +622,7 @@ export class DatabaseService {
         const term = search.trim()
         
         // Find products matching the search term in name/brand fields
-        let nameQuery = supabase
+        const nameQuery = supabase
           .from('product_offers')
           .select('product_id')
           .or(`name_store.ilike.%${term}%`)

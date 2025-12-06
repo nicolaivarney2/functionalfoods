@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { ExternalLink, Users, MessageCircle, Search, Filter } from 'lucide-react'
 import RedditCommunityWidget from '@/components/RedditCommunityWidget'
 
@@ -267,12 +268,12 @@ export default function RedditCommunitiesPage() {
             >
               Følg os på Reddit
             </a>
-            <a
+            <Link
               href="/"
               className="border-2 border-white text-white hover:bg-white hover:text-orange-500 px-6 py-3 rounded-lg font-medium transition-colors"
             >
               Tilbage til Functional Foods
-            </a>
+            </Link>
           </div>
         </div>
       </div>

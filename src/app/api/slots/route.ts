@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     // Get next available slot
     const nextAvailableSlot = SlotScheduler.getNextAvailableSlot(occupiedSlots)
     
-    let slots: any[] = []
+    const slots: any[] = []
     
     if (startDate && endDate) {
       // Get slots for date range

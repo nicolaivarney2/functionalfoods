@@ -414,8 +414,8 @@ export class MealPlanGenerator {
     let totalFiber = 0;
     let totalSugar = 0;
     let totalSodium = 0;
-    let totalVitamins: { [key: string]: number } = {};
-    let totalMinerals: { [key: string]: number } = {};
+    const totalVitamins: { [key: string]: number } = {};
+    const totalMinerals: { [key: string]: number } = {};
 
     // Generate meals for each meal type
     for (const mealDistribution of config.mealStructure.mealDistribution) {
