@@ -64,7 +64,7 @@ export async function GET(
     const matcher = new FridaDTUMatcher()
 
     const items: BreakdownItem[] = []
-    let totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
+    const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
 
     for (const ing of recipe.ingredients || []) {
       const grams = gramsFromUnit(ing.amount || 0, ing.unit || '', ing.name)

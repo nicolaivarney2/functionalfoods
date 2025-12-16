@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
 
     let updated = 0
-    let inserted = 0
+    const inserted = 0
     const changedSamples: Array<{ id: string; name: string; from: any; to: any }> = []
 
     // Helper to extract price info from Python scraper structure

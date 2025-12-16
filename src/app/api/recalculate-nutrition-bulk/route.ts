@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
         let totalCarbs = 0
         let totalFat = 0
         let totalFiber = 0
-        let totalVitamins: Record<string, number> = {}
-        let totalMinerals: Record<string, number> = {}
+        const totalVitamins: Record<string, number> = {}
+        const totalMinerals: Record<string, number> = {}
         let matchedIngredients = 0
-        let totalIngredients = recipe.ingredients.length
+        const totalIngredients = recipe.ingredients.length
 
         // Calculate nutrition for each ingredient
         for (const ingredient of recipe.ingredients) {

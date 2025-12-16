@@ -610,6 +610,7 @@ export class DatabaseService {
             unit: p.unit || 'stk',
             unit_price: row.price_per_unit || row.price_per_kilogram || null,
             is_on_sale: isOnSale,
+            sale_end_date: row.sale_valid_to || null,
             discount_percentage: discountPct,
             image_url: p.image_url || this.getProductPlaceholderImage(),
             store: this.mapStoreIdToDisplayName(row.store_id),
@@ -630,7 +631,7 @@ export class DatabaseService {
         const term = search.trim()
         
         // Find products matching the search term in name/brand fields
-        let nameQuery = supabase
+        const nameQuery = supabase
           .from('product_offers')
           .select('product_id')
           .or(`name_store.ilike.%${term}%`)
@@ -725,6 +726,7 @@ export class DatabaseService {
           unit: p.unit || 'stk',
           unit_price: row.price_per_unit || row.price_per_kilogram || null,
           is_on_sale: isOnSale,
+          sale_end_date: row.sale_valid_to || null,
           discount_percentage: discountPct,
           image_url: p.image_url || this.getProductPlaceholderImage(),
           store: this.mapStoreIdToDisplayName(row.store_id),

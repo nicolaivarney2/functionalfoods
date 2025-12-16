@@ -257,7 +257,7 @@ export default function RecipeOverviewPage() {
     setFilteredRecipes(filtered)
 
     // Apply sorting
-    let sorted = [...(filtered || [])]
+    const sorted = [...(filtered || [])]
     switch (sortBy) {
       case 'newest':
         sorted.sort((a, b) => {

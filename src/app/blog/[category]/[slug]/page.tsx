@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { createSupabaseClient } from '@/lib/supabase'
 import { ArrowLeft, Calendar, User, ExternalLink, CheckCircle, Info } from 'lucide-react'
 
@@ -292,13 +293,13 @@ export default function BlogPostPage() {
         <div className="text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
           <p className="text-xl text-gray-600 mb-8">Blog post ikke fundet</p>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Gå tilbage til forsiden
-          </a>
+          </Link>
         </div>
       </div>
     )

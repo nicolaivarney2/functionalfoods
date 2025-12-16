@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         matchedProducts = matchedProductsData
       } else {
         // Fallback: count manually with pagination
-        let allMatchedProducts = new Set()
+        const allMatchedProducts = new Set()
         let offset = 0
         const limit = 1000
         let hasMore = true

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ShoppingCart, Heart, Share2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, Heart, Share2, TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react'
 
 interface Product {
   id: string
@@ -34,39 +34,98 @@ interface Product {
   discount_percentage?: number
 }
 
-// Helper function to format offer expiration date
-const formatOfferExpiration = (saleEndDate: string | null | undefined, store?: string): string | null => {
-  if (!saleEndDate) return null
+// Store update schedule - when each store updates their offers
+const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
+  'Netto': 'Fredag',
+  'REMA 1000': 'Lørdag',
+  '365 Discount': 'Onsdag',
+  'Lidl': 'Lørdag',
+  'Bilka': 'Fredag',
+  'Nemlig': 'Søndag',
+  'MENY': 'Torsdag',
+  'Spar': 'Torsdag',
+  'Kvickly': 'Torsdag',
+  'Super Brugsen': 'Torsdag',
+  'Brugsen': 'Fredag',
+  'Løvbjerg': 'Torsdag',
+  'ABC Lavpris': 'Tirsdag'
+}
+
+// Map Danish weekday names to day indices (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+const WEEKDAY_MAP: { [key: string]: number } = {
+  'Søndag': 0,
+  'Mandag': 1,
+  'Tirsdag': 2,
+  'Onsdag': 3,
+  'Torsdag': 4,
+  'Fredag': 5,
+  'Lørdag': 6
+}
+
+// Utility function to calculate offer end date from store weekday
+function getOfferEndDate(store: string, saleEndDate?: string | null): string | null {
+  // If we have a sale_end_date from the database, use it
+  if (saleEndDate) {
+    return saleEndDate
+  }
   
-  const endDate = new Date(saleEndDate)
+  // Otherwise, calculate based on store's offer day
+  const offerDay = STORE_UPDATE_SCHEDULE[store]
+  if (!offerDay) {
+    return null
+  }
+  
+  const weekdayIndex = WEEKDAY_MAP[offerDay]
+  if (weekdayIndex === undefined) {
+    return null
+  }
+  
   const now = new Date()
+  const currentDay = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   
-  // Don't show expiration for expired offers (they shouldn't be displayed anyway)
-  if (endDate < now) return null
-  
-  // Calculate days until expiration
-  const daysUntilExpiration = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  
-  // If expiring today or tomorrow, show day name
-  if (daysUntilExpiration <= 1) {
-    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
-    const dayName = dayNames[endDate.getDay()]
-    return daysUntilExpiration === 0 ? `Tilbud udløber i dag` : `Tilbud udløber ${dayName}`
+  // Calculate days until next offer day
+  let daysUntilOfferDay = weekdayIndex - currentDay
+  if (daysUntilOfferDay <= 0) {
+    // If the offer day has passed this week, get next week's date
+    daysUntilOfferDay += 7
   }
   
-  // If within a week, show day name
-  if (daysUntilExpiration <= 7) {
-    const dayNames = ['søndag', 'mandag', 'tirsdag', 'onsdag', 'torsdag', 'fredag', 'lørdag']
-    const dayName = dayNames[endDate.getDay()]
-    return `Tilbud udløber ${dayName}`
+  // Create date for the offer end (at end of day, 23:59:59)
+  const offerEndDate = new Date(now)
+  offerEndDate.setDate(now.getDate() + daysUntilOfferDay)
+  offerEndDate.setHours(23, 59, 59, 999)
+  
+  return offerEndDate.toISOString()
+}
+
+// Format date for display
+function formatOfferEndDate(dateString: string | null): string {
+  if (!dateString) return ''
+  
+  const date = new Date(dateString)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const dateOnly = new Date(date)
+  dateOnly.setHours(0, 0, 0, 0)
+  
+  // If it's today, show "i dag"
+  if (dateOnly.getTime() === today.getTime()) {
+    return 'i dag'
   }
   
-  // Otherwise show formatted date
-  const dateFormatter = new Intl.DateTimeFormat('da-DK', { 
-    day: 'numeric', 
-    month: 'long' 
+  // If it's tomorrow, show "i morgen"
+  if (dateOnly.getTime() === tomorrow.getTime()) {
+    return 'i morgen'
+  }
+  
+  // Otherwise show weekday and date
+  return date.toLocaleDateString('da-DK', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long'
   })
-  return `Tilbud udløber ${dateFormatter.format(endDate)}`
 }
 
 // 🚀 STATE-OF-THE-ART PRICE CHART COMPONENT
@@ -481,12 +540,20 @@ export default function ProductPage() {
                   </p>
                 )}
                 
-                {/* Offer expiration notice */}
-                {formatOfferExpiration(product.sale_end_date, product.store) && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    {formatOfferExpiration(product.sale_end_date, product.store)}
-                  </p>
-                )}
+                {/* Offer End Date */}
+                {product.is_on_sale && (() => {
+                  const offerEndDate = getOfferEndDate(product.store, product.sale_end_date)
+                  const formattedDate = formatOfferEndDate(offerEndDate)
+                  if (formattedDate) {
+                    return (
+                      <div className="flex items-center gap-2 text-sm text-gray-500 mt-3 pt-3 border-t border-gray-200">
+                        <Clock size={16} className="text-gray-400" />
+                        <span>Tilbud slutter {formattedDate}</span>
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
               </div>
 
               {/* Quantity and unit info */}

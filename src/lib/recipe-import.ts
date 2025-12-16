@@ -479,7 +479,7 @@ export async function importRecipesWithRetry(
   console.log(`🔄 Starting import with retry (max ${maxRetries} attempts)`)
   
   // First attempt
-  let result = await importRecipesInBatches(rawData, batchOptions)
+  const result = await importRecipesInBatches(rawData, batchOptions)
   
   // Retry failed recipes if any
   for (let attempt = 1; attempt <= maxRetries && result.failedRecipes > 0; attempt++) {
