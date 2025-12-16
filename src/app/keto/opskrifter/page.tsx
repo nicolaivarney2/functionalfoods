@@ -339,11 +339,11 @@ export default function KetoRecipesPage() {
       <section className="py-20 bg-gradient-to-br from-gray-50 to-purple-50/30">
         <div className="container">
           {filteredRecipes.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredRecipes.map((recipe, index) => (
                 <div
                   key={recipe.id}
-                  className="transition-all duration-500"
+                  className="transition-all duration-500 h-full"
                   style={{ transitionDelay: `${index * 100}ms` }}
                 >
                   <RecipeCard recipe={recipe} />

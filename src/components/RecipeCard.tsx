@@ -22,8 +22,8 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
   }
 
   return (
-    <article className="recipe-card">
-      <Link href={`/opskrift/${recipe.slug}`} className="block">
+    <article className="recipe-card h-full flex flex-col">
+      <Link href={`/opskrift/${recipe.slug}`} className="block h-full flex flex-col">
         {/* Recipe Image */}
         <div className="relative aspect-[4/3] overflow-hidden">
           {recipe.imageUrl ? (
@@ -41,7 +41,7 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
         </div>
 
         {/* Recipe Content */}
-        <div className="p-6">
+        <div className="p-6 flex-grow flex flex-col">
           {/* Title */}
           <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
             {recipe.title}
@@ -55,21 +55,21 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
           )}
 
           {/* Recipe Meta */}
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-1">
-                <Clock size={16} />
-                <span>{formatTime(recipe.totalTime || 0)}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mt-auto">
+            <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-500">
+              <div className="flex items-center gap-1">
+                <Clock size={14} className="sm:w-4 sm:h-4" />
+                <span className="whitespace-nowrap">{formatTime(recipe.totalTime || 0)}</span>
               </div>
-              <div className="flex items-center space-x-1">
-                <Users size={16} />
-                <span>{recipe.servings || 1} pers</span>
+              <div className="flex items-center gap-1">
+                <Users size={14} className="sm:w-4 sm:h-4" />
+                <span className="whitespace-nowrap">{recipe.servings || 1} pers</span>
               </div>
             </div>
 
             {/* Difficulty */}
             {recipe.difficulty && (
-              <span className={`px-2 py-1 text-xs font-medium ${
+              <span className={`px-2 py-1 text-xs font-medium whitespace-nowrap ${
                 recipe.difficulty === 'Nem' ? 'bg-green-100 text-green-800' :
                 recipe.difficulty === 'Mellem' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'

@@ -164,7 +164,7 @@ export default function Home() {
               </h1>
               
               <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-8 max-w-2xl mx-auto drop-shadow-md">
-                Tilpas maden til DIT liv. Ikke omvendt.
+                <b>Tilpas maden til DIT liv. Ikke omvendt.</b>
               </p>
               
               {/* Search Bar with Dropdown */}
@@ -235,8 +235,8 @@ export default function Home() {
                 </form>
               </div>
             </div>
-                    </div>
-                  </div>
+          </div>
+        </div>
       </section>
 
       {/* Niche Selection Section */}
@@ -483,22 +483,16 @@ export default function Home() {
                 De grundlæggende principper
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Der findes tusind veje, men de bygger alle på de samme mekanismer
+                Der findes mange veje til vægttab, men de bygger alle på de samme mekanismer
               </p>
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               {[
                 {
-                  title: "Kalorier betyder noget",
+                  title: "Forbrænd mere end du spiser",
                   description: "Kroppen taber sig, når du indtager mindre energi, end du forbruger. Det er fysik, ikke magi.",
                   icon: Target,
-                  color: "green"
-                },
-                {
-                  title: "Madkvalitet betyder også noget",
-                  description: "Jo mere næringsrig mad, jo nemmere er det at holde kroppen stærk, mæt og stabil.",
-                  icon: Leaf,
                   color: "green"
                 },
                 {
@@ -506,6 +500,12 @@ export default function Home() {
                   description: "500 kcal fra grøntsager og fisk fylder anderledes end 500 kcal fra hvidt brød og olie.",
                   icon: Target,
                   color: "blue"
+                },
+                {
+                  title: "Madkvalitet betyder også noget",
+                  description: "Jo mere næringsrig mad, jo nemmere er det at holde kroppen stærk, mæt og stabil.",
+                  icon: Leaf,
+                  color: "green"
                 },
                 {
                   title: "Vaner styrer alt",
@@ -547,7 +547,7 @@ export default function Home() {
                   Det handler om de valg, du tager ved hvert eneste måltid.
                 </p>
                 <p className="text-gray-600 text-center mb-10 max-w-2xl mx-auto">
-                  Når du vælger bedre løsninger igen og igen, så bygger du et kalorieunderskud op, måltid for måltid — og det er sådan vægttab sker i virkeligheden.
+                  Når du vælger bedre løsninger igen og igen, så bygger du et kalorieunderskud op, måltid for måltid - og det er sådan vægttab sker i virkeligheden.
                 </p>
 
                 {/* Tre kort */}
@@ -597,7 +597,7 @@ export default function Home() {
                   <div className="flex flex-col md:flex-row items-center justify-center gap-8">
                     <div className="flex-1 text-center md:text-left">
                       <p className="text-sm font-semibold text-gray-700 mb-4">
-                        Vi giver dig opskrifter og madplaner, der gør det nemt at tage det gode valg — ikke én gang, men hundrede gange.
+                        Vi giver dig opskrifter og madplaner, der gør det nemt at tage det gode valg - ikke én gang, men hele vejen til dit mål.
                       </p>
                       <p className="text-base font-bold text-green-600">
                         Det er sådan du taber 5, 10 eller 20 kg uden at "starte forfra" hele tiden.
@@ -640,7 +640,7 @@ export default function Home() {
               Find den madstil, der passer til dig
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Alle kostretninger kan virke – men kun, hvis du kan leve med dem.<br />
+              Alle kostretninger kan virke – men <b>kun, hvis du kan leve med dem.</b><br />
               Vælg din madstil, og udforsk vægttabsguides og opskrifter
             </p>
           </div>
@@ -750,10 +750,10 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                    Personlige AI madplaner
+                    Din personlige AI madplaner
                   </h3>
                   <p className="text-gray-700 leading-relaxed mb-6">
-                    Vores AI skaber madplaner der er skræddersyet til dig og din familie. Baseret på dine præferencer, vægttabsmål og livsstil.
+                    Vores AI madplans-system lærer dig at kende, og er skræddersyet til dig og din familie, dine madpræferencer, vægttabsmål og livsstil - Og selvfølgelig næste ugens tilbud!
                   </p>
                   <Link
                     href="/premium"

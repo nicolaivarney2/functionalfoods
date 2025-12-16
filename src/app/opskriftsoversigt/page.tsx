@@ -113,16 +113,6 @@ const extendedDietaryCategories = [
     imageAlt: 'Familievenlige retter til hverdagen'
   },
   {
-    id: '6',
-    name: 'MIDDELHAVSDIÆTEN',
-    slug: 'mediterranean',
-    description: 'Middelhavs-inspirerede sunde opskrifter',
-    color: 'bg-red-500',
-    recipeCount: 267,
-    imageUrl: '/images/categories/mediterranean.webp',
-    imageAlt: 'Middelhavs mad med olivenolie, fisk og grønne grøntsager'
-  },
-  {
     id: '7',
     name: 'FLEKSITARISK',
     slug: 'flexitarian',
@@ -148,17 +138,40 @@ export default function RecipeOverviewPage() {
   // State for recipes and filters
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([])
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([])
-  const [sortedRecipes, setSortedRecipes] = useState<Recipe[]>([])
-  const [displayedRecipes, setDisplayedRecipes] = useState<Recipe[]>([])
   
   // State for filters and pagination
   const [selectedDietary, setSelectedDietary] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState('newest')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [prepTimeFilter, setPrepTimeFilter] = useState<'all' | 'quick' | 'medium' | 'long'>('all')
+  const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
-  const [displayCount, setDisplayCount] = useState(8)
   const [isLoading, setIsLoading] = useState(true)
+  const [showFloatingFilter, setShowFloatingFilter] = useState(false)
+
+  // Track scroll position for floating filter button
+  useEffect(() => {
+    const handleScroll = () => {
+      // Find the recipes section
+      const recipesSection = document.getElementById('recipes-section')
+      if (!recipesSection) return
+
+      const rect = recipesSection.getBoundingClientRect()
+      // Show floating button when recipes section is visible and user has scrolled past filters
+      const filtersSection = document.getElementById('filters-section')
+      if (filtersSection) {
+        const filtersRect = filtersSection.getBoundingClientRect()
+        // Show if recipes section is visible and filters section is above viewport
+        setShowFloatingFilter(rect.top < window.innerHeight && filtersRect.bottom < 0)
+      } else {
+        setShowFloatingFilter(rect.top < window.innerHeight)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    handleScroll() // Check on mount
+
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   // Load recipes on component mount
   useEffect(() => {
@@ -191,29 +204,20 @@ export default function RecipeOverviewPage() {
     loadRecipes()
   }, [])
 
-  // Apply filters and sorting when dependencies change
+  // Apply filters when dependencies change
   useEffect(() => {
-    console.log('🔄 Applying filters and sorting...')
-    console.log(`📊 Total recipes: ${allRecipes?.length || 0}`)
-    console.log(`🔍 Search query: "${searchQuery}"`)
-    console.log(`🥗 Selected dietary: "${selectedDietary}"`)
-    console.log(`📂 Selected category: "${selectedCategory}"`)
-    
     let filtered = allRecipes || []
 
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(recipe => {
-        // Check title
         if (recipe.title.toLowerCase().includes(query)) {
           return true
         }
-        // Check description
         if (recipe.description?.toLowerCase().includes(query)) {
           return true
         }
-        // Check ingredients (ensure it's an array)
         if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
           if (recipe.ingredients.some(ingredient =>
             ingredient.name.toLowerCase().includes(query)
@@ -223,83 +227,58 @@ export default function RecipeOverviewPage() {
         }
         return false
       })
-      console.log(`🔍 After search filter: ${filtered?.length || 0} recipes`)
     }
 
     // Apply dietary filter
     if (selectedDietary !== 'all') {
       filtered = filtered.filter(recipe => {
-        // Ensure dietaryCategories exists and is an array before filtering
         if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
           return false
         }
         return recipe.dietaryCategories.some(cat => {
-          // Normalize category names by removing brackets for comparison
           const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
           const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
           return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
         })
       })
-      console.log(`🥗 After dietary filter: ${filtered?.length || 0} recipes`)
     }
 
-    // Apply category filter
-    if (selectedCategory !== 'all') {
+    // Prep time filter
+    if (prepTimeFilter !== 'all') {
       filtered = filtered.filter(recipe => {
-        // Normalize category names by removing brackets for comparison
-        const normalizedRecipeCat = recipe.mainCategory?.replace(/[\[\]]/g, '').trim() || ''
-        const normalizedSelected = selectedCategory.replace(/[\[\]]/g, '').trim()
-        return normalizedRecipeCat.toLowerCase() === normalizedSelected.toLowerCase()
+        const total = recipe.totalTime || (recipe.preparationTime || 0) + (recipe.cookingTime || 0)
+        if (prepTimeFilter === 'quick') return total <= 30
+        if (prepTimeFilter === 'medium') return total > 30 && total <= 60
+        if (prepTimeFilter === 'long') return total > 60
+        return true
       })
-      console.log(`📂 After category filter: ${filtered?.length || 0} recipes`)
+    }
+
+    // Meal type filter
+    if (mealTypeFilter !== 'all') {
+      filtered = filtered.filter(recipe => {
+        const mainCat = (recipe.mainCategory || '').toLowerCase()
+        const filterLower = mealTypeFilter.toLowerCase()
+        return mainCat.includes(filterLower) || filterLower.includes(mainCat)
+      })
     }
 
     setFilteredRecipes(filtered)
+  }, [allRecipes, searchQuery, selectedDietary, prepTimeFilter, mealTypeFilter])
 
-    // Apply sorting
-    const sorted = [...(filtered || [])]
-    switch (sortBy) {
-      case 'newest':
-        sorted.sort((a, b) => {
-          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
-          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
-          return dateB - dateA
-        })
-        break
-      case 'oldest':
-        sorted.sort((a, b) => {
-          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
-          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
-          return dateA - dateB
-        })
-        break
-      case 'time-asc':
-        sorted.sort((a, b) => (a.totalTime || 0) - (b.totalTime || 0))
-        break
-      case 'time-desc':
-        sorted.sort((a, b) => (b.totalTime || 0) - (a.totalTime || 0))
-        break
-      case 'rating':
-        // For now, sort by newest since we don't have ratings
-        sorted.sort((a, b) => {
-          const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
-          const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
-          return dateB - dateA
-        })
-        break
-    }
+  // Get unique meal types from recipes
+  const mealTypes = Array.from(
+    new Set(allRecipes.map(r => r.mainCategory).filter(Boolean))
+  ).sort()
 
-    setSortedRecipes(sorted)
-    setDisplayedRecipes(sorted?.slice(0, displayCount) || [])
-    console.log(`✅ Final result: ${sorted?.length || 0} sorted recipes, ${sorted?.slice(0, displayCount)?.length || 0} displayed`)
-    console.log('📋 Displayed recipes:', sorted?.slice(0, displayCount)?.map(r => r?.title || 'Unknown') || [])
-  }, [allRecipes, searchQuery, selectedDietary, selectedCategory, sortBy, displayCount])
-
-  const handleLoadMore = () => {
-    setDisplayCount(prev => prev + 8)
+  const clearFilters = () => {
+    setPrepTimeFilter('all')
+    setMealTypeFilter('all')
+    setSearchQuery('')
+    setSelectedDietary('all')
   }
 
-  const hasMoreRecipes = displayedRecipes && sortedRecipes ? displayedRecipes.length < sortedRecipes.length : false
+  const hasActiveFilters = prepTimeFilter !== 'all' || mealTypeFilter !== 'all' || searchQuery !== '' || selectedDietary !== 'all'
 
   if (isLoading) {
     return (
@@ -393,193 +372,284 @@ export default function RecipeOverviewPage() {
             )) : null}
           </div>
           
-          <div className="text-center mt-12">
-            <button 
-              onClick={() => document.getElementById('alle-opskrifter')?.scrollIntoView({ behavior: 'smooth' })}
-              className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium transition-colors"
-            >
-              Eller udforsk alle opskrifter
-              <ArrowRight className="w-4 h-4" />
-            </button>
+        </div>
+      </section>
+
+      {/* Search and Filters Section */}
+      <section id="filters-section" className="py-8 bg-white border-b border-gray-100">
+        <div className="container">
+          <div className="flex flex-col gap-4">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <div className="relative flex-1 max-w-md w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Søg i alle opskrifter..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
+                  showFilters || hasActiveFilters
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Filter size={20} />
+                Filtre
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
+                    {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== '', selectedDietary !== 'all'].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-3 text-gray-600 hover:text-gray-900 font-medium transition-colors"
+                >
+                  Ryd filtre
+                </button>
+              )}
+            </div>
+
+            {/* Filters Panel */}
+            {showFilters && (
+              <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Dietary Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Mad ideologi
+                    </label>
+                    <select
+                      value={selectedDietary}
+                      onChange={(e) => setSelectedDietary(e.target.value)}
+                      className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+                    >
+                      <option value="all">Alle mad ideologier</option>
+                      <option value="FAMILIEMAD">Familiemad</option>
+                      <option value="Keto">Keto</option>
+                      <option value="SENSE">SENSE</option>
+                      <option value="LCHF/PALEO">LCHF/Paleo</option>
+                      <option value="MEAL PREP">Meal Prep</option>
+                      <option value="ANTI-INFLAMMATORISK">Anti-Inflammatorisk</option>
+                      <option value="MIDDELHAVSDIÆTEN">Middelhavsdiæten</option>
+                      <option value="FLEKSITARISK">Fleksitarisk</option>
+                      <option value="5:2 DIÆT">5:2 Diæt</option>
+                    </select>
+                  </div>
+
+                  {/* Prep Time Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Forbredelsestid
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { value: 'all', label: 'Alle' },
+                        { value: 'quick', label: 'Under 30 min' },
+                        { value: 'medium', label: '30-60 min' },
+                        { value: 'long', label: 'Over 60 min' },
+                      ].map(option => (
+                        <button
+                          key={option.value}
+                          onClick={() => setPrepTimeFilter(option.value as any)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            prepTimeFilter === option.value
+                              ? 'bg-green-600 text-white shadow-md'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Meal Type Filter */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Måltidstype
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setMealTypeFilter('all')}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          mealTypeFilter === 'all'
+                            ? 'bg-green-600 text-white shadow-md'
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                      >
+                        Alle
+                      </button>
+                      {mealTypes.map(type => (
+                        <button
+                          key={type}
+                          onClick={() => setMealTypeFilter(type)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            mealTypeFilter === type
+                              ? 'bg-green-600 text-white shadow-md'
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Results Count */}
+            <div className="text-center text-sm text-gray-600">
+              Viser {filteredRecipes.length} af {allRecipes.length} opskrifter
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Divider */}
-      <div className="border-b border-gray-200"></div>
-
-      {/* Alle opskrifter Section */}
-      <section id="alle-opskrifter" className="py-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      {/* Recipes Grid */}
+      <section id="recipes-section" className="py-20 pb-24 md:pb-20 bg-gradient-to-br from-gray-50 to-green-50/30">
         <div className="container">
-          <div className="text-center mb-16">
+          {filteredRecipes.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {filteredRecipes.map((recipe, index) => (
+                <div
+                  key={recipe.id}
+                  className="transition-all duration-500 h-full"
+                  style={{ transitionDelay: `${index * 100}ms` }}
+                >
+                  <RecipeCard recipe={recipe} priority={index < 8} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4">🍽️</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                {hasActiveFilters ? 'Ingen opskrifter fundet' : 'Ingen opskrifter endnu'}
+              </h3>
+              <p className="text-gray-600 mb-8">
+                {hasActiveFilters
+                  ? 'Prøv at justere dine filtre for at se flere opskrifter.'
+                  : 'Vi arbejder på at tilføje flere opskrifter. Kom snart tilbage!'
+                }
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 font-medium transition-colors"
+                >
+                  Ryd alle filtre
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-br from-green-50 via-white to-blue-50">
+        <div className="container">
+          <div className="max-w-4xl mx-auto text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
-              Alle opskrifter
+              Klar til at komme i gang?
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Søg og filtrer gennem alle vores opskrifter – alle beregnet på vitaminer og næring.
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Udforsk vores opskrifter, lær om vægttab, eller få din personlige AI-madplan
             </p>
           </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* Card 1 */}
+            <Link 
+              href="/opskriftsoversigt"
+              className="group bg-white rounded-2xl p-8 border-2 border-gray-100 hover:border-green-200 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="text-5xl mb-4 text-center">🍽️</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3 text-center group-hover:text-green-600 transition-colors">
+                Alle opskrifter
+              </h3>
+              <p className="text-gray-600 text-center mb-4">
+                Udforsk +2.509 gratis opskrifter beregnet på vitaminer og næring
+              </p>
+              <div className="text-center text-green-600 font-medium group-hover:underline">
+                Se alle →
+              </div>
+            </Link>
+
+            {/* Card 2 */}
+            <Link 
+              href="/vægttab"
+              className="group bg-white rounded-2xl p-8 border-2 border-gray-100 hover:border-green-200 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="text-5xl mb-4 text-center">📚</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-3 text-center group-hover:text-green-600 transition-colors">
+                Lær om vægttab
+              </h3>
+              <p className="text-gray-600 text-center mb-4">
+                Videnskabelig vejledning til varigt vægttab gennem kost
+              </p>
+              <div className="text-center text-green-600 font-medium group-hover:underline">
+                Læs mere →
+              </div>
+            </Link>
+
+            {/* Card 3 */}
+            <Link 
+              href="/premium"
+              className="group bg-gradient-to-br from-green-600 to-blue-600 rounded-2xl p-8 border-2 border-green-500 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+            >
+              <div className="text-5xl mb-4 text-center">✨</div>
+              <h3 className="text-xl font-bold text-white mb-3 text-center">
+                AI-madplaner
+              </h3>
+              <p className="text-green-50 text-center mb-4">
+                Få personlige madplaner skræddersyet til dig og din familie
+              </p>
+              <div className="text-center text-white font-medium group-hover:underline">
+                Prøv gratis →
+              </div>
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Search and Filter Section */}
-      <section className="bg-white py-8">
-        <div className="container">
-          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Søg i alle opskrifter her"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-              />
-            </div>
-
-            {/* Mad ideologi select - Added after search */}
-            <select
-              value={selectedDietary}
-              onChange={(e) => setSelectedDietary(e.target.value)}
-              className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+      {/* Floating Filter Button (Mobile Only) */}
+      {showFloatingFilter && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+          <div className="bg-white border-t border-gray-200 shadow-lg">
+            <button
+              onClick={() => {
+                setShowFilters(!showFilters)
+                // Scroll to filters section
+                document.getElementById('filters-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }}
+              className={`w-full py-4 px-6 font-semibold text-lg transition-all duration-200 ${
+                showFilters || hasActiveFilters
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-700'
+              }`}
             >
-              <option value="all">Alle mad ideologier</option>
-              <option value="FAMILIEMAD">Familiemad</option>
-              <option value="Keto">Keto</option>
-              <option value="SENSE">SENSE</option>
-              <option value="LCHF/PALEO">LCHF/Paleo</option>
-              <option value="MEAL PREP">Meal Prep</option>
-              <option value="ANTI-INFLAMMATORISK">Anti-Inflammatorisk</option>
-              <option value="MIDDELHAVSDIÆTEN">Middelhavsdiæten</option>
-              <option value="FLEKSITARISK">Fleksitarisk</option>
-              <option value="5:2 DIÆT">5:2 Diæt</option>
-            </select>
-
-            {/* Filter Button */}
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-4 py-3 transition-colors"
-            >
-              <Filter size={20} />
-              <span>Filter</span>
-              {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <div className="flex items-center justify-center gap-2">
+                <Filter size={20} />
+                <span>Filtre</span>
+                {hasActiveFilters && (
+                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-sm">
+                    {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== '', selectedDietary !== 'all'].filter(Boolean).length}
+                  </span>
+                )}
+              </div>
             </button>
           </div>
-
-          {/* Advanced Filters Accordion */}
-          {showFilters && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sortering</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                  >
-                    <option value="newest">Nyeste først</option>
-                    <option value="oldest">Ældste først</option>
-                    <option value="time-asc">Kortest tid</option>
-                    <option value="time-desc">Længste tid</option>
-                    <option value="rating">Højeste rating</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
-                  >
-                    <option value="all">Alle kategorier</option>
-                    <option value="Aftensmad">Aftensmad</option>
-                    <option value="Frokost">Frokost</option>
-                    <option value="Morgenmad">Morgenmad</option>
-                    <option value="Salater">Salater</option>
-                    <option value="Desserter">Desserter</option>
-                    <option value="Snacks">Snacks</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-600">
-                  {filteredRecipes.length} opskrifter fundet
-                </p>
-              </div>
-            </div>
-          )}
         </div>
-      </section>
-
-      {/* Recipe Grid Section */}
-      <section className="py-8 bg-white">
-        <div className="container">
-          {displayedRecipes && displayedRecipes.length > 0 ? (
-            <>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {displayedRecipes && Array.isArray(displayedRecipes) ? displayedRecipes.map((recipe, index) => (
-                  <RecipeCard 
-                    key={recipe.id} 
-                    recipe={recipe} 
-                    priority={index < 6} // Priority loading for first 6 images
-                  />
-                )) : null}
-              </div>
-              
-              {/* Load More Button */}
-              {hasMoreRecipes && (
-                <div className="text-center mt-12">
-                  <button
-                    onClick={handleLoadMore}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Vis flere opskrifter ({sortedRecipes.length - displayedRecipes.length} tilbage)
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <p className="text-gray-600 text-lg">
-                Ingen opskrifter fundet. Prøv at ændre dine søgekriterier.
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Information Sections */}
-      <section className="py-12 bg-gray-50">
-        <div className="container">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4 text-gray-900">Sund mad og mental coaching</h3>
-              <p className="text-gray-600 mb-4">
-                Det er kroppen der indtager maden, men sindet der styrer hånden. 
-                Vi tror derfor på, at skab et samspil imellem sind og krop er vigtigt, 
-                for at opnå en sund livsstil.
-              </p>
-              <Link href="/mental-sundhed" className="text-gray-900 hover:text-gray-700 font-medium">
-                Læs om mental sundhed her →
-              </Link>
-            </div>
-            
-            <div className="card">
-              <h3 className="text-xl font-bold mb-4 text-gray-900">Billig mad, der også er sundt</h3>
-              <p className="text-gray-600 mb-4">
-                Når vi spiser sunde retter, får vi mere overskud og sparer også ofte penge. 
-                En sund livsstil med Functional Foods er derfor egnet til at spare penge.
-              </p>
-              <Link href="/mad-budget" className="text-gray-900 hover:text-gray-700 font-medium">
-                Find billig mad her →
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      )}
     </main>
   )
 } 
