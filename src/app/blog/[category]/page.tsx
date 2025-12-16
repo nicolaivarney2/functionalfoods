@@ -32,10 +32,108 @@ interface HubRecipe {
   rating?: number
 }
 
+type CategoryConfig = {
+  name: string
+  emoji: string
+  bgColor: string
+  introTitle: string
+  introLead: string
+  showRecipes: boolean
+}
+
+const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  keto: {
+    name: 'Keto',
+    emoji: '🥑',
+    bgColor: '#F6FCFB',
+    introTitle: 'Det bedste fra keto verdenen.',
+    introLead:
+      'Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for Keto. Her finder du guides, artikler og inspiration.',
+    showRecipes: true,
+  },
+  sense: {
+    name: 'Sense',
+    emoji: '🧠',
+    bgColor: '#F8F9FA',
+    introTitle: 'Det bedste fra Sense verdenen.',
+    introLead:
+      'Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for Sense. Her finder du guides, artikler og inspiration.',
+    showRecipes: true,
+  },
+  'lchf-paleo': {
+    name: 'LCHF/Paleo',
+    emoji: '🥩',
+    bgColor: '#FFF7ED',
+    introTitle: 'Det bedste fra LCHF/Paleo verdenen.',
+    introLead:
+      'Guides, artikler og opskrifter til dig der vil spise mere low carb og naturligt.',
+    showRecipes: true,
+  },
+  'anti-inflammatory': {
+    name: 'Anti-inflammatorisk',
+    emoji: '🌿',
+    bgColor: '#ECFDF5',
+    introTitle: 'Det bedste fra den anti-inflammatoriske verden.',
+    introLead:
+      'Guides og artikler om anti-inflammatorisk kost, sundhed og madvalg der støtter kroppen.',
+    showRecipes: true,
+  },
+  flexitarian: {
+    name: 'Fleksitarisk',
+    emoji: '🥬',
+    bgColor: '#F0FDFA',
+    introTitle: 'Det bedste fra den fleksitariske verden.',
+    introLead:
+      'Guides, artikler og opskrifter med fokus på mere plantebaseret mad – uden at det bliver ekstremt.',
+    showRecipes: true,
+  },
+  '5-2-diet': {
+    name: '5:2 Diæt',
+    emoji: '⏰',
+    bgColor: '#EFF6FF',
+    introTitle: 'Det bedste fra 5:2 verdenen.',
+    introLead:
+      'Guides og artikler om intermittent fasting og 5:2 – plus opskrifter og inspiration.',
+    showRecipes: true,
+  },
+  familie: {
+    name: 'Familiemad',
+    emoji: '👨‍👩‍👧‍👦',
+    bgColor: '#EFF6FF',
+    introTitle: 'Det bedste fra familiemad verdenen.',
+    introLead:
+      'Guides, artikler og opskrifter der passer ind i en travl hverdag for hele familien.',
+    showRecipes: true,
+  },
+  'meal-prep': {
+    name: 'Meal Prep',
+    emoji: '📦',
+    bgColor: '#EFF6FF',
+    introTitle: 'Det bedste fra meal prep verdenen.',
+    introLead:
+      'Guides og artikler om planlægning, struktur og mad der gør hverdagen nemmere.',
+    showRecipes: true,
+  },
+  mentalt: {
+    name: 'Mentalt',
+    emoji: '🧠',
+    bgColor: '#F9FAFB',
+    introTitle: 'Adfærd og vaner – vægttab i praksis.',
+    introLead:
+      'Her finder du artikler om mentalitet, adfærd og vaner – og hvordan de kan spille med (eller imod) dit mål.',
+    showRecipes: false,
+  },
+}
+
 export default function BlogCategoryHubPage() {
   const params = useParams() as any
   const categorySlug = params?.category as string
   const supabase = createSupabaseClient()
+  const categoryKey = (categorySlug || '').toLowerCase()
+  const categoryCfg = CATEGORY_CONFIG[categoryKey]
+  const categoryName =
+    categoryCfg?.name ||
+    (categorySlug ? categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1) : 'Blog')
 
   const [firstArticle, setFirstArticle] = useState<HubPost | null>(null)
   const [latestArticles, setLatestArticles] = useState<HubPost[]>([])
@@ -47,18 +145,37 @@ export default function BlogCategoryHubPage() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Resolve category id first so we can filter properly (avoid "limit then filter" issues)
+        const { data: categoryRow, error: categoryError } = await supabase
+          .from('blog_categories')
+          .select('id,slug,name')
+          .eq('slug', categorySlug)
+          .maybeSingle()
+
+        if (categoryError) {
+          console.error('Error loading blog category:', categoryError)
+        }
+
+        const categoryId = (categoryRow as any)?.id
+        if (!categoryId) {
+          setFirstArticle(null)
+          setLatestArticles([])
+          setMustReads([])
+          setPopularArticles([])
+          setRecipes([])
+          return
+        }
+
         // First article (latest published for category)
         const { data: latestData } = await supabase
           .from('blog_posts')
           .select('id,title,slug,excerpt,published_at,view_count,header_image_url,category:blog_categories(slug,name)')
           .eq('status', 'published')
+          .eq('category_id', categoryId)
           .order('published_at', { ascending: false, nullsFirst: false })
           .limit(1)
 
-        const first = (latestData || []).filter((p: any) => {
-          const cat = Array.isArray(p.category) ? p.category[0] : p.category
-          return cat?.slug === categorySlug
-        }).map((p: any) => {
+        const first = (latestData || []).map((p: any) => {
           const cat = Array.isArray(p.category) ? p.category[0] : p.category
           return { ...p, category: cat }
         })[0]
@@ -69,14 +186,12 @@ export default function BlogCategoryHubPage() {
           .from('blog_posts')
           .select('id,title,slug,excerpt,published_at,view_count,header_image_url,category:blog_categories(slug,name)')
           .eq('status', 'published')
+          .eq('category_id', categoryId)
           .order('published_at', { ascending: false, nullsFirst: false })
-          .limit(10)
+          .limit(5)
 
         const latestFiltered = (latestPosts || [])
-          .filter((p: any) => {
-            const cat = Array.isArray(p.category) ? p.category[0] : p.category
-            return cat?.slug === categorySlug && p.id !== first?.id
-          })
+          .filter((p: any) => p.id !== first?.id)
           .map((p: any) => {
             const cat = Array.isArray(p.category) ? p.category[0] : p.category
             return { ...p, category: cat }
@@ -90,13 +205,11 @@ export default function BlogCategoryHubPage() {
           .select('id,title,slug,excerpt,view_count,header_image_url,category:blog_categories(slug,name)')
           .eq('status', 'published')
           .eq('post_type', 'core')
+          .eq('category_id', categoryId)
           .order('published_at', { ascending: false, nullsFirst: false })
           .limit(6)
 
-        const mustReadsFiltered = (corePosts || []).filter((p: any) => {
-          const cat = Array.isArray(p.category) ? p.category[0] : p.category
-          return cat?.slug === categorySlug
-        }).map((p: any) => {
+        const mustReadsFiltered = (corePosts || []).map((p: any) => {
           const cat = Array.isArray(p.category) ? p.category[0] : p.category
           return { ...p, category: cat }
         })
@@ -107,56 +220,55 @@ export default function BlogCategoryHubPage() {
           .from('blog_posts')
           .select('id,title,slug,excerpt,view_count,published_at,category:blog_categories(slug,name)')
           .eq('status', 'published')
+          .eq('category_id', categoryId)
           .order('view_count', { ascending: false, nullsFirst: false })
-          .limit(10)
+          .limit(5)
 
-        const popularFiltered = (popularPosts || [])
-          .filter((p: any) => {
-            const cat = Array.isArray(p.category) ? p.category[0] : p.category
-            return cat?.slug === categorySlug
-          })
-          .map((p: any) => {
-            const cat = Array.isArray(p.category) ? p.category[0] : p.category
-            return { ...p, category: cat }
-          })
-          .slice(0, 5)
+        const popularFiltered = (popularPosts || []).map((p: any) => {
+          const cat = Array.isArray(p.category) ? p.category[0] : p.category
+          return { ...p, category: cat }
+        })
         setPopularArticles(popularFiltered)
 
         // Recipes matching dietary category
-        const { data: recipesData } = await supabase
-          .from('recipes')
-          .select('*')
-          .order('updatedAt', { ascending: false })
-          .limit(50)
+        if (categoryCfg?.showRecipes) {
+          const { data: recipesData } = await supabase
+            .from('recipes')
+            .select('*')
+            .order('updatedAt', { ascending: false })
+            .limit(50)
 
-        const diet = (categorySlug || '').toLowerCase()
-        let filtered = (recipesData || [])
-        
-        // Try multiple matching strategies
-        if (diet) {
-          // 1. Check dietaryCategories array
-          const byDietaryCat = filtered.filter(r => {
-            const dc = r.dietaryCategories || r.dietary_categories || []
-            if (!Array.isArray(dc)) return false
-            return dc.map((x: any) => String(x).toLowerCase()).includes(diet)
-          })
+          const diet = (categorySlug || '').toLowerCase()
+          let filtered = (recipesData || [])
           
-          // 2. Check keywords
-          const byKeywords = filtered.filter(r => {
-            const kw = r.keywords || []
-            if (!Array.isArray(kw)) return false
-            return kw.some((k: any) => String(k).toLowerCase().includes(diet))
-          })
-          
-          // Combine and deduplicate
-          const uniqueIds = Array.from(new Set([...byDietaryCat, ...byKeywords].map(r => r.id)))
-          const combined = uniqueIds.map(id => 
-            filtered.find(r => r.id === id)
-          ).filter(Boolean)
-          
-          filtered = combined.length > 0 ? combined : filtered
+          // Try multiple matching strategies
+          if (diet) {
+            // 1. Check dietaryCategories array
+            const byDietaryCat = filtered.filter(r => {
+              const dc = r.dietaryCategories || r.dietary_categories || []
+              if (!Array.isArray(dc)) return false
+              return dc.map((x: any) => String(x).toLowerCase()).includes(diet)
+            })
+            
+            // 2. Check keywords
+            const byKeywords = filtered.filter(r => {
+              const kw = r.keywords || []
+              if (!Array.isArray(kw)) return false
+              return kw.some((k: any) => String(k).toLowerCase().includes(diet))
+            })
+            
+            // Combine and deduplicate
+            const uniqueIds = Array.from(new Set([...byDietaryCat, ...byKeywords].map(r => r.id)))
+            const combined = uniqueIds.map(id => 
+              filtered.find(r => r.id === id)
+            ).filter(Boolean)
+            
+            filtered = combined.length > 0 ? combined : filtered
+          }
+          setRecipes(filtered.length > 0 ? filtered.slice(0, 9) : (recipesData || []).slice(0, 9))
+        } else {
+          setRecipes([])
         }
-        setRecipes(filtered.length > 0 ? filtered.slice(0, 9) : (recipesData || []).slice(0, 9))
       } finally {
         setLoading(false)
       }
@@ -175,20 +287,7 @@ export default function BlogCategoryHubPage() {
     return new Date(dateString).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
   }
 
-  // Dummy data for 3 essential articles (replace with real data later)
-  const essentialArticles = [
-    { id: 1, title: 'Begynderguide til Keto', slug: 'begynderguide-til-keto', excerpt: 'Alt du skal vide for at komme i gang med keto-diæten', readTime: 18 },
-    { id: 2, title: 'Hvad er ketoner og ketose?', slug: 'hvad-er-ketoner-og-ketose', excerpt: 'Forstå den videnskabelige baggrund for keto', readTime: 15 },
-    { id: 3, title: 'Guide til vægttab med keto', slug: 'guide-til-vaegttab-med-keto', excerpt: 'Lær hvordan du taber dig effektivt med keto', readTime: 11 }
-  ]
-
-  // Category-specific background colors
-  const categoryBgColors: Record<string, string> = {
-    keto: '#F6FCFB',
-    sense: '#F8F9FA',
-    // Add more categories as needed
-  }
-  const categoryBgColor = categoryBgColors[categorySlug.toLowerCase()] || '#FFFFFF'
+  const categoryBgColor = categoryCfg?.bgColor || '#FFFFFF'
 
   return (
     <div className="min-h-screen bg-white">
@@ -196,15 +295,18 @@ export default function BlogCategoryHubPage() {
       <section className="py-8 bg-white">
         <div className="container">
           <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3">Det bedste fra {capitalize(categorySlug)} verdenen.</h1>
+            <h1 className="text-xl sm:text-2xl font-semibold text-gray-700 mb-3">
+              {categoryCfg?.introTitle || `Det bedste fra ${capitalize(categorySlug)} verdenen.`}
+            </h1>
             <p className="text-gray-500 text-sm sm:text-base leading-relaxed">
-              Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for {capitalize(categorySlug)}. Her finder du vores eksperters
-              uddrag af sundhedsstudier, artikler, {capitalize(categorySlug)} opskrifter, og low carb madprodukter vi er vilde med for tiden.
+              {categoryCfg?.introLead || `Her finder du guides, artikler og inspiration inden for ${categoryName}.`}
             </p>
-            <p className="text-gray-500 text-xs sm:text-sm leading-relaxed mt-4">
-              Vi dækker hvad der rør sig i det danske (og internationale) {categorySlug.toLowerCase()} miljø, og vores videnskabsbaserede journalistik hjælper dig
-              med at træffe mere velinformerede madvalg og tabe dig med {capitalize(categorySlug)}.
-            </p>
+            {categoryKey !== 'mentalt' && (
+              <p className="text-gray-500 text-xs sm:text-sm leading-relaxed mt-4">
+                Vi dækker hvad der rør sig i det danske (og internationale) {categorySlug.toLowerCase()} miljø, og vores videnskabsbaserede journalistik hjælper dig
+                med at træffe mere velinformerede madvalg og tabe dig med {capitalize(categorySlug)}.
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -269,7 +371,9 @@ export default function BlogCategoryHubPage() {
       {mustReads.length > 0 && (
         <section className="py-12" style={{ backgroundColor: categoryBgColor }}>
           <div className="container">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8">Must Reads</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8">
+              Praktiske {categoryName} guides
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {mustReads.slice(0, 3).map(p => (
                 <Link key={p.id} href={`/blog/${categorySlug}/${p.slug}`} className="group block">
@@ -375,6 +479,7 @@ export default function BlogCategoryHubPage() {
       </section>
 
       {/* Recipes Section */}
+      {categoryCfg?.showRecipes && (
       <section className="py-12 bg-white">
         <div className="container">
           <div className="flex items-center justify-between mb-8">
@@ -491,38 +596,7 @@ export default function BlogCategoryHubPage() {
           `}</style>
         </div>
       </section>
-
-      {/* 3 Essential Articles Section */}
-      <section className="py-12 bg-white border-t border-gray-200">
-        <div className="container">
-          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-8 text-center">Praktiske {capitalize(categorySlug)} guides</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {essentialArticles.map((article, idx) => (
-              <Link 
-                key={article.id} 
-                href={`/blog/${categorySlug}/${article.slug}`}
-                className="group block bg-white rounded-xl shadow-md hover:shadow-xl transition-all overflow-hidden"
-              >
-                <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600">
-                  <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold">
-                    {idx + 1}
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">{article.title}</h3>
-                  <p className="text-sm text-gray-600 mb-3">{article.excerpt}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{article.readTime} min læsetid</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      )}
 
       {/* Links to Other Pages */}
       <section className="py-12 bg-gray-50 border-t border-gray-200">
@@ -542,7 +616,7 @@ export default function BlogCategoryHubPage() {
             </Link>
             <Link href={`/blog/${categorySlug}`} className="text-center p-6 bg-white rounded-lg hover:shadow-md transition-shadow border border-gray-100">
               <div className="text-3xl mb-2">📚</div>
-              <div className="font-semibold text-gray-900">{capitalize(categorySlug)} Guides & Blogs</div>
+              <div className="font-semibold text-gray-900">{categoryName} Guides & Blogs</div>
             </Link>
             <Link href="/vægttab" className="text-center p-6 bg-white rounded-lg hover:shadow-md transition-shadow border border-gray-100">
               <div className="text-3xl mb-2">⚖️</div>

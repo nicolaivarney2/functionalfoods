@@ -42,6 +42,7 @@ interface BlogPost {
 export default function BlogPostPage() {
   const params = useParams()
   const slug = (params as any).slug as string
+  const categorySlug = (params as any).category as string
   const [post, setPost] = useState<BlogPost | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -327,18 +328,11 @@ export default function BlogPostPage() {
             <div>
               {/* Breadcrumb */}
               <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-                {(post.breadcrumb_path || ['Keto', 'Blogs']).map((item, index) => (
-                  <div key={index} className="flex items-center">
-                    {index > 0 && <span className="mx-2">›</span>}
-                    {index === 0 ? (
-                      <a href="/keto" className="hover:text-blue-600 cursor-pointer">{item}</a>
-                    ) : index === 1 ? (
-                      <a href="/keto/blogs" className="hover:text-blue-600 cursor-pointer">{item}</a>
-                    ) : (
-                      <span className="text-gray-700">{item}</span>
-                    )}
-                  </div>
-                ))}
+                <Link href={`/blog/${categorySlug}`} className="hover:text-blue-600">
+                  {(post.category && !Array.isArray(post.category) ? post.category.name : null) || (categorySlug ? categorySlug.toUpperCase() : 'BLOG')}
+                </Link>
+                <span className="mx-2">›</span>
+                <span className="text-gray-700">Artikel</span>
               </nav>
 
               {/* Evidence-based badge */}

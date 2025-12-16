@@ -550,6 +550,32 @@ export default function WeightLossPage() {
                 </div>
               ))}
               </div>
+
+            {/* CTA: Mentalt / adfærd og vaner */}
+            <div className="mt-10">
+              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 sm:p-8 border border-green-100">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                  <div className="max-w-2xl">
+                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                      Vægttab starter i hovedet – ikke kun på tallerkenen
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed">
+                      Har du brug for at lære mere om adfærd, vægttab og hvordan vores mentalitet og vaner spiller med (eller imod) vores mål om vægttab?
+                      Så gå til <span className="font-semibold">Adfærd og vaner</span>.
+                    </p>
+                  </div>
+                  <div className="flex-shrink-0">
+                    <Link
+                      href="/blog/mentalt"
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors w-full sm:w-auto"
+                    >
+                      Adfærd og vaner
+                      <ArrowRight className="w-5 h-5" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

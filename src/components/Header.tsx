@@ -12,6 +12,7 @@ const mainMenuItems = [
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
   { name: 'MADBUDGET', href: '/madbudget' },
   { name: 'VÆGTTAB', href: '/vægttab' },
+  { name: 'MENTALT', href: '/blog/mentalt' },
   { name: 'BAG OM FF', href: '/bag-om-ff' },
 ]
 
