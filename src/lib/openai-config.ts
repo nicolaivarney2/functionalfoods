@@ -7,7 +7,7 @@ interface OpenAIConfig {
     familiemad: string
     keto: string
     sense: string
-    paleo: string
+    'glp-1': string
     antiinflammatorisk: string
     fleksitarisk: string
     '5-2': string
@@ -35,7 +35,7 @@ export function getOpenAIConfig(): OpenAIConfig | null {
             familiemad: process.env.OPENAI_ASSISTANT_FAMILIEMAD || '',
             keto: process.env.OPENAI_ASSISTANT_KETO || '',
             sense: process.env.OPENAI_ASSISTANT_SENSE || '',
-            paleo: process.env.OPENAI_ASSISTANT_PALEO || '',
+            'glp-1': process.env.OPENAI_ASSISTANT_GLP1 || '',
             antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
             fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
             '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',

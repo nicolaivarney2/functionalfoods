@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`🧠 Generating Sense recipe: ${categoryName}`)
+    console.log(`✋ Generating Sense recipe: ${categoryName}`)
 
     // Get OpenAI config from existing system
     const openaiConfig = getOpenAIConfig()

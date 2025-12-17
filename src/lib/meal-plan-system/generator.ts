@@ -200,7 +200,7 @@ export class MealPlanGenerator {
         cookTime: 15,
         servings: 1,
         categories: [RecipeCategory.Dinner],
-        dietaryApproaches: ['keto', 'paleo'],
+        dietaryApproaches: ['keto', 'glp-1'],
         nutritionalInfo: {
           caloriesPer100g: 180,
           proteinPer100g: 22,

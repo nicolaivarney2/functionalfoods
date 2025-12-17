@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Scale, Lightbulb, Hand, UtensilsCrossed, Target, TrendingDown, AlertCircle, CheckCircle2, XCircle, Clock, Leaf } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Scale, Lightbulb, Hand, UtensilsCrossed, Target, TrendingDown, AlertCircle, CheckCircle2, XCircle, Clock, Leaf } from 'lucide-react'
 
 export default function SenseWeightLossTheoryPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -97,7 +97,7 @@ export default function SenseWeightLossTheoryPage() {
         <div className="container max-w-4xl mx-auto">
           <div className={`mb-12 transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900">
-              Hvordan taber man sig med Sense? <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">(Grundlogikken)</span>
+              Hvad er grundlogikken i at tabe sig med Sense?
             </h2>
             
             <div className="bg-white rounded-3xl p-8 md:p-12 shadow-lg border border-gray-100">
@@ -695,6 +695,86 @@ export default function SenseWeightLossTheoryPage() {
                   <span className="text-gray-700">Du har en spiseforstyrrelse eller meget kompliceret forhold til mad (så bør du altid tale med læge/beh. først)</span>
                 </li>
               </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hvordan kan FunctionalFoods hjælpe dig i gang? */}
+      <section className="py-20 bg-gradient-to-br from-green-50/50 to-blue-50/50">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-gray-900">
+                Hvordan kan FunctionalFoods hjælpe dig i gang?
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 md:p-12 border-2 border-green-200 shadow-lg mb-8">
+              <div className="space-y-6 text-gray-700 leading-relaxed">
+                <p className="text-lg">
+                  I stedet for, at du skal tælle kalorier, går vores system ud på, at tænke fremad.
+                </p>
+                
+                <p>
+                  Vi designer madplaner for dig for næste uge, der ved hjælp af AI er lavet ud fra følgende kriterier:
+                </p>
+                
+                <ul className="space-y-3 list-none">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Din mad ideologi</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Dine mad præferencer</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Din familie og dit liv</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Udregnet efter din krop</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Designet ud fra næste uges tilbud i dine favorit dagligvarebutikker!</span>
+                  </li>
+                </ul>
+
+                <p className="text-lg font-medium text-gray-900 pt-4">
+                  Skal vi hjælpe dig i gang? Det er gratis hos os.
+                </p>
+
+                <div className="pt-4">
+                  <Link 
+                    href="/medlem"
+                    className="font-semibold text-green-600 hover:text-green-700 transition-colors inline-flex items-center gap-2"
+                  >
+                    » Læs mere
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link 
+                href="/medlem" 
+                className="group bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-green-500/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                » Se FF systemet
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              
+              <Link 
+                href="/sense" 
+                className="group bg-white border-2 border-green-200 text-green-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-green-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                Lær om Sense
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
           </div>
         </div>

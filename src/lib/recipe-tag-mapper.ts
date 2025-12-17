@@ -8,8 +8,8 @@ export function getDietaryCategories(category: string): string[] {
     'familiemad': ['Familiemad'],
     'keto': ['Keto'],
     'sense': ['Sense'],
-    'paleo': ['Paleo', 'LCHF'], // LCHF/PALEO = Paleo, LCHF (2 separate tags)
-    'lchf': ['Paleo', 'LCHF'], // Same as paleo
+    'glp-1': ['GLP-1 kost'],
+    'glp1': ['GLP-1 kost'],
     'antiinflammatorisk': ['Antiinflammatorisk'],
     'fleksitarisk': ['Fleksitarisk'],
     '5-2': ['5:2'], // 5:2 DIÆT = 5:2

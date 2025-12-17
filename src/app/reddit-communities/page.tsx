@@ -119,7 +119,7 @@ const redditCommunities: RedditCommunity[] = [
   }
 ]
 
-const categories = ['Alle', 'Keto', 'Vægttab', 'LCHF', 'Paleo', 'Meal Prep', 'Sundhed', 'Plantebaseret', 'Fasting', 'Familie', 'Budget']
+const categories = ['Alle', 'Keto', 'Vægttab', 'GLP-1', 'Meal Prep', 'Sundhed', 'Plantebaseret', 'Fasting', 'Familie', 'Budget']
 
 export default function RedditCommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')

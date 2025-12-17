@@ -27,9 +27,9 @@ export default function KetoPage() {
             </div>
             
             <h1 className="text-4xl md:text-6xl font-bold mb-8 text-gray-900 leading-tight">
-              Keto –<br />
+              Keto -<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-600">
-                lav-kulhydrat, høj-fedt
+                Lav-kulhydrat, høj-fedt, moderat-protein
               </span>
             </h1>
             
@@ -56,7 +56,7 @@ export default function KetoPage() {
               Udforsk keto
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Lær om keto vægttab og find opskrifter der passer til din ketogene livsstil.
+              Lær om keto vægttab og find opskrifter der passer til din ketogene livsstil.<br /> Du kan enten gå til vores Keto-vægttabs sektion, se alle vores Keto opskrifter, eller læse videre om Keto her på siden.
             </p>
           </div>
 
@@ -120,12 +120,12 @@ export default function KetoPage() {
               <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
                 Hvad er 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-green-600">
-                  keto diæt?
+                  {' '}keto diæt?
                 </span>
               </h2>
               
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Keto diæt er en kost med et lavt antal kulhydrater, et moderat mængde protein og en høj mængde fedt, der hjælper kroppen med at forbrænde fedt i stedet for kulhydrater som energikilde.
+                Keto er en kost med et lavt antal kulhydrater, et moderat mængde protein og en høj mængde fedt, der hjælper kroppen med at forbrænde fedt i stedet for kulhydrater som energikilde.
               </p>
               
               <div className="space-y-6">
@@ -136,12 +136,12 @@ export default function KetoPage() {
                 
                 <div className="bg-green-100 border border-green-200 rounded-2xl p-6">
                   <h4 className="font-semibold text-green-800 mb-2">Vægttab</h4>
-                  <p className="text-green-700">Keto kan hjælpe med hurtigt vægttab, især i starten, da kroppen tømmer glykogenlagerne der binder vand. Så du taber 2-3 kg på de første par uger.</p>
+                  <p className="text-green-700">Keto kan hjælpe med hurtigt vægttab, især i starten, da kroppen tømmer sukkerdepoter der binder vand. Det er motiverende, og herefter, kræver det snuden i sporet - Men vi hjælper dig.</p>
                 </div>
                 
                 <div className="bg-blue-100 border border-blue-200 rounded-2xl p-6">
                   <h4 className="font-semibold text-blue-800 mb-2">Stabil energi</h4>
-                  <p className="text-blue-700">Mange oplever mere stabil energi og mindre sultfølelser på keto. Du er derfor ikke sulten hele tiden, og har alligevel godt med energi.</p>
+                  <p className="text-blue-700">Mange oplever mere stabil energi og mindre sultfølelser på keto. Du er derfor ikke sulten hele tiden, og har alligevel godt med energi fra protein og fedt.</p>
                 </div>
               </div>
             </div>
@@ -255,26 +255,27 @@ export default function KetoPage() {
                   Så anbefaler vi, at du start med at sætte dig mere ind i Keto gennem vores Vægttabs-sektion, og bagefter undersøger nogle opskrifter gennem vores Keto opskrifter sektion.
                 </p>
                 <p>
-                  Når du er klar, så anbefaler vi, at du laver en bruger og udfylder lidt om dig - Så sørger vi for, at lave en madplan der passer dig og dit liv.
+                  Vi er klar når du er. Gennem vores system, gider vi dig hele vejen igennem.
                 </p>
                 <p>
-                  I 2026 kan vi også lave madplaner ud fra næste uges tilbud i dagligvarebutikker, så du sparer masser af penge.
+                  Opret en gratis bruger og brug vores system til at lave madplaner ud fra din madideologi, dine mad præferencer og tilbud i din fortrukne dagligvarebutik!
                 </p>
-                <p className="font-semibold text-gray-900">
-                  Prøv vores premium i 7 dage gratis.
-                </p>
-                <p className="text-sm text-gray-600">
-                  Premium gælder alle madkategorier.
-                </p>
+                <Link 
+                  href="/medlem"
+                  className="font-semibold text-gray-900 hover:text-purple-600 transition-colors inline-flex items-center gap-2"
+                >
+                  » Læs mere (og opret dig gratis)
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-6">
               <Link 
-                href="/premium" 
+                href="/medlem" 
                 className="group bg-gradient-to-r from-purple-600 to-green-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
               >
-                Prøv gratis i 7 dage
+                » Se FF systemet
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               

@@ -286,7 +286,7 @@ export default function WeightLossPage() {
                 },
                 {
                   name: "Sense",
-                  icon: "🧠",
+                  icon: "✋",
                   short: "Danske kostråd",
                   href: "/sense"
                 },

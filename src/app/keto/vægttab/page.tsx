@@ -511,6 +511,86 @@ export default function KetoWeightLossPage() {
         </div>
       </section>
 
+      {/* Hvordan kan FunctionalFoods hjælpe dig i gang? */}
+      <section className="py-20 bg-gradient-to-br from-purple-50/50 to-green-50/50">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-gray-900">
+                Hvordan kan FunctionalFoods hjælpe dig i gang?
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 md:p-12 border-2 border-purple-200 shadow-lg mb-8">
+              <div className="space-y-6 text-gray-700 leading-relaxed">
+                <p className="text-lg">
+                  I stedet for, at du skal tælle kalorier, går vores system ud på, at tænke fremad.
+                </p>
+                
+                <p>
+                  Vi designer madplaner for dig for næste uge, der ved hjælp af AI er lavet ud fra følgende kriterier:
+                </p>
+                
+                <ul className="space-y-3 list-none">
+                  <li className="flex items-start gap-3">
+                    <Check className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <span>Din mad ideologi</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <span>Dine mad præferencer</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <span>Din familie og dit liv</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <span>Udregnet efter din krop</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="w-6 h-6 text-purple-600 mt-0.5 flex-shrink-0" />
+                    <span>Designet ud fra næste uges tilbud i dine favorit dagligvarebutikker!</span>
+                  </li>
+                </ul>
+
+                <p className="text-lg font-medium text-gray-900 pt-4">
+                  Skal vi hjælpe dig i gang? Det er gratis hos os.
+                </p>
+
+                <div className="pt-4">
+                  <Link 
+                    href="/medlem"
+                    className="font-semibold text-purple-600 hover:text-purple-700 transition-colors inline-flex items-center gap-2"
+                  >
+                    » Læs mere
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link 
+                href="/medlem" 
+                className="group bg-gradient-to-r from-purple-600 to-green-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                » Se FF systemet
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              
+              <Link 
+                href="/keto" 
+                className="group bg-white border-2 border-purple-200 text-purple-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-purple-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                Lær om Keto
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
         <div className="container">

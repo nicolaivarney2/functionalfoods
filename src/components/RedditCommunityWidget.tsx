@@ -111,8 +111,8 @@ export default function RedditCommunityWidget({
     
     const categoryMap: { [key: string]: string[] } = {
       'keto': ['DKketo'],
-      'lchf': ['DKlchf', 'DKpaleo'],
-      'paleo': ['DKpaleo', 'DKlchf'],
+      'glp-1': ['DKlchf', 'DKpaleo'],
+      'glp1': ['DKlchf', 'DKpaleo'],
       'vaegttab': ['DKvaegttab', 'DKketo', 'DK52diet'],
       'mealprep': ['DKmealprep', 'DKfamiliemad'],
       'antiinflammatorisk': ['DKantiinflammatorisk'],

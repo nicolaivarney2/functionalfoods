@@ -154,11 +154,8 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
     }
     
     // Add other common dietary categories
-    if (recipe.tags.cuisine?.includes('paleo')) {
-      dietaryCategories = [...dietaryCategories, 'Paleo']
-    }
-    if (recipe.tags.cuisine?.includes('lchf')) {
-      dietaryCategories = [...dietaryCategories, 'LCHF']
+    if (recipe.tags.cuisine?.includes('glp-1') || recipe.tags.cuisine?.includes('glp1')) {
+      dietaryCategories = [...dietaryCategories, 'GLP-1 kost']
     }
 
     return {

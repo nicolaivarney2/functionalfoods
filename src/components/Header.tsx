@@ -19,7 +19,7 @@ const mainMenuItems = [
 const dietaryCategories = [
   { name: 'KETO', href: '/keto' },
   { name: 'SENSE', href: '/sense' },
-  { name: 'LCHF/PALEO', href: '/lchf-paleo' },
+  { name: 'GLP-1 KOST', href: '/GLP-1' },
   { name: 'MEAL PREP', href: '/meal-prep' },
   { name: 'ANTI-INFLAMMATORISK', href: '/anti-inflammatory' },
   { name: 'FLEKSITARISK', href: '/flexitarian' },

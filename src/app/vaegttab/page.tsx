@@ -33,8 +33,8 @@ export default function WeightLossPage() {
             </h2>
             
             <p className="text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed mb-8">
-              Der findes mange veje til vægttab. Keto, Sense, LCHF eller noget helt fjerde – men grundprincipperne er altid de samme: 
-              <strong className="text-gray-900"> Kalorier tæller, og kroppen har brug for næring, ikke bare færre kalorier.</strong>
+              Der findes mange veje til vægttab. Keto, Sense, GLP-1 kost eller noget helt fjerde – men grundprincipperne er de samme: 
+              <strong className="text-gray-900"> Kalorier tæller, madkvalitet tæller - Og så den kostform, der virker for dig. Lad os hjælpe.</strong>
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -89,7 +89,7 @@ export default function WeightLossPage() {
                 },
                 {
                   myth: "Den bedste kost er den, der virker for alle",
-                  truth: "Den bedste kost er den, du faktisk kan leve med. Konsistens slår perfektion hver gang.",
+                  truth: "Den bedste kost er den, der virker for dig. Vedholdenhed slår perfektion hver gang.",
                   icon: Heart
                 }
               ].map((item, idx) => (
@@ -113,71 +113,19 @@ export default function WeightLossPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* De grundlæggende principper */}
-      <section className="py-20 bg-white">
-        <div className="container">
-          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                De grundlæggende principper
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Der findes tusind veje, men de bygger alle på de samme mekanismer
+            {/* Opsummering efter de 4 bokse */}
+            <div className="mt-12 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-8 border-2 border-green-200 text-center">
+              <p className="text-lg text-gray-800 leading-relaxed mb-4">
+                Det er væsentligt hvor du får din kalorier fra, hvor mange kalorier du spiser, og så, at vi finder den spiseform, der virker for dig. Vores system hjælper dig med at forstå, og gør rejsen overskuelig.
               </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  title: "Kalorier betyder noget",
-                  description: "Kroppen taber sig, når du indtager mindre energi, end du forbruger. Det er fysik, ikke magi.",
-                  icon: Scale,
-                  color: "green"
-                },
-                {
-                  title: "Madkvalitet betyder også noget",
-                  description: "Jo mere næringsrig mad, jo nemmere er det at holde kroppen stærk, mæt og stabil.",
-                  icon: Leaf,
-                  color: "green"
-                },
-                {
-                  title: "Madens densitet tæller",
-                  description: "500 kcal fra grøntsager og fisk fylder anderledes end 500 kcal fra hvidt brød og olie.",
-                  icon: Target,
-                  color: "blue"
-                },
-                {
-                  title: "Vaner styrer alt",
-                  description: "Det er ikke de enkelte måltider, men mønstrene over tid, der bestemmer resultatet.",
-                  icon: Zap,
-                  color: "orange"
-                }
-              ].map((principle, idx) => {
-                const colorClasses = {
-                  green: "bg-green-100 text-green-600 border-green-200",
-                  blue: "bg-blue-100 text-blue-600 border-blue-200",
-                  orange: "bg-orange-100 text-orange-600 border-orange-200"
-                }
-                return (
-                  <div key={idx} className="bg-white rounded-2xl p-6 border-2 hover:shadow-lg transition-all">
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 border-2 ${colorClasses[principle.color as keyof typeof colorClasses]}`}>
-                      <principle.icon className="w-7 h-7" />
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-3">{principle.title}</h3>
-                    <p className="text-gray-600 text-sm leading-relaxed">{principle.description}</p>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Placeholder for illustration */}
-            <div className="mt-12 bg-white rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <div className="text-6xl mb-4">📊</div>
-              <p className="text-gray-500 text-sm">Illustration: Infografik der viser energiindtag vs. energiforbrug, med "madens kvalitet" som balancepunkt</p>
+              <Link
+                href="/medlem"
+                className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
+              >
+                Læs mere
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
           </div>
         </div>
@@ -207,15 +155,15 @@ export default function WeightLossPage() {
                 <ul className="space-y-3 text-gray-700">
                   <li className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Protein</strong> sender stærke mæthedssignaler og bruger energi til at forbrænde</span>
+                    <span><strong>Protein</strong> holder dig mæt længe, og særligt i kombination med bestemte fødevarer</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Fiber</strong> fylder maven og sænker blodsukkeret langsomt</span>
+                    <span><strong>Fiber</strong> fylder maven og holder blodsukkeret stabilt</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Fedt</strong> holder dig mæt længe og stabiliserer energi</span>
+                    <span><strong>Sund fedt</strong> er essentielt, og når dine celler er sunde, gør det rejsen meget nemmere.</span>
                   </li>
                 </ul>
                 </div>
@@ -234,7 +182,7 @@ export default function WeightLossPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <X className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                    <span><strong>Ultraforarbejdet mad</strong> er designet til at spise mere af</span>
+                    <span><strong>Ultraforarbejdet mad</strong> er designet til at få dig til at spise mere</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <X className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
@@ -260,92 +208,13 @@ export default function WeightLossPage() {
               ))}
             </div>
                     </div>
-                  </div>
-      </section>
-
-      {/* Find din madniche */}
-      <section id="find-din-madstil" className="py-20 bg-gray-50">
-        <div className="container">
-          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Find den madstil, der passer til dit liv
-              </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Alle kostretninger kan virke – men kun, hvis du kan leve med dem
-              </p>
-                    </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                {
-                  name: "Keto",
-                  icon: "🥑",
-                  short: "Lav-kulhydrat, høj-fedt",
-                  href: "/keto"
-                },
-                {
-                  name: "Sense",
-                  icon: "🧠",
-                  short: "Danske kostråd",
-                  href: "/sense"
-                },
-                {
-                  name: "LCHF/Paleo",
-                  icon: "🥩",
-                  short: "Naturlig kost",
-                  href: "/lchf-paleo"
-                },
-                {
-                  name: "Anti-inflammatorisk",
-                  icon: "🌿",
-                  short: "Mod inflammation",
-                  href: "/anti-inflammatory"
-                },
-                {
-                  name: "Fleksitarisk",
-                  icon: "🥬",
-                  short: "Plantebaseret",
-                  href: "/flexitarian"
-                },
-                {
-                  name: "5:2 Diæt",
-                  icon: "⏰",
-                  short: "Intermittent fasting",
-                  href: "/5-2-diet"
-                },
-                {
-                  name: "Familiemad",
-                  icon: "👨‍👩‍👧‍👦",
-                  short: "Hele familien",
-                  href: "/familie"
-                },
-                {
-                  name: "Meal Prep",
-                  icon: "📦",
-                  short: "Planlagt mad",
-                  href: "/opskrifter/meal-prep"
-                }
-              ].map((niche, idx) => (
-                <Link
-                  key={idx}
-                  href={niche.href}
-                  className="block bg-white rounded-2xl p-6 border-2 border-gray-100 text-center hover:border-green-200 hover:shadow-xl transition-all group"
-                >
-                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">{niche.icon}</div>
-                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">{niche.name}</h3>
-                  <p className="text-sm text-gray-500 group-hover:text-green-500 transition-colors">{niche.short}</p>
-                </Link>
-              ))}
-            </div>
-                    </div>
         </div>
       </section>
 
       {/* Sådan taber du dig - Kalorietracker */}
       <section className="py-20 bg-white">
         <div className="container">
-          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-600 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
                 Sådan taber du dig
@@ -427,11 +296,90 @@ export default function WeightLossPage() {
                   <div className="bg-purple-50 border-2 border-purple-100 rounded-xl p-6">
                     <h4 className="font-semibold text-purple-800 mb-2">Bæredygtig tilgang</h4>
                     <p className="text-purple-700 text-sm leading-relaxed">
-                      Find en mad-ideologi du kan følge resten af livet – ikke bare en hurtig kur.
+                      Find en mad-ideologi du kan leve med at følge i noget tid – ikke bare en hurtig kur (for holdbart vægttab tager tid).
                     </p>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Find din madniche */}
+      <section id="find-din-madstil" className="py-20 bg-gray-50">
+        <div className="container">
+          <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
+                Find den madstil, der passer til dit liv
+              </h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+              </p>
+                    </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                {
+                  name: "Keto",
+                  icon: "🥑",
+                  short: "Lav-kulhydrat, høj-fedt",
+                  href: "/keto"
+                },
+                {
+                  name: "Sense",
+                  icon: "✋",
+                  short: "Danske kostråd",
+                  href: "/sense"
+                },
+                {
+                  name: "GLP-1 kost",
+                  icon: "🧠",
+                  short: "Naturligt vægttab",
+                  href: "/GLP-1"
+                },
+                {
+                  name: "Anti-inflammatorisk",
+                  icon: "🌿",
+                  short: "Mod inflammation",
+                  href: "/anti-inflammatory"
+                },
+                {
+                  name: "Fleksitarisk",
+                  icon: "🥬",
+                  short: "Plantebaseret",
+                  href: "/flexitarian"
+                },
+                {
+                  name: "5:2 Diæt",
+                  icon: "⏰",
+                  short: "Intermittent fasting",
+                  href: "/5-2-diet"
+                },
+                {
+                  name: "Familiemad",
+                  icon: "👨‍👩‍👧‍👦",
+                  short: "Hele familien",
+                  href: "/familie"
+                },
+                {
+                  name: "Meal Prep",
+                  icon: "📦",
+                  short: "Planlagt mad",
+                  href: "/opskrifter/meal-prep"
+                }
+              ].map((niche, idx) => (
+                <Link
+                  key={idx}
+                  href={niche.href}
+                  className="block bg-white rounded-2xl p-6 border-2 border-gray-100 text-center hover:border-green-200 hover:shadow-xl transition-all group"
+                >
+                  <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">{niche.icon}</div>
+                  <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">{niche.name}</h3>
+                  <p className="text-sm text-gray-500 group-hover:text-green-500 transition-colors">{niche.short}</p>
+                </Link>
+              ))}
             </div>
           </div>
         </div>
@@ -507,10 +455,13 @@ export default function WeightLossPage() {
           <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
-                Vægttab handler om mere end mad
+                For os i FunctionalFoods, handler vægttab om mere end mad
             </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                En holistisk tilgang til sund balance
+                Vi prøver at skabe en holistisk tilgang til sund balance, og at klæde dig på med redskaber der gør, at du kan lykkedes. Maden skal passe ind i dit liv og ikke omvendt.
+              </p>
+              <p className="text-base text-gray-600 max-w-2xl mx-auto mt-4">
+                Det gør vi bl.a. ved at tilpasse madplaner efter din fortrukne madideologi, dine madpræferencer, tilbud i din fortrukne dagligvarerbutik - Og lærer vi dig om mentale madvaner.
             </p>
           </div>
 
@@ -614,23 +565,23 @@ export default function WeightLossPage() {
                 </div>
               </div>
 
-              {/* LCHF & Paleo */}
-              <div className="bg-gradient-to-br from-orange-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              {/* GLP-1 Kost */}
+              <div className="bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
                 <div className="flex items-start gap-4 mb-6">
-                  <div className="text-5xl flex-shrink-0">🥩</div>
+                  <div className="text-5xl flex-shrink-0">🧠</div>
                   <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">LCHF & Paleo – naturlig kost</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">GLP-1 kost – naturligt vægttab med maksimal mæthed</h3>
                     <p className="text-gray-600 leading-relaxed mb-4">
-                      Begge fokuserer på at spise ren og uforarbejdet mad. LCHF reducerer kulhydrater og øger fedt, mens Paleo tager udgangspunkt i mad som før landbruget – kød, grønt, nødder og rene råvarer. Ideelt for dem, der ønsker "ægte mad" uden tilsætninger, hvor vægttab kommer som en bivirkning af sund kost.
+                      GLP-1 (Glucagon-Like Peptide-1) er kroppens eget mæthedshormon, som spiller en nøglerolle i appetitregulering og vægtkontrol. Det er præcis dét hormonet Ozempic og Wegovy stimulerer – men vidste du, at du også kan booste din GLP-1 naturligt med mad?
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-6">
-                      LCHF og Paleo er effektivt til vægttab, men har, ligesom Keto, nogle faldgrupper, da rigtig mad ofte også har mange kalorier. Maden har en høj densitet (mæthedsfornemmelse), og med den rette vejledning, kan det føre til stort vægttab og en sund og stærk krop.
+                      Den nye GLP-1 kost er designet til at efterligne og forstærke kroppens GLP-1 respons – helt uden medicin. Ved at spise protein, fibre og sunde fedtstoffer i hvert måltid, får du øget mæthed, lavere appetit og effektivt vægttab.
                     </p>
                     <Link
-                      href="/lchf-paleo"
-                      className="inline-flex items-center gap-2 text-orange-600 font-semibold hover:text-orange-700 transition-colors group"
+                      href="/GLP-1"
+                      className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:text-blue-700 transition-colors group"
                     >
-                      Er du interesseret i mere, så læs om LCHF & Paleo
+                      Er du interesseret i mere, så læs om GLP-1 kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </div>
@@ -757,7 +708,7 @@ export default function WeightLossPage() {
                 },
                 {
                   q: "Hvilken kostretning er bedst?",
-                  a: "Den, der passer til dit liv. Keto, Sense, LCHF – alle kan virke, hvis du kan leve med dem. Det handler om konsistens, ikke perfektion."
+                  a: "Den, der passer til dit liv. Keto, Sense, GLP-1 kost – alle kan virke, hvis du kan leve med dem. Det handler om konsistens, ikke perfektion."
                 },
                 {
                   q: "Hvordan holder jeg vægten bagefter?",

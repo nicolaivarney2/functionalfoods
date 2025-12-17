@@ -33,7 +33,7 @@ const RECIPE_CATEGORIES: RecipeCategory[] = [
     id: 'sense',
     name: 'Sense',
     description: 'Sunde, balancerede retter med fokus på næring',
-    icon: '🧠',
+    icon: '✋',
     color: 'bg-purple-500',
     difficulty: 'Easy'
   },

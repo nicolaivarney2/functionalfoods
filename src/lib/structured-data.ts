@@ -23,8 +23,8 @@ export function generateRecipeStructuredData(recipe: Recipe) {
       // Map dietary categories to schema.org diet types
       const dietMap: { [key: string]: string } = {
         'Keto': 'https://schema.org/LowCarbDiet',
-        'LCHF': 'https://schema.org/LowCarbDiet',
-        'Paleo': 'https://schema.org/GlutenFreeDiet',
+        'GLP-1 kost': 'https://schema.org/LowCarbDiet',
+        'GLP-1': 'https://schema.org/LowCarbDiet',
         'Vegetarian': 'https://schema.org/VegetarianDiet',
         'Vegan': 'https://schema.org/VeganDiet',
         'Gluten-Free': 'https://schema.org/GlutenFreeDiet',
@@ -132,8 +132,8 @@ export function generateRecipeCollectionStructuredData(category: string, recipes
           "suitableForDiet": (recipe.dietaryCategories && Array.isArray(recipe.dietaryCategories)) ? recipe.dietaryCategories.map(cat => {
             const dietMap: { [key: string]: string } = {
               'Keto': 'https://schema.org/LowCarbDiet',
-              'LCHF': 'https://schema.org/LowCarbDiet',
-              'Paleo': 'https://schema.org/GlutenFreeDiet',
+              'GLP-1 kost': 'https://schema.org/LowCarbDiet',
+              'GLP-1': 'https://schema.org/LowCarbDiet',
               'Vegetarian': 'https://schema.org/VegetarianDiet',
               'Vegan': 'https://schema.org/VeganDiet',
               'Gluten-Free': 'https://schema.org/GlutenFreeDiet',
@@ -164,7 +164,7 @@ export function generateWebsiteStructuredData() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Functional Foods",
-    "description": "Sunde opskrifter til vægttab og en sund livsstil. Keto, LCHF og sunde opskrifter til hverdagen.",
+    "description": "Sunde opskrifter til vægttab og en sund livsstil. Keto, GLP-1 kost og sunde opskrifter til hverdagen.",
     "url": "https://functionalfoods.dk",
     "potentialAction": {
       "@type": "SearchAction",

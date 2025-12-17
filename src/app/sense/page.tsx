@@ -122,12 +122,12 @@ export default function SensePage() {
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900 leading-tight">
               Hvad er 
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
-                Sense?
+                {' '}Sense?
               </span>
             </h2>
             
             <p className="text-xl md:text-2xl text-gray-700 max-w-4xl mx-auto leading-relaxed mb-4">
-              Sense er en meget simpel måde at spise på, hvor du bruger <strong>hænderne som mål</strong> — ikke kalorietælling, ikke stramme regler.
+              Sense er en meget simpel måde at spise på, hvor du bruger <strong>hænderne som mål</strong> - ikke kalorietælling, ikke stramme regler.
             </p>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
               Du spiser almindelig mad, og strukturen hjælper dig automatisk med at spise i passende mængder.
@@ -142,7 +142,7 @@ export default function SensePage() {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">3 måltider om dagen</h3>
               <p className="text-gray-600 leading-relaxed">
-                Du spiser tre hovedmåltider, og det er dét. Ingen snacks, ingen konstant småspisning.
+                Du spiser tre hovedmåltider, og det er dét. Ingen snacks, ingen konstant småspisning i den periode du har dedikeret dig til Sense. Og får du smag for mindre snacking, er det nemmere at holde dit vægttab efter du er nået i mål. Kroppen vænner sig til det vi giver den.
               </p>
             </div>
 
@@ -180,7 +180,7 @@ export default function SensePage() {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">Intet forbudt</h3>
               <p className="text-gray-600 leading-relaxed">
-                Du må spise <strong>ALT</strong> — metoden handler kun om mængder. Det gør systemet ret nemt at følge i den virkelige verden (familiespisning, restaurantbesøg, sociale ting osv.).
+                Du må spise <strong>ALT</strong> - metoden handler kun om mængder. Det gør systemet ret nemt at følge i den virkelige verden (familiespisning, restaurantbesøg, sociale ting osv.).
               </p>
             </div>
           </div>
@@ -401,6 +401,86 @@ export default function SensePage() {
               <p className="text-gray-500 text-sm">
                 Alle vores ressourcer er baseret på danske kostråd og er designet til at være praktiske og nemme at følge i hverdagen.
               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hvordan kan FunctionalFoods hjælpe dig i gang? */}
+      <section className="py-20 bg-gradient-to-br from-green-50/50 to-blue-50/50">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold mb-6 text-gray-900">
+                Hvordan kan FunctionalFoods hjælpe dig i gang?
+              </h2>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 md:p-12 border-2 border-green-200 shadow-lg mb-8">
+              <div className="space-y-6 text-gray-700 leading-relaxed">
+                <p className="text-lg">
+                  I stedet for, at du skal tælle kalorier, går vores system ud på, at tænke fremad.
+                </p>
+                
+                <p>
+                  Vi designer madplaner for dig for næste uge, der ved hjælp af AI er lavet ud fra følgende kriterier:
+                </p>
+                
+                <ul className="space-y-3 list-none">
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Din mad ideologi</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Dine mad præferencer</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Din familie og dit liv</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Udregnet efter din krop</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-0.5 flex-shrink-0" />
+                    <span>Designet ud fra næste uges tilbud i dine favorit dagligvarebutikker!</span>
+                  </li>
+                </ul>
+
+                <p className="text-lg font-medium text-gray-900 pt-4">
+                  Skal vi hjælpe dig i gang? Det er gratis hos os.
+                </p>
+
+                <div className="pt-4">
+                  <Link 
+                    href="/medlem"
+                    className="font-semibold text-green-600 hover:text-green-700 transition-colors inline-flex items-center gap-2"
+                  >
+                    » Læs mere
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link 
+                href="/medlem" 
+                className="group bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-green-500/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                » Se FF systemet
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              
+              <Link 
+                href="/sense" 
+                className="group bg-white border-2 border-green-200 text-green-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-green-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
+              >
+                Lær om Sense
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
           </div>
         </div>

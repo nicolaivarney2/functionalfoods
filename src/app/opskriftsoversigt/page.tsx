@@ -74,13 +74,13 @@ const extendedDietaryCategories = [
   },
   {
     id: '3',
-    name: 'LCHF/PALEO',
-    slug: 'lchf-paleo',
-    description: 'Lav-kulhydrat og paleo opskrifter',
-    color: 'bg-orange-500',
-    recipeCount: 389,
-    imageUrl: '/images/categories/lchf-paleo.webp',
-    imageAlt: 'LCHF og paleo mad med kød, nødder og frugt'
+    name: 'GLP-1 KOST',
+    slug: 'glp-1',
+    description: 'Naturligt vægttab med maksimal mæthed',
+    color: 'bg-blue-500',
+    recipeCount: 0,
+    imageUrl: '/images/categories/glp-1.webp',
+    imageAlt: 'GLP-1 kost med protein, fibre og sunde fedtstoffer'
   },
   {
     id: '4',
@@ -352,8 +352,8 @@ export default function RecipeOverviewPage() {
               >
                 <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
                   {category.name === 'KETO' && '🥑'}
-                  {category.name === 'SENSE' && '🧠'}
-                  {category.name === 'LCHF/PALEO' && '🥩'}
+                  {category.name === 'SENSE' && '✋'}
+                  {category.name === 'GLP-1 KOST' && '🧠'}
                   {category.name === 'ANTI-INFLAMMATORISK' && '🌿'}
                   {category.name === 'FLEKSITARISK' && '🥬'}
                   {category.name === '5:2 DIÆT' && '⏰'}
@@ -382,14 +382,14 @@ export default function RecipeOverviewPage() {
             {/* Search Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <div className="relative flex-1 max-w-md w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
                   placeholder="Søg i alle opskrifter..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-                />
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
+              />
               </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -426,26 +426,26 @@ export default function RecipeOverviewPage() {
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Mad ideologi
                     </label>
-                    <select
-                      value={selectedDietary}
-                      onChange={(e) => setSelectedDietary(e.target.value)}
+            <select
+              value={selectedDietary}
+              onChange={(e) => setSelectedDietary(e.target.value)}
                       className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-                    >
-                      <option value="all">Alle mad ideologier</option>
-                      <option value="FAMILIEMAD">Familiemad</option>
-                      <option value="Keto">Keto</option>
-                      <option value="SENSE">SENSE</option>
-                      <option value="LCHF/PALEO">LCHF/Paleo</option>
-                      <option value="MEAL PREP">Meal Prep</option>
-                      <option value="ANTI-INFLAMMATORISK">Anti-Inflammatorisk</option>
-                      <option value="MIDDELHAVSDIÆTEN">Middelhavsdiæten</option>
-                      <option value="FLEKSITARISK">Fleksitarisk</option>
-                      <option value="5:2 DIÆT">5:2 Diæt</option>
-                    </select>
-                  </div>
+            >
+              <option value="all">Alle mad ideologier</option>
+              <option value="FAMILIEMAD">Familiemad</option>
+              <option value="Keto">Keto</option>
+              <option value="SENSE">SENSE</option>
+              <option value="GLP-1 KOST">GLP-1 kost</option>
+              <option value="MEAL PREP">Meal Prep</option>
+              <option value="ANTI-INFLAMMATORISK">Anti-Inflammatorisk</option>
+              <option value="MIDDELHAVSDIÆTEN">Middelhavsdiæten</option>
+              <option value="FLEKSITARISK">Fleksitarisk</option>
+              <option value="5:2 DIÆT">5:2 Diæt</option>
+            </select>
+          </div>
 
                   {/* Prep Time Filter */}
-                  <div>
+                <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Forbredelsestid
                     </label>
@@ -469,10 +469,10 @@ export default function RecipeOverviewPage() {
                         </button>
                       ))}
                     </div>
-                  </div>
-
+                </div>
+                
                   {/* Meal Type Filter */}
-                  <div>
+                <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Måltidstype
                     </label>
@@ -521,7 +521,7 @@ export default function RecipeOverviewPage() {
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
               {filteredRecipes.map((recipe, index) => (
                 <div
-                  key={recipe.id}
+                    key={recipe.id} 
                   className="transition-all duration-500 h-full"
                   style={{ transitionDelay: `${index * 100}ms` }}
                 >
@@ -582,7 +582,7 @@ export default function RecipeOverviewPage() {
               <div className="text-center text-green-600 font-medium group-hover:underline">
                 Se alle →
               </div>
-            </Link>
+              </Link>
 
             {/* Card 2 */}
             <Link 
@@ -598,7 +598,7 @@ export default function RecipeOverviewPage() {
               </p>
               <div className="text-center text-green-600 font-medium group-hover:underline">
                 Læs mere →
-              </div>
+            </div>
             </Link>
 
             {/* Card 3 */}
@@ -616,7 +616,7 @@ export default function RecipeOverviewPage() {
               <div className="text-center text-white font-medium group-hover:underline">
                 Prøv gratis →
               </div>
-            </Link>
+              </Link>
           </div>
         </div>
       </section>

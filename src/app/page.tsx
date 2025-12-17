@@ -73,8 +73,8 @@ export default function Home() {
       const categoryMap: { [key: string]: string } = {
         'keto': 'Keto',
         'sense': 'Sense',
-        'lchf': 'LCHF/Paleo',
-        'paleo': 'LCHF/Paleo',
+        'glp-1': 'GLP-1 kost',
+        'glp1': 'GLP-1 kost',
         'anti-inflammatory': 'Anti-inflammatorisk',
         'flexitarian': 'Fleksitarisk',
         '5-2-diet': '5:2 Diæt',
@@ -92,8 +92,8 @@ export default function Home() {
       const hrefMap: { [key: string]: string } = {
         'keto': '/keto/opskrifter',
         'sense': '/sense/opskrifter',
-        'lchf': '/lchf-paleo/opskrifter',
-        'paleo': '/lchf-paleo/opskrifter',
+        'glp-1': '/GLP-1/opskrifter',
+        'glp1': '/GLP-1/opskrifter',
         'anti-inflammatory': '/anti-inflammatory/opskrifter',
         'flexitarian': '/flexitarian/opskrifter',
         '5-2-diet': '/5-2-diet/opskrifter',
@@ -126,8 +126,8 @@ export default function Home() {
 
   const niches = [
     { name: 'Keto', icon: '🥑', href: '/keto/opskrifter', short: 'Fedtforbrænding' },
-    { name: 'Sense', icon: '🧠', href: '/sense/opskrifter', short: 'Danske kostråd' },
-    { name: 'LCHF/Paleo', icon: '🥩', href: '/lchf-paleo/opskrifter', short: 'Naturlig mad' },
+    { name: 'Sense', icon: '✋', href: '/sense/opskrifter', short: 'Danske kostråd' },
+    { name: 'GLP-1 kost', icon: '🧠', href: '/GLP-1/opskrifter', short: 'Naturligt vægttab' },
     { name: 'Anti-inflammatorisk', icon: '🌿', href: '/anti-inflammatory/opskrifter', short: 'Sundhedsfokus' },
     { name: 'Fleksitarisk', icon: '🥬', href: '/flexitarian/opskrifter', short: 'Fleksibel kost' },
     { name: '5:2 Diæt', icon: '⏰', href: '/5-2-diet/opskrifter', short: 'Fasteperioder' },
@@ -292,7 +292,7 @@ export default function Home() {
               {
                 icon: FileText,
                 title: 'Gratis opskrifter inden for alle mad kategorier',
-                description: 'Keto, Sense, LCHF, Paleo, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og klar til brug.',
+                description: 'Keto, Sense, GLP-1 kost, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og klar til brug.',
                 color: 'from-green-500 to-green-600'
               },
               {
@@ -656,17 +656,17 @@ export default function Home() {
               },
               {
                 name: "SENSE",
-                icon: "🧠",
+                icon: "✋",
                 description: "Bruger håndflader og spiseforståelse",
                 suitsYou: "Vil spise almindelig mad uden forbud",
                 href: "/sense/opskrifter"
               },
               {
-                name: "LCHF/PALEO",
-                icon: "🥩",
-                description: "Som Keto, men mere fleksibel",
-                suitsYou: "Ønsker fedtforbrænding uden at være ekstrem",
-                href: "/lchf-paleo/opskrifter"
+                name: "GLP-1 KOST",
+                icon: "🧠",
+                description: "Naturligt vægttab med maksimal mæthed",
+                suitsYou: "Vil booste kroppens eget mæthedshormon naturligt",
+                href: "/GLP-1/opskrifter"
               },
               {
                 name: "MEAL PREP",

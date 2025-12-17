@@ -53,20 +53,20 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
   },
   sense: {
     name: 'Sense',
-    emoji: '🧠',
+    emoji: '✋',
     bgColor: '#F8F9FA',
     introTitle: 'Det bedste fra Sense verdenen.',
     introLead:
       'Functionalfoods dækker hvad der sker i mad og ernæringsverdenen inden for Sense. Her finder du guides, artikler og inspiration.',
     showRecipes: true,
   },
-  'lchf-paleo': {
-    name: 'LCHF/Paleo',
-    emoji: '🥩',
-    bgColor: '#FFF7ED',
-    introTitle: 'Det bedste fra LCHF/Paleo verdenen.',
+  'glp-1': {
+    name: 'GLP-1 kost',
+    emoji: '🧠',
+    bgColor: '#EFF6FF',
+    introTitle: 'Det bedste fra GLP-1 kost verdenen.',
     introLead:
-      'Guides, artikler og opskrifter til dig der vil spise mere low carb og naturligt.',
+      'Guides, artikler og opskrifter til dig der vil booste kroppens eget mæthedshormon naturligt.',
     showRecipes: true,
   },
   'anti-inflammatory': {
