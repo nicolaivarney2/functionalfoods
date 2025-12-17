@@ -22,7 +22,6 @@ interface Product {
   store: string
   amount?: string
   isFavorite?: boolean
-  sale_end_date?: string | null
 }
 
 interface ProductCounts {
