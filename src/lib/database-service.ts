@@ -615,7 +615,6 @@ export class DatabaseService {
             image_url: p.image_url || this.getProductPlaceholderImage(),
             store: this.mapStoreIdToDisplayName(row.store_id),
             amount: p.amount ? String(p.amount) : null,
-            sale_end_date: row.sale_valid_to || null,
           }
         })
         
