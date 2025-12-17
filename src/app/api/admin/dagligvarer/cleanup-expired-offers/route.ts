@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       .from('product_offers')
       .select('id, name_store, is_on_sale, sale_valid_to, store_id, current_price')
       .ilike('name_store', '%marcipan%')
-      .order('sale_valid_to', { ascending: true, nullsLast: true })
+      .order('sale_valid_to', { ascending: true, nullsFirst: false })
       .limit(100)
     
     if (marcipanError) {
