@@ -107,7 +107,7 @@ export function updateOpenAIConfig(updates: Partial<OpenAIConfig>): boolean {
         familiemad: '',
         keto: '',
         sense: '',
-        paleo: '',
+        'glp-1': '',
         antiinflammatorisk: '',
         fleksitarisk: '',
         '5-2': '',
