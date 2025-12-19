@@ -67,8 +67,12 @@ Brug bindestreg (-) foran hvert tip.`
       const errorMessage = errorData.error?.message || 'Unknown error'
       
       // Provide helpful error messages for common issues
-      if (errorMessage.includes('Incorrect API key')) {
-        throw new Error(`OpenAI API key er ugyldig. Tjek at OPENAI_API_KEY environment variable er korrekt sat i Vercel.`)
+      if (errorMessage.includes('Incorrect API key') || errorMessage.includes('Invalid API key')) {
+        const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+        const location = isProduction 
+          ? 'Vercel environment variables' 
+          : '.env filen eller /admin/settings'
+        throw new Error(`OpenAI API key er ugyldig eller udløbet. Tjek at OPENAI_API_KEY er korrekt i ${location}. Du kan få en ny key på https://platform.openai.com/api-keys`)
       } else if (errorMessage.includes('rate limit')) {
         throw new Error(`Rate limit nået. Vent venligst et øjeblik før du prøver igen.`)
       } else {
