@@ -24,7 +24,7 @@ const CONFIG_FILE = isServerless
 
 export function getOpenAIConfig(): OpenAIConfig | null {
   try {
-    // In serverless environment, try to get config from environment variables
+    // In serverless environment (Vercel production), only use environment variables
     if (isServerless) {
       const apiKey = process.env.OPENAI_API_KEY
       
@@ -48,12 +48,33 @@ export function getOpenAIConfig(): OpenAIConfig | null {
       return null
     }
     
-    // Local environment - read from file
+    // Local environment - try multiple sources in order:
+    // 1. First check .env file directly (for localhost development)
+    const envApiKey = process.env.OPENAI_API_KEY
+    if (envApiKey) {
+      console.log('✅ Using OpenAI API key from .env file')
+      return {
+        apiKey: envApiKey,
+        assistantIds: {
+          familiemad: process.env.OPENAI_ASSISTANT_FAMILIEMAD || '',
+          keto: process.env.OPENAI_ASSISTANT_KETO || '',
+          sense: process.env.OPENAI_ASSISTANT_SENSE || '',
+          'glp-1': process.env.OPENAI_ASSISTANT_GLP1 || '',
+          antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
+          fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
+          '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',
+          'meal-prep': process.env.OPENAI_ASSISTANT_MEAL_PREP || ''
+        }
+      }
+    }
+    
+    // 2. Fallback to config file if it exists
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf-8')
       const config = JSON.parse(configData)
       
       if (config.apiKey) {
+        console.log('✅ Using OpenAI API key from config file')
         return {
           apiKey: config.apiKey,
           assistantIds: config.assistantIds || {
