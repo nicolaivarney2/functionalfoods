@@ -44,6 +44,8 @@ export default function AdminPublishingPage() {
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
+  const [generatingBulkTips, setGeneratingBulkTips] = useState(false)
+  const [bulkTipsResult, setBulkTipsResult] = useState<string | null>(null)
 
   useEffect(() => {
     loadRecipes()
@@ -478,6 +480,56 @@ export default function AdminPublishingPage() {
     return recipe.status === statusFilter
   })
 
+  const handleBulkGenerateTips = async () => {
+    const draftRecipesWithoutTips = recipes.filter(r => 
+      r.status === 'draft' && (!r.personalTips || r.personalTips.trim() === '')
+    )
+
+    if (draftRecipesWithoutTips.length === 0) {
+      alert('Ingen kladder uden tips fundet!')
+      return
+    }
+
+    if (!confirm(`⚠️ Dette vil generere AI tips for ${draftRecipesWithoutTips.length} kladder. Dette kan tage flere minutter. Fortsæt?`)) {
+      return
+    }
+
+    setGeneratingBulkTips(true)
+    setBulkTipsResult(null)
+
+    try {
+      const response = await fetch('/api/admin/recipes/bulk-generate-tips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunne ikke generere tips')
+      }
+
+      setBulkTipsResult(
+        `✅ ${data.message}\n` +
+        `Processeret: ${data.processed}\n` +
+        `Succesfulde: ${data.successful}\n` +
+        `Fejlede: ${data.failed}` +
+        (data.errors && data.errors.length > 0 ? `\n\nFejl:\n${data.errors.slice(0, 5).join('\n')}` : '')
+      )
+
+      // Reload recipes to show updated tips
+      await loadRecipes()
+
+    } catch (error) {
+      console.error('❌ Error generating bulk tips:', error)
+      setBulkTipsResult(`Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    } finally {
+      setGeneratingBulkTips(false)
+    }
+  }
+
   const handleBulkNutritionRecalculation = async () => {
     if (!confirm('⚠️ ADVARSEL: Denne handling vil genberegne mikro og makro ernæring for ALLE opskrifter på én gang. Dette kan tage flere minutter. Er du sikker på at du vil fortsætte?')) {
       return;
@@ -658,6 +710,30 @@ export default function AdminPublishingPage() {
             </button>
           </div>
           
+          {/* Bulk AI Tips Generation */}
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-900 mb-2">🤖 Generer AI Tips for Kladder</h4>
+            <p className="text-xs text-blue-700 mb-3">
+              Genererer AI tips automatisk for alle kladder der mangler tips. Dette kan tage lidt tid.
+            </p>
+            {bulkTipsResult && (
+              <div className={`mb-3 p-3 rounded text-sm whitespace-pre-line ${
+                bulkTipsResult.includes('Fejl') || bulkTipsResult.includes('fejlede')
+                  ? 'bg-red-50 text-red-700 border border-red-200' 
+                  : 'bg-green-50 text-green-700 border border-green-200'
+              }`}>
+                {bulkTipsResult}
+              </div>
+            )}
+            <button
+              onClick={handleBulkGenerateTips}
+              disabled={generatingBulkTips}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {generatingBulkTips ? '⏳ Genererer tips...' : `🤖 Generer AI Tips (${recipes.filter(r => r.status === 'draft' && (!r.personalTips || r.personalTips.trim() === '')).length} kladder)`}
+            </button>
+          </div>
+
           {/* Bulk Nutrition Recalculation */}
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Masse Opdatering af Ernæring</h4>
