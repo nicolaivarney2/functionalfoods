@@ -363,6 +363,27 @@ export default function CreateRecipePage() {
     })
   }
 
+  const handleAddIngredient = () => {
+    if (!editableRecipe) return
+
+    setEditableRecipe(prev => {
+      if (!prev) return null
+
+      return {
+        ...prev,
+        ingredients: [
+          ...(prev.ingredients || []),
+          {
+            name: '',
+            amount: 1,
+            unit: 'stk',
+            notes: ''
+          }
+        ]
+      }
+    })
+  }
+
   const handleUpdateInstruction = (index: number, field: string, value: any) => {
     if (!editableRecipe) return
     
@@ -378,6 +399,30 @@ export default function CreateRecipePage() {
       return {
         ...prev,
         instructions: newInstructions
+      }
+    })
+  }
+
+  const handleAddInstruction = () => {
+    if (!editableRecipe) return
+
+    setEditableRecipe(prev => {
+      if (!prev) return null
+
+      const nextStepNumber =
+        (prev.instructions || []).reduce((max, step) => Math.max(max, step?.stepNumber || 0), 0) + 1
+
+      return {
+        ...prev,
+        instructions: [
+          ...(prev.instructions || []),
+          {
+            stepNumber: nextStepNumber,
+            instruction: '',
+            time: undefined,
+            tips: ''
+          }
+        ]
       }
     })
   }
@@ -728,6 +773,15 @@ export default function CreateRecipePage() {
                           </div>
                         </div>
                       ))}
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleAddIngredient}
+                          className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 text-sm"
+                        >
+                          + Tilføj ingrediens
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <ul className="space-y-2">
@@ -793,6 +847,15 @@ export default function CreateRecipePage() {
                           </div>
                         </div>
                       ))}
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={handleAddInstruction}
+                          className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 text-sm"
+                        >
+                          + Tilføj trin
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <ol className="space-y-3">
