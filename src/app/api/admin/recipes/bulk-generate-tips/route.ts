@@ -8,8 +8,8 @@ export const revalidate = 0
 async function generateTipsForRecipe(recipe: any): Promise<string | null> {
   try {
     // Call the same API endpoint that single-tip generation uses
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+    // In server-side context, use localhost or environment variable
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
     
     const response = await fetch(`${baseUrl}/api/ai/generate-tips`, {
       method: 'POST',
