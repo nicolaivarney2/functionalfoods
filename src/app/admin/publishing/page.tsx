@@ -508,9 +508,7 @@ export default function AdminPublishingPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        const errorMsg = data.error || 'Kunne ikke generere tips'
-        const details = data.details ? `\n\n${data.details}` : ''
-        throw new Error(errorMsg + details)
+        throw new Error(data.error || 'Kunne ikke generere tips')
       }
 
       setBulkTipsResult(

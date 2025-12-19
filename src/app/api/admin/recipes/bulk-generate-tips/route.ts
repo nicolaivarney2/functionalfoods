@@ -7,7 +7,10 @@ export const revalidate = 0
 
 async function generateTipsForRecipe(recipe: any): Promise<string | null> {
   const config = getOpenAIConfig()
-  if (!config?.apiKey) return null
+  
+  if (!config || !config.apiKey) {
+    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
+  }
 
   const prompt = `Generer personlige tips til denne opskrift:
 
@@ -19,22 +22,18 @@ Kategori: ${Array.isArray(recipe.dietaryCategories) ? recipe.dietaryCategories.j
 
 Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60000) // 60s timeout per recipe
-
-  const startedAt = Date.now()
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: "gpt-4o",
         messages: [
           {
-            role: 'system',
+            role: "system",
             content: `Du er en erfaren kok der skal give personlige tips til opskrifter. Skriv altid på dansk.
 
 Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.
@@ -45,101 +44,36 @@ Formatér tips sådan:
 - Tredje tip her
 - Fjerde tip her
 
-Brug bindestreg (-) foran hvert tip.`,
+Brug bindestreg (-) foran hvert tip.`
           },
-          { role: 'user', content: prompt },
+          {
+            role: "user",
+            content: prompt
+          }
         ],
         temperature: 0.8,
-        max_tokens: 1000,
-      }),
-      signal: controller.signal,
+        max_tokens: 1000
+      })
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null)
-      const msg = errorData?.error?.message || response.statusText || 'Unknown error'
-      throw new Error(`OpenAI API error: ${msg}`)
+      const errorData = await response.json()
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
-    const tips = data.choices?.[0]?.message?.content
-    if (!tips) throw new Error('No content generated')
-
-    console.log(`🕒 OpenAI OK (${Date.now() - startedAt}ms): ${recipe.title}`)
-    return tips
+    const content = data.choices[0]?.message?.content
+    
+    return content || null
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error)
-    console.error(`❌ OpenAI failed (${Date.now() - startedAt}ms): ${recipe.title}: ${msg}`)
+    console.error(`Error generating tips for ${recipe.title}:`, error)
     return null
-  } finally {
-    clearTimeout(timeout)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Starting bulk AI tips generation for draft recipes...')
-
-    // Check OpenAI config first
-    const openaiConfig = getOpenAIConfig()
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-    
-    if (!openaiConfig || !openaiConfig.apiKey) {
-      const errorMsg = isProduction
-        ? 'OpenAI API key mangler i production. Tilføj OPENAI_API_KEY environment variable i Vercel dashboard.'
-        : 'OpenAI API key mangler. Tilføj den i /admin/settings'
-      
-      return NextResponse.json({ 
-        error: errorMsg,
-        details: 'API key er påkrævet for at generere AI tips'
-      }, { status: 500 })
-    }
-
-    // Validate API key format (should start with sk-)
-    if (!openaiConfig.apiKey.startsWith('sk-')) {
-      return NextResponse.json({ 
-        error: 'Ugyldig OpenAI API key format. API key skal starte med "sk-"',
-        details: 'Tjek at API key\'en er korrekt i Vercel environment variables eller /admin/settings'
-      }, { status: 500 })
-    }
-
-    // Preflight: test whether OpenAI accepts the key. If not, abort (ChatGPT-only).
-    try {
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${openaiConfig.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: 'ping' }],
-          max_tokens: 5,
-          temperature: 0,
-        }),
-      })
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => null)
-        const msg = err?.error?.message || resp.statusText || 'Unknown error'
-        if (String(msg).includes('Incorrect API key') || String(msg).includes('Invalid API key')) {
-          return NextResponse.json(
-            {
-              error: 'OpenAI afviser API key (Incorrect API key). Opdater API key i /admin/settings før bulk kan køre.',
-              details: msg,
-            },
-            { status: 500 }
-          )
-        }
-      }
-    } catch {
-      return NextResponse.json(
-        {
-          error: 'Kunne ikke kontakte OpenAI (preflight). Prøv igen om lidt.',
-        },
-        { status: 500 }
-      )
-    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -229,7 +163,7 @@ export async function POST(request: NextRequest) {
 
         // Add delay between requests to avoid rate limiting (except for last one)
         if (i < recipesNeedingTips.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
         }
 
       } catch (error) {

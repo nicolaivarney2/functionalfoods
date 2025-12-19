@@ -108,7 +108,15 @@ Brug bindestreg (-) foran hvert tip.`
 
   } catch (error: any) {
     console.error('OpenAI API error:', error)
-    // IMPORTANT: No fallback. If OpenAI fails, surface error so user can fix API key.
-    throw error
+    // Fallback til template hvis API fejler
+    return generatePersonalTipsFallback()
   }
+}
+
+function generatePersonalTipsFallback(): string {
+  return `Denne ret har jeg lavet mange gange, og den bliver bedre hver gang!
+
+- Min bedste tip er at tage dig tid til at forberede alle ingredienserne først.
+- Jeg plejer at servere den med en frisk salat til - det giver en perfekt balance.
+- Lad retten hvile i 5 minutter efter den er færdig, så udvikler alle smagene sig perfekt.`
 }

@@ -24,7 +24,7 @@ const CONFIG_FILE = isServerless
 
 export function getOpenAIConfig(): OpenAIConfig | null {
   try {
-    // In serverless environment (Vercel production), only use environment variables
+    // In serverless environment, try to get config from environment variables
     if (isServerless) {
       const apiKey = process.env.OPENAI_API_KEY
       
@@ -48,8 +48,7 @@ export function getOpenAIConfig(): OpenAIConfig | null {
       return null
     }
     
-    // Local environment - try multiple sources in order:
-    // 1. Prefer config file written by /admin/settings (so bulk + single behave the same)
+    // Local environment - read from file
     if (fs.existsSync(CONFIG_FILE)) {
       const configData = fs.readFileSync(CONFIG_FILE, 'utf-8')
       const config = JSON.parse(configData)
@@ -67,24 +66,6 @@ export function getOpenAIConfig(): OpenAIConfig | null {
             '5-2': '',
             'meal-prep': ''
           }
-        }
-      }
-    }
-
-    // 2. Fallback to .env (useful for localhost dev)
-    const envApiKey = process.env.OPENAI_API_KEY
-    if (envApiKey) {
-      return {
-        apiKey: envApiKey,
-        assistantIds: {
-          familiemad: process.env.OPENAI_ASSISTANT_FAMILIEMAD || '',
-          keto: process.env.OPENAI_ASSISTANT_KETO || '',
-          sense: process.env.OPENAI_ASSISTANT_SENSE || '',
-          'glp-1': process.env.OPENAI_ASSISTANT_GLP1 || '',
-          antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
-          fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
-          '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',
-          'meal-prep': process.env.OPENAI_ASSISTANT_MEAL_PREP || ''
         }
       }
     }
