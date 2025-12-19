@@ -43,8 +43,6 @@ export default function AdminPublishingPage() {
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
-  const [fixingCategories, setFixingCategories] = useState(false)
-  const [fixCategoriesResult, setFixCategoriesResult] = useState<string | null>(null)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
 
   useEffect(() => {
@@ -303,42 +301,6 @@ export default function AdminPublishingPage() {
 
   const removeCategory = (categoryToRemove: string) => {
     setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }
-
-  const handleFixCategories = async () => {
-    setFixingCategories(true)
-    setFixCategoriesResult(null)
-    
-    try {
-      const response = await fetch('/api/admin/recipes/fix-categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Kunne ikke rette kategorier')
-      }
-      
-      setFixCategoriesResult(
-        `✅ Rettet ${data.fixed} af ${data.total} opskrifter.\n` +
-        `Fordeling: ${Object.entries(data.categoryDistribution || {})
-          .map(([cat, count]) => `${cat}: ${count}`)
-          .join(', ')}`
-      )
-      
-      // Reload recipes to show updated categories
-      await loadRecipes()
-      
-    } catch (error) {
-      console.error('Error fixing categories:', error)
-      setFixCategoriesResult(`Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
-    } finally {
-      setFixingCategories(false)
-    }
   }
 
   const deleteRecipe = async (recipeSlug: string, recipeName: string) => {
@@ -1257,32 +1219,6 @@ export default function AdminPublishingPage() {
       
       {/* Auto-Publisher komponent */}
       <AutoPublisher />
-      
-      {/* Fix Categories Tool */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl border-2 border-blue-200 p-4 max-w-sm">
-          <h3 className="font-semibold text-gray-900 mb-2">Fix Kategorier</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            Retter mainCategory (Frokost/Morgenmad/Aftensmad) baseret på opskriftens beskrivelse for alle opskrifter.
-          </p>
-          {fixCategoriesResult && (
-            <div className={`mb-4 p-3 rounded text-sm whitespace-pre-line ${
-              fixCategoriesResult.includes('Fejl') 
-                ? 'bg-red-50 text-red-700 border border-red-200' 
-                : 'bg-green-50 text-green-700 border border-green-200'
-            }`}>
-              {fixCategoriesResult}
-            </div>
-          )}
-          <button
-            onClick={handleFixCategories}
-            disabled={fixingCategories}
-            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
-          >
-            {fixingCategories ? 'Retter kategorier...' : 'Ret alle kategorier'}
-          </button>
-        </div>
-      </div>
     </AdminLayout>
   )
 }
