@@ -5,9 +5,22 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function generateTipsForRecipe(recipe: any): Promise<string | null> {
+function generateFallbackTips(recipe: any): string {
+  const title = recipe?.title ? String(recipe.title) : 'opskriften'
+  const totalTime = (recipe?.preparationTime || 0) + (recipe?.cookingTime || 0)
+  const cats = Array.isArray(recipe?.dietaryCategories) ? recipe.dietaryCategories : []
+  const catText = cats.length ? cats.join(', ') : 'Generel'
+
+  return `- Jeg anbefaler at gøre alle ingredienser klar først – så går ${title.toLowerCase()} meget nemmere i køkkenet.\n- Smag til undervejs (salt/syre/krydderi). Små justeringer løfter retten markant.\n- Hvis du vil have mere “restaurant-følelse”, så giv det 2-3 minutter ekstra med høj varme til sidst for mere stegeskorpe/smag.\n- Tip til ${catText}: lav gerne en dobbelt portion – det bliver ofte endnu bedre dagen efter.\n${totalTime ? `- Tids-tip: sæt en timer på ca. ${totalTime} min, så du holder flow og timing.` : ''}`.trim()
+}
+
+async function generateTipsForRecipe(recipe: any, openaiEnabled: boolean): Promise<string | null> {
   const config = getOpenAIConfig()
   if (!config?.apiKey) return null
+
+  if (!openaiEnabled) {
+    return generateFallbackTips(recipe)
+  }
 
   const prompt = `Generer personlige tips til denne opskrift:
 
@@ -70,6 +83,11 @@ Brug bindestreg (-) foran hvert tip.`,
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error(`❌ OpenAI failed (${Date.now() - startedAt}ms): ${recipe.title}: ${msg}`)
+
+    // If the key is invalid, fall back (this matches how single-tip endpoint behaves today)
+    if (msg.includes('Incorrect API key') || msg.includes('Invalid API key')) {
+      return generateFallbackTips(recipe)
+    }
     return null
   } finally {
     clearTimeout(timeout)
@@ -101,6 +119,37 @@ export async function POST(request: NextRequest) {
         error: 'Ugyldig OpenAI API key format. API key skal starte med "sk-"',
         details: 'Tjek at API key\'en er korrekt i Vercel environment variables eller /admin/settings'
       }, { status: 500 })
+    }
+
+    // Preflight: test whether OpenAI accepts the key. If not, run in fallback-mode (fast, no blocking).
+    let openaiEnabled = true
+    try {
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${openaiConfig.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 5,
+          temperature: 0,
+        }),
+      })
+
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => null)
+        const msg = err?.error?.message || resp.statusText || 'Unknown error'
+        if (String(msg).includes('Incorrect API key') || String(msg).includes('Invalid API key')) {
+          openaiEnabled = false
+          console.log('⚠️ OpenAI key rejected → running bulk tips in fallback-mode')
+        }
+      }
+    } catch {
+      // Network issues -> don't block whole run; fall back
+      openaiEnabled = false
+      console.log('⚠️ OpenAI preflight failed → running bulk tips in fallback-mode')
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -163,7 +212,7 @@ export async function POST(request: NextRequest) {
 
       try {
         // Generate tips
-        const tips = await generateTipsForRecipe(recipe)
+        const tips = await generateTipsForRecipe(recipe, openaiEnabled)
 
         if (tips) {
           // Save tips to database
@@ -191,7 +240,8 @@ export async function POST(request: NextRequest) {
 
         // Add delay between requests to avoid rate limiting (except for last one)
         if (i < recipesNeedingTips.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000)) // 2 second delay
+          // Only delay when we're actually calling OpenAI
+          await new Promise(resolve => setTimeout(resolve, openaiEnabled ? 2000 : 10))
         }
 
       } catch (error) {
