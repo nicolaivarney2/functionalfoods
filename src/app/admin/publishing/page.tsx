@@ -43,10 +43,33 @@ export default function AdminPublishingPage() {
   const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
+  const [fixingCategories, setFixingCategories] = useState(false)
+  const [fixCategoriesResult, setFixCategoriesResult] = useState<string | null>(null)
+  const [allowedCategories, setAllowedCategories] = useState<string[]>([])
 
   useEffect(() => {
     loadRecipes()
+    loadAllowedCategories()
   }, [])
+
+  const loadAllowedCategories = async () => {
+    try {
+      const response = await fetch('/api/admin/recipe-categories')
+      if (response.ok) {
+        const data = await response.json()
+        setAllowedCategories(data.categories || [])
+      }
+    } catch (error) {
+      console.error('Error loading allowed categories:', error)
+      // Fallback to default categories
+      setAllowedCategories([
+        'Aftensmad', 'Verden rundt', 'Frokost', 'Is og sommer', 'Salater',
+        'Fisk', 'Morgenmad', 'God til to dage', 'Vegetar', 'Tilbehør',
+        'Bagværk', 'Madpakke opskrifter', 'Desserter', 'Fatbombs',
+        'Food prep', 'Simre retter', 'Dip og dressinger'
+      ])
+    }
+  }
 
   const loadRecipes = async () => {
     try {
@@ -95,7 +118,16 @@ export default function AdminPublishingPage() {
     
     // Sæt de oprindelige værdier fra opskriften
     setDescription(recipe.description || '')
-    setCategories(recipe.dietaryCategories || [])
+    // Kombiner mainCategory, subCategories og dietaryCategories til én liste
+    const allCategories: string[] = []
+    if (recipe.mainCategory) allCategories.push(recipe.mainCategory)
+    if (recipe.subCategories && recipe.subCategories.length > 0) {
+      allCategories.push(...recipe.subCategories)
+    }
+    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
+      allCategories.push(...recipe.dietaryCategories)
+    }
+    setCategories(allCategories)
     
     // Sæt selectedDate og selectedTime baseret på eksisterende planlægning
     const existingSchedule = schedules.find(s => s.recipeId === recipe.id)
@@ -203,6 +235,27 @@ export default function AdminPublishingPage() {
     if (!selectedRecipe) return
 
     try {
+      // Separer kategorier i mainCategory, subCategories og dietaryCategories
+      // mainCategory skal være en af de tilladte kategorier
+      const dietaryCategoryKeywords = ['Keto', 'LCHF', 'Paleo', 'Vegetarian', 'Vegan', 'Gluten-Free', 'SENSE', 'GLP-1', 'glp-1', 'glp1']
+      
+      // Find mainCategory - skal være en af de tilladte kategorier
+      const mainCategory = categories.find(cat => allowedCategories.includes(cat)) || 
+                          selectedRecipe.mainCategory || 
+                          'Aftensmad'
+      
+      // subCategories er alle andre kategorier der ikke er dietary
+      const subCategories = categories.filter(cat => 
+        cat !== mainCategory && 
+        !dietaryCategoryKeywords.includes(cat) &&
+        allowedCategories.includes(cat) // Kun tilladte kategorier
+      )
+      
+      // dietaryCategories er diæt-relaterede
+      const dietaryCategories = categories.filter(cat => 
+        dietaryCategoryKeywords.includes(cat)
+      )
+
       // Gem til database via API
       const response = await fetch(`/api/admin/recipes`, {
         method: 'PUT',
@@ -211,7 +264,9 @@ export default function AdminPublishingPage() {
         },
         body: JSON.stringify({ 
           recipeId: selectedRecipe.id,
-          dietaryCategories: categories 
+          mainCategory,
+          subCategories,
+          dietaryCategories
         }),
       })
 
@@ -222,12 +277,12 @@ export default function AdminPublishingPage() {
       // Opdater local state
       const updatedRecipes = recipes.map(recipe => 
         recipe.id === selectedRecipe.id 
-          ? { ...recipe, dietaryCategories: categories }
+          ? { ...recipe, mainCategory, subCategories, dietaryCategories }
           : recipe
       )
       setRecipes(updatedRecipes)
       
-      const updatedRecipe = { ...selectedRecipe, dietaryCategories: categories }
+      const updatedRecipe = { ...selectedRecipe, mainCategory, subCategories, dietaryCategories }
       setSelectedRecipe(updatedRecipe)
       setEditingCategories(false)
       
@@ -248,6 +303,42 @@ export default function AdminPublishingPage() {
 
   const removeCategory = (categoryToRemove: string) => {
     setCategories(categories.filter(cat => cat !== categoryToRemove))
+  }
+
+  const handleFixCategories = async () => {
+    setFixingCategories(true)
+    setFixCategoriesResult(null)
+    
+    try {
+      const response = await fetch('/api/admin/recipes/fix-categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Kunne ikke rette kategorier')
+      }
+      
+      setFixCategoriesResult(
+        `✅ Rettet ${data.fixed} af ${data.total} opskrifter.\n` +
+        `Fordeling: ${Object.entries(data.categoryDistribution || {})
+          .map(([cat, count]) => `${cat}: ${count}`)
+          .join(', ')}`
+      )
+      
+      // Reload recipes to show updated categories
+      await loadRecipes()
+      
+    } catch (error) {
+      console.error('Error fixing categories:', error)
+      setFixCategoriesResult(`Fejl: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
+    } finally {
+      setFixingCategories(false)
+    }
   }
 
   const deleteRecipe = async (recipeSlug: string, recipeName: string) => {
@@ -800,14 +891,22 @@ export default function AdminPublishingPage() {
                             ))}
                           </div>
                           <div className="flex gap-2 mb-3">
-                            <input
-                              type="text"
-                              value={newCategory}
-                              onChange={(e) => setNewCategory(e.target.value)}
-                              onKeyPress={(e) => e.key === 'Enter' && addCategory()}
-                              placeholder="Tilføj ny kategori..."
-                              className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                value={newCategory}
+                                onChange={(e) => setNewCategory(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && addCategory()}
+                                placeholder="Søg eller tilføj kategori..."
+                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                list="allowed-categories"
+                              />
+                              <datalist id="allowed-categories">
+                                {allowedCategories.map((cat) => (
+                                  <option key={cat} value={cat} />
+                                ))}
+                              </datalist>
+                            </div>
                             <button
                               onClick={addCategory}
                               className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700"
@@ -815,6 +914,9 @@ export default function AdminPublishingPage() {
                               Tilføj
                             </button>
                           </div>
+                          <p className="text-xs text-gray-500 mb-3">
+                            Tilladte kategorier: {allowedCategories.join(', ')}
+                          </p>
                           <div className="flex gap-3">
                             <button
                               onClick={saveCategories}
@@ -837,14 +939,27 @@ export default function AdminPublishingPage() {
                       ) : (
                         <div className="flex flex-wrap gap-2">
                           {categories.length > 0 ? (
-                            categories.map((category, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {category}
-                              </span>
-                            ))
+                            categories.map((category, index) => {
+                              // Bestem farve baseret på kategori type
+                              const mealCategories = ['Morgenmad', 'Frokost', 'Aftensmad', 'Snack']
+                              const dietaryCategories = ['Keto', 'LCHF', 'Paleo', 'Vegetarian', 'Vegan', 'Gluten-Free', 'SENSE', 'GLP-1', 'glp-1', 'glp1']
+                              
+                              let bgColor = 'bg-blue-100 text-blue-800'
+                              if (mealCategories.includes(category)) {
+                                bgColor = 'bg-green-100 text-green-800'
+                              } else if (dietaryCategories.includes(category)) {
+                                bgColor = 'bg-purple-100 text-purple-800'
+                              }
+                              
+                              return (
+                                <span
+                                  key={index}
+                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor}`}
+                                >
+                                  {category}
+                                </span>
+                              )
+                            })
                           ) : (
                             <p className="text-sm text-gray-500 italic">Ingen kategorier endnu. Klik "Rediger" for at tilføje.</p>
                           )}
@@ -1142,6 +1257,32 @@ export default function AdminPublishingPage() {
       
       {/* Auto-Publisher komponent */}
       <AutoPublisher />
+      
+      {/* Fix Categories Tool */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <div className="bg-white rounded-lg shadow-xl border-2 border-blue-200 p-4 max-w-sm">
+          <h3 className="font-semibold text-gray-900 mb-2">Fix Kategorier</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Retter mainCategory (Frokost/Morgenmad/Aftensmad) baseret på opskriftens beskrivelse for alle opskrifter.
+          </p>
+          {fixCategoriesResult && (
+            <div className={`mb-4 p-3 rounded text-sm whitespace-pre-line ${
+              fixCategoriesResult.includes('Fejl') 
+                ? 'bg-red-50 text-red-700 border border-red-200' 
+                : 'bg-green-50 text-green-700 border border-green-200'
+            }`}>
+              {fixCategoriesResult}
+            </div>
+          )}
+          <button
+            onClick={handleFixCategories}
+            disabled={fixingCategories}
+            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+          >
+            {fixingCategories ? 'Retter kategorier...' : 'Ret alle kategorier'}
+          </button>
+        </div>
+      </div>
     </AdminLayout>
   )
 }

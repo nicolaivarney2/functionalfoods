@@ -115,89 +115,82 @@ export default function GLP1Page() {
       {/* What is GLP-1 Section */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50/30">
         <div className="container">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight text-center">
                 Hvad er 
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600">
                   {' '}GLP-1 kost?
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                GLP-1 (Glucagon-Like Peptide-1) er kroppens eget mæthedshormon, som spiller en nøglerolle i appetitregulering og vægtkontrol. Det er præcis dét hormonet Ozempic og Wegovy stimulerer – men vidste du, at du også kan booste din GLP-1 naturligt med mad?
-              </p>
-              
-              <p className="text-lg text-gray-700 mb-8 leading-relaxed">
-                Den nye GLP-1 kost er designet til at efterligne og forstærke kroppens GLP-1 respons – helt uden medicin.
-              </p>
-              
-              <div className="space-y-6">
-                <div className="bg-blue-100 border border-blue-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-blue-800 mb-2">Naturlig mæthed</h4>
-                  <p className="text-blue-700">Kost med protein, fibre og sunde fedtstoffer stimulerer GLP-1 naturligt.</p>
+              <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 mb-8">
+                <p className="text-xl text-gray-700 mb-6 leading-relaxed">
+                  <strong>GLP-1 kosten er en moderne, biologisk funderet kosttilgang, der tager udgangspunkt i kroppens egne mætheds- og appetithormoner</strong> – især hormonet GLP-1 (Glucagon-Like Peptide-1).
+                </p>
+                
+                <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+                  GLP-1 er et naturligt hormon, som frigives fra tarmen, når vi spiser. Hormonet spiller en central rolle i:
+                </p>
+                
+                <div className="grid md:grid-cols-2 gap-4 mb-8">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                    <span className="text-gray-700">Appetitregulering</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <span className="text-gray-700">Mæthed</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                    <span className="text-gray-700">Blodsukkerkontrol</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-teal-600 flex-shrink-0" />
+                    <span className="text-gray-700">Vægtregulering</span>
+                  </div>
                 </div>
                 
-                <div className="bg-green-100 border border-green-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-green-800 mb-2">Lavere appetit</h4>
-                  <p className="text-green-700">Langsomt optagelige måltider stabiliserer blodsukkeret og reducerer cravings.</p>
-                </div>
-                
-                <div className="bg-emerald-100 border border-emerald-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-emerald-800 mb-2">Effektivt vægttab</h4>
-                  <p className="text-emerald-700">Færre kalorier – uden at du skal gå sulten i seng.</p>
+                <div className="bg-blue-50 border-l-4 border-blue-500 rounded-r-xl p-6 mb-6">
+                  <p className="text-gray-700 leading-relaxed">
+                    Det er netop denne mekanisme, som ligger bag vægttabsmedicin som Ozempic og Wegovy. <strong>GLP-1 kosten er inspireret af samme fysiologi – men anvendt gennem mad, måltidsstruktur og fødevarevalg i stedet for (eller som supplement til) medicin.</strong>
+                  </p>
                 </div>
               </div>
-            </div>
-
-            <div className={`transition-all duration-1000 delay-700 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
-              <div className="bg-white rounded-3xl p-8 shadow-2xl shadow-blue-500/10 border border-blue-100">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-green-500 rounded-2xl flex items-center justify-center">
-                    <Brain className="w-6 h-6 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900">GLP-1 principper</h3>
-                </div>
+              
+              <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 md:p-12 shadow-xl border border-green-200 mb-8">
+                <h3 className="text-2xl md:text-3xl font-bold mb-6 text-gray-900">
+                  Grundidéen
+                </h3>
+                <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+                  GLP-1 kosten handler <strong>ikke om kalorietælling, forbud eller viljestyrke</strong>. Den handler om at spise på en måde, der biologisk reducerer sult, øger mæthed og skaber ro omkring mad.
+                </p>
                 
-                <div className="space-y-4">
+                <p className="text-lg text-gray-700 mb-6 leading-relaxed">
+                  Når GLP-1 aktiveres optimalt:
+                </p>
+                
+                <div className="grid md:grid-cols-2 gap-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">🥚</span>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Protein i hvert måltid</h4>
-                      <p className="text-sm text-gray-600">Æg, kylling, fisk, græsk yoghurt</p>
-                    </div>
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <span className="text-gray-700">føler man sig hurtigere mæt</span>
                   </div>
-                  
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">🥬</span>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Fiberrige grøntsager</h4>
-                      <p className="text-sm text-gray-600">Broccoli, linser, havre</p>
-                    </div>
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <span className="text-gray-700">spiser man automatisk mindre</span>
                   </div>
-                  
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">🥑</span>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Sunde fedtstoffer</h4>
-                      <p className="text-sm text-gray-600">Avocado, olivenolie, nødder</p>
-                    </div>
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <span className="text-gray-700">falder cravings</span>
                   </div>
-                  
                   <div className="flex items-start gap-3">
-                    <XCircle className="w-6 h-6 text-red-500 mt-1" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">Ingen flydende kalorier</h4>
-                      <p className="text-sm text-gray-600">GLP-1 belønner solide måltider</p>
-                    </div>
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <span className="text-gray-700">stabiliseres blodsukkeret</span>
                   </div>
-                  
-                  <div className="flex items-start gap-3">
-                    <Clock className="w-6 h-6 text-blue-500 mt-1" />
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-1">2-3 mættende måltider</h4>
-                      <p className="text-sm text-gray-600">Stabil energi, færre cravings</p>
-                    </div>
+                  <div className="flex items-start gap-3 md:col-span-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-600 mt-1 flex-shrink-0" />
+                    <span className="text-gray-700">bliver vægttab lettere at fastholde</span>
                   </div>
                 </div>
               </div>
@@ -206,109 +199,237 @@ export default function GLP1Page() {
         </div>
       </section>
 
-      {/* Why GLP-1 Works Section */}
+      {/* How GLP-1 Works Physiologically */}
       <section className="py-20 bg-white">
         <div className="container">
-          <div className={`text-center mb-16 transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
-              Derfor virker GLP-1 kosten
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              GLP-1 kost er designet til at maksimere kroppens naturlige mæthedssignaler.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            {[
-              {
-                icon: <CheckCircle2 className="w-8 h-8" />,
-                title: "Øget mæthed",
-                description: "Kost med protein, fibre og sunde fedtstoffer stimulerer GLP-1 naturligt",
-                color: "bg-blue-500"
-              },
-              {
-                icon: <CheckCircle2 className="w-8 h-8" />,
-                title: "Lavere appetit",
-                description: "Langsomt optagelige måltider stabiliserer blodsukkeret",
-                color: "bg-green-500"
-              },
-              {
-                icon: <CheckCircle2 className="w-8 h-8" />,
-                title: "Effektivt vægttab",
-                description: "Færre kalorier – uden at du skal gå sulten i seng",
-                color: "bg-emerald-500"
-              },
-              {
-                icon: <CheckCircle2 className="w-8 h-8" />,
-                title: "Perfekt støtte",
-                description: "Understøtter semaglutid behandling og hjælper dig til at holde vægten bagefter",
-                color: "bg-teal-500"
-              }
-            ].map((item, index) => (
-              <div
-                key={item.title}
-                className="bg-white border-2 border-gray-100 rounded-2xl p-6 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2"
-                style={{ transitionDelay: `${index * 100}ms` }}
-              >
-                <div className={`w-14 h-14 ${item.color} rounded-2xl flex items-center justify-center text-white mb-4`}>
-                  {item.icon}
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 text-center">
+                Hvordan GLP-1 virker fysiologisk
+              </h2>
+              
+              <p className="text-xl text-gray-600 mb-12 text-center max-w-3xl mx-auto leading-relaxed">
+                GLP-1 påvirker kroppen på flere niveauer samtidigt:
+              </p>
+              
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-3xl p-8 border-2 border-blue-200">
+                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                    <Brain className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Hjernen</h3>
+                  <p className="text-gray-700 leading-relaxed">
+                    <strong>Appetit og mæthed:</strong> GLP-1 sender signaler til mæthedscentre i hjernen, som reducerer sult og lyst til mad. Det er her, følelsen af "ro omkring mad" opstår.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-3">{item.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">{item.description}</p>
+                
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-3xl p-8 border-2 border-green-200">
+                  <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-6">
+                    <UtensilsCrossed className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Maven</h3>
+                  <p className="text-gray-700 leading-relaxed">
+                    <strong>Mavetømning:</strong> GLP-1 sænker hastigheden, hvormed maden forlader maven. Det giver længere mæthed og mere stabile blodsukkerkurver.
+                  </p>
+                </div>
+                
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-3xl p-8 border-2 border-emerald-200">
+                  <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mb-6">
+                    <Target className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Bugspytkirtlen</h3>
+                  <p className="text-gray-700 leading-relaxed">
+                    <strong>Blodsukkerkontrol:</strong> GLP-1 øger insulinudskillelsen, men kun når der er sukker i blodet, og dæmper samtidig glukagon. Resultatet er mindre blodsukkerudsving og færre cravings.
+                  </p>
+                </div>
               </div>
-            ))}
+              
+              <div className="bg-gradient-to-br from-blue-50 to-green-50 rounded-3xl p-8 border border-blue-200 text-center">
+                <p className="text-lg text-gray-700 leading-relaxed">
+                  <strong>GLP-1 kosten er designet til at understøtte og forstærke disse mekanismer naturligt.</strong>
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* How to eat GLP-1 Section */}
+      {/* What Characterizes GLP-1 Diet */}
       <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50/30">
         <div className="container">
-          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 text-center">
-              Sådan spiser du efter GLP-1 principperne
-            </h2>
-            
-            <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-3xl">🥚</div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-2">Protein i hvert måltid</h3>
-                    <p className="text-gray-600 text-sm">Æg, kylling, fisk, græsk yoghurt</p>
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-900 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 text-center">
+                Hvad kendetegner GLP-1 kosten i praksis
+              </h2>
+              
+              <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 mb-8">
+                <p className="text-lg text-gray-700 mb-8 leading-relaxed">
+                  GLP-1 kosten fokuserer på fødevarer og måltidsprincipper, som er kendt for at stimulere mæthedshormoner og give langvarig mæthed:
+                </p>
+                
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl">🥚</div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 mb-2">Protein i hvert måltid</h4>
+                      <p className="text-gray-600 text-sm">Fx æg, fisk, kylling, græsk yoghurt, bælgfrugter</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl">🥬</div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 mb-2">Fiberrige fødevarer</h4>
+                      <p className="text-gray-600 text-sm">Grøntsager, fuldkorn, havre, linser</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4">
+                    <div className="text-3xl">🥑</div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 mb-2">Sunde fedtstoffer</h4>
+                      <p className="text-gray-600 text-sm">Olivenolie, avocado, nødder</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4">
+                    <XCircle className="w-8 h-8 text-red-500 mt-1" />
+                    <div>
+                      <h4 className="font-bold text-gray-900 mb-2">Lav andel af ultraforarbejdet mad</h4>
+                      <p className="text-gray-600 text-sm">Meget få eller ingen flydende kalorier</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 md:col-span-2">
+                    <Clock className="w-8 h-8 text-blue-500 mt-1" />
+                    <div>
+                      <h4 className="font-bold text-gray-900 mb-2">2–3 mættende måltider frem for konstant snacking</h4>
+                      <p className="text-gray-600 text-sm">Fokus er på fødevarer med høj mæthed pr. kalorie og lav påvirkning af blodsukkeret</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* What GLP-1 Diet is NOT */}
+      <section className="py-20 bg-white">
+        <div className="container">
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-1100 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 text-center">
+                Hvad GLP-1 kosten <span className="text-red-600">ikke</span> er
+              </h2>
+              
+              <div className="bg-red-50 rounded-3xl p-8 md:p-12 border-2 border-red-200 mb-8">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-700 font-medium">Det er ikke en low-carb, keto eller paleo-kur</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-700 font-medium">Det er ikke en sultekur</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-700 font-medium">Det er ikke en kalorie-fikseret diæt</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-red-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-700 font-medium">Det er ikke afhængig af faste, men kan kombineres med faste</p>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex items-start gap-4">
-                  <div className="text-3xl">🥬</div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-2">Fiberrige grøntsager og bælgfrugter</h3>
-                    <p className="text-gray-600 text-sm">Fx broccoli, linser, havre</p>
+                <div className="mt-8 pt-8 border-t border-red-200">
+                  <p className="text-gray-700 leading-relaxed">
+                    <strong>GLP-1 kosten kan overlappe med andre kostformer, men er defineret af effekt på appetit og mæthed – ikke af ideologi.</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Who is it for */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-blue-50/30">
+        <div className="container">
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-1300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 text-center">
+                For hvem er GLP-1 kosten relevant?
+              </h2>
+              
+              <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100 mb-8">
+                <p className="text-lg text-gray-700 mb-8 leading-relaxed">
+                  GLP-1 kosten er relevant for flere grupper:
+                </p>
+                
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+                    <CheckCircle2 className="w-6 h-6 text-blue-600 mt-1 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>Personer der ønsker vægttab uden konstant sult</strong></p>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-green-50 rounded-2xl border border-green-200">
+                    <CheckCircle2 className="w-6 h-6 text-green-600 mt-1 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>Personer med cravings, overspisning eller ustabil appetit</strong></p>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-600 mt-1 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>Personer på GLP-1 medicin, som ønsker kost, der understøtter behandlingen</strong></p>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-teal-50 rounded-2xl border border-teal-200">
+                    <CheckCircle2 className="w-6 h-6 text-teal-600 mt-1 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>Personer der vil fastholde vægttab efter medicinsk behandling</strong></p>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-purple-50 rounded-2xl border border-purple-200">
+                    <CheckCircle2 className="w-6 h-6 text-purple-600 mt-1 flex-shrink-0" />
+                    <p className="text-gray-700"><strong>Personer med insulinresistens, prædiabetes eller blodsukkerproblemer</strong></p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Future-proof perspective */}
+      <section className="py-20 bg-white">
+        <div className="container">
+          <div className="max-w-5xl mx-auto">
+            <div className={`transition-all duration-1000 delay-1500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="bg-gradient-to-br from-blue-600 to-green-600 rounded-3xl p-8 md:p-12 shadow-2xl text-white">
+                <h2 className="text-3xl md:text-4xl font-bold mb-6">
+                  Fremtidssikret perspektiv
+                </h2>
                 
-                <div className="flex items-start gap-4">
-                  <div className="text-3xl">🥑</div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-2">Sunde fedtstoffer</h3>
-                    <p className="text-gray-600 text-sm">Avocado, olivenolie, nødder</p>
-                  </div>
-                </div>
+                <p className="text-lg text-blue-50 mb-6 leading-relaxed">
+                  Selvom navnet "GLP-1 kost" bruges som indgang, er konceptet bredere end ét hormon. Nyere fedmebehandlinger (fx kombinationer med amylin og GIP) bekræfter, at appetit er hormonstyret – og at mad kan bruges strategisk til at påvirke disse signaler.
+                </p>
                 
-                <div className="flex items-start gap-4">
-                  <XCircle className="w-8 h-8 text-red-500 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-2">Ingen flydende kalorier og snacks</h3>
-                    <p className="text-gray-600 text-sm">GLP-1 belønner solide måltider</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-4 md:col-span-2">
-                  <Clock className="w-8 h-8 text-blue-500 mt-1" />
-                  <div>
-                    <h3 className="font-bold text-gray-900 mb-2">2-3 mættende måltider om dagen</h3>
-                    <p className="text-gray-600 text-sm">Stabil energi, færre cravings</p>
-                  </div>
+                <div className="bg-white/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <p className="text-xl font-semibold text-white leading-relaxed">
+                    GLP-1 kosten repræsenterer derfor en ny kategori: <strong>Hormonbaseret appetitkontrol med mad</strong>
+                  </p>
                 </div>
               </div>
             </div>

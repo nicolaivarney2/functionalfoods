@@ -106,13 +106,13 @@ export async function PUT(request: NextRequest) {
     
     // Parse request body
     const body = await request.json()
-    const { recipeId, description, dietaryCategories } = body
+    const { recipeId, description, dietaryCategories, mainCategory, subCategories } = body
     
     if (!recipeId) {
       return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 })
     }
     
-    console.log('🔍 Updating recipe:', { recipeId, description, dietaryCategories })
+    console.log('🔍 Updating recipe:', { recipeId, description, dietaryCategories, mainCategory, subCategories })
     
     // Prepare update data
     const updateData: any = {}
@@ -121,6 +121,12 @@ export async function PUT(request: NextRequest) {
     }
     if (dietaryCategories !== undefined) {
       updateData.dietaryCategories = dietaryCategories
+    }
+    if (mainCategory !== undefined) {
+      updateData.mainCategory = mainCategory
+    }
+    if (subCategories !== undefined) {
+      updateData.subCategories = subCategories
     }
     
     // Add updated timestamp

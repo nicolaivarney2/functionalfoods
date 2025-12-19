@@ -132,8 +132,54 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
         tips: undefined
       }))
 
-    // Determine main category from course tags
-    const mainCategory = (recipe.tags.course && recipe.tags.course.length > 0) ? recipe.tags.course[0] : 'Hovedret'
+    // Determine main category from course tags with normalization to allowed categories
+    const normalizeMainCategory = (courseTag: string, description: string, title: string = ''): string => {
+      const tagLower = (courseTag || '').toLowerCase()
+      const descLower = (description || '').toLowerCase()
+      const titleLower = (title || '').toLowerCase()
+      const allText = `${titleLower} ${descLower} ${tagLower}`
+      
+      // Allowed categories from Ketoliv
+      const allowedCategories = [
+        'Aftensmad', 'Verden rundt', 'Frokost', 'Is og sommer', 'Salater',
+        'Fisk', 'Morgenmad', 'God til to dage', 'Vegetar', 'Tilbehør',
+        'Bagværk', 'Madpakke opskrifter', 'Desserter', 'Fatbombs',
+        'Food prep', 'Simre retter', 'Dip og dressinger'
+      ]
+      
+      // Check for specific category keywords (most specific first)
+      if (allText.includes('madpakke')) return 'Madpakke opskrifter'
+      if (allText.includes('salat') || allText.includes('salater')) return 'Salater'
+      if (allText.includes('fisk') || allText.includes('laks') || allText.includes('tun')) return 'Fisk'
+      if (allText.includes('is') || allText.includes('sommer')) return 'Is og sommer'
+      if (allText.includes('dessert') || allText.includes('desserter')) return 'Desserter'
+      if (allText.includes('bagværk') || allText.includes('brød') || allText.includes('kage')) return 'Bagværk'
+      if (allText.includes('vegetar')) return 'Vegetar'
+      if (allText.includes('fatbomb')) return 'Fatbombs'
+      if (allText.includes('food prep') || allText.includes('meal prep')) return 'Food prep'
+      if (allText.includes('simre')) return 'Simre retter'
+      if (allText.includes('dip') || allText.includes('dressing')) return 'Dip og dressinger'
+      if (allText.includes('tilbehør')) return 'Tilbehør'
+      if (allText.includes('verden rundt') || allText.includes('international')) return 'Verden rundt'
+      if (allText.includes('god til to dage') || allText.includes('batch')) return 'God til to dage'
+      
+      // Meal type keywords
+      if (allText.includes('frokost') || allText.includes('lunch') || allText.includes('til frokost')) {
+        return 'Frokost'
+      }
+      if (allText.includes('morgenmad') || allText.includes('breakfast') || allText.includes('til morgenmad')) {
+        return 'Morgenmad'
+      }
+      if (allText.includes('aftensmad') || allText.includes('dinner') || allText.includes('middag') || allText.includes('hovedret')) {
+        return 'Aftensmad'
+      }
+      
+      // Default fallback
+      return 'Aftensmad'
+    }
+    
+    const rawCourseTag = (recipe.tags.course && recipe.tags.course.length > 0) ? recipe.tags.course[0] : ''
+    const mainCategory = normalizeMainCategory(rawCourseTag, recipe.summary || '', recipe.name || '')
 
     // Calculate total time
     const prepTime = parseInt(String(recipe.prep_time).replace(',', '.')) || 0
