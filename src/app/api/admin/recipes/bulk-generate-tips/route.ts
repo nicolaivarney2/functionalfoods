@@ -5,39 +5,74 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Use the same endpoint as single-tip generation to ensure identical behavior
 async function generateTipsForRecipe(recipe: any): Promise<string | null> {
+  const config = getOpenAIConfig()
+  if (!config?.apiKey) return null
+
+  const prompt = `Generer personlige tips til denne opskrift:
+
+Opskrift: ${recipe.title}
+Beskrivelse: ${recipe.description || 'En lækker opskrift der er værd at prøve'}
+Sværhedsgrad: ${recipe.difficulty || 'Mellem'}
+Total tid: ${(recipe.preparationTime || 0) + (recipe.cookingTime || 0)} minutter
+Kategori: ${Array.isArray(recipe.dietaryCategories) ? recipe.dietaryCategories.join(', ') : 'Generel'}
+
+Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60000) // 60s timeout per recipe
+
+  const startedAt = Date.now()
   try {
-    // Call the same API endpoint that single-tip generation uses
-    // In server-side context, use localhost or environment variable
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-    
-    const response = await fetch(`${baseUrl}/api/ai/generate-tips`, {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        Authorization: `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        title: recipe.title,
-        description: recipe.description || 'En lækker opskrift der er værd at prøve',
-        difficulty: recipe.difficulty || 'Mellem',
-        totalTime: (recipe.preparationTime || 0) + (recipe.cookingTime || 0),
-        dietaryCategories: Array.isArray(recipe.dietaryCategories) 
-          ? recipe.dietaryCategories 
-          : ['Generel']
-      })
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `Du er en erfaren kok der skal give personlige tips til opskrifter. Skriv altid på dansk.
+
+Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.
+
+Formatér tips sådan:
+- Første tip her
+- Andet tip her  
+- Tredje tip her
+- Fjerde tip her
+
+Brug bindestreg (-) foran hvert tip.`,
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.8,
+        max_tokens: 1000,
+      }),
+      signal: controller.signal,
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to generate tips')
+      const errorData = await response.json().catch(() => null)
+      const msg = errorData?.error?.message || response.statusText || 'Unknown error'
+      throw new Error(`OpenAI API error: ${msg}`)
     }
 
     const data = await response.json()
-    return data.tips || null
+    const tips = data.choices?.[0]?.message?.content
+    if (!tips) throw new Error('No content generated')
+
+    console.log(`🕒 OpenAI OK (${Date.now() - startedAt}ms): ${recipe.title}`)
+    return tips
   } catch (error) {
-    console.error(`Error generating tips for ${recipe.title}:`, error)
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error(`❌ OpenAI failed (${Date.now() - startedAt}ms): ${recipe.title}: ${msg}`)
     return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
