@@ -18,6 +18,10 @@ WHERE NOT EXISTS (SELECT 1 FROM recipe_categories_config);
 -- Enable RLS
 ALTER TABLE recipe_categories_config ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist (for re-running the script)
+DROP POLICY IF EXISTS "Allow public read access to recipe categories" ON recipe_categories_config;
+DROP POLICY IF EXISTS "Allow authenticated users to update recipe categories" ON recipe_categories_config;
+
 -- Create policy for public read access
 CREATE POLICY "Allow public read access to recipe categories" ON recipe_categories_config FOR SELECT USING (true);
 
