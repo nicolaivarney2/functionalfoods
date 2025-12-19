@@ -9,7 +9,13 @@ async function generateTipsForRecipe(recipe: any): Promise<string | null> {
   const config = getOpenAIConfig()
   
   if (!config || !config.apiKey) {
-    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
+    // Check if we're in production and API key should come from env var
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    if (isProduction) {
+      throw new Error('OpenAI API key mangler i production. Tilføj OPENAI_API_KEY environment variable i Vercel.')
+    } else {
+      throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
+    }
   }
 
   const prompt = `Generer personlige tips til denne opskrift:
@@ -58,7 +64,16 @@ Brug bindestreg (-) foran hvert tip.`
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      const errorMessage = errorData.error?.message || 'Unknown error'
+      
+      // Provide helpful error messages for common issues
+      if (errorMessage.includes('Incorrect API key')) {
+        throw new Error(`OpenAI API key er ugyldig. Tjek at OPENAI_API_KEY environment variable er korrekt sat i Vercel.`)
+      } else if (errorMessage.includes('rate limit')) {
+        throw new Error(`Rate limit nået. Vent venligst et øjeblik før du prøver igen.`)
+      } else {
+        throw new Error(`OpenAI API error: ${errorMessage}`)
+      }
     }
 
     const data = await response.json()
@@ -74,6 +89,29 @@ Brug bindestreg (-) foran hvert tip.`
 export async function POST(request: NextRequest) {
   try {
     console.log('🚀 Starting bulk AI tips generation for draft recipes...')
+
+    // Check OpenAI config first
+    const openaiConfig = getOpenAIConfig()
+    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+    
+    if (!openaiConfig || !openaiConfig.apiKey) {
+      const errorMsg = isProduction
+        ? 'OpenAI API key mangler i production. Tilføj OPENAI_API_KEY environment variable i Vercel dashboard.'
+        : 'OpenAI API key mangler. Tilføj den i /admin/settings'
+      
+      return NextResponse.json({ 
+        error: errorMsg,
+        details: 'API key er påkrævet for at generere AI tips'
+      }, { status: 500 })
+    }
+
+    // Validate API key format (should start with sk-)
+    if (!openaiConfig.apiKey.startsWith('sk-')) {
+      return NextResponse.json({ 
+        error: 'Ugyldig OpenAI API key format. API key skal starte med "sk-"',
+        details: 'Tjek at API key\'en er korrekt i Vercel environment variables eller /admin/settings'
+      }, { status: 500 })
+    }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
