@@ -5,28 +5,13 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-async function generateTipsForRecipe(recipe: any): Promise<string | null> {
+// Use the same function as the single-tip generation endpoint
+async function callOpenAIStandardAPI(prompt: string): Promise<string> {
   const config = getOpenAIConfig()
   
   if (!config || !config.apiKey) {
-    // Check if we're in production and API key should come from env var
-    const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-    if (isProduction) {
-      throw new Error('OpenAI API key mangler i production. Tilføj OPENAI_API_KEY environment variable i Vercel.')
-    } else {
-      throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
-    }
+    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
   }
-
-  const prompt = `Generer personlige tips til denne opskrift:
-
-Opskrift: ${recipe.title}
-Beskrivelse: ${recipe.description || 'En lækker opskrift der er værd at prøve'}
-Sværhedsgrad: ${recipe.difficulty || 'Mellem'}
-Total tid: ${(recipe.preparationTime || 0) + (recipe.cookingTime || 0)} minutter
-Kategori: ${Array.isArray(recipe.dietaryCategories) ? recipe.dietaryCategories.join(', ') : 'Generel'}
-
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -64,26 +49,38 @@ Brug bindestreg (-) foran hvert tip.`
 
     if (!response.ok) {
       const errorData = await response.json()
-      const errorMessage = errorData.error?.message || 'Unknown error'
-      
-      // Provide helpful error messages for common issues
-      if (errorMessage.includes('Incorrect API key') || errorMessage.includes('Invalid API key')) {
-        const isProduction = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-        const location = isProduction 
-          ? 'Vercel environment variables' 
-          : '.env filen eller /admin/settings'
-        throw new Error(`OpenAI API key er ugyldig eller udløbet. Tjek at OPENAI_API_KEY er korrekt i ${location}. Du kan få en ny key på https://platform.openai.com/api-keys`)
-      } else if (errorMessage.includes('rate limit')) {
-        throw new Error(`Rate limit nået. Vent venligst et øjeblik før du prøver igen.`)
-      } else {
-        throw new Error(`OpenAI API error: ${errorMessage}`)
-      }
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
     }
 
     const data = await response.json()
     const content = data.choices[0]?.message?.content
     
-    return content || null
+    if (!content) {
+      throw new Error('No content generated')
+    }
+
+    return content
+
+  } catch (error: any) {
+    console.error('OpenAI API error:', error)
+    throw error // Re-throw instead of fallback for bulk operations
+  }
+}
+
+async function generateTipsForRecipe(recipe: any): Promise<string | null> {
+  const prompt = `Generer personlige tips til denne opskrift:
+
+Opskrift: ${recipe.title}
+Beskrivelse: ${recipe.description || 'En lækker opskrift der er værd at prøve'}
+Sværhedsgrad: ${recipe.difficulty || 'Mellem'}
+Total tid: ${(recipe.preparationTime || 0) + (recipe.cookingTime || 0)} minutter
+Kategori: ${Array.isArray(recipe.dietaryCategories) ? recipe.dietaryCategories.join(', ') : 'Generel'}
+
+Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
+
+  try {
+    const tips = await callOpenAIStandardAPI(prompt)
+    return tips
   } catch (error) {
     console.error(`Error generating tips for ${recipe.title}:`, error)
     return null
