@@ -1,86 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { getOpenAIConfig } from '@/lib/openai-config'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Use the same function as the single-tip generation endpoint
-async function callOpenAIStandardAPI(prompt: string): Promise<string> {
-  const config = getOpenAIConfig()
-  
-  if (!config || !config.apiKey) {
-    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
-  }
-
+// Use the same endpoint as single-tip generation to ensure identical behavior
+async function generateTipsForRecipe(recipe: any): Promise<string | null> {
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call the same API endpoint that single-tip generation uses
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                   (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+    
+    const response = await fetch(`${baseUrl}/api/ai/generate-tips`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `Du er en erfaren kok der skal give personlige tips til opskrifter. Skriv altid på dansk.
-
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.
-
-Formatér tips sådan:
-- Første tip her
-- Andet tip her  
-- Tredje tip her
-- Fjerde tip her
-
-Brug bindestreg (-) foran hvert tip.`
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.8,
-        max_tokens: 1000
+        title: recipe.title,
+        description: recipe.description || 'En lækker opskrift der er værd at prøve',
+        difficulty: recipe.difficulty || 'Mellem',
+        totalTime: (recipe.preparationTime || 0) + (recipe.cookingTime || 0),
+        dietaryCategories: Array.isArray(recipe.dietaryCategories) 
+          ? recipe.dietaryCategories 
+          : ['Generel']
       })
     })
 
     if (!response.ok) {
       const errorData = await response.json()
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      throw new Error(errorData.error || 'Failed to generate tips')
     }
 
     const data = await response.json()
-    const content = data.choices[0]?.message?.content
-    
-    if (!content) {
-      throw new Error('No content generated')
-    }
-
-    return content
-
-  } catch (error: any) {
-    console.error('OpenAI API error:', error)
-    throw error // Re-throw instead of fallback for bulk operations
-  }
-}
-
-async function generateTipsForRecipe(recipe: any): Promise<string | null> {
-  const prompt = `Generer personlige tips til denne opskrift:
-
-Opskrift: ${recipe.title}
-Beskrivelse: ${recipe.description || 'En lækker opskrift der er værd at prøve'}
-Sværhedsgrad: ${recipe.difficulty || 'Mellem'}
-Total tid: ${(recipe.preparationTime || 0) + (recipe.cookingTime || 0)} minutter
-Kategori: ${Array.isArray(recipe.dietaryCategories) ? recipe.dietaryCategories.join(', ') : 'Generel'}
-
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
-
-  try {
-    const tips = await callOpenAIStandardAPI(prompt)
-    return tips
+    return data.tips || null
   } catch (error) {
     console.error(`Error generating tips for ${recipe.title}:`, error)
     return null
