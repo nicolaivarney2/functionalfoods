@@ -42,17 +42,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!openaiConfig.assistantIds?.['5-2']) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: '5:2 Assistant ID not configured',
-          details: 'Please configure 5:2 Assistant ID in admin settings'
-        },
-        { status: 500 }
-      )
-    }
-
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     

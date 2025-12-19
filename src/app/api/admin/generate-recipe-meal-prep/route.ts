@@ -42,17 +42,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!openaiConfig.assistantIds?.['meal-prep']) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Meal Prep Assistant ID not configured',
-          details: 'Please configure Meal Prep Assistant ID in admin settings'
-        },
-        { status: 500 }
-      )
-    }
-
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
