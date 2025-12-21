@@ -44,10 +44,12 @@ export default function AdminPublishingPage() {
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
+  const [dietaryCategories, setDietaryCategories] = useState<string[]>([])
 
   useEffect(() => {
     loadRecipes()
     loadAllowedCategories()
+    loadDietaryCategories()
   }, [])
 
   const loadAllowedCategories = async () => {
@@ -65,6 +67,23 @@ export default function AdminPublishingPage() {
         'Fisk', 'Morgenmad', 'God til to dage', 'Vegetar', 'Tilbehør',
         'Bagværk', 'Madpakke opskrifter', 'Desserter', 'Fatbombs',
         'Food prep', 'Simre retter', 'Dip og dressinger'
+      ])
+    }
+  }
+
+  const loadDietaryCategories = async () => {
+    try {
+      const response = await fetch('/api/admin/dietary-categories')
+      if (response.ok) {
+        const data = await response.json()
+        setDietaryCategories(data.categories || [])
+      }
+    } catch (error) {
+      console.error('Error loading dietary categories:', error)
+      // Fallback to default dietary categories
+      setDietaryCategories([
+        'Keto', 'Sense', 'GLP-1 kost', 'Meal prep', 'Anti-inflammatorisk',
+        'Fleksitarisk', '5:2 diæt', 'Familiemad', 'Low carb'
       ])
     }
   }
@@ -234,24 +253,25 @@ export default function AdminPublishingPage() {
 
     try {
       // Separer kategorier i mainCategory, subCategories og dietaryCategories
-      // mainCategory skal være en af de tilladte kategorier
-      const dietaryCategoryKeywords = ['Keto', 'LCHF', 'Paleo', 'Vegetarian', 'Vegan', 'Gluten-Free', 'SENSE', 'GLP-1', 'glp-1', 'glp1']
+      // mainCategory skal være en af de tilladte kategorier (Aftensmad, Frokost, osv.)
+      // dietaryCategories skal være fra dietary categories listen (Keto, Meal Prep, osv.)
       
-      // Find mainCategory - skal være en af de tilladte kategorier
-      const mainCategory = categories.find(cat => allowedCategories.includes(cat)) || 
-                          selectedRecipe.mainCategory || 
-                          'Aftensmad'
-      
-      // subCategories er alle andre kategorier der ikke er dietary
-      const subCategories = categories.filter(cat => 
-        cat !== mainCategory && 
-        !dietaryCategoryKeywords.includes(cat) &&
-        allowedCategories.includes(cat) // Kun tilladte kategorier
+      // Først: Find dietary categories - disse skal ALDRIG være mainCategory
+      const selectedDietaryCategories = categories.filter(cat => 
+        dietaryCategories.includes(cat)
       )
       
-      // dietaryCategories er diæt-relaterede
-      const dietaryCategories = categories.filter(cat => 
-        dietaryCategoryKeywords.includes(cat)
+      // Find mainCategory - skal være en af de tilladte kategorier (IKKE dietary)
+      const mainCategory = categories.find(cat => 
+        allowedCategories.includes(cat) && 
+        !dietaryCategories.includes(cat) // Sikrer at dietary categories ikke bliver mainCategory
+      ) || selectedRecipe.mainCategory || 'Aftensmad'
+      
+      // subCategories er alle andre kategorier der ikke er dietary og ikke er mainCategory
+      const subCategories = categories.filter(cat => 
+        cat !== mainCategory && 
+        !dietaryCategories.includes(cat) && // Ikke dietary
+        allowedCategories.includes(cat) // Kun tilladte kategorier
       )
 
       // Gem til database via API
@@ -264,7 +284,7 @@ export default function AdminPublishingPage() {
           recipeId: selectedRecipe.id,
           mainCategory,
           subCategories,
-          dietaryCategories
+          dietaryCategories: selectedDietaryCategories
         }),
       })
 
@@ -275,12 +295,12 @@ export default function AdminPublishingPage() {
       // Opdater local state
       const updatedRecipes = recipes.map(recipe => 
         recipe.id === selectedRecipe.id 
-          ? { ...recipe, mainCategory, subCategories, dietaryCategories }
+          ? { ...recipe, mainCategory, subCategories, dietaryCategories: selectedDietaryCategories }
           : recipe
       )
       setRecipes(updatedRecipes)
       
-      const updatedRecipe = { ...selectedRecipe, mainCategory, subCategories, dietaryCategories }
+      const updatedRecipe = { ...selectedRecipe, mainCategory, subCategories, dietaryCategories: selectedDietaryCategories }
       setSelectedRecipe(updatedRecipe)
       setEditingCategories(false)
       
@@ -867,6 +887,9 @@ export default function AdminPublishingPage() {
                                 {allowedCategories.map((cat) => (
                                   <option key={cat} value={cat} />
                                 ))}
+                                {dietaryCategories.map((cat) => (
+                                  <option key={cat} value={cat} />
+                                ))}
                               </datalist>
                             </div>
                             <button
@@ -878,6 +901,8 @@ export default function AdminPublishingPage() {
                           </div>
                           <p className="text-xs text-gray-500 mb-3">
                             Tilladte kategorier: {allowedCategories.join(', ')}
+                            <br />
+                            Dietary kategorier: {dietaryCategories.join(', ')}
                           </p>
                           <div className="flex gap-3">
                             <button
@@ -889,7 +914,13 @@ export default function AdminPublishingPage() {
                             <button
                               onClick={() => {
                                 setEditingCategories(false)
-                                setCategories(selectedRecipe.dietaryCategories || [])
+                                // Reset til original state
+                                const allCategories = [
+                                  selectedRecipe.mainCategory,
+                                  ...(selectedRecipe.subCategories || []),
+                                  ...(selectedRecipe.dietaryCategories || [])
+                                ].filter(Boolean) as string[]
+                                setCategories(allCategories)
                                 setNewCategory('')
                               }}
                               className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
@@ -904,7 +935,6 @@ export default function AdminPublishingPage() {
                             categories.map((category, index) => {
                               // Bestem farve baseret på kategori type
                               const mealCategories = ['Morgenmad', 'Frokost', 'Aftensmad', 'Snack']
-                              const dietaryCategories = ['Keto', 'LCHF', 'Paleo', 'Vegetarian', 'Vegan', 'Gluten-Free', 'SENSE', 'GLP-1', 'glp-1', 'glp1']
                               
                               let bgColor = 'bg-blue-100 text-blue-800'
                               if (mealCategories.includes(category)) {

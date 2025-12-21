@@ -28,10 +28,17 @@ export default function AdminSettingsPage() {
   const [categoriesSaved, setCategoriesSaved] = useState(false)
   const [categoriesLoading, setCategoriesLoading] = useState(false)
 
+  // Dietary categories management
+  const [dietaryCategories, setDietaryCategories] = useState<string[]>([])
+  const [newDietaryCategory, setNewDietaryCategory] = useState('')
+  const [dietaryCategoriesSaved, setDietaryCategoriesSaved] = useState(false)
+  const [dietaryCategoriesLoading, setDietaryCategoriesLoading] = useState(false)
+
   useEffect(() => {
     // Load current settings from config file
     loadCurrentSettings()
     loadRecipeCategories()
+    loadDietaryCategories()
   }, [])
 
   const loadCurrentSettings = async () => {
@@ -125,6 +132,69 @@ export default function AdminSettingsPage() {
 
   const removeCategory = (categoryToRemove: string) => {
     setRecipeCategories(recipeCategories.filter(cat => cat !== categoryToRemove))
+  }
+
+  const loadDietaryCategories = async () => {
+    try {
+      const response = await fetch('/api/admin/dietary-categories')
+      if (response.ok) {
+        const data = await response.json()
+        setDietaryCategories(data.categories || [])
+      }
+    } catch (error) {
+      console.error('Error loading dietary categories:', error)
+      // Fallback to default categories
+      setDietaryCategories([
+        'Keto',
+        'Sense',
+        'GLP-1 kost',
+        'Meal prep',
+        'Anti-inflammatorisk',
+        'Fleksitarisk',
+        '5:2 diæt',
+        'Familiemad',
+        'Low carb'
+      ])
+    }
+  }
+
+  const saveDietaryCategories = async () => {
+    try {
+      setDietaryCategoriesLoading(true)
+      const response = await fetch('/api/admin/dietary-categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          categories: dietaryCategories,
+        })
+      })
+
+      if (response.ok) {
+        setDietaryCategoriesSaved(true)
+        setTimeout(() => setDietaryCategoriesSaved(false), 2000)
+      } else {
+        const error = await response.json()
+        alert(`Fejl ved gemning: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Error saving dietary categories:', error)
+      alert('Fejl ved gemning af dietary kategorier')
+    } finally {
+      setDietaryCategoriesLoading(false)
+    }
+  }
+
+  const addDietaryCategory = () => {
+    if (newDietaryCategory.trim() && !dietaryCategories.includes(newDietaryCategory.trim())) {
+      setDietaryCategories([...dietaryCategories, newDietaryCategory.trim()])
+      setNewDietaryCategory('')
+    }
+  }
+
+  const removeDietaryCategory = (categoryToRemove: string) => {
+    setDietaryCategories(dietaryCategories.filter(cat => cat !== categoryToRemove))
   }
 
   const saveSettings = async () => {
@@ -331,6 +401,80 @@ export default function AdminSettingsPage() {
             <>
               <Save className="w-4 h-4" />
               Gem Kategorier
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Dietary Categories Management */}
+      <div className="mt-8 bg-white rounded-lg shadow p-6 space-y-6">
+        <h2 className="text-xl font-semibold text-gray-900">Dietary Kategorier (Tags)</h2>
+        <p className="text-sm text-gray-600">
+          Administrer de tilladte dietary kategorier/tags for opskrifter (Keto, Sense, GLP-1 kost, osv.). Disse tags bruges til at markere opskrifter med specifikke diættyper eller kostformer.
+        </p>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Tilføj ny dietary kategori
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newDietaryCategory}
+              onChange={(e) => setNewDietaryCategory(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && addDietaryCategory()}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="F.eks. 'Paleo'"
+            />
+            <button
+              onClick={addDietaryCategory}
+              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Tilføj
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-3">
+            Nuværende dietary kategorier ({dietaryCategories.length})
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {dietaryCategories.map((category, index) => (
+              <span
+                key={index}
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-800 rounded-full text-sm font-medium"
+              >
+                {category}
+                <button
+                  onClick={() => removeDietaryCategory(category)}
+                  className="text-purple-600 hover:text-purple-800"
+                  title="Fjern kategori"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </span>
+            ))}
+          </div>
+          {dietaryCategories.length === 0 && (
+            <p className="text-sm text-gray-500 italic">Ingen dietary kategorier endnu. Tilføj en kategori ovenfor.</p>
+          )}
+        </div>
+
+        <button
+          onClick={saveDietaryCategories}
+          disabled={dietaryCategoriesLoading}
+          className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {dietaryCategoriesLoading ? (
+            <>💾 Gemmer...</>
+          ) : dietaryCategoriesSaved ? (
+            <>✅ Dietary kategorier gemt!</>
+          ) : (
+            <>
+              <Save className="w-4 h-4" />
+              Gem Dietary Kategorier
             </>
           )}
         </button>
