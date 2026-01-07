@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search } from 'lucide-react'
+import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search, CheckCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
+import { motion, AnimatePresence } from 'framer-motion'
+import { dietaryFactory, DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system'
+import { mealPlanGenerator } from '@/lib/meal-plan-system'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -175,6 +178,19 @@ const mockRecipes = [
   }
 ]
 
+interface AdultProfile {
+  id: string
+  gender?: 'male' | 'female'
+  age?: number
+  height?: number // cm
+  weight?: number // kg
+  activityLevel?: ActivityLevel
+  dietaryApproach?: string // 'keto', 'sense', 'glp-1', etc.
+  mealsPerDay: string[] // ['dinner', 'breakfast', 'lunch']
+  weightGoal?: WeightGoal // 'weight-loss', 'maintenance', 'muscle-gain'
+  isComplete: boolean
+}
+
 export default function MadbudgetPage() {
   const [familyProfile, setFamilyProfile] = useState({
     adults: 2,
@@ -182,8 +198,9 @@ export default function MadbudgetPage() {
     childrenAges: ['4-8', '4-8'],
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
-    dislikedIngredients: ['oliven', 'fetaost'],
-    selectedStores: [1, 2, 8] // REMA 1000, Netto, Løvbjerg
+    excludedIngredients: [] as string[], // Changed from dislikedIngredients
+    selectedStores: [1, 2, 8], // REMA 1000, Netto, Løvbjerg
+    adultsProfiles: [] as AdultProfile[] // New: profiles for each adult
   })
   
   type MealType = 'breakfast' | 'lunch' | 'dinner'
@@ -199,6 +216,10 @@ export default function MadbudgetPage() {
     sunday: { breakfast: null, lunch: null, dinner: null }
   })
   
+  const [savedMealPlans, setSavedMealPlans] = useState<any[]>([])
+  const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null)
+  const [currentWeekNumber, setCurrentWeekNumber] = useState<number>(0)
+  
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
   const [showFamilySettings, setShowFamilySettings] = useState(false)
@@ -210,6 +231,33 @@ export default function MadbudgetPage() {
   const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
   const [showCostSavings, setShowCostSavings] = useState(true)
   
+  // Vægttabsprofil state
+  const [showWeightLossProfileModal, setShowWeightLossProfileModal] = useState(false)
+  const [editingAdultIndex, setEditingAdultIndex] = useState<number | null>(null)
+  const [weightLossProfileStep, setWeightLossProfileStep] = useState(0)
+  const [currentWeightLossProfile, setCurrentWeightLossProfile] = useState<Partial<AdultProfile>>({
+    mealsPerDay: ['dinner'],
+    isComplete: false
+  })
+  
+  // Loading state for meal plan generation
+  const [isGeneratingMealPlan, setIsGeneratingMealPlan] = useState(false)
+  const [generationProgress, setGenerationProgress] = useState('')
+  const [generationSteps] = useState([
+    'Matcher opskrifter med data og mål...',
+    'Balancerer makro og mikro næring...',
+    'Finder de bedste tilbud ud fra butikker...',
+    'Tjekker familiefaktorer...',
+    'Fjerner beslutningstræthed...',
+    'Optimerer og validerer madplan...'
+  ])
+  
+  // Variation parameter (0-3 scale)
+  const [variationLevel, setVariationLevel] = useState(2) // Default: medium variation
+  
+  // Shopping list state
+  const [shoppingList, setShoppingList] = useState<any>(null)
+  
   // Basisvarer state
   const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
@@ -220,10 +268,161 @@ export default function MadbudgetPage() {
   const [loadingBasisvarer, setLoadingBasisvarer] = useState(false)
   const [loadingProductSearch, setLoadingProductSearch] = useState(false)
 
+  // Load family profile from database on mount
+  useEffect(() => {
+    const loadFamilyProfile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        const headers: HeadersInit = { 'Content-Type': 'application/json' }
+        if (session) {
+          headers['Authorization'] = `Bearer ${session.access_token}`
+        }
+        const response = await fetch('/api/madbudget/family-profile', { headers })
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.data) {
+            if (result.data.familyProfile) {
+              setFamilyProfile(prev => ({
+                ...prev,
+                adults: result.data.familyProfile.adults || prev.adults,
+                children: result.data.familyProfile.children || prev.children,
+                childrenAges: result.data.familyProfile.children_ages || prev.childrenAges,
+                prioritizeOrganic: result.data.familyProfile.prioritize_organic ?? prev.prioritizeOrganic,
+                prioritizeAnimalOrganic: result.data.familyProfile.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
+                excludedIngredients: result.data.familyProfile.excluded_ingredients || prev.excludedIngredients,
+                selectedStores: result.data.familyProfile.selected_stores || prev.selectedStores
+              }))
+              setVariationLevel(result.data.familyProfile.variation_level || 2)
+            }
+            if (result.data.adultProfiles && result.data.adultProfiles.length > 0) {
+              setFamilyProfile(prev => ({
+                ...prev,
+                adultsProfiles: result.data.adultProfiles.map((p: any) => ({
+                  id: p.id,
+                  gender: p.gender,
+                  age: p.age,
+                  height: p.height,
+                  weight: p.weight,
+                  activityLevel: p.activity_level,
+                  dietaryApproach: p.dietary_approach,
+                  mealsPerDay: p.meals_per_day || ['dinner'],
+                  weightGoal: p.weight_goal,
+                  isComplete: p.is_complete
+                }))
+              }))
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading family profile:', error)
+      }
+    }
+    loadFamilyProfile()
+  }, [])
+
+  // Save family profile to database when it changes (debounced)
+  useEffect(() => {
+    const saveFamilyProfile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        // Debounce saves
+        const timeoutId = setTimeout(async () => {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            await fetch('/api/madbudget/family-profile', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({
+                familyProfile: {
+                  adults: familyProfile.adults,
+                  children: familyProfile.children,
+                  childrenAges: familyProfile.childrenAges,
+                  prioritizeOrganic: familyProfile.prioritizeOrganic,
+                  prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+                  excludedIngredients: familyProfile.excludedIngredients,
+                  selectedStores: familyProfile.selectedStores,
+                  variationLevel
+                },
+                adultProfiles: familyProfile.adultsProfiles
+              })
+            })
+          }
+        }, 1000) // Wait 1 second after last change
+
+        return () => clearTimeout(timeoutId)
+      } catch (error) {
+        console.error('Error saving family profile:', error)
+      }
+    }
+    saveFamilyProfile()
+  }, [familyProfile, variationLevel])
+
   // Load basisvarer on component mount
   useEffect(() => {
     loadBasisvarer()
   }, [])
+  
+  // Load saved meal plans and calculate current week number
+  useEffect(() => {
+    const loadMealPlans = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+
+        const headers: HeadersInit = { 'Content-Type': 'application/json' }
+        headers['Authorization'] = `Bearer ${session.access_token}`
+        
+        const response = await fetch('/api/madbudget/meal-plan', { headers })
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.data) {
+            const plans = Array.isArray(result.data) ? result.data : [result.data]
+            setSavedMealPlans(plans)
+            
+            // Calculate current week number
+            const now = new Date()
+            const getWeekNumber = (date: Date): number => {
+              const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+              const dayNum = d.getUTCDay() || 7
+              d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+              const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+              return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+            }
+            setCurrentWeekNumber(getWeekNumber(now))
+            
+            // Load active meal plan if exists
+            const activePlan = plans.find((p: any) => p.is_active)
+            if (activePlan && activePlan.meal_plan_data) {
+              setMealPlan(activePlan.meal_plan_data)
+              setShoppingList(activePlan.shopping_list || [])
+              setSelectedWeekNumber(activePlan.week_number || null)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading meal plans:', error)
+      }
+    }
+    
+    loadMealPlans()
+  }, [])
+  
+  // Function to load a specific week's meal plan
+  const loadWeekMealPlan = async (weekNumber: number) => {
+    const plan = savedMealPlans.find((p: any) => p.week_number === weekNumber)
+    if (plan && plan.meal_plan_data) {
+      setMealPlan(plan.meal_plan_data)
+      setShoppingList(plan.shopping_list || [])
+      setSelectedWeekNumber(weekNumber)
+    }
+  }
 
   // No need to load categories or products for ingredient-based basisvarer
 
@@ -474,9 +673,297 @@ export default function MadbudgetPage() {
     setShowRecipeDetail(true)
   }
 
-  const generateMealPlan = () => {
-    // AI-generated meal plan logic will go here
-    console.log('Generating AI meal plan...')
+  // Initialize adultsProfiles when adults count changes
+  useEffect(() => {
+    if (familyProfile.adultsProfiles.length < familyProfile.adults) {
+      // Add missing profiles
+      const newProfiles = Array.from({ length: familyProfile.adults - familyProfile.adultsProfiles.length }, (_, i) => ({
+        id: `adult-${Date.now()}-${i}`,
+        mealsPerDay: ['dinner'],
+        isComplete: false
+      }))
+      setFamilyProfile(prev => ({
+        ...prev,
+        adultsProfiles: [...prev.adultsProfiles, ...newProfiles]
+      }))
+    } else if (familyProfile.adultsProfiles.length > familyProfile.adults) {
+      // Remove excess profiles
+      setFamilyProfile(prev => ({
+        ...prev,
+        adultsProfiles: prev.adultsProfiles.slice(0, prev.adults)
+      }))
+    }
+  }, [familyProfile.adults])
+
+  // Open weight loss profile modal
+  const openWeightLossProfile = (adultIndex: number) => {
+    setEditingAdultIndex(adultIndex)
+    const existingProfile = familyProfile.adultsProfiles[adultIndex]
+    if (existingProfile) {
+      setCurrentWeightLossProfile(existingProfile)
+    } else {
+      setCurrentWeightLossProfile({
+        id: `adult-${Date.now()}-${adultIndex}`,
+        mealsPerDay: ['dinner'],
+        isComplete: false
+      })
+    }
+    setWeightLossProfileStep(0)
+    setShowWeightLossProfileModal(true)
+  }
+
+  // Save weight loss profile
+  const saveWeightLossProfile = async () => {
+    if (editingAdultIndex === null) return
+    
+    const updatedProfiles = [...familyProfile.adultsProfiles]
+    updatedProfiles[editingAdultIndex] = {
+      ...currentWeightLossProfile,
+      isComplete: true
+    } as AdultProfile
+    
+    setFamilyProfile(prev => ({
+      ...prev,
+      adultsProfiles: updatedProfiles
+    }))
+    
+    // Save to database immediately
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        await fetch('/api/madbudget/family-profile', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            familyProfile: {
+              adults: familyProfile.adults,
+              children: familyProfile.children,
+              childrenAges: familyProfile.childrenAges,
+              prioritizeOrganic: familyProfile.prioritizeOrganic,
+              prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+              excludedIngredients: familyProfile.excludedIngredients,
+              selectedStores: familyProfile.selectedStores,
+              variationLevel
+            },
+            adultProfiles: updatedProfiles
+          })
+        })
+      }
+    } catch (error) {
+      console.error('Error saving weight loss profile to database:', error)
+    }
+    
+    setShowWeightLossProfileModal(false)
+    setEditingAdultIndex(null)
+    setWeightLossProfileStep(0)
+  }
+
+  // Check if all adults have complete profiles
+  const allAdultsHaveProfiles = () => {
+    return familyProfile.adultsProfiles.length === familyProfile.adults &&
+           familyProfile.adultsProfiles.every(p => p.isComplete)
+  }
+
+  // Validate dietary approaches - voksne skal have samme kostretning eller en på familiemad
+  const validateDietaryApproaches = () => {
+    if (familyProfile.adults === 0) return true
+    
+    const approaches = familyProfile.adultsProfiles
+      .filter(p => p.isComplete && p.dietaryApproach)
+      .map(p => p.dietaryApproach)
+    
+    if (approaches.length === 0) return false
+    
+    const uniqueApproaches = [...new Set(approaches)]
+    
+    // Hvis alle voksne har samme kostretning, er det altid ok (uanset om der er børn eller ej)
+    if (uniqueApproaches.length === 1) {
+      return true
+    }
+    
+    // Hvis der er forskellige kostretninger:
+    // - Hvis der er børn, skal mindst én være på familiemad
+    if (familyProfile.children > 0) {
+      const hasFamiliemad = uniqueApproaches.includes('familiemad')
+      if (!hasFamiliemad) {
+        return false // Mindst én voksen skal være på familiemad hvis der er børn og forskellige kostretninger
+      }
+    }
+    
+    // Hvis der ikke er børn, kan man have forskellige kostretninger (men ikke anbefalet)
+    // Vi tillader det, men det er ikke optimalt
+    return true
+  }
+
+  const generateMealPlan = async () => {
+    // Validate before generating
+    if (!allAdultsHaveProfiles()) {
+      alert('Alle voksne skal have udfyldt deres vægttabsprofil først')
+      return
+    }
+    
+    if (!validateDietaryApproaches()) {
+      alert('Voksne skal have samme kostretning, eller mindst én skal være på familiemad hvis der er børn')
+      return
+    }
+    
+    setIsGeneratingMealPlan(true)
+    setGenerationProgress(generationSteps[0])
+    
+    try {
+      // Step 1: Match recipes
+      setGenerationProgress(generationSteps[0])
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Step 2: Balance nutrition
+      setGenerationProgress(generationSteps[1])
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Step 3: Find deals (placeholder - will be implemented later)
+      setGenerationProgress(generationSteps[2])
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Step 4: Check family factors
+      setGenerationProgress(generationSteps[3])
+      
+      // Actually generate the meal plan
+      const weekPlan = await mealPlanGenerator.generateOneWeekMealPlan(
+        {
+          adults: familyProfile.adults,
+          children: familyProfile.children,
+          childrenAges: familyProfile.childrenAges || [],
+          adultsProfiles: familyProfile.adultsProfiles.map(p => ({
+            dietaryApproach: p.dietaryApproach,
+            mealsPerDay: p.mealsPerDay || ['dinner'],
+            weightGoal: p.weightGoal
+          })),
+          excludedIngredients: familyProfile.excludedIngredients,
+          selectedStores: familyProfile.selectedStores,
+          prioritizeOrganic: familyProfile.prioritizeOrganic
+        },
+        variationLevel
+      )
+      
+      // Step 5: Remove decision fatigue
+      setGenerationProgress(generationSteps[4])
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Step 6: Optimize and validate
+      setGenerationProgress(generationSteps[5])
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
+      // Convert weekPlan to UI format
+      const newMealPlan: Record<DayKey, Record<MealType, any | null>> = {
+        monday: { breakfast: null, lunch: null, dinner: null },
+        tuesday: { breakfast: null, lunch: null, dinner: null },
+        wednesday: { breakfast: null, lunch: null, dinner: null },
+        thursday: { breakfast: null, lunch: null, dinner: null },
+        friday: { breakfast: null, lunch: null, dinner: null },
+        saturday: { breakfast: null, lunch: null, dinner: null },
+        sunday: { breakfast: null, lunch: null, dinner: null }
+      }
+      
+      const dayNames: DayKey[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+      
+      weekPlan.days.forEach((dayPlan, dayIndex) => {
+        const dayKey = dayNames[dayIndex]
+        dayPlan.meals.forEach(meal => {
+          const mealType = meal.mealType as MealType
+          if (mealType && dayKey) {
+            newMealPlan[dayKey][mealType] = {
+              id: meal.recipe.id,
+              title: meal.recipe.title,
+              image: meal.recipe.imageUrl,
+              ingredients: meal.recipe.ingredients.map((ing: any) => ({
+                name: ing.name || ing.ingredientName,
+                amount: ing.amount,
+                unit: ing.unit
+              })),
+              servings: meal.servings,
+              prepTime: meal.recipe.prepTime || '30 min',
+              category: meal.recipe.category || 'Dinner',
+              dietaryTags: meal.recipe.dietaryCategories || []
+            }
+          }
+        })
+      })
+      
+      setMealPlan(newMealPlan)
+      
+      // Generate shopping list
+      setShoppingList(weekPlan.shoppingList)
+      
+      // Save meal plan to database
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          console.error('No session found, cannot save meal plan')
+        } else {
+          const weekStart = new Date()
+          weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1) // Monday
+          weekStart.setHours(0, 0, 0, 0)
+          const weekEnd = new Date(weekStart)
+          weekEnd.setDate(weekEnd.getDate() + 6) // Sunday
+          weekEnd.setHours(23, 59, 59, 999)
+          
+          // Calculate week number (ISO week)
+          const getWeekNumber = (date: Date): number => {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+            const dayNum = d.getUTCDay() || 7
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+            return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+          }
+          const weekNumber = getWeekNumber(weekStart)
+
+          const response = await fetch('/api/madbudget/meal-plan', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({
+              name: `Madplan Uge ${weekNumber} (${weekStart.toISOString().split('T')[0]})`,
+              weekStartDate: weekStart.toISOString().split('T')[0],
+              weekEndDate: weekEnd.toISOString().split('T')[0],
+              weekNumber,
+              variationLevel,
+              familyProfileSnapshot: {
+                adults: familyProfile.adults,
+                children: familyProfile.children,
+                childrenAges: familyProfile.childrenAges,
+                adultsProfiles: familyProfile.adultsProfiles
+              },
+              mealPlanData: newMealPlan, // Save the UI format
+              shoppingList: weekPlan.shoppingList,
+              totalCost: null, // Will be calculated later with prices
+              totalSavings: null, // Will be calculated later
+              estimatedCaloriesPerDay: null // Will be calculated later
+            })
+          })
+          
+          if (response.ok) {
+            console.log('Meal plan saved successfully')
+          } else {
+            console.error('Failed to save meal plan:', await response.text())
+          }
+        }
+      } catch (error) {
+        console.error('Error saving meal plan:', error)
+        // Don't fail the whole operation if save fails
+      }
+      
+      setIsGeneratingMealPlan(false)
+      setGenerationProgress('')
+    } catch (error) {
+      console.error('Error generating meal plan:', error)
+      setIsGeneratingMealPlan(false)
+      setGenerationProgress('')
+      alert('Der opstod en fejl ved generering af madplan. Prøv igen.')
+    }
   }
 
   const calculateSavings = () => {
@@ -747,17 +1234,79 @@ export default function MadbudgetPage() {
           {/* Center Column - Meal Planner */}
           <div className="lg:col-span-2">
             <div className="bg-white p-6 rounded-lg shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
-                  <Calendar size={20} className="mr-2" />
-                  Ugeplanlægger
-                </h2>
-                <button
-                  onClick={generateMealPlan}
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
-                >
-                  Generer AI madplan
-                </button>
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                    <Calendar size={20} className="mr-2" />
+                    Ugeplanlægger
+                  </h2>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  {/* Week selector */}
+                  {savedMealPlans.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">Uge:</label>
+                      <select
+                        value={selectedWeekNumber || currentWeekNumber}
+                        onChange={(e) => {
+                          const weekNum = parseInt(e.target.value)
+                          loadWeekMealPlan(weekNum)
+                        }}
+                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {savedMealPlans
+                          .map((p: any) => {
+                            const weekNum = p.week_number || (() => {
+                              const date = new Date(p.week_start_date)
+                              const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                              const dayNum = d.getUTCDay() || 7
+                              d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+                              const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+                              return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+                            })()
+                            return { weekNum, plan: p }
+                          })
+                          .sort((a, b) => b.weekNum - a.weekNum)
+                          .map(({ weekNum, plan }) => (
+                            <option key={plan.id} value={weekNum}>
+                              Uge {weekNum} {weekNum === currentWeekNumber ? '(Nuværende)' : ''}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                  )}
+                  
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Variation: {variationLevel === 0 ? 'Meget ensartet' : variationLevel === 1 ? 'Lidt variation' : variationLevel === 2 ? 'Moderat variation' : 'Meget variation'}
+                    </label>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-xs text-gray-500">Ensartet</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="3"
+                        step="1"
+                        value={variationLevel}
+                        onChange={(e) => setVariationLevel(parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-500">Varieret</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {variationLevel === 0 && 'Samme retter flere dage i træk'}
+                      {variationLevel === 1 && 'Lidt gentagelse, primært nye retter'}
+                      {variationLevel === 2 && 'God balance mellem nyt og kendt'}
+                      {variationLevel === 3 && 'Maksimal variation, undgår gentagelse'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={generateMealPlan}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+                  >
+                    Generer AI madplan
+                  </button>
+                </div>
               </div>
 
               {/* Desktop: 7 Days Grid */}
@@ -784,7 +1333,7 @@ export default function MadbudgetPage() {
                                   const mealKey = mealType.key as MealType
                                   openRecipeSelector(dayKey, mealKey)
                                 }}
-                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
+                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
                                 {currentMeal ? (
                                   <div className="text-center">
@@ -794,9 +1343,11 @@ export default function MadbudgetPage() {
                                     <div className="text-xs text-gray-500 mb-1">
                                       {currentMeal.store}
                                     </div>
-                                    <div className="text-xs text-green-600 font-medium">
-                                      Sparer {currentMeal.savings.toFixed(0)} kr
-                                    </div>
+                                    {currentMeal.savings !== undefined && currentMeal.savings > 0 && (
+                                      <div className="text-xs text-green-600 font-medium">
+                                        Sparer {currentMeal.savings.toFixed(0)} kr
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="text-center">
@@ -865,7 +1416,7 @@ export default function MadbudgetPage() {
                                   const mealKey = mealType.key as MealType
                                   openRecipeSelector(dayKey, mealKey)
                                 }}
-                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store} (Sparer ${currentMeal.savings.toFixed(0)} kr)` : `Vælg ${mealType.label.toLowerCase()}`}
+                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
                                 {currentMeal ? (
                                   <div className="text-center">
@@ -875,9 +1426,11 @@ export default function MadbudgetPage() {
                                     <div className="text-xs text-gray-500 mb-1">
                                       {currentMeal.store}
                                     </div>
-                                    <div className="text-xs text-green-600 font-medium">
-                                      Sparer {currentMeal.savings.toFixed(0)} kr
-                                    </div>
+                                    {currentMeal.savings !== undefined && currentMeal.savings > 0 && (
+                                      <div className="text-xs text-green-600 font-medium">
+                                        Sparer {currentMeal.savings.toFixed(0)} kr
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="text-center">
@@ -915,10 +1468,62 @@ export default function MadbudgetPage() {
                 <ShoppingCart size={20} className="mr-2" />
                 Indkøbsliste
               </h2>
-              <div className="text-center py-8 text-gray-500">
-                <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
-                <p>Din indkøbsliste vil blive genereret når du har planlagt din madplan</p>
-              </div>
+              
+              {!shoppingList ? (
+                <div className="text-center py-8 text-gray-500">
+                  <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                  <p>Din indkøbsliste vil blive genereret når du har planlagt din madplan</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Shopping list categories */}
+                  {shoppingList.categories?.map((category: any, catIndex: number) => (
+                    <div key={catIndex} className="border-b border-gray-200 pb-4 last:border-b-0">
+                      <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
+                      <ul className="space-y-2">
+                        {category.items?.map((item: any, itemIndex: number) => (
+                          <li key={itemIndex} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center space-x-2 flex-1">
+                              {item.isOptional && (
+                                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Kombi</span>
+                              )}
+                              <span className="text-gray-700">
+                                {item.name}
+                                {item.notes && (
+                                  <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
+                                )}
+                              </span>
+                            </div>
+                            <span className="text-gray-900 font-medium">
+                              {item.amount} {item.unit}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                  
+                  {/* Basisvarer section */}
+                  {basisvarer.length > 0 && (
+                    <div className="border-t border-gray-200 pt-4 mt-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">Basisvarer</h4>
+                      <ul className="space-y-2">
+                        {basisvarer.map((item) => (
+                          <li key={item.id} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-700">{item.ingredient_name}</span>
+                            <span className="text-gray-900 font-medium">
+                              {item.quantity} {item.unit}
+                              {item.notes && (
+                                <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1007,8 +1612,10 @@ export default function MadbudgetPage() {
                         {recipe.title}
                       </h4>
                       <div className="text-right">
-                        <div className="font-bold text-gray-900 text-lg">{recipe.totalPrice.toFixed(2)} kr</div>
-                        <div className="text-sm text-green-600">Sparer {recipe.savings.toFixed(2)} kr</div>
+                        <div className="font-bold text-gray-900 text-lg">{recipe.totalPrice?.toFixed(2) || '0.00'} kr</div>
+                        {recipe.savings !== undefined && recipe.savings > 0 && (
+                          <div className="text-sm text-green-600">Sparer {recipe.savings.toFixed(2)} kr</div>
+                        )}
                       </div>
                     </div>
 
@@ -1112,10 +1719,12 @@ export default function MadbudgetPage() {
                 <div className="text-2xl font-bold text-gray-900">{selectedRecipe.totalPrice.toFixed(2)} kr</div>
                 <div className="text-sm text-gray-600">Total pris</div>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{selectedRecipe.savings.toFixed(2)} kr</div>
-                <div className="text-sm text-gray-600">Besparer</div>
-              </div>
+              {selectedRecipe.savings !== undefined && selectedRecipe.savings > 0 && (
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{selectedRecipe.savings.toFixed(2)} kr</div>
+                  <div className="text-sm text-gray-600">Besparer</div>
+                </div>
+              )}
             </div>
 
             {/* Ingredients */}
@@ -1312,8 +1921,120 @@ export default function MadbudgetPage() {
                 </p>
               </div>
               
+              {/* Vægttabsprofiler for voksne */}
+              {familyProfile.adults > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Vægttabsprofiler for voksne
+                  </label>
+                  <div className="space-y-2">
+                    {Array.from({ length: familyProfile.adults }, (_, index) => {
+                      const profile = familyProfile.adultsProfiles[index]
+                      const isComplete = profile?.isComplete || false
+                      return (
+                        <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-sm font-medium text-gray-700">Voksen {index + 1}</span>
+                            {isComplete && (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            )}
+                          </div>
+                          <button
+                            onClick={() => openWeightLossProfile(index)}
+                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            {isComplete ? 'Rediger profil' : 'Udfyld profil'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {/* Ekskluderede ingredienser */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Madvarer vi ikke kan lide (ekskluder fra madplan)
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  {[
+                    { id: 'red-meat', label: 'Rødt kød' },
+                    { id: 'poultry', label: 'Fjerkræ' },
+                    { id: 'pork', label: 'Svinekød' },
+                    { id: 'fish', label: 'Fisk' },
+                    { id: 'eggs', label: 'Æg' },
+                    { id: 'shellfish', label: 'Skaldyr' },
+                    { id: 'nuts', label: 'Nødder' },
+                    { id: 'dairy', label: 'Mælkeprodukter' },
+                    { id: 'gluten', label: 'Gluten' },
+                    { id: 'soy', label: 'Soja' }
+                  ].map((food) => (
+                    <label key={food.id} className="flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={familyProfile.excludedIngredients.includes(food.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setFamilyProfile(prev => ({
+                              ...prev,
+                              excludedIngredients: [...prev.excludedIngredients, food.id]
+                            }))
+                          } else {
+                            setFamilyProfile(prev => ({
+                              ...prev,
+                              excludedIngredients: prev.excludedIngredients.filter(id => id !== food.id)
+                            }))
+                          }
+                        }}
+                        className="mr-2"
+                      />
+                      <span className="text-sm text-gray-700">{food.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
               <button
-                onClick={() => setShowFamilySettings(false)}
+                onClick={async () => {
+                  // Save to database before closing
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession()
+                    if (session) {
+                      const response = await fetch('/api/madbudget/family-profile', {
+                        method: 'POST',
+                        headers: { 
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({
+                          familyProfile: {
+                            adults: familyProfile.adults,
+                            children: familyProfile.children,
+                            childrenAges: familyProfile.childrenAges,
+                            prioritizeOrganic: familyProfile.prioritizeOrganic,
+                            prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+                            excludedIngredients: familyProfile.excludedIngredients,
+                            selectedStores: familyProfile.selectedStores,
+                            variationLevel
+                          },
+                          adultProfiles: familyProfile.adultsProfiles
+                        })
+                      })
+                      
+                      if (response.ok) {
+                        setShowFamilySettings(false)
+                      } else {
+                        alert('Der opstod en fejl ved gemning. Prøv igen.')
+                      }
+                    } else {
+                      setShowFamilySettings(false)
+                    }
+                  } catch (error) {
+                    console.error('Error saving family settings:', error)
+                    alert('Der opstod en fejl ved gemning. Prøv igen.')
+                  }
+                }}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
               >
                 Gem indstillinger
@@ -1474,6 +2195,489 @@ export default function MadbudgetPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Vægttabsprofil Modal */}
+      {showWeightLossProfileModal && (
+        <motion.div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowWeightLossProfileModal(false)}
+        >
+          <motion.div
+            className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-2xl sm:w-full max-h-[90vh] overflow-hidden flex flex-col"
+            initial={{ y: '100%', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-gray-900">
+                  Vægttabsprofil - Voksen {editingAdultIndex !== null ? editingAdultIndex + 1 : ''}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowWeightLossProfileModal(false)
+                    setWeightLossProfileStep(0)
+                    setCurrentWeightLossProfile({
+                      mealsPerDay: ['dinner'],
+                      isComplete: false
+                    })
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="mt-4">
+                <div className="flex items-center justify-center space-x-4 mb-2">
+                  <span className="text-sm text-gray-500">
+                    Trin {weightLossProfileStep + 1} af 5
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${((weightLossProfileStep + 1) / 5) * 100}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <AnimatePresence mode="wait">
+                {/* Step 1: Grundlæggende info */}
+                {weightLossProfileStep === 0 && (
+                  <motion.div
+                    key="step1"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Grundlæggende information</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Køn</label>
+                        <select
+                          value={currentWeightLossProfile.gender || ''}
+                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                            ...prev,
+                            gender: e.target.value as 'male' | 'female'
+                          }))}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
+                        >
+                          <option value="">Vælg køn</option>
+                          <option value="male">Mand</option>
+                          <option value="female">Kvinde</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Alder</label>
+                        <input
+                          type="number"
+                          value={currentWeightLossProfile.age || ''}
+                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                            ...prev,
+                            age: parseInt(e.target.value)
+                          }))}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
+                          placeholder="År"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Højde (cm)</label>
+                        <input
+                          type="number"
+                          value={currentWeightLossProfile.height || ''}
+                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                            ...prev,
+                            height: parseInt(e.target.value)
+                          }))}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
+                          placeholder="cm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Vægt (kg)</label>
+                        <input
+                          type="number"
+                          value={currentWeightLossProfile.weight || ''}
+                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                            ...prev,
+                            weight: parseFloat(e.target.value)
+                          }))}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
+                          placeholder="kg"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Aktivitetsniveau</label>
+                      <select
+                        value={currentWeightLossProfile.activityLevel || ''}
+                        onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                          ...prev,
+                          activityLevel: parseFloat(e.target.value) as ActivityLevel
+                        }))}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
+                      >
+                        <option value="">Vælg aktivitetsniveau</option>
+                        <option value={ActivityLevel.Sedentary}>Stillesiddende - Lidt eller ingen motion</option>
+                        <option value={ActivityLevel.LightlyActive}>Lidt aktiv - Let motion 1-3 dage/uge</option>
+                        <option value={ActivityLevel.ModeratelyActive}>Moderat aktiv - Moderat motion 3-5 dage/uge</option>
+                        <option value={ActivityLevel.VeryActive}>Meget aktiv - Hård motion 6-7 dage/uge</option>
+                        <option value={ActivityLevel.ExtremelyActive}>Ekstremt aktiv - Meget hård motion, fysisk arbejde</option>
+                      </select>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Step 2: Energiberegning */}
+                {weightLossProfileStep === 1 && (
+                  <motion.div
+                    key="step2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    {(() => {
+                      // Calculate energy needs if we have all required data
+                      const hasAllData = currentWeightLossProfile.gender && 
+                                        currentWeightLossProfile.age && 
+                                        currentWeightLossProfile.height && 
+                                        currentWeightLossProfile.weight && 
+                                        currentWeightLossProfile.activityLevel
+                      
+                      let energyNeeds = null
+                      if (hasAllData) {
+                        const profile: UserProfile = {
+                          gender: currentWeightLossProfile.gender!,
+                          age: currentWeightLossProfile.age!,
+                          height: currentWeightLossProfile.height!,
+                          weight: currentWeightLossProfile.weight!,
+                          activityLevel: currentWeightLossProfile.activityLevel!,
+                          goal: currentWeightLossProfile.weightGoal || WeightGoal.WeightLoss
+                        }
+                        energyNeeds = DietaryCalculator.calculateTargetCalories(profile)
+                      }
+                      
+                      return (
+                        <>
+                          <div className="text-center mb-6">
+                            <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                              Dine personlige energibehov
+                            </h4>
+                            <p className="text-sm text-gray-600">
+                              Baseret på din profil, her er dine daglige kalorietargets:
+                            </p>
+                          </div>
+
+                          {energyNeeds ? (
+                            <>
+                              <motion.div 
+                                className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.2 }}
+                              >
+                                <div className="text-center p-4 bg-[#1B365D]/10 rounded-xl border border-[#1B365D]/20">
+                                  <div className="text-2xl font-bold text-[#1B365D] mb-1">
+                                    {Math.round(energyNeeds.bmr)}
+                                  </div>
+                                  <p className="text-xs text-gray-600">Basal stofskifte</p>
+                                </div>
+
+                                <div className="text-center p-4 bg-[#87A96B]/10 rounded-xl border border-[#87A96B]/20">
+                                  <div className="text-2xl font-bold text-[#87A96B] mb-1">
+                                    {Math.round(energyNeeds.tdee)}
+                                  </div>
+                                  <p className="text-xs text-gray-600">Dagligt energiforbrug</p>
+                                </div>
+
+                                <div className="text-center p-4 bg-[#D4AF37]/10 rounded-xl border border-[#D4AF37]/20">
+                                  <div className="text-2xl font-bold text-[#D4AF37] mb-1">
+                                    {energyNeeds.targetCalories}
+                                  </div>
+                                  <p className="text-xs text-gray-600">Dagligt kalorietarget</p>
+                                </div>
+                              </motion.div>
+
+                              <div className="text-center">
+                                <p className="text-sm text-gray-500">
+                                  Disse tal vil blive brugt til at tilpasse din madplan præcist til dine behov.
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center py-8 text-gray-500">
+                              <p>Udfyld alle profiloplysninger for at se din energiberegning</p>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </motion.div>
+                )}
+
+                {/* Step 3: Kostretning */}
+                {weightLossProfileStep === 2 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Kostretning</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {[
+                        { id: 'keto', name: 'Keto', desc: 'Højt fedt, moderat protein, meget lavt kulhydrat' },
+                        { id: 'sense', name: 'Sense', desc: 'Balanceret tilgang til sund mad og vægttab' },
+                        { id: 'glp-1', name: 'GLP-1', desc: 'Tilpasset til GLP-1 medicin' },
+                        { id: 'anti-inflammatory', name: 'Anti-inflammatorisk', desc: 'Fokuserer på anti-inflammatoriske fødevarer' },
+                        { id: 'flexitarian', name: 'Fleksitarisk', desc: 'Primært plantebaseret med lejlighedsvis kød' },
+                        { id: '5-2', name: '5:2 diæt', desc: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag' },
+                        { id: 'meal-prep', name: 'Meal prep', desc: 'Avancerede meal prep retter' },
+                        { id: 'familiemad', name: 'Sund familiemad', desc: 'Klassiske, næringsrige retter der passer til hele familien' }
+                      ].map((approach) => (
+                        <label
+                          key={approach.id}
+                          className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            currentWeightLossProfile.dietaryApproach === approach.id
+                              ? 'border-[#1B365D] bg-[#1B365D]/5'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="dietaryApproach"
+                            value={approach.id}
+                            checked={currentWeightLossProfile.dietaryApproach === approach.id}
+                            onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                              ...prev,
+                              dietaryApproach: e.target.value
+                            }))}
+                            className="mr-3"
+                          />
+                          <div>
+                            <div className="font-semibold text-gray-900">{approach.name}</div>
+                            <div className="text-sm text-gray-600">{approach.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Step 4: Måltider om dagen */}
+                {weightLossProfileStep === 3 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Hvor mange måltider om dagen?</h4>
+                    <div className="space-y-3">
+                      {[
+                        { id: 'dinner', label: 'Aftensmad', desc: 'Altid inkluderet', required: true },
+                        { id: 'breakfast', label: 'Morgenmad', desc: 'Valgfrit' },
+                        { id: 'lunch', label: 'Frokost', desc: 'Valgfrit' }
+                      ].map((meal) => (
+                        <label
+                          key={meal.id}
+                          className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            currentWeightLossProfile.mealsPerDay?.includes(meal.id)
+                              ? 'border-[#1B365D] bg-[#1B365D]/5'
+                              : meal.required
+                              ? 'border-gray-300 bg-gray-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={currentWeightLossProfile.mealsPerDay?.includes(meal.id) || meal.required}
+                            disabled={meal.required}
+                            onChange={(e) => {
+                              if (meal.required) return
+                              if (e.target.checked) {
+                                setCurrentWeightLossProfile(prev => ({
+                                  ...prev,
+                                  mealsPerDay: [...(prev.mealsPerDay || []), meal.id]
+                                }))
+                              } else {
+                                setCurrentWeightLossProfile(prev => ({
+                                  ...prev,
+                                  mealsPerDay: (prev.mealsPerDay || []).filter(id => id !== meal.id)
+                                }))
+                              }
+                            }}
+                            className="mr-3"
+                          />
+                          <div>
+                            <div className="font-semibold text-gray-900">{meal.label}</div>
+                            <div className="text-sm text-gray-600">{meal.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Step 5: Mål */}
+                {weightLossProfileStep === 4 && (
+                  <motion.div
+                    key="step4"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Mål</h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        { value: WeightGoal.WeightLoss, label: 'Ønsker at tabe sig', desc: 'Tabe vægt og forbedre kropssammensætning', icon: '📉' },
+                        { value: WeightGoal.Maintenance, label: 'Ønsker at bibeholde vægt', desc: 'Vedligehold din nuværende vægt og forbedre sundhed', icon: '⚖️' },
+                        { value: WeightGoal.MuscleGain, label: 'Ønsker at tage på i vægt', desc: 'Byg muskel og øge styrke', icon: '💪' }
+                      ].map((goal) => (
+                        <label
+                          key={goal.value}
+                          className={`flex items-center p-6 border-2 rounded-xl cursor-pointer transition-all ${
+                            currentWeightLossProfile.weightGoal === goal.value
+                              ? 'border-[#1B365D] bg-[#1B365D]/5'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="weightGoal"
+                            value={goal.value}
+                            checked={currentWeightLossProfile.weightGoal === goal.value}
+                            onChange={(e) => setCurrentWeightLossProfile(prev => ({
+                              ...prev,
+                              weightGoal: e.target.value as WeightGoal
+                            }))}
+                            className="mr-4"
+                          />
+                          <div className="flex items-center">
+                            <span className="text-2xl mr-4">{goal.icon}</span>
+                            <div>
+                              <div className="font-semibold text-gray-900 text-lg">{goal.label}</div>
+                              <div className="text-gray-600">{goal.desc}</div>
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  if (weightLossProfileStep > 0) {
+                    setWeightLossProfileStep(prev => prev - 1)
+                  } else {
+                    setShowWeightLossProfileModal(false)
+                  }
+                }}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <ChevronLeft size={20} />
+                <span>{weightLossProfileStep === 0 ? 'Luk' : 'Tilbage'}</span>
+              </button>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500">
+                  Trin {weightLossProfileStep + 1} af 5
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (weightLossProfileStep < 4) {
+                    setWeightLossProfileStep(prev => prev + 1)
+                  } else {
+                    saveWeightLossProfile()
+                  }
+                }}
+                className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white rounded-lg hover:shadow-lg transition-all"
+              >
+                <span>{weightLossProfileStep === 4 ? 'Gem' : 'Næste'}</span>
+                {weightLossProfileStep < 4 && <ChevronRight size={20} />}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Loading Screen for Meal Plan Generation */}
+      {isGeneratingMealPlan && (
+        <motion.div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center"
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+          >
+            {/* Animated emoji */}
+            <motion.div
+              className="text-6xl mb-6"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              🍽️
+            </motion.div>
+            
+            {/* Progress text */}
+            <motion.p
+              key={generationProgress}
+              className="text-lg font-semibold text-gray-900 mb-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              {generationProgress}
+            </motion.p>
+            
+            {/* Loading dots */}
+            <div className="flex justify-center space-x-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-2 h-2 bg-[#1B365D] rounded-full"
+                  animate={{
+                    scale: [1, 1.5, 1],
+                    opacity: [0.5, 1, 0.5]
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    delay: i * 0.2
+                  }}
+                />
+              ))}
+            </div>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   )

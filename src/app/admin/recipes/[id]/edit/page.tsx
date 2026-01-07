@@ -274,10 +274,66 @@ export default function EditRecipe({ params }: PageProps) {
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                     />
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       placeholder="Amount"
-                      value={ingredient.amount}
-                      onChange={(e) => updateIngredient(index, 'amount', parseFloat(e.target.value) || 0)}
+                      value={(() => {
+                        if (ingredient.amount === 0 || ingredient.amount === null || ingredient.amount === undefined) {
+                          return ''
+                        }
+                        const str = String(ingredient.amount)
+                        if (str.includes('.')) {
+                          return str.replace('.', ',')
+                        }
+                        return str
+                      })()}
+                      onChange={(e) => {
+                        let value = e.target.value
+                        // Tillad kun tal, komma og punktum
+                        value = value.replace(/[^\d,.]/g, '')
+                        
+                        // Tillad kun ét komma eller ét punktum
+                        const commaIndex = value.indexOf(',')
+                        const dotIndex = value.indexOf('.')
+                        if (commaIndex !== -1 && dotIndex !== -1) {
+                          if (commaIndex < dotIndex) {
+                            value = value.replace(/\./g, '')
+                          } else {
+                            value = value.replace(/,/g, '')
+                          }
+                        }
+                        
+                        // Opdater input-værdien direkte
+                        e.target.value = value
+                        
+                        // Hvis tom eller kun komma, sæt til 0
+                        if (value === '' || value === ',') {
+                          updateIngredient(index, 'amount', 0)
+                          return
+                        }
+                        
+                        // Konverter komma til punktum for parsing
+                        const normalizedValue = value.replace(',', '.')
+                        const numValue = parseFloat(normalizedValue)
+                        
+                        if (!isNaN(numValue) && isFinite(numValue)) {
+                          updateIngredient(index, 'amount', numValue)
+                        }
+                      }}
+                      onBlur={(e) => {
+                        let value = e.target.value.trim()
+                        if (value === '' || value === ',') {
+                          updateIngredient(index, 'amount', 0)
+                          return
+                        }
+                        const normalizedValue = value.replace(',', '.')
+                        const numValue = parseFloat(normalizedValue)
+                        if (!isNaN(numValue) && isFinite(numValue)) {
+                          updateIngredient(index, 'amount', numValue)
+                        } else {
+                          updateIngredient(index, 'amount', 0)
+                        }
+                      }}
                       className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                     />
                     <input

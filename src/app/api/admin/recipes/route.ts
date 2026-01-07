@@ -106,13 +106,11 @@ export async function PUT(request: NextRequest) {
     
     // Parse request body
     const body = await request.json()
-    const { recipeId, description, dietaryCategories, mainCategory, subCategories } = body
+    const { recipeId, description, dietaryCategories, mainCategory, subCategories, ingredients, instructions } = body
     
     if (!recipeId) {
       return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 })
     }
-    
-    console.log('🔍 Updating recipe:', { recipeId, description, dietaryCategories, mainCategory, subCategories })
     
     // Prepare update data
     const updateData: any = {}
@@ -120,17 +118,45 @@ export async function PUT(request: NextRequest) {
       updateData.description = description
     }
     if (dietaryCategories !== undefined) {
-      updateData.dietaryCategories = dietaryCategories
+      const dietaryArray = Array.isArray(dietaryCategories) ? dietaryCategories : []
+      updateData.dietaryCategories = dietaryArray
     }
     if (mainCategory !== undefined) {
       updateData.mainCategory = mainCategory
     }
     if (subCategories !== undefined) {
-      updateData.subCategories = subCategories
+      const subCategoriesArray = Array.isArray(subCategories) ? subCategories : []
+      updateData.subCategories = subCategoriesArray
+    }
+    if (ingredients !== undefined) {
+      updateData.ingredients = Array.isArray(ingredients) ? ingredients : []
+    }
+    if (instructions !== undefined) {
+      updateData.instructions = Array.isArray(instructions) ? instructions : []
     }
     
-    // Add updated timestamp
     updateData.updatedAt = new Date().toISOString()
+    
+    // Workaround: Hvis dietaryCategories arrayet bliver kortere, sæt det til null først
+    // Dette tvinger Supabase til at opdatere JSONB kolonnen korrekt
+    if (dietaryCategories !== undefined) {
+      const dietaryArray = Array.isArray(dietaryCategories) ? dietaryCategories : []
+      const { data: currentRecipe } = await supabase
+        .from('recipes')
+        .select('dietaryCategories')
+        .eq('id', recipeId)
+        .single()
+      
+      const currentArray = Array.isArray(currentRecipe?.dietaryCategories) ? currentRecipe.dietaryCategories : []
+      if (dietaryArray.length < currentArray.length) {
+        // Array er kortere - sæt til null først for at tvinge opdatering
+        await supabase
+          .from('recipes')
+          .update({ dietaryCategories: null })
+          .eq('id', recipeId)
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
+    }
     
     // Update recipe in database
     const { data, error } = await supabase
@@ -141,11 +167,23 @@ export async function PUT(request: NextRequest) {
     
     if (error) {
       console.error('❌ Error updating recipe:', error)
-      return NextResponse.json({ error: 'Failed to update recipe' }, { status: 500 })
+      return NextResponse.json({ 
+        error: 'Failed to update recipe', 
+        details: error.message 
+      }, { status: 500 })
     }
     
-    console.log('✅ Recipe updated successfully:', data)
-    return NextResponse.json({ success: true, data })
+    // Verify the update
+    const { data: verifyData } = await supabase
+      .from('recipes')
+      .select('id, title, dietaryCategories, mainCategory, subCategories')
+      .eq('id', recipeId)
+      .single()
+    
+    return NextResponse.json({ 
+      success: true, 
+      data: verifyData || data 
+    })
   } catch (error) {
     console.error('❌ Error in /api/admin/recipes PUT:', error)
     return NextResponse.json(

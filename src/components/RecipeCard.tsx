@@ -16,8 +16,9 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
     return mins > 0 ? `${hours}t ${mins}min` : `${hours}t`
   }
 
-  const formatCategory = (category: string) => {
+  const formatCategory = (category: string | null | undefined) => {
     // Remove brackets and clean up the category name
+    if (!category) return ''
     return category.replace(/[\[\]]/g, '').trim()
   }
 
@@ -80,23 +81,31 @@ export default function RecipeCard({ recipe, showRating = true, priority = false
           </div>
 
           {/* Categories */}
-          {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
-              {recipe.dietaryCategories.slice(0, 2).map((category) => (
-                <span
-                  key={category}
-                  className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700"
-                >
-                  {formatCategory(category)}
-                </span>
-              ))}
-              {recipe.dietaryCategories.length > 2 && (
-                <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600">
-                  +{recipe.dietaryCategories.length - 2}
-                </span>
-              )}
-            </div>
-          )}
+          {(() => {
+            const validCategories = recipe.dietaryCategories?.filter(
+              (cat): cat is string => cat != null && typeof cat === 'string' && cat.trim() !== ''
+            ) || []
+            
+            if (validCategories.length === 0) return null
+            
+            return (
+              <div className="flex flex-wrap gap-1 mt-3">
+                {validCategories.slice(0, 2).map((category, index) => (
+                  <span
+                    key={`${category}-${index}`}
+                    className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700"
+                  >
+                    {formatCategory(category)}
+                  </span>
+                ))}
+                {validCategories.length > 2 && (
+                  <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600">
+                    +{validCategories.length - 2}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </Link>
     </article>

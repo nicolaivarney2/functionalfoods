@@ -67,7 +67,7 @@ export default async function RecipePage({ params }: PageProps) {
         }}
       />
       
-      <main className="min-h-screen bg-white">
+      <main className="min-h-screen bg-white overflow-x-hidden">
         {/* Header with Search */}
         <section className="bg-white border-b border-gray-200">
           <div className="container py-4">

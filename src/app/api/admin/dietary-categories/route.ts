@@ -14,7 +14,9 @@ const DEFAULT_DIETARY_CATEGORIES = [
   'Fleksitarisk',
   '5:2 diæt',
   'Familiemad',
-  'Low carb'
+  'Low carb',
+  'Kombi-familiemad', // Opskrift med kartofler/ris/pasta, kan bruges i keto-familie
+  'Kombi-keto' // Keto opskrift, kan bruges i familiemad
 ]
 
 export async function GET(request: NextRequest) {

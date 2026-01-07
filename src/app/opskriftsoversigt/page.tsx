@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Search, Filter, ChevronDown, ChevronUp, Sparkles, Target, ArrowRight } from 'lucide-react'
 import { recipeCategories, dietaryCategories } from '@/lib/sample-data'
 import RecipeCard from '@/components/RecipeCard'
+import MobileRecipeFilterBar from '@/components/MobileRecipeFilterBar'
 import { useState, useEffect } from 'react'
 
 interface Recipe {
@@ -53,81 +54,89 @@ interface Recipe {
 // Extended dietary categories with images and 8th option - REORGANIZED
 const extendedDietaryCategories = [
   {
-    id: '1',
-    name: 'KETO',
-    slug: 'keto',
-    description: 'Ketogene opskrifter til vægttab og sundhed',
-    color: 'bg-purple-500',
-    recipeCount: 712,
-    imageUrl: '/images/categories/keto.webp',
-    imageAlt: 'Keto mad med bacon, æg og grønne grøntsager'
-  },
-  {
-    id: '2',
-    name: 'SENSE',
-    slug: 'sense',
-    description: 'Sunde opskrifter baseret på danske kostråd',
-    color: 'bg-green-500',
-    recipeCount: 445,
-    imageUrl: '/images/categories/sense.webp',
-    imageAlt: 'Sunde danske retter med rugbrød og grønne grøntsager'
-  },
-  {
-    id: '3',
-    name: 'GLP-1 KOST',
-    slug: 'glp-1',
-    description: 'Naturligt vægttab med maksimal mæthed',
-    color: 'bg-blue-500',
-    recipeCount: 0,
-    imageUrl: '/images/categories/glp-1.webp',
-    imageAlt: 'GLP-1 kost med protein, fibre og sunde fedtstoffer'
-  },
-  {
-    id: '4',
-    name: 'MEAL PREP',
-    slug: 'meal-prep',
-    description: 'Opskrifter til madplanlægning og forberedelse',
-    color: 'bg-blue-500',
-    recipeCount: 234,
-    imageUrl: '/images/categories/meal-prep.webp',
-    imageAlt: 'Forberedte måltider og madplanlægning'
-  },
-  {
-    id: '5',
-    name: 'ANTI-INFLAMMATORISK',
-    slug: 'anti-inflammatory',
-    description: 'Anti-inflammatoriske opskrifter til sundhed',
-    color: 'bg-emerald-500',
-    recipeCount: 156,
-    imageUrl: '/images/categories/anti-inflammatory.webp',
-    imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
-  },
-  {
-    id: '10',
-    name: 'FAMILIEMAD',
+    id: 'Familiemad',
+    name: 'Familiemad',
     slug: 'familie',
     description: 'Almindelige familiemad opskrifter',
     color: 'bg-blue-500',
+    icon: '👨‍👩‍👧‍👦',
     recipeCount: 450,
     imageUrl: '/images/categories/familie.webp',
     imageAlt: 'Familievenlige retter til hverdagen'
   },
   {
-    id: '7',
-    name: 'FLEKSITARISK',
+    id: 'Keto',
+    name: 'Keto',
+    slug: 'keto',
+    description: 'Ketogene opskrifter til vægttab og sundhed',
+    color: 'bg-purple-500',
+    icon: '🥑',
+    recipeCount: 712,
+    imageUrl: '/images/categories/keto.webp',
+    imageAlt: 'Keto mad med bacon, æg og grønne grøntsager'
+  },
+  {
+    id: 'Sense',
+    name: 'Sense',
+    slug: 'sense',
+    description: 'Sunde opskrifter baseret på danske kostråd',
+    color: 'bg-green-500',
+    icon: '✋',
+    recipeCount: 445,
+    imageUrl: '/images/categories/sense.webp',
+    imageAlt: 'Sunde danske retter med rugbrød og grønne grøntsager'
+  },
+  {
+    id: 'GLP-1 kost',
+    name: 'GLP-1 kost',
+    slug: 'glp-1',
+    description: 'Naturligt vægttab med maksimal mæthed',
+    color: 'bg-blue-500',
+    icon: '🧠',
+    recipeCount: 0,
+    imageUrl: '/images/categories/glp-1.webp',
+    imageAlt: 'GLP-1 kost med protein, fibre og sunde fedtstoffer'
+  },
+  {
+    id: 'Meal prep',
+    name: 'Meal prep',
+    slug: 'meal-prep',
+    description: 'Opskrifter til madplanlægning og forberedelse',
+    color: 'bg-blue-500',
+    icon: '📦',
+    recipeCount: 234,
+    imageUrl: '/images/categories/meal-prep.webp',
+    imageAlt: 'Forberedte måltider og madplanlægning'
+  },
+  {
+    id: 'Antiinflammatorisk',
+    name: 'Antiinflammatorisk',
+    slug: 'anti-inflammatory',
+    description: 'Anti-inflammatoriske opskrifter til sundhed',
+    color: 'bg-emerald-500',
+    icon: '🌿',
+    recipeCount: 156,
+    imageUrl: '/images/categories/anti-inflammatory.webp',
+    imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
+  },
+  {
+    id: 'Fleksitarisk',
+    name: 'Fleksitarisk',
     slug: 'flexitarian',
     description: 'Fleksitariske opskrifter med fokus på planter',
     color: 'bg-teal-500',
+    icon: '🥬',
     recipeCount: 98,
     imageUrl: '/images/categories/flexitarian.webp',
     imageAlt: 'Fleksitariske retter med planter og lidt kød'
   },
   {
-    id: '9',
-    name: '5:2 DIÆT',
+    id: '5:2',
+    name: '5:2 Diæt',
     slug: '5-2-diet',
     description: 'Opskrifter til 5:2 intermittent fasting',
     color: 'bg-amber-500',
+    icon: '⏰',
     recipeCount: 123,
     imageUrl: '/images/categories/5-2-diet.webp',
     imageAlt: 'Sunde måltider til 5:2 diæt og intermittent fasting'
@@ -236,6 +245,7 @@ export default function RecipeOverviewPage() {
           return false
         }
         return recipe.dietaryCategories.some(cat => {
+          if (!cat) return false
           const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
           const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
           return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
@@ -432,15 +442,9 @@ export default function RecipeOverviewPage() {
                       className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
             >
               <option value="all">Alle mad ideologier</option>
-              <option value="FAMILIEMAD">Familiemad</option>
-              <option value="Keto">Keto</option>
-              <option value="SENSE">SENSE</option>
-              <option value="GLP-1 KOST">GLP-1 kost</option>
-              <option value="MEAL PREP">Meal Prep</option>
-              <option value="ANTI-INFLAMMATORISK">Anti-Inflammatorisk</option>
-              <option value="MIDDELHAVSDIÆTEN">Middelhavsdiæten</option>
-              <option value="FLEKSITARISK">Fleksitarisk</option>
-              <option value="5:2 DIÆT">5:2 Diæt</option>
+              {extendedDietaryCategories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
             </select>
           </div>
 
@@ -621,35 +625,25 @@ export default function RecipeOverviewPage() {
         </div>
       </section>
 
-      {/* Floating Filter Button (Mobile Only) */}
-      {showFloatingFilter && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
-          <div className="bg-white border-t border-gray-200 shadow-lg">
-            <button
-              onClick={() => {
-                setShowFilters(!showFilters)
-                // Scroll to filters section
-                document.getElementById('filters-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              }}
-              className={`w-full py-4 px-6 font-semibold text-lg transition-all duration-200 ${
-                showFilters || hasActiveFilters
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700'
-              }`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Filter size={20} />
-                <span>Filtre</span>
-                {hasActiveFilters && (
-                  <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-sm">
-                    {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== '', selectedDietary !== 'all'].filter(Boolean).length}
-                  </span>
-                )}
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Mobile Filter Bar */}
+      <MobileRecipeFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        prepTimeFilter={prepTimeFilter}
+        onPrepTimeChange={setPrepTimeFilter}
+        mealTypeFilter={mealTypeFilter}
+        onMealTypeChange={setMealTypeFilter}
+        mealTypes={mealTypes}
+        selectedDietary={selectedDietary}
+        onDietaryChange={setSelectedDietary}
+        dietaryCategories={extendedDietaryCategories.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          icon: cat.icon
+        }))}
+        onClearFilters={clearFilters}
+        hasActiveFilters={hasActiveFilters}
+      />
     </main>
   )
 } 

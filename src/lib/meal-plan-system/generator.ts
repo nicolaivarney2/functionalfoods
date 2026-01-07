@@ -40,6 +40,14 @@ import {
 // Import database service
 import { databaseService } from '../database-service';
 
+// Import kombi-supplement system
+import {
+  getKombiSupplements,
+  hasKombiTag,
+  calculateSupplementAmount,
+  KombiSupplement
+} from './kombi-supplements';
+
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
@@ -99,18 +107,38 @@ export class MealPlanGenerator {
             id: recipe.id,
             title: recipe.title,
             description: recipe.description,
-            ingredients: recipe.ingredients?.map(ing => ({
-              ingredientId: ing.id || ing.name,
-              amount: ing.amount,
-              unit: ing.unit
-            })) || [],
+            ingredients: recipe.ingredients?.map(ing => {
+              // Try to get ingredient name from ingredientService if ing.name is missing
+              let ingredientName = ing.name
+              if (!ingredientName && ing.id) {
+                const ingredientData = ingredientService.getIngredientById(ing.id)
+                if (ingredientData) {
+                  ingredientName = ingredientData.name
+                } else {
+                  // If ing.id is actually a name (not an ID), use it
+                  const isLikelyId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ing.id) || 
+                                     /^temp-\d+$/i.test(ing.id)
+                  if (!isLikelyId) {
+                    ingredientName = ing.id
+                  }
+                }
+              }
+              
+              return {
+                ingredientId: ing.id || ing.name || ingredientName,
+                amount: ing.amount,
+                unit: ing.unit,
+                name: ingredientName || ing.name || ing.id // Preserve name for shopping list
+              }
+            }) || [],
             instructions: recipe.instructions?.map(inst => inst.instruction) || [],
             prepTime: recipe.preparationTime || 0,
             cookTime: recipe.cookingTime || 0,
             servings: recipe.servings || 4,
             categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
             dietaryApproaches,
-             nutritionalInfo: {
+            mainCategory: recipe.mainCategory || 'Aftensmad', // Preserve for meal type filtering
+            nutritionalInfo: {
               caloriesPer100g: recipe.calories || 0,
               proteinPer100g: recipe.protein || 0,
               carbsPer100g: recipe.carbs || 0,
@@ -373,9 +401,128 @@ export class MealPlanGenerator {
   }
 
   /**
+   * Generate a 1-week meal plan for madbudget (family meal planning)
+   */
+  async generateOneWeekMealPlan(
+    familyProfile: {
+      adults: number
+      children: number
+      childrenAges: string[]
+      adultsProfiles: Array<{
+        dietaryApproach?: string
+        excludedFoods: string[]
+        mealsPerDay: string[]
+        weightGoal?: string
+      }>
+      excludedIngredients: string[]
+      selectedStores: number[]
+      prioritizeOrganic: boolean
+    },
+    variationLevel: number = 2 // 0-3 scale for variation preference
+  ): Promise<WeekPlan> {
+    const startTime = Date.now();
+
+    // Determine primary dietary approach
+    // If children exist, prioritize familiemad or kombi-tags
+    // Otherwise use the adults' dietary approach
+    let primaryDietaryApproach = 'familiemad'
+    const hasChildren = familyProfile.children > 0
+    const hasKetoAdults = familyProfile.adultsProfiles.some(p => p.dietaryApproach === 'keto')
+    
+    if (hasChildren) {
+      // If children exist, check if any adult is on familiemad
+      const hasFamiliemadAdult = familyProfile.adultsProfiles.some(p => p.dietaryApproach === 'familiemad')
+      if (hasFamiliemadAdult) {
+        primaryDietaryApproach = 'familiemad'
+      } else if (hasKetoAdults) {
+        // Use kombi-tags if keto adults with children
+        primaryDietaryApproach = 'keto' // Will prioritize kombi-tags in filtering
+      }
+    } else {
+      // No children - use first adult's dietary approach
+      primaryDietaryApproach = familyProfile.adultsProfiles[0]?.dietaryApproach || 'sense'
+    }
+
+    // Get dietary approach
+    const dietaryApproach = dietaryFactory.getDiet(primaryDietaryApproach);
+    if (!dietaryApproach) {
+      throw new Error(`Dietary approach ${primaryDietaryApproach} not found`);
+    }
+
+    // Combine all excluded ingredients from family and adults
+    const allExcludedIngredients = [
+      ...familyProfile.excludedIngredients,
+      ...familyProfile.adultsProfiles.flatMap(p => p.excludedFoods || [])
+    ]
+
+    // Determine which meals to generate based on adults' preferences
+    // If any adult has breakfast/lunch selected, include them
+    const mealsToGenerate = new Set<string>(['dinner']) // Always include dinner
+    familyProfile.adultsProfiles.forEach(profile => {
+      if (profile.mealsPerDay) {
+        profile.mealsPerDay.forEach(meal => mealsToGenerate.add(meal))
+      }
+    })
+    
+    // Create meal structure that includes all selected meals
+    const mealStructure = this.createMealStructure(dietaryApproach)
+    // Filter mealDistribution to only include selected meals
+    const filteredMealDistribution = mealStructure.mealDistribution.filter((meal: any) => 
+      mealsToGenerate.has(meal.mealType)
+    )
+    
+    // Create meal plan configuration
+    const config: MealPlanConfig = {
+      targetCalories: 2000, // Will be calculated per person later
+      macroTargets: {
+        protein: 100,
+        carbs: 150,
+        fat: 80
+      },
+      dietaryApproach,
+      excludedIngredients: allExcludedIngredients,
+      excludedCategories: [],
+      allergies: [],
+      intolerances: [],
+      mealStructure: {
+        ...mealStructure,
+        mealDistribution: filteredMealDistribution,
+        mealsPerDay: Array.from(mealsToGenerate)
+      },
+      varietyPreferences: {
+        maxRepeatDays: Math.max(1, 3 - variationLevel), // Higher variation = fewer repeat days
+        preferredCuisines: [],
+        avoidCuisines: [],
+        seasonalPreferences: []
+      },
+      difficultyLevel: DifficultyLevel.Medium,
+      timeConstraints: {
+        maxPrepTime: 30,
+        maxCookTime: 60,
+        preferredCookingDays: ['monday', 'wednesday', 'friday'],
+        batchCookingAllowed: true
+      }
+    };
+
+    // Generate 1 week of meal plans
+    const weekPlan = await this.generateWeekPlan(1, config);
+
+    console.log(`1-week meal plan generated in ${Date.now() - startTime}ms`);
+    return weekPlan;
+  }
+
+  /**
    * Generate a single week of meal plans
    */
-  private async generateWeekPlan(weekNumber: number, config: MealPlanConfig): Promise<WeekPlan> {
+  private async generateWeekPlan(
+    weekNumber: number,
+    config: MealPlanConfig,
+    filterOptions?: {
+      hasChildren?: boolean
+      hasKetoAdults?: boolean
+      prioritizeKombiTags?: boolean
+    }
+  ): Promise<WeekPlan> {
     const days: DayPlan[] = [];
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + (weekNumber - 1) * 7);
@@ -384,7 +531,7 @@ export class MealPlanGenerator {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + dayIndex);
       
-      const dayPlan = await this.generateDayPlan(date, config);
+      const dayPlan = await this.generateDayPlan(date, config, filterOptions);
       days.push(dayPlan);
     }
 
@@ -405,7 +552,15 @@ export class MealPlanGenerator {
   /**
    * Generate a single day of meals
    */
-  private async generateDayPlan(date: Date, config: MealPlanConfig): Promise<DayPlan> {
+  private async generateDayPlan(
+    date: Date,
+    config: MealPlanConfig,
+    filterOptions?: {
+      hasChildren?: boolean
+      hasKetoAdults?: boolean
+      prioritizeKombiTags?: boolean
+    }
+  ): Promise<DayPlan> {
     const meals: MealAssignment[] = [];
     let totalCalories = 0;
     let totalProtein = 0;
@@ -466,10 +621,15 @@ export class MealPlanGenerator {
   private async generateMeal(
     mealDistribution: any,
     config: MealPlanConfig,
-    date: Date
+    date: Date,
+    filterOptions?: {
+      hasChildren?: boolean
+      hasKetoAdults?: boolean
+      prioritizeKombiTags?: boolean
+    }
   ): Promise<MealAssignment> {
-    // Filter recipes based on dietary approach and exclusions
-    const availableRecipes = this.filterRecipes(config);
+    // Filter recipes based on dietary approach, meal type, and exclusions
+    const availableRecipes = this.filterRecipes(config, mealDistribution.mealType, filterOptions);
     
     // Score and rank recipes
     const scoredRecipes = this.scoreRecipes(availableRecipes, mealDistribution, config);
@@ -500,13 +660,30 @@ export class MealPlanGenerator {
   }
 
   /**
-   * Filter recipes based on dietary approach and exclusions
+   * Filter recipes based on dietary approach, meal type, and exclusions
    */
-  private filterRecipes(config: MealPlanConfig): Recipe[] {
-    console.log(`🔍 Filtering ${this.recipes.length} recipes for dietary approach: ${config.dietaryApproach.id}`);
-    console.log(`🔍 Available recipes:`, this.recipes.map(r => ({ title: r.title, approaches: r.dietaryApproaches })));
+  private filterRecipes(config: MealPlanConfig, mealType?: MealType, filterOptions?: any): Recipe[] {
+    console.log(`🔍 Filtering ${this.recipes.length} recipes for dietary approach: ${config.dietaryApproach.id}${mealType ? `, meal type: ${mealType}` : ''}`);
+    console.log(`🔍 Available recipes:`, this.recipes.map(r => ({ title: r.title, approaches: r.dietaryApproaches, category: (r as any).mainCategory })));
+    
+    // Map mealType to Danish category names
+    const mealTypeToCategory: Record<string, string> = {
+      'breakfast': 'Morgenmad',
+      'lunch': 'Frokost',
+      'dinner': 'Aftensmad',
+      'snack': 'Snack'
+    }
     
     const filteredRecipes = this.recipes.filter(recipe => {
+      // Filter by meal type if provided
+      if (mealType) {
+        const expectedCategory = mealTypeToCategory[mealType]
+        const recipeCategory = (recipe as any).mainCategory || ''
+        if (expectedCategory && recipeCategory.toLowerCase() !== expectedCategory.toLowerCase()) {
+          console.log(`❌ Recipe ${recipe.title} excluded: wrong meal type (expected ${expectedCategory}, got ${recipeCategory})`)
+          return false
+        }
+      }
       // Check dietary approach compatibility
       const hasDietaryApproach = recipe.dietaryApproaches.some(approach => {
         // Handle both "Keto" and "[Keto]" formats by removing brackets
@@ -880,20 +1057,69 @@ export class MealPlanGenerator {
    * Generate shopping list for a week
    */
   private generateShoppingList(weekNumber: number, days: DayPlan[]): ShoppingList {
-    const ingredientMap = new Map<string, { amount: number; unit: string }>();
+    const ingredientMap = new Map<string, { amount: number; unit: string; name: string }>();
+    const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
 
     // Aggregate ingredients from all meals
     days.forEach(day => {
       day.meals.forEach(meal => {
         meal.recipe.ingredients.forEach(ingredient => {
-          const key = ingredient.ingredientId;
-          const current = ingredientMap.get(key) || { amount: 0, unit: ingredient.unit };
+          // Get ingredient name - first check if name is directly available on ingredient object
+          let ingredientName = (ingredient as any).name
+          
+          // If no name, try to get from ingredientService using ingredientId
+          if (!ingredientName || ingredientName.startsWith('temp-')) {
+            const ingredientData = ingredientService.getIngredientById(ingredient.ingredientId)
+            if (ingredientData && ingredientData.name) {
+              ingredientName = ingredientData.name
+            } else {
+              // If ingredientId is actually a name (not an ID), use it directly
+              // Check if it looks like a UUID or temp-X pattern
+              const isLikelyId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ingredient.ingredientId) || 
+                                 /^temp-\d+$/i.test(ingredient.ingredientId)
+              if (!isLikelyId) {
+                ingredientName = ingredient.ingredientId
+              } else {
+                // Last resort: if we have temp-X or UUID, try to find by searching all ingredients
+                // This is a fallback for when ingredientId doesn't match anything
+                console.warn(`⚠️ Could not find name for ingredient with ID: ${ingredient.ingredientId}`)
+                ingredientName = `Ingrediens (${ingredient.ingredientId})` // Fallback name
+              }
+            }
+          }
+          
+          const key = ingredientName.toLowerCase().trim()
+          const current = ingredientMap.get(key) || { amount: 0, unit: ingredient.unit || 'stk', name: ingredientName };
           
           ingredientMap.set(key, {
             amount: current.amount + (ingredient.amount * meal.servings),
-            unit: ingredient.unit
+            unit: ingredient.unit || current.unit,
+            name: ingredientName
           });
         });
+
+        // Check for kombi-tags and add supplements
+        if (meal.recipe.dietaryCategories) {
+          const kombiTag = hasKombiTag(meal.recipe.dietaryCategories);
+          if (kombiTag) {
+            const supplements = getKombiSupplements(kombiTag);
+            supplements.forEach(supplement => {
+              const calculated = calculateSupplementAmount(supplement, meal.servings);
+              const key = calculated.ingredientName.toLowerCase();
+              const current = supplementMap.get(key) || { 
+                amount: 0, 
+                unit: calculated.unit, 
+                reason: calculated.reason 
+              };
+              
+              supplementMap.set(key, {
+                amount: current.amount + calculated.amount,
+                unit: calculated.unit,
+                reason: calculated.reason
+              });
+            });
+          }
+        }
       });
     });
 
@@ -902,11 +1128,24 @@ export class MealPlanGenerator {
     const proteinItems: ShoppingItem[] = [];
     const vegetableItems: ShoppingItem[] = [];
     const otherItems: ShoppingItem[] = [];
+    const supplementItems: ShoppingItem[] = [];
 
-    ingredientMap.forEach((value, ingredientId) => {
-      const ingredient = ingredientService.getIngredientById(ingredientId);
+    // Add regular ingredients
+    ingredientMap.forEach((value, key) => {
+      // Try to get ingredient name from service using the key (which might be ingredientId or name)
+      let ingredientName = (value as any).name || key
+      let ingredient = ingredientService.getIngredientById(key)
+      
+      // If key is not an ID, try to find by name
+      if (!ingredient && key !== (value as any).name) {
+        // Key might be the name itself, so use it
+        ingredientName = key
+      } else if (ingredient) {
+        ingredientName = ingredient.name
+      }
+      
       const item: ShoppingItem = {
-        name: ingredient?.name || ingredientId,
+        name: ingredientName,
         amount: value.amount,
         unit: value.unit
       };
@@ -920,6 +1159,18 @@ export class MealPlanGenerator {
       }
     });
 
+    // Add supplements from kombi-opskrifter
+    supplementMap.forEach((value, ingredientName) => {
+      const item: ShoppingItem = {
+        name: ingredientName,
+        amount: value.amount,
+        unit: value.unit,
+        isSupplement: true,
+        supplementReason: value.reason
+      };
+      supplementItems.push(item);
+    });
+
     if (proteinItems.length > 0) {
       categories.push({ name: 'Protein', items: proteinItems });
     }
@@ -928,6 +1179,13 @@ export class MealPlanGenerator {
     }
     if (otherItems.length > 0) {
       categories.push({ name: 'Other', items: otherItems });
+    }
+    // Add supplements as a separate category at the end
+    if (supplementItems.length > 0) {
+      categories.push({ 
+        name: 'Supplements (kombi-opskrifter)', 
+        items: supplementItems 
+      });
     }
 
     return {

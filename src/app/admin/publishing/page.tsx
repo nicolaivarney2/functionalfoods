@@ -8,7 +8,7 @@ import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculato
 import IngredientMatchesBox from '@/components/IngredientMatchesBox'
 import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
-import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save, Plus, X } from 'lucide-react'
 
 interface RecipeWithTips extends Recipe {
   personalTips?: string
@@ -45,6 +45,10 @@ export default function AdminPublishingPage() {
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
   const [dietaryCategories, setDietaryCategories] = useState<string[]>([])
+  const [editingIngredients, setEditingIngredients] = useState(false)
+  const [editingInstructions, setEditingInstructions] = useState(false)
+  const [editedIngredients, setEditedIngredients] = useState<any[]>([])
+  const [editedInstructions, setEditedInstructions] = useState<any[]>([])
 
   useEffect(() => {
     loadRecipes()
@@ -83,7 +87,8 @@ export default function AdminPublishingPage() {
       // Fallback to default dietary categories
       setDietaryCategories([
         'Keto', 'Sense', 'GLP-1 kost', 'Meal prep', 'Anti-inflammatorisk',
-        'Fleksitarisk', '5:2 diæt', 'Familiemad', 'Low carb'
+        'Fleksitarisk', '5:2 diæt', 'Familiemad', 'Low carb',
+        'Kombi-familiemad', 'Kombi-keto'
       ])
     }
   }
@@ -91,7 +96,10 @@ export default function AdminPublishingPage() {
   const loadRecipes = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/recipes')
+      // Tilføj cache-busting for at sikre frisk data
+      const response = await fetch(`/api/admin/recipes?t=${Date.now()}`, {
+        cache: 'no-store'
+      })
       if (!response.ok) {
         throw new Error('Kunne ikke hente opskrifter')
       }
@@ -132,6 +140,8 @@ export default function AdminPublishingPage() {
     setEditingTips(false)
     setEditingDescription(false)
     setEditingCategories(false)
+    setEditingIngredients(false)
+    setEditingInstructions(false)
     
     // Sæt de oprindelige værdier fra opskriften
     setDescription(recipe.description || '')
@@ -145,6 +155,10 @@ export default function AdminPublishingPage() {
       allCategories.push(...recipe.dietaryCategories)
     }
     setCategories(allCategories)
+    
+    // Sæt ingredienser og instruktioner til redigering
+    setEditedIngredients(recipe.ingredients || [])
+    setEditedInstructions(recipe.instructions || [])
     
     // Sæt selectedDate og selectedTime baseret på eksisterende planlægning
     const existingSchedule = schedules.find(s => s.recipeId === recipe.id)
@@ -289,26 +303,151 @@ export default function AdminPublishingPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Kunne ikke gemme kategorier')
+        const errorData = await response.json().catch(() => ({}))
+        console.error('❌ API error response:', errorData)
+        throw new Error(errorData.error || 'Kunne ikke gemme kategorier')
       }
 
-      // Opdater local state
+      const result = await response.json()
+
+      // Opdater local state med data fra serveren
+      const serverRecipe = result.data || result
+      const finalDietaryCategories = Array.isArray(serverRecipe.dietaryCategories) 
+        ? serverRecipe.dietaryCategories 
+        : selectedDietaryCategories
+      const finalSubCategories = Array.isArray(serverRecipe.subCategories) 
+        ? serverRecipe.subCategories 
+        : subCategories
+      const finalMainCategory = serverRecipe.mainCategory || mainCategory
+      
       const updatedRecipes = recipes.map(recipe => 
         recipe.id === selectedRecipe.id 
-          ? { ...recipe, mainCategory, subCategories, dietaryCategories: selectedDietaryCategories }
+          ? { 
+              ...recipe, 
+              mainCategory: finalMainCategory,
+              subCategories: finalSubCategories,
+              dietaryCategories: finalDietaryCategories
+            }
           : recipe
       )
       setRecipes(updatedRecipes)
       
-      const updatedRecipe = { ...selectedRecipe, mainCategory, subCategories, dietaryCategories: selectedDietaryCategories }
+      const updatedRecipe = { 
+        ...selectedRecipe, 
+        mainCategory: finalMainCategory,
+        subCategories: finalSubCategories,
+        dietaryCategories: finalDietaryCategories
+      }
       setSelectedRecipe(updatedRecipe)
       setEditingCategories(false)
       
-      console.log('✅ Kategorier gemt for:', selectedRecipe.title)
+      // Genindlæs opskrifter fra databasen for at sikre konsistens
+      await loadRecipes()
+      
+      // Find den opdaterede opskrift igen efter reload
+      const { data: reloadData } = await fetch(`/api/admin/recipes?t=${Date.now()}`, {
+        cache: 'no-store'
+      }).then(r => r.json())
+      const reloadedRecipe = reloadData?.recipes?.find((r: any) => r.id === selectedRecipe.id)
+      if (reloadedRecipe) {
+        setSelectedRecipe(reloadedRecipe as RecipeWithTips)
+      }
       
     } catch (error) {
       console.error('❌ Error saving categories:', error)
       alert('Kunne ikke gemme kategorier. Prøv igen.')
+    }
+  }
+
+  const saveIngredients = async () => {
+    if (!selectedRecipe) return
+
+    try {
+      setSaving(true)
+      const response = await fetch(`/api/admin/recipes?timestamp=${new Date().getTime()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+        body: JSON.stringify({
+          recipeId: selectedRecipe.id,
+          ingredients: editedIngredients
+        }),
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Kunne ikke gemme ingredienser')
+      }
+
+      const result = await response.json()
+      
+      // Update local state
+      const updatedRecipe = { ...selectedRecipe, ingredients: editedIngredients }
+      setSelectedRecipe(updatedRecipe)
+      
+      const updatedRecipes = recipes.map(recipe =>
+        recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      setEditingIngredients(false)
+      console.log('✅ Ingredienser gemt for:', selectedRecipe.title)
+      alert('✅ Ingredienser gemt!')
+      
+    } catch (error) {
+      console.error('❌ Error saving ingredients:', error)
+      alert('Kunne ikke gemme ingredienser. Prøv igen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveInstructions = async () => {
+    if (!selectedRecipe) return
+
+    try {
+      setSaving(true)
+      const response = await fetch(`/api/admin/recipes?timestamp=${new Date().getTime()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+        body: JSON.stringify({
+          recipeId: selectedRecipe.id,
+          instructions: editedInstructions
+        }),
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Kunne ikke gemme instruktioner')
+      }
+
+      const result = await response.json()
+      
+      // Update local state
+      const updatedRecipe = { ...selectedRecipe, instructions: editedInstructions }
+      setSelectedRecipe(updatedRecipe)
+      
+      const updatedRecipes = recipes.map(recipe =>
+        recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+      )
+      setRecipes(updatedRecipes)
+      
+      setEditingInstructions(false)
+      console.log('✅ Instruktioner gemt for:', selectedRecipe.title)
+      alert('✅ Instruktioner gemt!')
+      
+    } catch (error) {
+      console.error('❌ Error saving instructions:', error)
+      alert('Kunne ikke gemme instruktioner. Prøv igen.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -959,6 +1098,39 @@ export default function AdminPublishingPage() {
                       )}
                     </div>
 
+                    {/* Ingredienser og Fremgangsmåde */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Ingredienser & Fremgangsmåde</h4>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              // Sørg for at ingredienser er sat før modal åbnes
+                              setEditedIngredients(selectedRecipe.ingredients || [])
+                              setEditingIngredients(true)
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger ingredienser
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Sørg for at instruktioner er sat før modal åbnes
+                              setEditedInstructions(selectedRecipe.instructions || [])
+                              setEditingInstructions(true)
+                            }}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger fremgangsmåde
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        <p>Ingredienser: {selectedRecipe.ingredients?.length || 0} stk</p>
+                        <p>Fremgangsmåde: {selectedRecipe.instructions?.length || 0} steps</p>
+                      </div>
+                    </div>
+
                     <div className="flex gap-2">
                       {(selectedRecipe.status === 'draft' || selectedRecipe.status === 'scheduled') && (
                         <button
@@ -1249,6 +1421,257 @@ export default function AdminPublishingPage() {
       
       {/* Auto-Publisher komponent */}
       <AutoPublisher />
+
+        {/* Edit Ingredients Modal */}
+        {editingIngredients && selectedRecipe && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Rediger Ingredienser - {selectedRecipe.title}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setEditingIngredients(false)
+                      setEditedIngredients(selectedRecipe.ingredients || [])
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {editedIngredients.map((ingredient, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 border border-gray-200 rounded-lg">
+                      <div className="col-span-3">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={(() => {
+                            if (ingredient.amount === 0 || ingredient.amount === null || ingredient.amount === undefined) {
+                              return ''
+                            }
+                            const str = String(ingredient.amount)
+                            if (str.includes('.')) {
+                              return str.replace('.', ',')
+                            }
+                            return str
+                          })()}
+                          onChange={(e) => {
+                            let value = e.target.value
+                            value = value.replace(/[^\d,.]/g, '')
+                            const commaIndex = value.indexOf(',')
+                            const dotIndex = value.indexOf('.')
+                            if (commaIndex !== -1 && dotIndex !== -1) {
+                              if (commaIndex < dotIndex) {
+                                value = value.replace(/\./g, '')
+                              } else {
+                                value = value.replace(/,/g, '')
+                              }
+                            }
+                            if (value === '' || value === ',') {
+                              const updated = [...editedIngredients]
+                              updated[index] = { ...ingredient, amount: 0 }
+                              setEditedIngredients(updated)
+                              return
+                            }
+                            const normalizedValue = value.replace(',', '.')
+                            const numValue = parseFloat(normalizedValue)
+                            if (!isNaN(numValue) && isFinite(numValue)) {
+                              const updated = [...editedIngredients]
+                              updated[index] = { ...ingredient, amount: numValue }
+                              setEditedIngredients(updated)
+                            }
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder="Antal"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={ingredient.unit || ''}
+                          onChange={(e) => {
+                            const updated = [...editedIngredients]
+                            updated[index] = { ...ingredient, unit: e.target.value }
+                            setEditedIngredients(updated)
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder="Enhed"
+                        />
+                      </div>
+                      <div className="col-span-5">
+                        <input
+                          type="text"
+                          value={ingredient.name || ''}
+                          onChange={(e) => {
+                            const updated = [...editedIngredients]
+                            updated[index] = { ...ingredient, name: e.target.value }
+                            setEditedIngredients(updated)
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder="Ingrediens navn"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={ingredient.notes || ''}
+                          onChange={(e) => {
+                            const updated = [...editedIngredients]
+                            updated[index] = { ...ingredient, notes: e.target.value }
+                            setEditedIngredients(updated)
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                          placeholder="Note"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <button
+                          onClick={() => {
+                            const updated = editedIngredients.filter((_, i) => i !== index)
+                            setEditedIngredients(updated)
+                          }}
+                          className="w-full p-1 text-red-600 hover:text-red-800"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setEditedIngredients([...editedIngredients, { name: '', amount: 0, unit: '', notes: '' }])
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <Plus size={16} />
+                    Tilføj ingrediens
+                  </button>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => {
+                      setEditingIngredients(false)
+                      setEditedIngredients(selectedRecipe.ingredients || [])
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Annuller
+                  </button>
+                  <button
+                    onClick={saveIngredients}
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Gemmer...' : 'Gem ingredienser'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Instructions Modal */}
+        {editingInstructions && selectedRecipe && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Rediger Fremgangsmåde - {selectedRecipe.title}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setEditingInstructions(false)
+                      setEditedInstructions(selectedRecipe.instructions || [])
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {editedInstructions.map((instruction, index) => (
+                    <div key={index} className="p-3 border border-gray-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                          {instruction.stepNumber || index + 1}
+                        </div>
+                        <div className="flex-1">
+                          <textarea
+                            rows={3}
+                            value={instruction.instruction || ''}
+                            onChange={(e) => {
+                              const updated = [...editedInstructions]
+                              updated[index] = { ...instruction, instruction: e.target.value }
+                              setEditedInstructions(updated)
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Skriv instruktion..."
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updated = editedInstructions.filter((_, i) => i !== index)
+                            // Re-number steps
+                            updated.forEach((inst, i) => {
+                              inst.stepNumber = i + 1
+                            })
+                            setEditedInstructions(updated)
+                          }}
+                          className="flex-shrink-0 p-1 text-red-600 hover:text-red-800"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      const newStep = {
+                        stepNumber: editedInstructions.length + 1,
+                        instruction: '',
+                        time: 0,
+                        tips: ''
+                      }
+                      setEditedInstructions([...editedInstructions, newStep])
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    <Plus size={16} />
+                    Tilføj step
+                  </button>
+                  <div className="flex-1" />
+                  <button
+                    onClick={() => {
+                      setEditingInstructions(false)
+                      setEditedInstructions(selectedRecipe.instructions || [])
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                  >
+                    Annuller
+                  </button>
+                  <button
+                    onClick={saveInstructions}
+                    disabled={saving}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {saving ? 'Gemmer...' : 'Gem fremgangsmåde'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </AdminLayout>
   )
 }

@@ -14,7 +14,9 @@ export function getDietaryCategories(category: string): string[] {
     'fleksitarisk': ['Fleksitarisk'],
     '5-2': ['5:2'], // 5:2 DIÆT = 5:2
     'meal-prep': ['Meal prep'], // MEAL PREP, Meal prep
-    'mealprep': ['Meal prep'] // Alternative spelling
+    'mealprep': ['Meal prep'], // Alternative spelling
+    'kombi-familiemad': ['Kombi-familiemad'], // Opskrift med kartofler/ris/pasta, kan bruges i keto-familie
+    'kombi-keto': ['Kombi-keto'] // Keto opskrift, kan bruges i familiemad
   }
   
   return categoryMap[category] || [category]

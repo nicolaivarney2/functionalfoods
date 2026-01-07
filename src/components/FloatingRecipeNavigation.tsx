@@ -23,10 +23,10 @@ export default function FloatingRecipeNavigation({
   return (
     <>
       {/* Floating Navigation Buttons */}
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex space-x-2">
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 flex space-x-2 max-w-[calc(100vw-2rem)] px-2">
         <button
           onClick={onIngredientsClick}
-          className={`px-4 md:px-6 py-2 md:py-3 rounded-full text-sm md:text-base font-medium transition-all duration-200 ${
+          className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
             activeSection === 'ingredients'
               ? 'bg-green-600 text-white shadow-lg'
               : 'bg-gray-800 text-white hover:bg-gray-700'
@@ -36,7 +36,7 @@ export default function FloatingRecipeNavigation({
         </button>
         <button
           onClick={onInstructionsClick}
-          className={`px-4 md:px-6 py-2 md:py-3 rounded-full text-sm md:text-base font-medium transition-all duration-200 ${
+          className={`px-3 md:px-4 py-1.5 md:py-2 rounded-full text-xs md:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
             activeSection === 'instructions'
               ? 'bg-green-600 text-white shadow-lg'
               : 'bg-gray-800 text-white hover:bg-gray-700'

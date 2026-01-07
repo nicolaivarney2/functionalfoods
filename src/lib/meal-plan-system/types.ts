@@ -88,6 +88,8 @@ export interface ShoppingItem {
   estimatedCost?: number;
   notes?: string;
   isOptional?: boolean;
+  isSupplement?: boolean; // Marker supplements fra kombi-opskrifter
+  supplementReason?: string; // Forklaring til hvorfor supplementet er tilføjet
 }
 
 export interface WeeklyNutrition {

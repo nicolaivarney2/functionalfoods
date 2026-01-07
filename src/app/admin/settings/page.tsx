@@ -267,7 +267,7 @@ export default function AdminSettingsPage() {
             {Object.entries(assistantIds).map(([category, assistantId]) => (
               <div key={category}>
                 <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-                  {category.replace('-', ' ')} Assistant
+                  {category?.replace('-', ' ') || category} Assistant
                 </label>
                 <input
                   type="text"
