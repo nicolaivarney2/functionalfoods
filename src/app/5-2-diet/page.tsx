@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Leaf, Brain, Zap, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Zap, Sparkles, ChevronRight } from 'lucide-react'
 
 export default function FiveTwoDietPage() {
   const [isVisible, setIsVisible] = useState(false)
