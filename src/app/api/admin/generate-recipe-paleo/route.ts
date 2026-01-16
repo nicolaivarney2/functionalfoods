@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, 'paleo')
+    const recipe = parseGeneratedRecipe(recipeContent)
     
     console.log(`✅ Generated Paleo recipe: ${recipe.title}`)
 
@@ -222,7 +222,7 @@ UNDGÅ:
 - Processerede fødevarer`
 }
 
-function parseGeneratedRecipe(content: string, category: string): any {
+function parseGeneratedRecipe(content: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)

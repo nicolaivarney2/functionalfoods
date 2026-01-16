@@ -115,7 +115,7 @@ ${parameterInstructions}`
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, 'keto')
+    const recipe = parseGeneratedRecipe(recipeContent)
     
     console.log(`✅ Generated Keto recipe: ${recipe.title}`)
 
@@ -369,7 +369,7 @@ UNDGÅ:
 - Kartofler og stivelsesrige grøntsager`
 }
 
-function parseGeneratedRecipe(content: string, category: string): any {
+function parseGeneratedRecipe(content: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)

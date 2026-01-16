@@ -333,7 +333,7 @@ JSON-struktur (obligatorisk):
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, 'familiemad')
+    const recipe = parseGeneratedRecipe(recipeContent)
     
     // Validate that title doesn't already exist
     const normalizedNewTitle = recipe.title?.toLowerCase().trim()
@@ -499,7 +499,7 @@ function buildParameterInstructions(params: FamiliemadParameters): string {
     : ''
 }
 
-function parseGeneratedRecipe(content: string, category: string): any {
+function parseGeneratedRecipe(content: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)

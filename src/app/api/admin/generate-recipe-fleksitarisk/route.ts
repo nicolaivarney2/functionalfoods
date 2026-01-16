@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, 'fleksitarisk')
+    const recipe = parseGeneratedRecipe(recipeContent)
     
     console.log(`✅ Generated Fleksitarisk recipe: ${recipe.title}`)
 
@@ -222,7 +222,7 @@ PLANTEBASERET FOKUS:
 - Tilføj frisk urt for smag`
 }
 
-function parseGeneratedRecipe(content: string, category: string): any {
+function parseGeneratedRecipe(content: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)
