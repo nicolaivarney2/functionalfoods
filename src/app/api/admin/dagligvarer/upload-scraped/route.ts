@@ -7,20 +7,20 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-interface ScrapedProduct {
-  external_id: string
-  name: string
-  category: string
-  price?: number
-  original_price?: number
-  on_sale: boolean
-  description?: string
-  brand?: string
-  image_url?: string
-  available: boolean
-  last_updated: string
-  source: string
-}
+// interface ScrapedProduct { // Not used
+//   external_id: string
+//   name: string
+//   category: string
+//   price?: number
+//   original_price?: number
+//   on_sale: boolean
+//   description?: string
+//   brand?: string
+//   image_url?: string
+//   available: boolean
+//   last_updated: string
+//   source: string
+// }
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now()

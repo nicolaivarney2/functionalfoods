@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { rema1000Scraper, Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
+import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 import { databaseService } from '@/lib/database-service'
 import { createSupabaseClient } from '@/lib/supabase'
 

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { databaseService } from '@/lib/database-service'
+import { NextResponse } from 'next/server'
+// import { databaseService } from '@/lib/database-service' // Not used
 import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -61,7 +61,7 @@ function transformRemaProduct(apiData: any): any {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     console.log('🚀 Starting simple delta update...')
     

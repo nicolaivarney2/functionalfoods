@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     console.log(`📦 Netto product data:`, JSON.stringify(data, null, 2))
     
     // Transform Salling Group data to our format
-    const transformedProduct = transformNettoProduct(data, ean, storeId)
+    const transformedProduct = transformNettoProduct(data, ean)
     
     return NextResponse.json({
       success: true,
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function transformNettoProduct(data: any, ean: string, storeId: string) {
+function transformNettoProduct(data: any, ean: string) {
   try {
     const product = data.instore
     

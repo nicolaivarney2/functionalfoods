@@ -57,8 +57,8 @@ const standardizeUnit = (unit: string) => {
   return unitMap[unit.toLowerCase()] || 'stk'
 }
 
-// AI-baseret produkt kategorisering (not used)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// AI-baseret produkt kategorisering (not used - kept for future reference)
+// @ts-ignore
 const categorizeProductWithAI = async (_productData: any) => {
   return 'Ukategoriseret'
   /* 

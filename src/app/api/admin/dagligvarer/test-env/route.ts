@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabaseServer'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('🔍 Testing environment variables and Supabase connection...')
     

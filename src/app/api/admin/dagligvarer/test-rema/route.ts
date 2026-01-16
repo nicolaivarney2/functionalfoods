@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('🧠 Testing REMA 1000 delta update capabilities...')
     

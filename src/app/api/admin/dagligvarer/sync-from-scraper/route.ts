@@ -3,7 +3,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { databaseService } from '@/lib/database-service'
 import { createSupabaseServiceClient } from '@/lib/supabase'
-import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
+// import { SupermarketProduct } from '@/lib/supermarket-scraper/types' // Not used
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

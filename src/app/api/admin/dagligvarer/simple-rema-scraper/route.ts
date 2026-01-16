@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -50,7 +50,7 @@ async function tryRemaEndpoint(url: string, options: any = {}): Promise<any> {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const startTime = Date.now()
   
   try {

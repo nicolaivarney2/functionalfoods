@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 // Zyte API configuration
 const ZYTE_API_KEY = process.env.ZYTE_API_KEY
@@ -31,7 +31,7 @@ async function zyteRequest(payload: any): Promise<any> {
   return response.json()
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     if (!ZYTE_API_KEY) {
       return NextResponse.json({

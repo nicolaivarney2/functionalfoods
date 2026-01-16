@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const startTime = Date.now()
   const maxTimeMs = 25000 // 25 seconds for Vercel timeout
   
