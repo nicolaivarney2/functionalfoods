@@ -11,29 +11,6 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
-interface RecipeFormData {
-  title: string
-  description: string
-  shortDescription: string
-  preparationTime: number
-  cookingTime: number
-  calories?: number
-  protein?: number
-  carbs?: number
-  fat?: number
-  fiber?: number
-  mainCategory: string
-  subCategories: string[]
-  dietaryCategories: string[]
-  ingredients: Ingredient[]
-  instructions: RecipeStep[]
-  imageUrl: string
-  imageAlt: string
-  servings: number
-  difficulty: 'Nem' | 'Mellem' | 'Svær'
-  author: string
-}
-
 export default function EditRecipe({ params }: PageProps) {
   const router = useRouter()
   const [recipe, setRecipe] = useState<any>(null)

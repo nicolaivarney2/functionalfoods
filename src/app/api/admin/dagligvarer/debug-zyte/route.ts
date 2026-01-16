@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 // Zyte API configuration
 const ZYTE_API_KEY = process.env.ZYTE_API_KEY
@@ -50,7 +50,7 @@ function decodeBase64Response(body: string): any {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     if (!ZYTE_API_KEY) {
       return NextResponse.json({

@@ -57,8 +57,11 @@ const standardizeUnit = (unit: string) => {
   return unitMap[unit.toLowerCase()] || 'stk'
 }
 
-// AI-baseret produkt kategorisering
-const categorizeProductWithAI = async (productData: any) => {
+// AI-baseret produkt kategorisering (not used)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const categorizeProductWithAI = async (_productData: any) => {
+  return 'Ukategoriseret'
+  /* 
   try {
     // Byg kontekst for AI
     const context = `
@@ -139,6 +142,7 @@ Returner kun kategorinavnet, intet andet.
     console.log('⚠️ AI kategorisering fejlede, bruger fallback:', error)
     return fallbackCategoryMapping(productData.name)
   }
+  */
 }
 
 // Fallback kategorisering hvis AI fejler
@@ -622,7 +626,7 @@ export async function PUT(request: NextRequest) {
     )
     
     const body = await request.json()
-    const { action, metadataId } = body
+    const { action } = body
     
     if (action === 'downloadLatestJSON') {
       // Get the latest scraping metadata
@@ -670,7 +674,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = createClient(
       (process.env as any).NEXT_PUBLIC_SUPABASE_URL!,

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 import { POST as SyncFromScraper } from '../sync-from-scraper/route'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('🔄 Starting delta update process...')
     
@@ -23,8 +23,6 @@ export async function POST(request: NextRequest) {
     
     // NEW: Use DB-diff sync (latest scraped JSON) for reliable updates within serverless limits
     console.log('🔄 Starting delta update via DB-diff sync-from-scraper...')
-    const publicBase = (process.env as any).NEXT_PUBLIC_SUPABASE_URL as string | undefined
-    const storageUrl = publicBase ? `${publicBase}/storage/v1/object/public/scraper-data/rema/latest.json` : undefined
     // Try latest.json first; if it fails, fall back to default metadata-based sync
     let syncJson: any = null
     try {
@@ -82,7 +80,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('📊 Getting delta update status...')
     

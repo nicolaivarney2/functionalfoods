@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
           .single()
         
         // Use upsert to insert or update product
-        const { data: upsertedProduct, error: upsertError } = await supabase
+        const { error: upsertError } = await supabase
           .from('supermarket_products')
           .upsert({
             external_id: product.external_id,

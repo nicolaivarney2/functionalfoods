@@ -1222,7 +1222,6 @@ export default function AdminPublishingPage() {
                       </p>
                       <RecipeNutritionRecalculator 
                         recipeId={selectedRecipe.id} 
-                        recipeName={selectedRecipe.title} 
                         recipeName={selectedRecipe.title}
                       />
                       

@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
-import { Rema1000Scraper } from '@/lib/supermarket-scraper/rema1000-scraper'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -64,7 +63,7 @@ function transformProduct(productData: any): any {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const startTime = Date.now()
   const maxTimeMs = 9500 // 9.5 seconds for Vercel timeout (safe margin)
   
@@ -72,7 +71,6 @@ export async function POST(req: NextRequest) {
     console.log('🚀 Starting REMA 1000 full scrape with existing scraper...')
     
     const supabase = createSupabaseServiceClient()
-    const scraper = new Rema1000Scraper()
     
     // Get current products count
     const { count: currentCount } = await supabase
