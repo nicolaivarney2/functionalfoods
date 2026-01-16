@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -15,13 +15,13 @@ export async function POST(request: NextRequest) {
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) {
+        get() {
           return undefined
         },
-        set(name: string, value: string, options: any) {
+        set() {
           // Service role doesn't need cookies
         },
-        remove(name: string, options: any) {
+        remove() {
           // Service role doesn't need cookies
         },
       },

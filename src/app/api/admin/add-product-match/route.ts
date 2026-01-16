@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseServiceClient()
 
     // Check if match already exists
-    const { data: existingMatch, error: checkError } = await supabase
+    const { data: existingMatch } = await supabase
       .from('product_ingredient_matches')
       .select('id')
       .eq('ingredient_id', ingredient_id)

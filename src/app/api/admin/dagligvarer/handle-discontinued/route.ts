@@ -4,7 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const startTime = Date.now()
   const maxExecutionTime = 8000 // 8 seconds max to avoid Vercel timeout
   

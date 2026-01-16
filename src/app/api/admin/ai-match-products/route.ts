@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get total count for pagination
-    const { count: totalUnmatched, error: countError } = await supabase
+    const { count: totalUnmatched } = await supabase
       .from('supermarket_products')
       .select('*', { count: 'exact', head: true })
       .not('external_id', 'in', `(

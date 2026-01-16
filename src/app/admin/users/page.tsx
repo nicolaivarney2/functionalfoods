@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/AdminLayout'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
-import { Users, Shield, Mail, Calendar } from 'lucide-react'
+import { Mail } from 'lucide-react'
 
 interface UserProfile {
   id: string

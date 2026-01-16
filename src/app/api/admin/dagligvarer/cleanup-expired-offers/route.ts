@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     console.log(`📅 Current time (UTC): ${now}`)
 
     // First, let's check how many offers are marked as on_sale with a sale_valid_to date
-    const { count: totalOnSaleWithDate, error: countOnSaleError } = await supabase
+    const { count: totalOnSaleWithDate } = await supabase
       .from('product_offers')
       .select('*', { count: 'exact', head: true })
       .eq('is_on_sale', true)
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Get a sample to see what dates we have - order by sale_valid_to ASC to see oldest first
     // Check BOTH is_on_sale=true AND is_on_sale=false to see all offers with dates
-    const { data: sampleOffers, error: sampleError } = await supabase
+    const { data: sampleOffers } = await supabase
       .from('product_offers')
       .select('id, name_store, is_on_sale, sale_valid_to')
       .not('sale_valid_to', 'is', null)

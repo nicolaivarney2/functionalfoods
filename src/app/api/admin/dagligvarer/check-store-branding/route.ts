@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     console.log('🔍 Checking store branding status...')
     

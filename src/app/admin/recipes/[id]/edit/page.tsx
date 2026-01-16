@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Trash2, Plus, X } from 'lucide-react'
 import { sampleRecipes } from '@/lib/sample-data'
-import { Recipe, Ingredient, RecipeStep } from '@/types/recipe'
+import { Ingredient, RecipeStep } from '@/types/recipe'
 
 interface PageProps {
   params: Promise<{ id: string }>

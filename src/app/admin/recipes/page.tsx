@@ -12,16 +12,8 @@ import {
   Star, 
   Trash2,
   Eye,
-  EyeOff,
-  Edit,
-  CheckCircle,
   XCircle,
-  Clock,
-  ImageIcon,
-  Calculator,
-  TrendingUp,
   Upload,
-  Download,
   Play,
   Pause
 } from 'lucide-react'
@@ -49,7 +41,6 @@ export default function AdminRecipesPage() {
   const { isAdmin, checking } = useAdminAuth()
   const [recipes, setRecipes] = useState<RecipeWithStatus[]>([])
   const [loading, setLoading] = useState(true)
-  const [deleting, setDeleting] = useState<string | null>(null)
   
   // Batch import states
   const [batchImportProgress, setBatchImportProgress] = useState<BatchImportProgress>({
