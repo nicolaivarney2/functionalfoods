@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: "system",
-            content: createKetoSystemPrompt(existingTitles, parameterInstructions)
+            content: createKetoSystemPrompt(existingTitles)
           },
           {
             role: "user",
@@ -293,7 +293,7 @@ function buildParameterInstructions(params: KetoParameters): string {
     : ''
 }
 
-function createKetoSystemPrompt(existingTitles: string[], parameterInstructions: string = ''): string {
+function createKetoSystemPrompt(existingTitles: string[]): string {
   return `Du er en ekspert i Keto kost og dansk madlavning. Generer en detaljeret Keto opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
