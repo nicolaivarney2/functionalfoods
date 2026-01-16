@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`🍱 Generating Meal Prep recipe: ${categoryName}`)
+    console.log(`💪 Generating Proteinrig kost recipe: ${categoryName}`)
 
     // Get OpenAI config from existing system
     const openaiConfig = getOpenAIConfig()
@@ -45,8 +45,8 @@ export async function POST(request: NextRequest) {
     // Get existing recipe titles to avoid duplicates
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
-    // Create Meal Prep-specific system prompt
-    const systemPrompt = createMealPrepSystemPrompt(existingTitles)
+    // Create Proteinrig kost-specific system prompt
+    const systemPrompt = createProteinrigKostSystemPrompt(existingTitles)
     
     // Generate recipe with OpenAI using existing config
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Meal Prep opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på retter der holder sig frisk i 3 dage.`
+            content: `Generer en ny Proteinrig kost opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på retter med højt proteinindhold og optimal næring.`
           }
         ],
         temperature: 0.8,
@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, 'meal-prep')
+    const recipe = parseGeneratedRecipe(recipeContent, 'proteinrig-kost')
     
-    console.log(`✅ Generated Meal Prep recipe: ${recipe.title}`)
+    console.log(`✅ Generated Proteinrig kost recipe: ${recipe.title}`)
 
     return NextResponse.json({
       success: true,
@@ -95,11 +95,11 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error generating Meal Prep recipe:', error)
+    console.error('Error generating Proteinrig kost recipe:', error)
     return NextResponse.json(
       { 
         success: false, 
-        error: 'Failed to generate Meal Prep recipe',
+        error: 'Failed to generate Proteinrig kost recipe',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
@@ -107,30 +107,30 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createMealPrepSystemPrompt(existingTitles: string[]): string {
-  return `Du er en ekspert i meal prep og holdbar madlavning. Generer en detaljeret Meal Prep opskrift i JSON format.
+function createProteinrigKostSystemPrompt(existingTitles: string[]): string {
+  return `Du er en ekspert i proteinrig kost og optimal næring. Generer en detaljeret Proteinrig kost opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
 
-MEAL PREP PRINCIPPER:
-- Skal holde sig frisk i køleskab i 3 dage
-- Nem at opvarme uden at miste kvalitet
-- Balanceret næring over flere dage
-- Ingredienser der ikke bliver slatne
-- Portioner der passer til meal prep containere
-- Fokus på holdbarhed og nem opvarmning
+PROTEINRIG KOST PRINCIPPER:
+- Højt proteinindhold (minimum 20g protein per portion)
+- Balanceret næring med fokus på protein
+- Mættende og nærende
+- Optimal for vægttab og muskelopbygning
+- Fokus på kvalitetsprotein fra forskellige kilder
+- Balanceret med sunde kulhydrater og fedtstoffer
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
-  "title": "Meal Prep opskrift titel",
-  "description": "Kort beskrivelse med fokus på meal prep fordele",
+  "title": "Proteinrig kost opskrift titel",
+  "description": "Kort beskrivelse med fokus på proteinindhold og næring",
   "ingredients": [
     {
       "name": "ingrediens navn",
       "amount": 100,
       "unit": "g",
-      "notes": "valgfri note om meal prep fordele"
+      "notes": "valgfri note om proteinindhold"
     }
   ],
   "instructions": [
@@ -138,14 +138,14 @@ OPPSKRIFT FORMAT (returner kun JSON):
       "stepNumber": 1,
       "instruction": "Detaljeret instruktion med meal prep tips",
       "time": 10,
-      "tips": "valgfri meal prep tip"
+      "tips": "valgfri tip om proteinindhold"
     }
   ],
   "servings": 3,
   "prepTime": 30,
   "cookTime": 45,
   "difficulty": "Medium|Hard",
-  "dietaryCategories": ["meal-prep", "mealprep"],
+  "dietaryCategories": ["Proteinrig kost"],
   "nutritionalInfo": {
     "calories": 400,
     "protein": 25.0,
@@ -155,22 +155,23 @@ OPPSKRIFT FORMAT (returner kun JSON):
   }
 }
 
-MEAL PREP INGREDIENSER:
-- Kød: kylling, oksekød, svinekød (godt til opvarmning)
-- Fisk: laks, tun (holder sig godt)
-- Grøntsager: broccoli, kål, zucchini, squash
-- Bælgfrugter: kikærter, linser, bønner
-- Fuldkorn: quinoa, bulgur, ris, pasta
-- Nødder: mandler, valnødder (til sidst)
-- Fedt: olivenolie, avocado (til sidst)
+PROTEINRIGE INGREDIENSER:
+- Kød: kylling, oksekød, svinekød, kalkun
+- Fisk: laks, tun, torsk, sej
+- Æg: hele æg, æggehvider
+- Bælgfrugter: kikærter, linser, bønner, edamame
+- Mælkeprodukter: græsk yoghurt, cottage cheese, kvark
+- Nødder: mandler, valnødder, cashews
+- Grøntsager: broccoli, spinat, asparges (til fyld og fibre)
+- Fuldkorn: quinoa, bulgur, ris (til kulhydrater)
 
-MEAL PREP TIPS:
-- Kog grøntsager aldrig helt færdige
-- Gem nødder og fedt til sidst
-- Brug meal prep containere
-- Opvarm ved lav varme
-- Tilføj frisk urt ved servering
-- Gem saucer separat`
+PROTEINRIG KOST TIPS:
+- Sigte efter minimum 20-30g protein per måltid
+- Kombiner forskellige proteinkilder for fuld næringsprofil
+- Tilføj grøntsager for fibre og mæthed
+- Brug sunde fedtstoffer for opfattelse
+- Balance protein med kulhydrater efter aktivitetsniveau
+- Vælg magre proteinkilder for vægttab`
 }
 
 function parseGeneratedRecipe(content: string, category: string): any {
@@ -189,7 +190,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     }
 
     // Add category-specific dietary categories
-    recipe.dietaryCategories = getDietaryCategories('meal-prep')
+    recipe.dietaryCategories = getDietaryCategories('proteinrig-kost')
     
     // Ensure all required fields exist
     return {
@@ -201,7 +202,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       prepTime: recipe.prepTime || 30,
       cookTime: recipe.cookTime || 45,
       difficulty: recipe.difficulty || 'Medium',
-      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('meal-prep'),
+      dietaryCategories: recipe.dietaryCategories || getDietaryCategories('proteinrig-kost'),
       nutritionalInfo: recipe.nutritionalInfo || {
         calories: 400,
         protein: 25,
@@ -211,7 +212,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
       }
     }
   } catch (error) {
-    console.error('Error parsing generated Meal Prep recipe:', error)
+    console.error('Error parsing generated Proteinrig kost recipe:', error)
     throw new Error('Failed to parse generated recipe')
   }
 }

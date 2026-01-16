@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { IngredientCategory, IngredientTag } from '@/lib/ingredient-system/types'
-import { databaseService } from '@/lib/database-service'
+// import { databaseService } from '@/lib/database-service' // Not used
 
 interface IngredientModalProps {
   isOpen: boolean

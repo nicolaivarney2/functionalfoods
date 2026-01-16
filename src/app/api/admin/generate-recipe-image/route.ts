@@ -114,8 +114,11 @@ function createImagePrompt(recipe: any, category: string): string {
     case '5:2 Faste':
       prompt += 'light healthy meal, portion control, clean presentation, '
       break
-    case 'Meal Prep (3 dage)':
-      prompt += 'meal prep containers, organized food, fresh ingredients, '
+    case 'Proteinrig kost':
+      prompt += 'high protein meal, nutritious food, balanced nutrition, healthy ingredients, '
+      break
+    case 'Meal Prep (3 dage)': // Legacy support
+      prompt += 'high protein meal, nutritious food, balanced nutrition, healthy ingredients, '
       break
     default:
       prompt += 'delicious food, appetizing presentation, '

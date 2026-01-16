@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Edit, Trash2, Eye, Search, Filter, Calendar, User, Tag, ExternalLink, FileText, Settings } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, Calendar, User, Tag, ExternalLink, FileText, Settings } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
 interface BlogCategory {
@@ -42,8 +42,8 @@ export default function AdminBlogsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingPost, setEditingPost] = useState<BlogPost | null>(null)
+  const [, setShowCreateModal] = useState(false)
+  const [editingPost] = useState<BlogPost | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
 
   const supabase = createSupabaseClient()

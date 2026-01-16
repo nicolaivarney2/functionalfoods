@@ -165,11 +165,11 @@ Din rolle er at skrive informative, engagerende og hjælpsomme blogafsnit der hj
 - Praktiske råd til at håndtere sult
 - Danske 5:2-venlige opskrifter`,
     
-    'Meal Prep': `Du er ekspert i meal prep og madplanlægning. Fopuser på:
-- Effektiv meal prep strategier
+    'Proteinrig kost': `Du er ekspert i proteinrig kost og optimal næring. Fokuser på:
+- Effektive strategier for højt proteinindtag
 - Opbevaring og holdbarhed
 - Praktiske råd til at spare tid og penge
-- Danske meal prep opskrifter`,
+- Danske proteinrige opskrifter`,
     
     'Familiemad': `Du er ekspert i sund familieernæring. Fokuser på:
 - Sunde opskrifter hele familien kan lide

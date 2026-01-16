@@ -149,9 +149,9 @@ Din rolle er at lave korte, præcise resume'er der hjælper danske brugere med h
 - Praktiske råd til faste-dage
 - Sundhedsfordele og overvejelser`,
     
-    'Meal Prep': `Du er ekspert i meal prep. Fokuser på:
-- Effektive meal prep strategier
-- Praktiske råd til madplanlægning
+    'Proteinrig kost': `Du er ekspert i proteinrig kost. Fokuser på:
+- Optimal proteinindtag for sundhed og vægttab
+- Praktiske råd til proteinrige måltider
 - Opbevaring og holdbarhed`,
     
     'Familiemad': `Du er ekspert i sund familieernæring. Fokuser på:

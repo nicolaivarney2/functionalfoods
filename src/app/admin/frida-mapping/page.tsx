@@ -20,8 +20,8 @@ export default function FridaMappingPage() {
     
     try {
       setIsSearching(true)
-      const { FridaIntegration } = await import('@/lib/ingredient-system/frida-integration')
-      const fridaIntegration = new FridaIntegration()
+      // const { FridaIntegration } = await import('@/lib/ingredient-system/frida-integration')
+      // const fridaIntegration = new FridaIntegration() // Not used yet
       
       console.log(`🔍 Searching Frida for: ${searchTerm}`)
       

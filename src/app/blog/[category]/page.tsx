@@ -105,13 +105,13 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
       'Guides, artikler og opskrifter der passer ind i en travl hverdag for hele familien.',
     showRecipes: true,
   },
-  'meal-prep': {
-    name: 'Meal Prep',
-    emoji: '📦',
+  'proteinrig-kost': {
+    name: 'Proteinrig kost',
+    emoji: '💪',
     bgColor: '#EFF6FF',
-    introTitle: 'Det bedste fra meal prep verdenen.',
+    introTitle: 'Det bedste fra proteinrig kost verdenen.',
     introLead:
-      'Guides og artikler om planlægning, struktur og mad der gør hverdagen nemmere.',
+      'Guides og artikler om optimal proteinindtag, næring og sundhed.',
     showRecipes: true,
   },
   mentalt: {

@@ -34,7 +34,9 @@ import {
 import { 
   Recipe, 
   RecipeFilter, 
-  ingredientService 
+  ingredientService,
+  IngredientCategory,
+  INGREDIENT_CATEGORY_NAMES
 } from '../ingredient-system';
 
 // Import database service
@@ -52,6 +54,8 @@ export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
   private dailyUsedRecipes: Map<string, Set<string>> = new Map(); // Track per-day usage
+  private currentOffers: Map<string, any[]> = new Map(); // Cache for current offers by ingredient
+  private selectedIngredientIds: Set<string> = new Set(); // Track selected ingredients for overlap scoring
 
   constructor() {
     // Initialize recipes asynchronously
@@ -504,8 +508,16 @@ export class MealPlanGenerator {
       }
     };
 
+    // Load current offers from selected stores
+    console.log(`🛒 Loading offers from stores: ${familyProfile.selectedStores.join(', ')}`);
+    await this.loadCurrentOffers(familyProfile.selectedStores);
+
     // Generate 1 week of meal plans
-    const weekPlan = await this.generateWeekPlan(1, config);
+    const weekPlan = await this.generateWeekPlan(1, config, {
+      hasChildren,
+      hasKetoAdults,
+      prioritizeKombiTags: hasChildren && hasKetoAdults
+    });
 
     console.log(`1-week meal plan generated in ${Date.now() - startTime}ms`);
     return weekPlan;
@@ -523,6 +535,9 @@ export class MealPlanGenerator {
       prioritizeKombiTags?: boolean
     }
   ): Promise<WeekPlan> {
+    // Reset selected ingredients tracking for new week
+    this.selectedIngredientIds.clear();
+    
     const days: DayPlan[] = [];
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + (weekNumber - 1) * 7);
@@ -536,7 +551,7 @@ export class MealPlanGenerator {
     }
 
     // Generate shopping list for the week
-    const shoppingList = this.generateShoppingList(weekNumber, days);
+    const shoppingList = await this.generateShoppingList(weekNumber, days);
 
     // Calculate weekly nutrition
     const weeklyNutrition = this.calculateWeeklyNutrition(days, config);
@@ -631,8 +646,8 @@ export class MealPlanGenerator {
     // Filter recipes based on dietary approach, meal type, and exclusions
     const availableRecipes = this.filterRecipes(config, mealDistribution.mealType, filterOptions);
     
-    // Score and rank recipes
-    const scoredRecipes = this.scoreRecipes(availableRecipes, mealDistribution, config);
+    // Score and rank recipes (async for offer matching)
+    const scoredRecipes = await this.scoreRecipes(availableRecipes, mealDistribution, config);
     
     // Select the best recipe with meal type consideration
     const selectedRecipe = this.selectRecipe(scoredRecipes, date, mealDistribution.mealType);
@@ -734,24 +749,42 @@ export class MealPlanGenerator {
   }
 
   /**
-   * Score recipes based on compatibility and preferences
+   * Score recipes based on compatibility, preferences, and current offers
    */
-  private scoreRecipes(
+  private async scoreRecipes(
     recipes: Recipe[], 
     mealDistribution: any, 
     config: MealPlanConfig
-  ): RecipeScore[] {
-    return recipes.map(recipe => {
+  ): Promise<RecipeScore[]> {
+    const scoredRecipes = await Promise.all(recipes.map(async recipe => {
       const compatibility = this.calculateRecipeCompatibility(recipe, mealDistribution, config);
-      const score = this.calculateOverallScore(compatibility);
+      const baseScore = this.calculateOverallScore(compatibility);
+      
+      // Add offer-based scoring (async)
+      const offerScore = await this.calculateOfferScore(recipe);
+      
+      // Add ingredient overlap scoring (bonus for shared ingredients)
+      const overlapScore = this.calculateIngredientOverlapScore(recipe);
+      
+      const totalScore = baseScore + offerScore + overlapScore;
+      
+      const reasons = this.generateScoreReasons(compatibility);
+      if (offerScore > 0) {
+        reasons.push(`Ingredienser på tilbud (+${Math.round(offerScore)} point)`);
+      }
+      if (overlapScore > 0) {
+        reasons.push(`Deler ingredienser med andre opskrifter (+${Math.round(overlapScore)} point)`);
+      }
       
       return {
         recipe,
-        score,
-        reasons: this.generateScoreReasons(compatibility),
+        score: totalScore,
+        reasons,
         compatibility
       };
-    }).sort((a, b) => b.score - a.score);
+    }));
+    
+    return scoredRecipes.sort((a, b) => b.score - a.score);
   }
 
   /**
@@ -900,18 +933,47 @@ export class MealPlanGenerator {
     }
 
     // Select from top 3 unused recipes today with some randomness
+    // But prioritize recipes with ingredient overlap (smaller shopping list)
     const topRecipes = unusedTodayRecipes.slice(0, Math.min(3, unusedTodayRecipes.length));
-    const randomIndex = Math.floor(Math.random() * topRecipes.length);
+    
+    // Sort by overlap score (recipes with more shared ingredients first)
+    topRecipes.sort((a, b) => {
+      const aOverlap = this.countIngredientOverlap(a.recipe);
+      const bOverlap = this.countIngredientOverlap(b.recipe);
+      if (aOverlap !== bOverlap) {
+        return bOverlap - aOverlap; // Higher overlap first
+      }
+      return b.score - a.score; // Then by total score
+    });
+    
+    // Prefer recipes with overlap, but add some randomness
+    const randomIndex = Math.floor(Math.random() * Math.min(2, topRecipes.length)); // Top 2 instead of top 3
     const selectedRecipe = topRecipes[randomIndex].recipe;
+    
+    // Track selected ingredients for overlap scoring
+    selectedRecipe.ingredients.forEach(ing => {
+      this.selectedIngredientIds.add(ing.ingredientId);
+    });
     
     // Mark as used today
     dailyUsed.add(selectedRecipe.id);
     this.usedRecipes.add(selectedRecipe.id);
     
-    console.log(`✅ Selected recipe for ${mealKey}: ${selectedRecipe.title} (variety score: ${topRecipes[randomIndex].compatibility.varietyScore})`);
+    console.log(`✅ Selected recipe for ${mealKey}: ${selectedRecipe.title} (overlap: ${this.countIngredientOverlap(selectedRecipe)} ingredients)`);
     console.log(`📊 Daily usage for ${dateKey}: ${dailyUsed.size} recipes used`);
 
     return selectedRecipe;
+  }
+  
+  /**
+   * Count how many ingredients overlap with already selected recipes
+   */
+  private countIngredientOverlap(recipe: Recipe): number {
+    if (this.selectedIngredientIds.size === 0) return 0;
+    
+    return recipe.ingredients.filter(ing => 
+      this.selectedIngredientIds.has(ing.ingredientId)
+    ).length;
   }
 
   /**
@@ -1056,7 +1118,7 @@ export class MealPlanGenerator {
   /**
    * Generate shopping list for a week
    */
-  private generateShoppingList(weekNumber: number, days: DayPlan[]): ShoppingList {
+  private async generateShoppingList(weekNumber: number, days: DayPlan[]): Promise<ShoppingList> {
     const ingredientMap = new Map<string, { amount: number; unit: string; name: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
 
@@ -1123,18 +1185,64 @@ export class MealPlanGenerator {
       });
     });
 
-    // Convert to shopping categories
+    // Convert to shopping categories using IngredientCategory
     const categories: ShoppingCategory[] = [];
-    const proteinItems: ShoppingItem[] = [];
-    const vegetableItems: ShoppingItem[] = [];
-    const otherItems: ShoppingItem[] = [];
+    const categoryMap = new Map<string, ShoppingItem[]>();
     const supplementItems: ShoppingItem[] = [];
+
+    // Load product matches for ingredients to get categories
+    const ingredientIds = Array.from(new Set(
+      Array.from(ingredientMap.keys()).map(key => {
+        const ingredient = ingredientService.getIngredientById(key);
+        return ingredient?.id || key;
+      }).filter(id => id && !id.startsWith('temp-') && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))
+    ));
+    
+    // Get product matches for these ingredients to find categories
+    const productCategoryMap = new Map<string, string>(); // ingredientId -> product category
+    
+    if (ingredientIds.length > 0) {
+      try {
+        const { createSupabaseClient } = await import('../supabase');
+        const supabase = createSupabaseClient();
+        
+        const { data: matches } = await supabase
+          .from('product_ingredient_matches')
+          .select(`
+            ingredient_id,
+            product_offers!inner(
+              products:product_id (
+                category,
+                department
+              )
+            )
+          `)
+          .in('ingredient_id', ingredientIds)
+          .limit(1000);
+        
+        if (matches) {
+          for (const match of matches) {
+            const offer = match.product_offers;
+            if (offer && Array.isArray(offer.products) && offer.products.length > 0) {
+              const product = offer.products[0];
+              const category = product.category || product.department;
+              if (category && !productCategoryMap.has(match.ingredient_id)) {
+                productCategoryMap.set(match.ingredient_id, category);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading product categories for ingredients:', error);
+      }
+    }
 
     // Add regular ingredients
     ingredientMap.forEach((value, key) => {
       // Try to get ingredient name from service using the key (which might be ingredientId or name)
       let ingredientName = (value as any).name || key
-      let ingredient = ingredientService.getIngredientById(key)
+      const ingredient = ingredientService.getIngredientById(key)
+      const ingredientId = ingredient?.id || key;
       
       // If key is not an ID, try to find by name
       if (!ingredient && key !== (value as any).name) {
@@ -1150,13 +1258,108 @@ export class MealPlanGenerator {
         unit: value.unit
       };
 
-      if (ingredient?.category === 'protein') {
-        proteinItems.push(item);
-      } else if (ingredient?.category === 'groent' || ingredient?.category === 'frugt') {
-        vegetableItems.push(item);
+      // Get category - first try ingredient category, then product category from matches
+      let category: IngredientCategory = IngredientCategory.Andre;
+      let categoryName = 'Andre';
+      
+      // First check if ingredient has a category
+      if (ingredient?.category) {
+        const dbCategory = (ingredient.category as string).toLowerCase();
+        const categoryMap: Record<string, IngredientCategory> = {
+          // Dagligvarer categories (matching product categories)
+          'frugt og grønt': IngredientCategory.Groent,
+          'kød og fisk': IngredientCategory.Protein,
+          'mejeri og køl': IngredientCategory.Mejeri,
+          'brød og kager': IngredientCategory.Korn,
+          'kolonial': IngredientCategory.Korn,
+          'frost': IngredientCategory.Forarbejdet,
+          'drikkevarer': IngredientCategory.Drikke,
+          'slik og snacks': IngredientCategory.Forarbejdet,
+          // Legacy/alternative names (for backwards compatibility)
+          'kød': IngredientCategory.Protein,
+          'fisk': IngredientCategory.Protein,
+          'mejeri': IngredientCategory.Mejeri,
+          'grøntsager': IngredientCategory.Groent,
+          'frugt': IngredientCategory.Frugt,
+          'protein': IngredientCategory.Protein,
+          'groent': IngredientCategory.Groent,
+          'mælkeprodukter': IngredientCategory.Mejeri,
+          'krydderier': IngredientCategory.Krydderi,
+          'krydderi': IngredientCategory.Krydderi,
+          'fedtstoffer': IngredientCategory.Fedt,
+          'fedt': IngredientCategory.Fedt,
+          'nødder': IngredientCategory.Nodder,
+          'nodder': IngredientCategory.Nodder,
+          'frø': IngredientCategory.Fro,
+          'fro': IngredientCategory.Fro,
+          'korn': IngredientCategory.Korn,
+          'urter': IngredientCategory.Urter,
+          'bælgfrugter': IngredientCategory.Balg,
+          'balg': IngredientCategory.Balg,
+          'forarbejdet': IngredientCategory.Forarbejdet,
+          'drikke': IngredientCategory.Drikke,
+          'andre': IngredientCategory.Andre
+        };
+        
+        if (Object.values(IngredientCategory).includes(dbCategory as IngredientCategory)) {
+          category = dbCategory as IngredientCategory;
+        } else if (categoryMap[dbCategory]) {
+          category = categoryMap[dbCategory];
+        }
+        categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
       } else {
-        otherItems.push(item);
+        // If no ingredient category, try to get from product match
+        const productCategory = productCategoryMap.get(ingredientId);
+        if (productCategory) {
+          // Map product category to ingredient category
+          const productCategoryLower = productCategory.toLowerCase();
+          const productToIngredientMap: Record<string, IngredientCategory> = {
+            // New ingredient categories
+            'kød': IngredientCategory.Protein,
+            'fisk': IngredientCategory.Protein,
+            'mejeri': IngredientCategory.Mejeri,
+            'æg': IngredientCategory.Protein,
+            'grøntsager': IngredientCategory.Groent,
+            'frugt': IngredientCategory.Frugt,
+            'tørvarer': IngredientCategory.Korn,
+            'konserves': IngredientCategory.Forarbejdet,
+            'krydderi & smag': IngredientCategory.Krydderi,
+            'krydderi og smag': IngredientCategory.Krydderi,
+            'frost': IngredientCategory.Forarbejdet,
+            // Legacy product categories (for backwards compatibility)
+            'kød og fisk': IngredientCategory.Protein,
+            'fjerkræ': IngredientCategory.Protein,
+            'mejeri og køl': IngredientCategory.Mejeri,
+            'frugt og grønt': IngredientCategory.Groent,
+            'kolonial': IngredientCategory.Korn,
+            'brød og kager': IngredientCategory.Korn,
+            'fedt og olie': IngredientCategory.Fedt,
+            'krydderier': IngredientCategory.Krydderi,
+            'nødder': IngredientCategory.Nodder,
+            'drikkevarer': IngredientCategory.Drikke
+          };
+          
+          // Try exact match first
+          if (productToIngredientMap[productCategoryLower]) {
+            category = productToIngredientMap[productCategoryLower];
+          } else {
+            // Try partial match
+            for (const [productCat, ingCat] of Object.entries(productToIngredientMap)) {
+              if (productCategoryLower.includes(productCat) || productCat.includes(productCategoryLower)) {
+                category = ingCat;
+                break;
+              }
+            }
+          }
+          
+          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
+        }
       }
+      
+      if (!categoryMap.has(categoryName)) {
+        categoryMap.set(categoryName, []);
+      }
+      categoryMap.get(categoryName)!.push(item);
     });
 
     // Add supplements from kombi-opskrifter
@@ -1171,14 +1374,39 @@ export class MealPlanGenerator {
       supplementItems.push(item);
     });
 
-    if (proteinItems.length > 0) {
-      categories.push({ name: 'Protein', items: proteinItems });
+    // Convert category map to sorted categories
+    // Define category order for better UX
+    const categoryOrder = [
+      'Protein',
+      'Kød',
+      'Fisk',
+      'Mejeri',
+      'Grøntsager',
+      'Frugt',
+      'Korn & Cerealer',
+      'Fedt & Olie',
+      'Nødder & Frø',
+      'Bælgfrugter',
+      'Krydderier',
+      'Urter',
+      'Forarbejdede fødevarer',
+      'Drikkevarer',
+      'Andre'
+    ];
+
+    // Add categories in order
+    for (const categoryName of categoryOrder) {
+      const items = categoryMap.get(categoryName);
+      if (items && items.length > 0) {
+        categories.push({ name: categoryName, items });
+      }
     }
-    if (vegetableItems.length > 0) {
-      categories.push({ name: 'Vegetables', items: vegetableItems });
-    }
-    if (otherItems.length > 0) {
-      categories.push({ name: 'Other', items: otherItems });
+
+    // Add any remaining categories not in the order list
+    for (const [categoryName, items] of categoryMap.entries()) {
+      if (!categoryOrder.includes(categoryName) && items.length > 0) {
+        categories.push({ name: categoryName, items });
+      }
     }
     // Add supplements as a separate category at the end
     if (supplementItems.length > 0) {
@@ -1530,5 +1758,304 @@ export class MealPlanGenerator {
       case 'Selenium': return ['Eat Brazil nuts, seafood, and fortified foods'];
       default: return [];
     }
+  }
+
+  /**
+   * Load current offers from selected stores
+   */
+  private async loadCurrentOffers(selectedStores: number[]): Promise<void> {
+    try {
+      if (!selectedStores || selectedStores.length === 0) {
+        console.log('⚠️ No stores selected, skipping offer loading');
+        this.currentOffers.clear();
+        return;
+      }
+
+      // Convert store IDs to strings for database query
+      const storeIds = selectedStores.map(id => id.toString());
+      
+      // Get offers from database - only on sale items
+      const { products, total } = await databaseService.getSupermarketProductsV2(
+        1,
+        1000, // Get up to 1000 offers
+        undefined, // All categories
+        true, // offersOnly = true
+        undefined, // No search filter
+        storeIds, // Filter by selected stores
+        true, // foodOnly = true
+        false // organicOnly = false (we'll handle this separately)
+      );
+
+      console.log(`🛒 Loaded ${total} offers from ${selectedStores.length} store(s)`);
+
+      // Group offers by ingredient name (fuzzy matching)
+      this.currentOffers.clear();
+      
+      for (const product of products || []) {
+        const productData = product.products?.[0] || product;
+        const ingredientName = (productData.name_generic || product.name_store || '').toLowerCase().trim();
+        
+        if (!ingredientName) continue;
+
+        // Normalize ingredient name (remove brand, size info, etc.)
+        const normalizedName = this.normalizeIngredientName(ingredientName);
+        
+        if (!this.currentOffers.has(normalizedName)) {
+          this.currentOffers.set(normalizedName, []);
+        }
+        
+        this.currentOffers.get(normalizedName)!.push({
+          name: ingredientName,
+          category: productData.category,
+          discountPercentage: product.discount_percentage || 0,
+          currentPrice: product.current_price,
+          normalPrice: product.normal_price,
+          savings: (product.normal_price || 0) - (product.current_price || 0),
+          storeId: product.store_id
+        });
+      }
+
+      console.log(`✅ Cached ${this.currentOffers.size} unique ingredient offers`);
+    } catch (error) {
+      console.error('❌ Error loading offers:', error);
+      this.currentOffers.clear();
+    }
+  }
+
+  /**
+   * Normalize ingredient name for matching
+   */
+  private normalizeIngredientName(name: string): string {
+    // Remove common prefixes/suffixes
+    return name
+      .replace(/\s*(økologisk|organic|øko)\s*/gi, '')
+      .replace(/\s*\d+\s*(g|kg|ml|l|stk)\s*/gi, '')
+      .replace(/\s*-\s*/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  /**
+   * Calculate offer-based score for a recipe
+   * Uses product_ingredient_matches table for accurate matching
+   */
+  private async calculateOfferScore(recipe: Recipe): Promise<number> {
+    if (this.currentOffers.size === 0) {
+      return 0; // No offers available
+    }
+
+    let totalScore = 0;
+    const expensiveCategories = ['kød', 'fisk', 'ost', 'mælkeprodukter', 'nødder', 'frø'];
+    let matchedIngredients = 0;
+    
+    // Get ingredient IDs from recipe ingredients
+    const ingredientIds: string[] = [];
+    const ingredientNameMap = new Map<string, string>(); // Map ingredientId -> name
+    
+    for (const ingredient of recipe.ingredients) {
+      const ingredientId = ingredient.ingredientId;
+      const ingredientName = (ingredient as any).name || ingredientId;
+      
+      if (ingredientId && ingredientId !== ingredientName) {
+        ingredientIds.push(ingredientId);
+        ingredientNameMap.set(ingredientId, ingredientName);
+      }
+    }
+
+    // If we have ingredient IDs, try to match via product_ingredient_matches table
+    if (ingredientIds.length > 0) {
+      try {
+        const { createSupabaseClient } = await import('../supabase');
+        const supabase = createSupabaseClient();
+        
+        // Get product matches for these ingredients via product_ingredient_matches
+        // Then join with product_offers to get current offers
+        const { data: matches, error } = await supabase
+          .from('product_ingredient_matches')
+          .select(`
+            ingredient_id,
+            product_external_id,
+            confidence,
+            product_offers!inner(
+              id,
+              product_id,
+              store_id,
+              name_store,
+              current_price,
+              normal_price,
+              is_on_sale,
+              discount_percentage,
+              products:product_id (
+                id,
+                name_generic,
+                category,
+                department
+              )
+            )
+          `)
+          .in('ingredient_id', ingredientIds)
+          .eq('product_offers.is_on_sale', true)
+          .eq('product_offers.is_available', true);
+
+        if (!error && matches && matches.length > 0) {
+          // Group matches by ingredient_id
+          const matchesByIngredient = new Map<string, any[]>();
+          for (const match of matches) {
+            const ingId = match.ingredient_id;
+            if (!matchesByIngredient.has(ingId)) {
+              matchesByIngredient.set(ingId, []);
+            }
+            matchesByIngredient.get(ingId)!.push(match);
+          }
+
+          // Score each matched ingredient
+          for (const [ingredientId, ingredientMatches] of matchesByIngredient.entries()) {
+            const ingredientName = ingredientNameMap.get(ingredientId) || ingredientId;
+            
+            // Find best offer (highest discount) from selected stores
+            let bestOffer: any = null;
+            let bestDiscount = 0;
+            
+            for (const match of ingredientMatches) {
+              const offer = match.product_offers;
+              if (offer && offer.is_on_sale) {
+                // Check if offer is from a selected store (if we have that info)
+                const discount = offer.discount_percentage || 
+                  (offer.normal_price && offer.current_price
+                    ? ((offer.normal_price - offer.current_price) / offer.normal_price) * 100
+                    : 0);
+                
+                if (discount > bestDiscount) {
+                  bestDiscount = discount;
+                  const productData = Array.isArray(offer.products) ? offer.products[0] : offer.products;
+                  bestOffer = {
+                    category: (productData?.category || productData?.department || '').toLowerCase(),
+                    discountPercentage: discount,
+                    currentPrice: offer.current_price,
+                    normalPrice: offer.normal_price,
+                    savings: (offer.normal_price || 0) - (offer.current_price || 0)
+                  };
+                }
+              }
+            }
+
+            if (bestOffer) {
+              matchedIngredients++;
+              const category = bestOffer.category;
+              const isExpensive = expensiveCategories.some(cat => category.includes(cat));
+              const discount = bestOffer.discountPercentage || 0;
+              
+              // Base score: 10-30 points based on discount percentage
+              let score = Math.min(30, Math.max(10, discount));
+              
+              // Bonus for expensive categories (especially meat/fish)
+              if (isExpensive) {
+                score *= 2.5; // Increased multiplier for expensive items (was 2)
+                if (category.includes('kød') || category.includes('fisk')) {
+                  score *= 2; // Extra bonus for meat/fish (was 1.5)
+                  // Additional bonus for high discounts on meat/fish
+                  if (discount > 20) {
+                    score += 30; // Big bonus for >20% discount on meat/fish
+                  }
+                }
+              }
+              
+              totalScore += score;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error matching ingredients with products:', error);
+      }
+    }
+
+    // Fallback: If no matches found via database, try fuzzy matching with cached offers
+    if (matchedIngredients === 0) {
+      for (const ingredient of recipe.ingredients) {
+        const ingredientName = (ingredient as any).name || ingredient.ingredientId;
+        if (!ingredientName) continue;
+
+        const normalizedName = this.normalizeIngredientName(ingredientName);
+        let offers = this.currentOffers.get(normalizedName);
+        
+        if (!offers || offers.length === 0) {
+          // Try fuzzy matching
+          for (const [offerName, offerList] of this.currentOffers.entries()) {
+            if (offerName.includes(normalizedName) || normalizedName.includes(offerName)) {
+              offers = offerList;
+              break;
+            }
+          }
+        }
+        
+        if (offers && offers.length > 0) {
+          matchedIngredients++;
+          const bestOffer = offers.reduce((best, current) => 
+            (current.discountPercentage || 0) > (best.discountPercentage || 0) ? current : best
+          );
+          
+          const category = bestOffer.category?.toLowerCase() || '';
+          const isExpensive = expensiveCategories.some(cat => category.includes(cat));
+          const discount = bestOffer.discountPercentage || 0;
+          
+          let score = Math.min(30, Math.max(10, discount));
+          if (isExpensive) {
+            score *= 2;
+            if (category.includes('kød') || category.includes('fisk')) {
+              score *= 1.5;
+            }
+          }
+          
+          totalScore += score;
+        }
+      }
+    }
+
+    // Bonus if multiple ingredients are on offer
+    if (matchedIngredients >= 2) {
+      totalScore += 20;
+    }
+    if (matchedIngredients >= 3) {
+      totalScore += 30;
+    }
+
+    return Math.min(300, totalScore); // Increased cap to allow more offer influence
+  }
+  
+  /**
+   * Calculate score based on ingredient overlap with already selected recipes
+   * Higher score = more shared ingredients = smaller shopping list
+   */
+  private calculateIngredientOverlapScore(recipe: Recipe): number {
+    if (this.selectedIngredientIds.size === 0) {
+      return 0; // No overlap possible if nothing selected yet
+    }
+    
+    let overlapCount = 0;
+    const recipeIngredientIds = new Set(
+      recipe.ingredients.map(ing => ing.ingredientId)
+    );
+    
+    // Count how many ingredients overlap
+    for (const ingredientId of recipeIngredientIds) {
+      if (this.selectedIngredientIds.has(ingredientId)) {
+        overlapCount++;
+      }
+    }
+    
+    // Score: 5 points per overlapping ingredient, up to 50 points max
+    // This encourages reusing ingredients
+    return Math.min(50, overlapCount * 5);
+  }
+  
+  /**
+   * Count how many ingredients overlap with already selected recipes
+   */
+  private countIngredientOverlap(recipe: Recipe): number {
+    if (this.selectedIngredientIds.size === 0) return 0;
+    
+    return recipe.ingredients.filter(ing => 
+      this.selectedIngredientIds.has(ing.ingredientId)
+    ).length;
   }
 } 

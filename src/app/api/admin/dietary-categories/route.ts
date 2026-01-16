@@ -9,7 +9,7 @@ const DEFAULT_DIETARY_CATEGORIES = [
   'Keto',
   'Sense',
   'GLP-1 kost',
-  'Meal prep',
+  'Proteinrig kost',
   'Anti-inflammatorisk',
   'Fleksitarisk',
   '5:2 diæt',

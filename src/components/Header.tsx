@@ -20,7 +20,7 @@ const dietaryCategories = [
   { name: 'KETO', href: '/keto' },
   { name: 'SENSE', href: '/sense' },
   { name: 'GLP-1 KOST', href: '/GLP-1' },
-  { name: 'MEAL PREP', href: '/meal-prep' },
+  { name: 'PROTEINRIG KOST', href: '/proteinrig-kost' },
   { name: 'ANTI-INFLAMMATORISK', href: '/anti-inflammatory' },
   { name: 'FLEKSITARISK', href: '/flexitarian' },
   { name: '5:2 DIÆT', href: '/5-2-diet' },

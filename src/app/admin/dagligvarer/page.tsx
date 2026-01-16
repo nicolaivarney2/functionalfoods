@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Play, RefreshCw, Clock, CheckCircle, AlertCircle, Store, Database, TrendingUp } from 'lucide-react'
+import { Play, RefreshCw, Clock, AlertCircle, Store, Database, TrendingUp } from 'lucide-react'
 
 interface ScrapingStats {
   totalProducts: number
@@ -26,12 +26,9 @@ interface ScrapingProgress {
 export default function AdminDagligvarerPage() {
   const [selectedShop, setSelectedShop] = useState('rema1000')
   const [stats, setStats] = useState<ScrapingStats | null>(null)
-  const [fullScrapeProgress, setFullScrapeProgress] = useState<ScrapingProgress | null>(null)
+  const [fullScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [priceScrapeProgress, setPriceScrapeProgress] = useState<ScrapingProgress | null>(null)
-  const [batchScrapeProgress, setBatchScrapeProgress] = useState<ScrapingProgress | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [replaceAll, setReplaceAll] = useState(false)
 
   const shops = [
     { id: 'rema1000', name: 'REMA 1000', status: 'active' },
@@ -56,177 +53,7 @@ export default function AdminDagligvarerPage() {
     }
   }
 
-  const startFullScrape = async () => {
-    if (isLoading) return
-    setIsLoading(true)
-    setFullScrapeProgress({
-      isRunning: true,
-      currentBatch: 0,
-      totalBatches: 0,
-      processed: 0,
-      total: 0,
-      updated: 0,
-      inserted: 0,
-      errors: 0,
-      timeElapsed: 0
-    })
 
-    try {
-      const response = await fetch(`/api/admin/dagligvarer/full-scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shop: selectedShop })
-      })
-
-      const result = await response.json()
-      
-      if (result.success) {
-        setFullScrapeProgress({
-          isRunning: false,
-          currentBatch: result.batches?.completed || 0,
-          totalBatches: result.batches?.total || 0,
-          processed: result.stats?.processed || 0,
-          total: result.stats?.total || 0,
-          updated: result.stats?.updated || 0,
-          inserted: result.stats?.inserted || 0,
-          errors: result.stats?.errors || 0,
-          timeElapsed: result.timeElapsed || 0
-        })
-        
-        alert(`✅ Full scrape completed!\n\nProcessed: ${result.stats?.processed || 0}\nUpdated: ${result.stats?.updated || 0}\nNew: ${result.stats?.inserted || 0}\nTime: ${Math.round((result.timeElapsed || 0) / 1000)}s`)
-        await loadStats()
-      } else {
-        throw new Error(result.message || 'Full scrape failed')
-      }
-    } catch (error) {
-      console.error('Full scrape error:', error)
-      alert(`❌ Full scrape failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      setFullScrapeProgress(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const startBatchScrape = async () => {
-    if (isLoading) return
-    setIsLoading(true)
-    
-    // Get departments first via our API
-    let departments = []
-    try {
-      const deptResponse = await fetch('/api/admin/dagligvarer/departments')
-      const deptData = await deptResponse.json()
-      if (deptData.success) {
-        departments = deptData.departments || []
-      } else {
-        throw new Error(deptData.message || 'Failed to fetch departments')
-      }
-    } catch (error) {
-      console.error('Failed to fetch departments:', error)
-      alert('❌ Failed to fetch departments')
-      setIsLoading(false)
-      return
-    }
-
-    setBatchScrapeProgress({
-      isRunning: true,
-      currentBatch: 0,
-      totalBatches: 0,
-      processed: 0,
-      total: 0,
-      updated: 0,
-      inserted: 0,
-      errors: 0,
-      timeElapsed: 0
-    })
-
-    let totalProcessed = 0
-    let totalUpdated = 0
-    let totalInserted = 0
-    let totalErrors = 0
-    const startTime = Date.now()
-
-    try {
-      // Process each department
-      for (let deptIndex = 0; deptIndex < departments.length; deptIndex++) {
-        const department = departments[deptIndex]
-        console.log(`🔍 Processing department: ${department.name} (${deptIndex + 1}/${departments.length})`)
-        
-        let page = 1
-        let hasMore = true
-        
-        while (hasMore) {
-          try {
-            const response = await fetch('/api/admin/dagligvarer/batch-scrape', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                departmentId: department.id,
-                page: page,
-                limit: 100
-              })
-            })
-
-            const result = await response.json()
-            
-            if (result.success) {
-              totalProcessed += result.productsFound
-              totalUpdated += result.productsUpdated
-              totalInserted += result.productsAdded
-              
-              setBatchScrapeProgress({
-                isRunning: true,
-                currentBatch: page,
-                totalBatches: 0, // We don't know total pages upfront
-                processed: totalProcessed,
-                total: 0,
-                updated: totalUpdated,
-                inserted: totalInserted,
-                errors: totalErrors,
-                timeElapsed: Date.now() - startTime
-              })
-              
-              hasMore = result.hasMore
-              page++
-              
-              // Small delay between batches to avoid overwhelming the API
-              await new Promise(resolve => setTimeout(resolve, 100))
-            } else {
-              console.error(`Batch failed for ${department.name} page ${page}:`, result.message)
-              totalErrors++
-              hasMore = false
-            }
-          } catch (error) {
-            console.error(`Error processing ${department.name} page ${page}:`, error)
-            totalErrors++
-            hasMore = false
-          }
-        }
-      }
-      
-      setBatchScrapeProgress({
-        isRunning: false,
-        currentBatch: 0,
-        totalBatches: 0,
-        processed: totalProcessed,
-        total: 0,
-        updated: totalUpdated,
-        inserted: totalInserted,
-        errors: totalErrors,
-        timeElapsed: Date.now() - startTime
-      })
-      
-      alert(`🎉 Batch scrape completed!\n\nTotal processed: ${totalProcessed}\nUpdated: ${totalUpdated}\nNew: ${totalInserted}\nErrors: ${totalErrors}\nTime: ${Math.round((Date.now() - startTime) / 1000)}s`)
-      await loadStats()
-      
-    } catch (error) {
-      console.error('Batch scrape error:', error)
-      alert(`❌ Batch scrape failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      setBatchScrapeProgress(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const startPriceScrape = async () => {
     if (isLoading) return

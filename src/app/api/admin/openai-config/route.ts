@@ -21,7 +21,7 @@ export async function GET() {
           antiinflammatorisk: '',
           fleksitarisk: '',
           '5-2': '',
-          'meal-prep': ''
+          'proteinrig-kost': ''
         }
       })
     }

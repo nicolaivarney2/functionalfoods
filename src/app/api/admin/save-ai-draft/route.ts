@@ -211,7 +211,8 @@ function getMainCategory(category: string): string {
     'antiinflammatorisk': 'Sund mad',
     'fleksitarisk': 'Sund mad',
     '5-2': 'Sund mad',
-    'meal-prep': 'Meal Prep'
+    'proteinrig-kost': 'Proteinrig kost',
+    'meal-prep': 'Proteinrig kost' // Legacy mapping
   }
   
   return categoryMap[category] || 'Hovedretter'

@@ -6,7 +6,7 @@ import { Recipe } from '@/types/recipe'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import { 
-  Target, 
+  Target,
   Image, 
   FileText, 
   Star, 

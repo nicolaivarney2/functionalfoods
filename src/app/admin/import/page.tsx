@@ -1,21 +1,15 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import AdminLayout from '@/components/AdminLayout'
-import { Upload, Database, CheckCircle, AlertCircle, Loader2, BarChart3, FileText } from 'lucide-react'
+import { Database, CheckCircle, AlertCircle, Loader2, BarChart3, FileText } from 'lucide-react'
 import { ImportProcessor } from '@/lib/import-processor'
 import { RawRecipeData } from '@/lib/recipe-import'
 import { databaseService } from '@/lib/database-service'
 import { ingredientMatcher } from '@/lib/ingredient-matcher'
 
 export default function AdminImportPage() {
-  const [file, setFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [checking, setChecking] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info'>('info')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // const fileInputRef = useRef<HTMLInputElement>(null) // Not used
   const [isProcessing, setIsProcessing] = useState(false)
   const [importResult, setImportResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -69,7 +63,7 @@ export default function AdminImportPage() {
       setSaveStatus('Behandler ingredienser for duplikater...')
       
       // Process ingredients to remove duplicates
-      const { newIngredients, matchedIngredients, skippedCount } = await ingredientMatcher.processIngredients(importResult.ingredients)
+      const { newIngredients, skippedCount } = await ingredientMatcher.processIngredients(importResult.ingredients)
       
       console.log('🔍 Ingredient matching results:')
       console.log(`  - Total ingredients: ${importResult.ingredients.length}`)

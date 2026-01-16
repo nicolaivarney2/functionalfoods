@@ -2446,7 +2446,7 @@ export default function MadbudgetPage() {
                         { id: 'anti-inflammatory', name: 'Anti-inflammatorisk', desc: 'Fokuserer på anti-inflammatoriske fødevarer' },
                         { id: 'flexitarian', name: 'Fleksitarisk', desc: 'Primært plantebaseret med lejlighedsvis kød' },
                         { id: '5-2', name: '5:2 diæt', desc: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag' },
-                        { id: 'meal-prep', name: 'Meal prep', desc: 'Avancerede meal prep retter' },
+                        { id: 'proteinrig-kost', name: 'Proteinrig kost', desc: 'Proteinrige opskrifter til optimal næring' },
                         { id: 'familiemad', name: 'Sund familiemad', desc: 'Klassiske, næringsrige retter der passer til hele familien' }
                       ].map((approach) => (
                         <label

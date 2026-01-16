@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import AdminLayout from '@/components/AdminLayout'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
-import { Image, Download, Trash2, RefreshCw, Eye, FileImage, ExternalLink } from 'lucide-react'
+import { Download, RefreshCw, FileImage, ExternalLink } from 'lucide-react'
 
 interface RecipeImage {
   id: string

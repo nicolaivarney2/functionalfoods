@@ -11,7 +11,7 @@ interface OpenAIConfig {
     antiinflammatorisk: string
     fleksitarisk: string
     '5-2': string
-    'meal-prep': string
+    'proteinrig-kost': string
   }
 }
 
@@ -39,7 +39,7 @@ export function getOpenAIConfig(): OpenAIConfig | null {
             antiinflammatorisk: process.env.OPENAI_ASSISTANT_ANTIINFLAMMATORISK || '',
             fleksitarisk: process.env.OPENAI_ASSISTANT_FLEKSITARISK || '',
             '5-2': process.env.OPENAI_ASSISTANT_5_2 || '',
-            'meal-prep': process.env.OPENAI_ASSISTANT_MEAL_PREP || ''
+            'proteinrig-kost': process.env.OPENAI_ASSISTANT_PROTEINRIG_KOST || ''
           }
         }
       }
@@ -64,7 +64,7 @@ export function getOpenAIConfig(): OpenAIConfig | null {
             antiinflammatorisk: '',
             fleksitarisk: '',
             '5-2': '',
-            'meal-prep': ''
+            'proteinrig-kost': ''
           }
         }
       }

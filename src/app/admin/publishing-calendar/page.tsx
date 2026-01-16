@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
+import { format, addDays, subDays, startOfWeek, endOfWeek, isSameDay } from 'date-fns'
 import { da } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap, RefreshCw, Trash } from 'lucide-react'
-import { SlotScheduler, SlotSchedule } from '@/lib/slot-scheduler'
+import { ChevronLeft, ChevronRight, Trash2, CheckCircle, Brain, Calculator, Image, Star, AlertTriangle, Zap, RefreshCw, Trash } from 'lucide-react'
+import { SlotSchedule } from '@/lib/slot-scheduler'
 
 interface Recipe {
   id: string
@@ -32,8 +32,6 @@ export default function PublishingCalendarPage() {
   const [scheduledRecipes, setScheduledRecipes] = useState<SlotSchedule[]>([])
   const [recipeDetails, setRecipeDetails] = useState<Record<string, Recipe>>({})
   const [loading, setLoading] = useState(true)
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null)
 
   const SLOT_TIMES = ['07:00', '12:00', '15:30', '20:30']
   const SLOT_LABELS = ['Morgen', 'Middag', 'Eftermiddag', 'Aften']
@@ -120,11 +118,6 @@ export default function PublishingCalendarPage() {
     setCurrentWeek(new Date())
   }
 
-  const handleSlotClick = (date: Date, time: string) => {
-    const dateString = format(date, 'yyyy-MM-dd')
-    setSelectedDate(dateString)
-    setSelectedSlot(time)
-  }
 
   const handleRemoveRecipe = async (recipeId: string) => {
     if (!confirm('Er du sikker på at du vil fjerne denne opskrift fra slot?')) return

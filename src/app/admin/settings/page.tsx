@@ -19,7 +19,7 @@ export default function AdminSettingsPage() {
     antiinflammatorisk: '',
     fleksitarisk: '',
     '5-2': '',
-    'meal-prep': ''
+    'proteinrig-kost': ''
   })
   
   // Recipe categories management
@@ -55,7 +55,7 @@ export default function AdminSettingsPage() {
           antiinflammatorisk: '',
           fleksitarisk: '',
           '5-2': '',
-          'meal-prep': ''
+          'proteinrig-kost': ''
         })
       }
     } catch (error) {
@@ -308,7 +308,7 @@ export default function AdminSettingsPage() {
           OPENAI_ASSISTANT_ANTIINFLAMMATORISK=asst_xxx<br/>
           OPENAI_ASSISTANT_FLEKSITARISK=asst_xxx<br/>
           OPENAI_ASSISTANT_5_2=asst_xxx<br/>
-          OPENAI_ASSISTANT_MEAL_PREP=asst_xxx
+          OPENAI_ASSISTANT_PROTEINRIG_KOST=asst_xxx
         </div>
       </div>
 
@@ -325,7 +325,7 @@ export default function AdminSettingsPage() {
             <li><strong>Antiinflammatorisk:</strong> "Anti-inflammatory Recipe Generator"</li>
             <li><strong>Fleksitarisk:</strong> "Flexitarian Recipe Generator"</li>
             <li><strong>5:2:</strong> "5:2 Diet Recipe Generator"</li>
-            <li><strong>Meal Prep:</strong> "Meal Prep Recipe Generator"</li>
+            <li><strong>Proteinrig kost:</strong> "Proteinrig kost Recipe Generator"</li>
           </ul>
           <li>For hver Assistant: Kopier den relevante prompt fra koden</li>
           <li>Kopier hver Assistant ID og indsæt i det relevante felt ovenfor</li>

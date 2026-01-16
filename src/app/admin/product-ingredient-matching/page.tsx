@@ -58,11 +58,13 @@ export default function ProductIngredientMatchingPage() {
   // Load data on component mount
   useEffect(() => {
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Update stats when matches change
   useEffect(() => {
     updateStats()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingMatches])
 
   const loadData = async () => {
@@ -92,6 +94,13 @@ export default function ProductIngredientMatchingPage() {
       
       console.log(`📊 Loaded ${allProducts.length} grocery products`)
       console.log(`📋 Loaded ${existingMatchesData.length} existing matches`)
+      
+      // Log store distribution
+      const storeCounts = allProducts.reduce((acc: any, prod: any) => {
+        acc[prod.store] = (acc[prod.store] || 0) + 1
+        return acc
+      }, {})
+      console.log(`🏪 Store distribution:`, storeCounts)
       
     } catch (error) {
       console.error('Error loading data:', error)
@@ -132,53 +141,22 @@ export default function ProductIngredientMatchingPage() {
     return allIngredients
   }
 
+  // Don't load all products upfront - we'll load them on-demand when searching
   const loadProductsInBatches = async (): Promise<GroceryProduct[]> => {
-    const allProducts: GroceryProduct[] = []
-    let page = 1
-    let hasMore = true
-    const maxPages = 10 // Limit to 1000 products for testing
-
-    while (hasMore && page <= maxPages) {
-      try {
-        console.log(`📦 Loading products page ${page}...`)
-        const response = await fetch(`/api/admin/products-for-matching?page=${page}&limit=100`)
-        const data = await response.json()
-        
-        if (data.success && data.data.products) {
-          allProducts.push(...data.data.products.map((prod: any) => ({
-            id: prod.external_id,
-            name: prod.name,
-            category: prod.category || 'Andre',
-            store: prod.store,
-            price: prod.price,
-            originalPrice: prod.original_price,
-            isOnSale: prod.is_on_sale || false,
-            unit: 'stk', // Default unit
-            quantity: 1 // Default quantity
-          })))
-          
-          hasMore = data.data.pagination.hasMore
-          page++
-          console.log(`✅ Loaded ${allProducts.length} products so far...`)
-        } else {
-          hasMore = false
-        }
-      } catch (error) {
-        console.error('Error loading products batch:', error)
-        hasMore = false
-      }
-    }
-
-    return allProducts
+    // Return empty array - products will be loaded on-demand via search
+    return []
   }
 
   const loadExistingMatches = async (): Promise<ExistingMatch[]> => {
     try {
+      console.log('🔄 Loading existing matches from API...')
       const response = await fetch(`/api/admin/existing-matches?t=${Date.now()}`)
       const data = await response.json()
       
+      console.log('📥 API response:', data)
+      
       if (data.success) {
-        return data.matches.map((match: any) => ({
+        const matches = data.matches.map((match: any) => ({
           id: match.id,
           ingredient_id: match.ingredient_id,
           product_external_id: match.product_external_id,
@@ -192,10 +170,17 @@ export default function ProductIngredientMatchingPage() {
           product_original_price: match.product_original_price,
           product_is_on_sale: match.product_is_on_sale
         }))
+        console.log(`✅ Loaded ${matches.length} matches:`, matches.map((m: ExistingMatch) => ({ 
+          ingredient_id: m.ingredient_id, 
+          ingredient_name: m.ingredient_name,
+          product_name: m.product_name 
+        })))
+        return matches
       }
+      console.warn('⚠️ API returned success: false', data)
       return []
     } catch (error) {
-      console.error('Error loading existing matches:', error)
+      console.error('❌ Error loading existing matches:', error)
       return []
     }
   }
@@ -211,7 +196,21 @@ export default function ProductIngredientMatchingPage() {
 
   // Get products matched to a specific ingredient
   const getProductsForIngredient = (ingredientId: string): ExistingMatch[] => {
-    return existingMatches.filter(match => match.ingredient_id === ingredientId)
+    // Try both exact match and string comparison (in case of type mismatches)
+    const matches = existingMatches.filter(match => {
+      const matchId = String(match.ingredient_id).trim()
+      const searchId = String(ingredientId).trim()
+      return matchId === searchId
+    })
+    
+    if (matches.length === 0 && existingMatches.length > 0) {
+      console.log(`⚠️ No matches found for ingredient ${ingredientId}`)
+      console.log(`📋 Available ingredient_ids in matches:`, [...new Set(existingMatches.map(m => m.ingredient_id))])
+      console.log(`🔍 Searching for: "${ingredientId}" (type: ${typeof ingredientId})`)
+      console.log(`📋 First match ingredient_id: "${existingMatches[0]?.ingredient_id}" (type: ${typeof existingMatches[0]?.ingredient_id})`)
+    }
+    
+    return matches
   }
 
   // Add a product match to an ingredient
@@ -242,27 +241,15 @@ export default function ProductIngredientMatchingPage() {
       const data = await response.json()
       
       if (response.ok && data.success) {
-        // Add to local state
-        const newMatch: ExistingMatch = {
-          id: data.data.id, // Use real ID from database
-          ingredient_id: ingredientId,
-          product_external_id: product.id,
-          confidence: 100,
-          match_type: 'manual',
-          ingredient_name: ingredients.find(i => i.id === ingredientId)?.name || '',
-          product_name: product.name,
-          product_category: product.category,
-          product_store: product.store,
-          product_price: product.price,
-          product_original_price: product.originalPrice,
-          product_is_on_sale: product.isOnSale
-        }
-        
-        setExistingMatches(prev => [...prev, newMatch])
+        // Reload existing matches to get the new one from database
+        const updatedMatches = await loadExistingMatches()
+        setExistingMatches(updatedMatches)
         console.log('✅ Product match added successfully')
       } else {
-        console.error('❌ Failed to add product match:', data.message)
-        alert(`Failed to add product match: ${data.message}`)
+        console.error('❌ Failed to add product match:', data)
+        const errorMessage = data.details || data.message || 'Unknown error'
+        const errorHint = data.hint ? `\n\nHint: ${data.hint}` : ''
+        alert(`Failed to add product match: ${errorMessage}${errorHint}`)
       }
     } catch (error) {
       console.error('❌ Error adding product match:', error)
@@ -394,11 +381,14 @@ export default function ProductIngredientMatchingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Categories</option>
+                <option value="Frugt og grønt">Frugt og grønt</option>
                 <option value="Kød og fisk">Kød og fisk</option>
-                <option value="Grøntsager">Grøntsager</option>
-                <option value="Mejeri">Mejeri</option>
+                <option value="Mejeri og køl">Mejeri og køl</option>
                 <option value="Brød og kager">Brød og kager</option>
-                <option value="Krydderier">Krydderier</option>
+                <option value="Kolonial">Kolonial</option>
+                <option value="Frost">Frost</option>
+                <option value="Drikkevarer">Drikkevarer</option>
+                <option value="Slik og snacks">Slik og snacks</option>
                 <option value="Andre">Andre</option>
               </select>
             </div>
@@ -415,8 +405,17 @@ export default function ProductIngredientMatchingPage() {
                 <option value="all">All Stores</option>
                 <option value="REMA 1000">REMA 1000</option>
                 <option value="Netto">Netto</option>
-                <option value="Fakta">Fakta</option>
                 <option value="Bilka">Bilka</option>
+                <option value="Lidl">Lidl</option>
+                <option value="365 Discount">365 Discount</option>
+                <option value="Nemlig">Nemlig</option>
+                <option value="MENY">MENY</option>
+                <option value="Spar">Spar</option>
+                <option value="Kvickly">Kvickly</option>
+                <option value="Super Brugsen">Super Brugsen</option>
+                <option value="Brugsen">Brugsen</option>
+                <option value="Løvbjerg">Løvbjerg</option>
+                <option value="ABC Lavpris">ABC Lavpris</option>
               </select>
             </div>
           </div>
@@ -424,18 +423,61 @@ export default function ProductIngredientMatchingPage() {
 
         {/* Ingredients List */}
         <div className="space-y-4">
-          {currentIngredients.map((ingredient, index) => {
+          {currentIngredients.map((ingredient) => {
             const matchedProducts = getProductsForIngredient(ingredient.id)
+            console.log(`📦 Ingredient "${ingredient.name}" (${ingredient.id}): ${matchedProducts.length} matched products`)
             
             return (
               <div key={ingredient.id} className="bg-white rounded-lg shadow">
                 <div className="p-6">
                   {/* Ingredient Header */}
                   <div className="flex items-center justify-between mb-4">
-                    <div>
+                    <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900">{ingredient.name}</h3>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Category: {ingredient.category}
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="text-sm text-gray-600">
+                          Category:
+                        </div>
+                        <select
+                          value={ingredient.category || 'Andre'}
+                          onChange={async (e) => {
+                            const newCategory = e.target.value
+                            try {
+                              const response = await fetch(`/api/ingredients/${ingredient.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ category: newCategory })
+                              })
+                              const data = await response.json()
+                              if (response.ok && data.success) {
+                                // Update local state
+                                setIngredients(prev => prev.map(ing => 
+                                  ing.id === ingredient.id 
+                                    ? { ...ing, category: newCategory }
+                                    : ing
+                                ))
+                                console.log(`✅ Updated category for ${ingredient.name} to ${newCategory}`)
+                              } else {
+                                console.error('❌ Failed to update category:', data.error)
+                                alert(`Failed to update category: ${data.error || 'Unknown error'}`)
+                              }
+                            } catch (error) {
+                              console.error('❌ Error updating category:', error)
+                              alert('Error updating category')
+                            }
+                          }}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="Frugt og grønt">Frugt og grønt</option>
+                          <option value="Kød og fisk">Kød og fisk</option>
+                          <option value="Mejeri og køl">Mejeri og køl</option>
+                          <option value="Brød og kager">Brød og kager</option>
+                          <option value="Kolonial">Kolonial</option>
+                          <option value="Frost">Frost</option>
+                          <option value="Drikkevarer">Drikkevarer</option>
+                          <option value="Slik og snacks">Slik og snacks</option>
+                          <option value="Andre">Andre</option>
+                        </select>
                       </div>
                       {ingredient.description && (
                         <div className="text-sm text-gray-500 mt-1">
@@ -449,9 +491,24 @@ export default function ProductIngredientMatchingPage() {
                   </div>
 
                   {/* Matched Products */}
-                  {matchedProducts.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-md font-semibold text-gray-900 mb-3">Matched Products:</h4>
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-md font-semibold text-gray-900">
+                        Matched Products: {matchedProducts.length}
+                      </h4>
+                      <button
+                        onClick={async () => {
+                          console.log('🔄 Manually reloading matches...')
+                          const updatedMatches = await loadExistingMatches()
+                          setExistingMatches(updatedMatches)
+                          console.log(`✅ Reloaded ${updatedMatches.length} matches`)
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-800 underline"
+                      >
+                        Reload matches
+                      </button>
+                    </div>
+                    {matchedProducts.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {matchedProducts.map((match) => (
                           <div key={match.id} className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center space-x-2">
@@ -472,8 +529,12 @@ export default function ProductIngredientMatchingPage() {
                           </div>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">
+                        Ingen matches endnu. Tilføj et produkt nedenfor.
+                      </div>
+                    )}
+                  </div>
 
                   {/* Add Product Dropdown */}
                   <div>
@@ -481,10 +542,13 @@ export default function ProductIngredientMatchingPage() {
                       Add Product Match:
                     </h4>
                     <GroceryProductSelector
-                      groceryProducts={groceryProducts}
+                      groceryProducts={groceryProducts.filter(product => 
+                        selectedStore === 'all' || product.store === selectedStore
+                      )}
                       selectedProduct={null}
                       onSelect={(product) => addProductMatch(ingredient.id, product)}
                       placeholder="Search for a product to match..."
+                      ingredientId={ingredient.id}
                     />
                   </div>
                 </div>
@@ -525,26 +589,133 @@ export default function ProductIngredientMatchingPage() {
   )
 }
 
+// Simple cache for search results (shared across all instances to reduce duplicate requests)
+const searchCache = new Map<string, { products: GroceryProduct[], timestamp: number }>()
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 // Component for selecting grocery products
 function GroceryProductSelector({ 
   groceryProducts, 
   selectedProduct, 
   onSelect, 
-  placeholder 
+  placeholder,
+  ingredientId
 }: {
   groceryProducts: GroceryProduct[]
   selectedProduct: GroceryProduct | null
   onSelect: (product: GroceryProduct) => void
   placeholder: string
+  ingredientId: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [searchResults, setSearchResults] = useState<GroceryProduct[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+  const [hiddenProductIds, setHiddenProductIds] = useState<Set<string>>(new Set())
+
+  // Reset local state when switching ingredient (each ingredient has its own dropdown)
+  useEffect(() => {
+    setSearchTerm('')
+    setSearchResults([])
+    setHiddenProductIds(new Set())
+    setIsSearching(false)
+    if (searchTimeout) {
+      clearTimeout(searchTimeout)
+      setSearchTimeout(null)
+    }
+  }, [ingredientId])
   
-  const filteredProducts = groceryProducts.filter(product =>
-    (product.name && product.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (product.store && product.store.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  // Search products on-demand when user types (minimum 2 characters)
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout)
+    }
+    
+    // Only search if user has typed at least 2 characters
+    if (searchTerm.length < 2) {
+      setSearchResults([])
+      setIsSearching(false)
+      return
+    }
+    
+    // Debounce search by 500ms (increased from 300ms to reduce requests)
+    setIsSearching(true)
+    const timeout = setTimeout(async () => {
+      try {
+        // Check cache first (cache key includes search term only, not ingredientId, since products are the same)
+        const cacheKey = searchTerm.toLowerCase().trim()
+        const cached = searchCache.get(cacheKey)
+        const now = Date.now()
+        
+        if (cached && (now - cached.timestamp) < CACHE_TTL) {
+          console.log(`💾 Using cached results for "${searchTerm}"`)
+          // Filter out already matched products for this ingredient
+          const filtered = cached.products.filter((p: GroceryProduct) => !hiddenProductIds.has(p.id))
+          setSearchResults(filtered)
+          setIsSearching(false)
+          return
+        }
+        
+        console.log(`🔍 Searching for products: "${searchTerm}"`)
+        const response = await fetch(
+          `/api/admin/products-for-matching?search=${encodeURIComponent(searchTerm)}&limit=100&ingredient_id=${encodeURIComponent(ingredientId)}`
+        )
+        const data = await response.json()
+        
+        if (data.success && data.data.products) {
+          const products = data.data.products.map((prod: any) => ({
+            id: prod.external_id,
+            name: prod.name,
+            category: prod.category || 'Andre',
+            store: prod.store,
+            price: prod.price,
+            originalPrice: prod.original_price,
+            isOnSale: prod.is_on_sale || false,
+            unit: 'stk',
+            quantity: 1
+          }))
+          
+          // Cache the results
+          searchCache.set(cacheKey, { products, timestamp: now })
+          
+          // Filter out already matched products for this ingredient
+          const filtered = products.filter((p: GroceryProduct) => !hiddenProductIds.has(p.id))
+          setSearchResults(filtered)
+          console.log(`✅ Found ${filtered.length} products matching "${searchTerm}"`)
+        } else {
+          setSearchResults([])
+        }
+      } catch (error) {
+        console.error('Error searching products:', error)
+        setSearchResults([])
+      } finally {
+        setIsSearching(false)
+      }
+    }, 500) // Increased debounce to 500ms
+    
+    setSearchTimeout(timeout)
+    
+    return () => {
+      if (timeout) clearTimeout(timeout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, ingredientId]) // Added ingredientId to dependencies
+  
+  // Use search results if available, otherwise filter from groceryProducts
+  const filteredProducts = (searchTerm.length >= 2 
+    ? searchResults 
+    : groceryProducts.filter(product => {
+        if (!product) return false
+        const searchLower = searchTerm.toLowerCase()
+        const nameMatch = product.name && product.name.toLowerCase().includes(searchLower)
+        const categoryMatch = product.category && product.category.toLowerCase().includes(searchLower)
+        const storeMatch = product.store && product.store.toLowerCase().includes(searchLower)
+        return nameMatch || categoryMatch || storeMatch
+      }))
+    // Instantly hide items user already clicked in this session (better UX on large lists)
+    .filter(p => !hiddenProductIds.has(p.id))
 
   return (
     <div className="relative">
@@ -586,10 +757,32 @@ function GroceryProductSelector({
           </div>
           
           <div className="max-h-48 overflow-auto">
-            {filteredProducts.map((product) => (
+            {isSearching && searchTerm.length >= 2 && (
+              <div className="px-3 py-2 text-gray-500 text-center text-sm">
+                Søger efter "{searchTerm}"...
+              </div>
+            )}
+            {!isSearching && searchTerm.length < 2 && (
+              <div className="px-3 py-2 text-gray-500 text-center text-sm">
+                Skriv mindst 2 bogstaver for at søge...
+              </div>
+            )}
+            {!isSearching && searchTerm.length >= 2 && filteredProducts.length === 0 && (
+              <div className="px-3 py-2 text-gray-500 text-center text-sm">
+                Ingen produkter fundet for "{searchTerm}"
+              </div>
+            )}
+            {!isSearching && filteredProducts.map((product) => (
               <button
                 key={product.id}
                 onClick={() => {
+                  // Hide immediately in UI so it's easy to pick many without clutter
+                  setHiddenProductIds(prev => {
+                    const next = new Set(prev)
+                    next.add(product.id)
+                    return next
+                  })
+                  setSearchResults(prev => prev.filter(p => p.id !== product.id))
                   onSelect(product)
                   // Don't close dropdown - allow multiple selections
                   // setIsOpen(false)
@@ -607,12 +800,6 @@ function GroceryProductSelector({
               </button>
             ))}
           </div>
-          
-          {filteredProducts.length === 0 && (
-            <div className="px-3 py-2 text-gray-500 text-center">
-              No products found
-            </div>
-          )}
           
           {/* Close button */}
           <div className="p-2 border-t border-gray-200">

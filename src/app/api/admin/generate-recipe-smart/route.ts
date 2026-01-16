@@ -219,15 +219,15 @@ KATEGORI: 5:2 FASTE
 - Brug: magert kød, fisk, grøntsager, nødder
 - Undgå: fedtrige ingredienser, store portioner`
 
-    case 'meal-prep':
+    case 'proteinrig-kost':
+    case 'meal-prep': // Legacy support
       return basePrompt + `
 
-KATEGORI: MEAL PREP (3 DAGE)
-- Avancerede meal prep retter til 3 dage
-- Skal holde sig frisk i køleskab i 3 dage
-- Fokus på: holdbarhed, nem opvarmning, næring
-- Brug: ingredienser der ikke bliver slatne
-- Undgå: ingredienser der bliver dårlige hurtigt`
+KATEGORI: PROTEINRIG KOST
+- Proteinrige opskrifter til optimal næring
+- Fokus på: højt proteinindhold, balanceret næring, mæthed
+- Brug: magert kød, fisk, æg, bælgfrugter, nødder
+- Undgå: for meget kulhydrater, for lidt protein`
 
     default:
       return basePrompt

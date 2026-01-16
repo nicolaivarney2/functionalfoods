@@ -8,7 +8,7 @@ import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculato
 import IngredientMatchesBox from '@/components/IngredientMatchesBox'
 import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
-import { Calendar, Clock, CheckCircle, XCircle, Pencil, Save, Plus, X } from 'lucide-react'
+import { Pencil, Plus, X } from 'lucide-react'
 
 interface RecipeWithTips extends Recipe {
   personalTips?: string
@@ -40,7 +40,6 @@ export default function AdminPublishingPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('published')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
-  const [autoPublishStatus, setAutoPublishStatus] = useState<string>('Tjekker...')
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
@@ -86,7 +85,7 @@ export default function AdminPublishingPage() {
       console.error('Error loading dietary categories:', error)
       // Fallback to default dietary categories
       setDietaryCategories([
-        'Keto', 'Sense', 'GLP-1 kost', 'Meal prep', 'Anti-inflammatorisk',
+        'Keto', 'Sense', 'GLP-1 kost', 'Proteinrig kost', 'Anti-inflammatorisk',
         'Fleksitarisk', '5:2 diæt', 'Familiemad', 'Low carb',
         'Kombi-familiemad', 'Kombi-keto'
       ])
@@ -268,7 +267,7 @@ export default function AdminPublishingPage() {
     try {
       // Separer kategorier i mainCategory, subCategories og dietaryCategories
       // mainCategory skal være en af de tilladte kategorier (Aftensmad, Frokost, osv.)
-      // dietaryCategories skal være fra dietary categories listen (Keto, Meal Prep, osv.)
+      // dietaryCategories skal være fra dietary categories listen (Keto, Proteinrig kost, osv.)
       
       // Først: Find dietary categories - disse skal ALDRIG være mainCategory
       const selectedDietaryCategories = categories.filter(cat => 
@@ -382,7 +381,7 @@ export default function AdminPublishingPage() {
         throw new Error(errorData.error || 'Kunne ikke gemme ingredienser')
       }
 
-      const result = await response.json()
+      await response.json()
       
       // Update local state
       const updatedRecipe = { ...selectedRecipe, ingredients: editedIngredients }
@@ -428,7 +427,7 @@ export default function AdminPublishingPage() {
         throw new Error(errorData.error || 'Kunne ikke gemme instruktioner')
       }
 
-      const result = await response.json()
+      await response.json()
       
       // Update local state
       const updatedRecipe = { ...selectedRecipe, instructions: editedInstructions }
@@ -462,7 +461,7 @@ export default function AdminPublishingPage() {
     setCategories(categories.filter(cat => cat !== categoryToRemove))
   }
 
-  const deleteRecipe = async (recipeSlug: string, recipeName: string) => {
+  const deleteRecipe = async (recipeSlug: string) => {
     try {
       const response = await fetch(`/api/recipes/${recipeSlug}/delete`, {
         method: 'DELETE'
@@ -1223,6 +1222,7 @@ export default function AdminPublishingPage() {
                       </p>
                       <RecipeNutritionRecalculator 
                         recipeId={selectedRecipe.id} 
+                        recipeName={selectedRecipe.title} 
                         recipeName={selectedRecipe.title}
                       />
                       
@@ -1264,7 +1264,7 @@ export default function AdminPublishingPage() {
                       <button
                         onClick={() => {
                           if (confirm(`⚠️ ADVARSEL: Dette vil permanent slette opskriften "${selectedRecipe.title}" og alle tilhørende ingredienser og matches!\n\nEr du sikker på at du vil fortsætte?`)) {
-                            deleteRecipe(selectedRecipe.slug, selectedRecipe.title)
+                            deleteRecipe(selectedRecipe.slug)
                           }
                         }}
                         className="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700"

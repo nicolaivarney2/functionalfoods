@@ -79,7 +79,8 @@ export default function Home() {
         'flexitarian': 'Fleksitarisk',
         '5-2-diet': '5:2 Diæt',
         'family': 'Familiemad',
-        'meal-prep': 'Meal Prep'
+        'proteinrig-kost': 'Proteinrig kost',
+        'meal-prep': 'Proteinrig kost' // Legacy mapping
       }
       return categoryMap[category.toLowerCase()] || category
     }
@@ -98,7 +99,8 @@ export default function Home() {
         'flexitarian': '/flexitarian/opskrifter',
         '5-2-diet': '/5-2-diet/opskrifter',
         'family': '/familie/opskrifter',
-        'meal-prep': '/meal-prep/opskrifter'
+        'proteinrig-kost': '/proteinrig-kost/opskrifter',
+        'meal-prep': '/proteinrig-kost/opskrifter' // Legacy mapping
       }
       return hrefMap[category] || '/opskriftsoversigt'
     }
@@ -132,7 +134,7 @@ export default function Home() {
     { name: 'Fleksitarisk', icon: '🥬', href: '/flexitarian/opskrifter', short: 'Fleksibel kost' },
     { name: '5:2 Diæt', icon: '⏰', href: '/5-2-diet/opskrifter', short: 'Fasteperioder' },
     { name: 'Familiemad', icon: '👨‍👩‍👧‍👦', href: '/familie/opskrifter', short: 'Hele familien' },
-    { name: 'Meal Prep', icon: '📦', href: '/meal-prep/opskrifter', short: 'Planlagt mad' }
+    { name: 'Proteinrig kost', icon: '💪', href: '/proteinrig-kost/opskrifter', short: 'Optimal næring' }
   ]
 
   const companies = [
@@ -669,11 +671,11 @@ export default function Home() {
                 href: "/GLP-1/opskrifter"
               },
               {
-                name: "MEAL PREP",
-                icon: "📦",
-                description: "Planlægning, struktur og økonomi",
-                suitsYou: "Vil gøre vægttab praktisk og realistisk",
-                href: "/meal-prep/opskrifter"
+                name: "PROTEINRIG KOST",
+                icon: "💪",
+                description: "Optimal næring og proteinbalance",
+                suitsYou: "Vil optimere proteinindtag for sundhed og vægttab",
+                href: "/proteinrig-kost/opskrifter"
               },
               {
                 name: "ANTI-INFLAMMATORISK",

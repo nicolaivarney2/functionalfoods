@@ -98,15 +98,15 @@ const extendedDietaryCategories = [
     imageAlt: 'GLP-1 kost med protein, fibre og sunde fedtstoffer'
   },
   {
-    id: 'Meal prep',
-    name: 'Meal prep',
-    slug: 'meal-prep',
-    description: 'Opskrifter til madplanlægning og forberedelse',
+    id: 'Proteinrig kost',
+    name: 'Proteinrig kost',
+    slug: 'proteinrig-kost',
+    description: 'Proteinrige opskrifter til optimal næring',
     color: 'bg-blue-500',
-    icon: '📦',
+    icon: '💪',
     recipeCount: 234,
-    imageUrl: '/images/categories/meal-prep.webp',
-    imageAlt: 'Forberedte måltider og madplanlægning'
+    imageUrl: '/images/categories/proteinrig-kost.webp',
+    imageAlt: 'Proteinrige opskrifter til optimal næring'
   },
   {
     id: 'Antiinflammatorisk',
@@ -368,7 +368,7 @@ export default function RecipeOverviewPage() {
                   {category.name === 'FLEKSITARISK' && '🥬'}
                   {category.name === '5:2 DIÆT' && '⏰'}
                   {category.name === 'FAMILIEMAD' && '👨‍👩‍👧‍👦'}
-                  {category.name === 'MEAL PREP' && '📦'}
+                  {category.name === 'PROTEINRIG KOST' && '💪'}
                   {category.name === 'MIDDELHAVSDIÆTEN' && '🐟'}
                 </div>
                 <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">

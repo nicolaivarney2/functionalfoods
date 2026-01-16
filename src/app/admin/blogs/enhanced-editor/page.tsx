@@ -3,17 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
-  Save, 
-  Eye, 
   ArrowLeft, 
   Plus, 
   Trash2, 
   MoveUp, 
   MoveDown,
   CheckCircle,
-  AlertCircle,
-  Image as ImageIcon,
-  Link as LinkIcon,
   Sparkles
 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
@@ -70,7 +65,6 @@ interface BlogPost {
 
 export default function EnhancedBlogEditor() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [categories, setCategories] = useState<BlogCategory[]>([])
   const [widgets, setWidgets] = useState<BlogWidget[]>([])
@@ -144,7 +138,7 @@ export default function EnhancedBlogEditor() {
 
         if (data) {
           // Load sections from database
-          const { data: sections, error: sectionsError } = await supabase
+          const { data: sections } = await supabase
             .from('blog_content_sections')
             .select('*')
             .eq('blog_post_id', data.id)

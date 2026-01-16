@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 
 interface RecipeCategory {
@@ -70,10 +70,10 @@ const RECIPE_CATEGORIES: RecipeCategory[] = [
     difficulty: 'Hard'
   },
   {
-    id: 'meal-prep',
-    name: 'Meal Prep (3 dage)',
-    description: 'Avancerede meal prep retter til 3 dage',
-    icon: '📦',
+    id: 'proteinrig-kost',
+    name: 'Proteinrig kost',
+    description: 'Proteinrige opskrifter til optimal næring',
+    icon: '💪',
     color: 'bg-red-500',
     difficulty: 'Hard'
   }

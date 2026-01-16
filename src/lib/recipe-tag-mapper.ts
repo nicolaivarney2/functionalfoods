@@ -13,8 +13,9 @@ export function getDietaryCategories(category: string): string[] {
     'antiinflammatorisk': ['Antiinflammatorisk'],
     'fleksitarisk': ['Fleksitarisk'],
     '5-2': ['5:2'], // 5:2 DIÆT = 5:2
-    'meal-prep': ['Meal prep'], // MEAL PREP, Meal prep
-    'mealprep': ['Meal prep'], // Alternative spelling
+    'proteinrig-kost': ['Proteinrig kost'], // Proteinrig kost
+    'meal-prep': ['Proteinrig kost'], // Legacy mapping for backward compatibility
+    'mealprep': ['Proteinrig kost'], // Legacy mapping for backward compatibility
     'kombi-familiemad': ['Kombi-familiemad'], // Opskrift med kartofler/ris/pasta, kan bruges i keto-familie
     'kombi-keto': ['Kombi-keto'] // Keto opskrift, kan bruges i familiemad
   }

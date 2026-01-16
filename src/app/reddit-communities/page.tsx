@@ -64,7 +64,7 @@ const redditCommunities: RedditCommunity[] = [
     memberCount: '680',
     url: 'https://reddit.com/r/DKmealprep',
     color: '#06B6D4',
-    category: 'Meal Prep',
+    category: 'Proteinrig kost',
     recentPosts: 15
   },
   {
@@ -119,7 +119,7 @@ const redditCommunities: RedditCommunity[] = [
   }
 ]
 
-const categories = ['Alle', 'Keto', 'Vægttab', 'GLP-1', 'Meal Prep', 'Sundhed', 'Plantebaseret', 'Fasting', 'Familie', 'Budget']
+const categories = ['Alle', 'Keto', 'Vægttab', 'GLP-1', 'Proteinrig kost', 'Sundhed', 'Plantebaseret', 'Fasting', 'Familie', 'Budget']
 
 export default function RedditCommunitiesPage() {
   const [searchQuery, setSearchQuery] = useState('')

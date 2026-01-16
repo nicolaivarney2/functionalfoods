@@ -20,7 +20,7 @@ interface RedditCommunity {
 const COMMUNITY_CATEGORIES = [
   'Keto',
   'LCHF/Paleo', 
-  'Meal Prep',
+  'Proteinrig kost',
   'Anti-inflammatory',
   'Flexitarian',
   '5:2 Diet',

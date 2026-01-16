@@ -364,10 +364,10 @@ export default function WeightLossPage() {
                   href: "/familie"
                 },
                 {
-                  name: "Meal Prep",
-                  icon: "📦",
-                  short: "Planlagt mad",
-                  href: "/opskrifter/meal-prep"
+                  name: "Proteinrig kost",
+                  icon: "💪",
+                  short: "Optimal næring",
+                  href: "/proteinrig-kost/opskrifter"
                 }
               ].map((niche, idx) => (
                 <Link
@@ -657,23 +657,23 @@ export default function WeightLossPage() {
                 </div>
               </div>
 
-              {/* Meal Prep */}
+              {/* Proteinrig kost */}
               <div className="bg-gradient-to-br from-gray-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
                 <div className="flex items-start gap-4 mb-6">
-                  <div className="text-5xl flex-shrink-0">📦</div>
+                  <div className="text-5xl flex-shrink-0">💪</div>
                   <div className="flex-1">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Meal Prep – planlagt mad, mindre stress</h3>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Proteinrig kost – optimal næring for sundhed og vægttab</h3>
                     <p className="text-gray-600 leading-relaxed mb-4">
-                      Kernen er forberedelse: Lav maden én gang, spis flere gange. Generelt sparer du tid, penge og beslutninger i hverdagen – og gør det lettere at holde kursen. Den er velegnet til alle kosttyper og mål, og bruges mest som metode.
+                      Proteinrig kost fokuserer på at optimere dit proteinindtag for bedre sundhed, mæthed og vægttab. Protein er essentielt for muskelopbygning, vægttab og generel sundhed.
                     </p>
                     <p className="text-gray-700 leading-relaxed mb-6">
-                      Gennem vores koncept, fokuserer vi på at mindske stress og generelt madlavningen, som kan give tid til træning og andre ting. Vores meal prep funktion fokuserer på familiemad-kategorien, hvorfor der ikke er det samme fokus på vægttab som ved de andre madvaner.
+                      Gennem vores proteinrige opskrifter får du balancerede måltider med højt proteinindhold, der understøtter både vægttab og muskelopbygning. Perfekt til alle der vil optimere deres næring.
                     </p>
                     <Link
-                      href="/opskrifter/meal-prep"
+                      href="/proteinrig-kost/opskrifter"
                       className="inline-flex items-center gap-2 text-gray-700 font-semibold hover:text-gray-900 transition-colors group"
                     >
-                      Er du interesseret i mere, så læs om Meal Prep
+                      Er du interesseret i mere, så læs om Proteinrig kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                     </Link>
                   </div>
@@ -720,7 +720,7 @@ export default function WeightLossPage() {
                 },
                 {
                   q: "Hvordan kombinerer jeg vægttab og familieliv?",
-                  a: "Find en kost, der passer til hele familien. Meal prep, planlægning og at gøre det praktisk er nøglen. Det er ikke perfektion, det er konsistens."
+                  a: "Find en kost, der passer til hele familien. Proteinrig kost, planlægning og at gøre det praktisk er nøglen. Det er ikke perfektion, det er konsistens."
                 }
               ].map((faq, idx) => (
                 <details key={idx} className="bg-gray-50 rounded-xl p-6 border border-gray-200 group">

@@ -472,7 +472,7 @@ export default function IngredientMatchingPage() {
 
         {/* Ingredient Matches */}
         <div className="space-y-4">
-          {filteredMatches.map((match, index) => (
+          {filteredMatches.map((match) => (
             <div key={match.recipeIngredient.id} className="bg-white rounded-lg shadow">
               <div className="p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
