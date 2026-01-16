@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent, '5-2')
+    const recipe = parseGeneratedRecipe(recipeContent)
     
     console.log(`✅ Generated 5:2 Faste recipe: ${recipe.title}`)
 
@@ -174,7 +174,7 @@ FASTE-FOKUSEREDE TIPS:
 - Tilføj frisk urt for smag uden kalorier`
 }
 
-function parseGeneratedRecipe(content: string, category: string): any {
+function parseGeneratedRecipe(content: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)
