@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, CheckCircle2, XCircle, UtensilsCrossed, Clock } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, ChevronRight, CheckCircle2, XCircle, UtensilsCrossed, Clock } from 'lucide-react'
 
 export default function GLP1Page() {
   const [isVisible, setIsVisible] = useState(false)
