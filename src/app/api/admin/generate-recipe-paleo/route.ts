@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
-import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
+// import { generateMidjourneyPrompt } from '@/lib/midjourney-generator' // Not used
 
 interface ExistingRecipe {
   id: string
