@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Utensils, Search, Filter, ChevronLeft } from 'lucide-react'
+import { Utensils, Search, Filter, ChevronLeft } from 'lucide-react'
 import RecipeCard from '@/components/RecipeCard'
 import MobileRecipeFilterBar from '@/components/MobileRecipeFilterBar'
 import { Recipe } from '@/types/recipe'
@@ -55,7 +55,7 @@ export default function FamilieRecipesPage() {
           console.log(`👨‍👩‍👧‍👦 Found ${familieRecipes.length} familie recipes out of ${recipes.length} total`)
           if (familieRecipes.length === 0 && recipes.length > 0) {
             console.log('⚠️ No familie recipes found. Sample dietaryCategories from first 5 recipes:')
-            recipes.slice(0, 5).forEach((r, i) => {
+            recipes.slice(0, 5).forEach((r: Recipe, i: number) => {
               console.log(`  Recipe ${i + 1} (${r.title}):`, r.dietaryCategories)
             })
           }

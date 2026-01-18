@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, ChartBarIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ShoppingBagIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { dietaryFactory, UserProfile } from '@/lib/dietary-system';
 import { pdfGenerator, PDFQuality, PDFFormat, SectionType } from '@/lib/pdf-system';
 
@@ -22,16 +22,16 @@ interface MealPlanPreviewProps {
 const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
   userProfile,
   selectedDietaryApproach,
-  excludedIngredients,
-  allergies,
-  nutritionalAssessment,
+  excludedIngredients: _excludedIngredients,
+  allergies: _allergies,
+  nutritionalAssessment: _nutritionalAssessment,
   realMealPlan,
   onClose
 }) => {
   const [currentWeek, setCurrentWeek] = useState(1);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [pdfGenerationError, setPdfGenerationError] = useState<string | null>(null);
+  const [, setPdfGenerationError] = useState<string | null>(null);
 
   // Use real meal plan data if available, otherwise fall back to mock data
   const mealPlan = realMealPlan ? {
@@ -147,7 +147,6 @@ const MealPlanPreview: React.FC<MealPlanPreviewProps> = ({
   }
 
   const currentWeekData = mealPlan.realMealPlan.weeks[currentWeek - 1];
-  const mealPlanUserProfile = mealPlan.userProfile;
   const dietaryApproachName = dietaryFactory.getDiet(mealPlan.dietaryApproach)?.name;
   const shoppingList = currentWeekData?.shoppingList || { items: [] };
 

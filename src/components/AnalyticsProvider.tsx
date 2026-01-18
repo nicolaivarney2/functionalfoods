@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, Suspense } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { trackUserBehavior, getUserProfile, UserBehavior } from '@/lib/analytics'
 
 interface AnalyticsContextType {
@@ -34,7 +34,6 @@ function AnalyticsProviderContent({ children }: { children: React.ReactNode }) {
   })
 
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   useEffect(() => {
     // Load user profile on mount

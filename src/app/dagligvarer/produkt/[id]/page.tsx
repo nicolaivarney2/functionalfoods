@@ -374,12 +374,11 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [priceHistory, setPriceHistory] = useState<any[]>([])
-  const [priceLoading, setPriceLoading] = useState(false)
+  const [priceHistory] = useState<any[]>([])
   const [hoveredPoint, setHoveredPoint] = useState<any>(null)
   const [similarProducts, setSimilarProducts] = useState<Product[]>([])
   const [otherSizeProducts, setOtherSizeProducts] = useState<Product[]>([])
-  const [similarLoading, setSimilarLoading] = useState(false)
+  const [similarLoading] = useState(false)
 
   useEffect(() => {
     const fetchProduct = async () => {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight, Heart } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Zap, Sparkles, ChevronRight, Heart } from 'lucide-react'
 
 export default function ProteinrigKostPage() {
   const [isVisible, setIsVisible] = useState(false)

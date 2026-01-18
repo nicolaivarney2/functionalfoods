@@ -8,7 +8,7 @@ interface RecipeCardProps {
   priority?: boolean; // For above-the-fold images
 }
 
-export default function RecipeCard({ recipe, showRating = true, priority = false }: RecipeCardProps) {
+export default function RecipeCard({ recipe, showRating: _showRating = true, priority = false }: RecipeCardProps) {
   const formatTime = (minutes: number) => {
     if (minutes < 60) return `${minutes} min`
     const hours = Math.floor(minutes / 60)

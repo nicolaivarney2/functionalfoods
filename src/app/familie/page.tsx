@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight } from 'lucide-react'
 
 export default function FamiliePage() {
   const [isVisible, setIsVisible] = useState(false)

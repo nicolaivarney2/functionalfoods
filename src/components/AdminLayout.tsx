@@ -8,7 +8,6 @@ import { useImageMigration } from '@/hooks/useImageMigration'
 import { 
   BookOpen, 
   Calendar, 
-  Cog, 
   Database, 
   Home, 
   Image, 

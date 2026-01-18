@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   try {
-    const { id, type, config, context } = await req.json()
+    const { type, config, context } = await req.json()
     const cfg = config || {}
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
@@ -208,7 +208,6 @@ export async function POST(req: NextRequest) {
 
         const escapeHtml = (text: string | undefined | null): string => {
           if (!text) return ''
-          const div = { textContent: text } as any
           return String(text)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')

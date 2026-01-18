@@ -79,14 +79,6 @@ export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeDa
       const titleLower = (title || '').toLowerCase()
       const allText = `${titleLower} ${descLower} ${tagLower}`
       
-      // Allowed categories from Ketoliv
-      const allowedCategories = [
-        'Aftensmad', 'Verden rundt', 'Frokost', 'Is og sommer', 'Salater',
-        'Fisk', 'Morgenmad', 'God til to dage', 'Vegetar', 'Tilbehør',
-        'Bagværk', 'Madpakke opskrifter', 'Desserter', 'Fatbombs',
-        'Food prep', 'Simre retter', 'Dip og dressinger'
-      ]
-      
       // Check for specific category keywords (most specific first)
       if (allText.includes('madpakke')) return 'Madpakke opskrifter'
       if (allText.includes('salat') || allText.includes('salater')) return 'Salater'
@@ -120,9 +112,6 @@ export function convertKetolivRecipes(ketolivData: KetolivRecipe[]): RawRecipeDa
     
     const rawCourseTag = recipe.tags?.course?.[0] || ''
     const mainCategory = normalizeMainCategory(rawCourseTag, recipe.summary || '', recipe.name || '')
-
-    // Generate slug
-    const slug = (recipe.slug || '').replace('wprm-', '').replace(/-til$/, '')
 
     return {
       title: recipe.name || 'Untitled Recipe',

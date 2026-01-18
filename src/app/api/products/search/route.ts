@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Get available categories
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const supabase = await createClient()
     

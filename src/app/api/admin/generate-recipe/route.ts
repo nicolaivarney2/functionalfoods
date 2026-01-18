@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const existingTitles = existingRecipes.map(r => r.title.toLowerCase())
     
     // Create system prompt based on category
-    const systemPrompt = createSystemPrompt(category, categoryName, existingTitles)
+    const systemPrompt = createSystemPrompt(category, existingTitles)
     
     // Generate recipe with OpenAI
     const completion = await openai.chat.completions.create({
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent)
+    const recipe = parseGeneratedRecipe(recipeContent, category)
     
     console.log(`✅ Generated recipe: ${recipe.title}`)
 
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function createSystemPrompt(category: string, categoryName: string, existingTitles: string[]): string {
+function createSystemPrompt(category: string, existingTitles: string[]): string {
   const basePrompt = `Du er en ekspert i dansk madlavning og ernæring. Generer en detaljeret opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
@@ -215,7 +215,7 @@ KATEGORI: PROTEINRIG KOST
   }
 }
 
-function parseGeneratedRecipe(content: string): any {
+function parseGeneratedRecipe(content: string, category: string): any {
   try {
     // Try to extract JSON from the content
     const jsonMatch = content.match(/\{[\s\S]*\}/)

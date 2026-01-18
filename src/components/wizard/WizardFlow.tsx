@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '@heroicons/react/24/outline';
 
 // Import our systems
-import { dietaryFactory, DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
-import { ingredientService } from '@/lib/ingredient-system';
+import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
 import { mealPlanGenerator } from '@/lib/meal-plan-system';
 import MealPlanPreview from './MealPlanPreview';
 
@@ -45,7 +44,6 @@ const WizardFlow: React.FC = () => {
     isComplete: false
   });
 
-  const [isLoading, setIsLoading] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [mealPlan, setMealPlan] = useState<any>(null);
 
@@ -126,13 +124,6 @@ const WizardFlow: React.FC = () => {
 
   const goToStep = (stepIndex: number) => {
     setState(prev => ({ ...prev, currentStep: stepIndex }));
-  };
-
-  const completeStep = (stepId: string) => {
-    const stepIndex = steps.findIndex(step => step.id === stepId);
-    if (stepIndex !== -1) {
-      steps[stepIndex].isCompleted = true;
-    }
   };
 
   const currentStep = steps[state.currentStep];
@@ -350,57 +341,7 @@ const WizardFlow: React.FC = () => {
 };
 
 // Placeholder components for each step
-const WelcomeStep: React.FC<any> = ({ nextStep }) => (
-  <div className="text-center">
-    <div className="mb-8">
-      <div className="w-24 h-24 bg-gradient-to-r from-blue-500 to-green-500 rounded-full mx-auto mb-6 flex items-center justify-center">
-        <span className="text-white text-3xl">🎯</span>
-      </div>
-      <h3 className="text-2xl font-bold text-gray-900 mb-4">
-        Ready to Transform Your Health?
-      </h3>
-      <p className="text-gray-600 text-lg leading-relaxed max-w-2xl mx-auto">
-        In just a few minutes, we'll create your personalized 6-week nutrition plan. 
-        Get ready for a journey that will change how you think about food and health.
-      </p>
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <div className="text-center p-6 bg-blue-50 rounded-xl">
-        <div className="w-12 h-12 bg-blue-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <span className="text-white text-xl">⚡</span>
-        </div>
-        <h4 className="font-semibold text-gray-900 mb-2">Quick & Easy</h4>
-        <p className="text-gray-600 text-sm">Complete setup in under 5 minutes</p>
-      </div>
-      
-      <div className="text-center p-6 bg-green-50 rounded-xl">
-        <div className="w-12 h-12 bg-green-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <span className="text-white text-xl">🎯</span>
-        </div>
-        <h4 className="font-semibold text-gray-900 mb-2">Personalized</h4>
-        <p className="text-gray-600 text-sm">Tailored to your exact needs</p>
-      </div>
-      
-      <div className="text-center p-6 bg-purple-50 rounded-xl">
-        <div className="w-12 h-12 bg-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-          <span className="text-white text-xl">📈</span>
-        </div>
-        <h4 className="font-semibold text-gray-900 mb-2">Proven Results</h4>
-        <p className="text-gray-600 text-sm">Science-backed nutrition plans</p>
-      </div>
-    </div>
-
-    <button
-      onClick={nextStep}
-      className="px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-    >
-      Start Your Journey
-    </button>
-  </div>
-);
-
-const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
+const ProfileStep: React.FC<any> = ({ state, updateState, nextStep: _nextStep }) => (
   <div className="max-w-2xl mx-auto">
     <motion.div 
       className="grid grid-cols-1 md:grid-cols-2 gap-6"
@@ -514,39 +455,7 @@ const ProfileStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   </div>
 );
 
-const GoalsStep: React.FC<any> = ({ state, updateState, nextStep }) => (
-  <div className="max-w-2xl mx-auto">
-    <div className="grid grid-cols-1 gap-4">
-      {[
-        { value: WeightGoal.WeightLoss, label: 'Vægt tab', desc: 'Tabe vægt og forbedre kropssammensætning', icon: '📉' },
-        { value: WeightGoal.Maintenance, label: 'Vedligeholdelse', desc: 'Vedligehold din nuværende vægt og forbedre sundhed', icon: '⚖️' },
-        { value: WeightGoal.MuscleGain, label: 'Muskelbygning', desc: 'Byg muskel og øge styrke', icon: '💪' }
-      ].map((goal) => (
-        <label key={goal.value} className="flex items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-blue-300 transition-all duration-200">
-          <input
-            type="radio"
-            name="goal"
-            value={goal.value}
-            checked={state.userProfile.goal === goal.value}
-            onChange={(e) => updateState({ 
-              userProfile: { ...state.userProfile, goal: e.target.value as WeightGoal }
-            })}
-            className="mr-4"
-          />
-          <div className="flex items-center">
-            <span className="text-2xl mr-4">{goal.icon}</span>
-            <div>
-              <div className="font-semibold text-gray-900 text-lg">{goal.label}</div>
-              <div className="text-gray-600">{goal.desc}</div>
-            </div>
-          </div>
-        </label>
-      ))}
-    </div>
-  </div>
-);
-
-const EnergyStep: React.FC<any> = ({ state, updateState, nextStep }) => {
+const EnergyStep: React.FC<any> = ({ state, updateState, nextStep: _nextStep }) => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [hasCalculated, setHasCalculated] = useState(false);
@@ -796,7 +705,7 @@ const DietaryApproachStep: React.FC<any> = ({ state, updateState, nextStep }) =>
   );
 };
 
-const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep }) => (
+const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep: _nextStep }) => (
   <div className="max-w-2xl mx-auto">
     <div className="space-y-6">
       <div>
@@ -839,7 +748,7 @@ const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep }) => (
   </div>
 );
 
-const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep }) => (
+const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep: _nextStep }) => (
   <motion.div 
     className="max-w-2xl mx-auto"
     initial={{ opacity: 0, y: 20 }}
@@ -926,72 +835,6 @@ const NutritionalAssessmentStep: React.FC<any> = ({ state, updateState, nextStep
       </div>
     </motion.div>
   </motion.div>
-);
-
-const ReviewStep: React.FC<any> = ({ state, nextStep }) => (
-  <div className="max-w-2xl mx-auto">
-    <div className="space-y-6">
-      <div className="bg-blue-50 rounded-xl p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Your Profile Summary</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-gray-600">Age:</span>
-            <span className="ml-2 font-medium">{state.userProfile.age}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">Gender:</span>
-            <span className="ml-2 font-medium capitalize">{state.userProfile.gender}</span>
-          </div>
-          <div>
-            <span className="text-gray-600">Height:</span>
-            <span className="ml-2 font-medium">{state.userProfile.height} cm</span>
-          </div>
-          <div>
-            <span className="text-gray-600">Weight:</span>
-            <span className="ml-2 font-medium">{state.userProfile.weight} kg</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-green-50 rounded-xl p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Your Goals</h3>
-        <p className="text-gray-600">
-          {state.userProfile.goal === 'weight-loss' && 'Vægt tab - Fokus på kalorieunderskud og fedtforskydning'}
-          {state.userProfile.goal === 'maintenance' && 'Vedligeholdelse - Balancere kalorier og vedligeholde nuværende vægt'}
-          {state.userProfile.goal === 'muscle-gain' && 'Muskelbygning - Kalorieoverskud og proteinfokus'}
-        </p>
-      </div>
-
-      <div className="bg-purple-50 rounded-xl p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Dietary Approach</h3>
-        <p className="text-gray-600">
-          {dietaryFactory.getDiet(state.selectedDietaryApproach)?.name}
-        </p>
-      </div>
-
-      {state.excludedIngredients.length > 0 && (
-        <div className="bg-yellow-50 rounded-xl p-6">
-          <h3 className="font-semibold text-gray-900 mb-4">Foods to Avoid</h3>
-          <div className="flex flex-wrap gap-2">
-            {state.excludedIngredients.map((food: string) => (
-              <span key={food} className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-                {food}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="text-center">
-        <button
-          onClick={nextStep}
-          className="px-8 py-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-green-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-        >
-          Generate My 6-Week Plan
-        </button>
-      </div>
-    </div>
-  </div>
 );
 
 const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal, setMealPlan }) => {
@@ -1161,7 +1004,7 @@ const GeneratingStep: React.FC<any> = ({ state, setShowPreviewModal, setMealPlan
   );
 };
 
-const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep }) => (
+const MiscellaneousStep: React.FC<any> = ({ state, updateState, nextStep: _nextStep }) => (
   <motion.div 
     className="max-w-2xl mx-auto"
     initial={{ opacity: 0, y: 20 }}

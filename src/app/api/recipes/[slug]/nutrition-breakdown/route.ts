@@ -26,7 +26,7 @@ interface BreakdownItem {
   }
 }
 
-function gramsFromUnit(amount: number, unit: string, ingredientName?: string): number {
+function gramsFromUnit(amount: number, unit: string): number {
   const u = (unit || '').toLowerCase()
   const conversions: Record<string, number> = {
     g: 1,
@@ -48,7 +48,7 @@ function gramsFromUnit(amount: number, unit: string, ingredientName?: string): n
 }
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
@@ -67,7 +67,7 @@ export async function GET(
     const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
 
     for (const ing of recipe.ingredients || []) {
-      const grams = gramsFromUnit(ing.amount || 0, ing.unit || '', ing.name)
+      const grams = gramsFromUnit(ing.amount || 0, ing.unit || '')
       const scaleFactor = grams / 100
       const result = await matcher.matchIngredient(ing.name)
       const per100g = {

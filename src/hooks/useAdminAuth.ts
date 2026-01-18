@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export function useAdminAuth() {
-  const { user, session, loading } = useAuth()
+  const { user, loading } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [checking, setChecking] = useState(true)
   const router = useRouter()

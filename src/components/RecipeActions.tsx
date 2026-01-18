@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Heart, Share2, List, ShoppingCart } from 'lucide-react'
+import { Heart, Share2, ShoppingCart } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface RecipeActionsProps {

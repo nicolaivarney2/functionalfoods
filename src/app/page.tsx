@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Sparkles, Target, Zap, Brain, TrendingDown, Users, Leaf, FileText, Calculator, Calendar, Building2, HelpCircle, ChevronDown, Search, ChevronRight } from 'lucide-react'
+import { ArrowRight, Sparkles, Target, Zap, Brain, TrendingDown, Leaf, FileText, Calculator, Calendar, Building2, ChevronDown, Search, ChevronRight } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
 
 // Updated hero section with recipe focus and new design
@@ -137,10 +137,6 @@ export default function Home() {
     { name: 'Proteinrig kost', icon: '💪', href: '/proteinrig-kost/opskrifter', short: 'Optimal næring' }
   ]
 
-  const companies = [
-    'Nestlé', 'Unilever', 'Orkla', 'Arla', 'Salling Group', 'Coop', 'DLG', 'Danish Crown'
-  ]
-
   return (
     <main className="min-h-screen bg-white">
       {/* New Hero Section with Image */}
@@ -247,7 +243,7 @@ export default function Home() {
           <div className={`max-w-6xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Desktop: Grid Layout */}
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {niches.map((niche, idx) => (
+              {niches.map((niche) => (
                 <Link 
                   key={niche.name}
                   href={niche.href}
@@ -261,7 +257,7 @@ export default function Home() {
                   
             {/* Mobile: Accordion Layout */}
             <div className="md:hidden space-y-2">
-              {niches.map((niche, idx) => (
+              {niches.map((niche) => (
                 <div key={niche.name} className="border-b border-gray-200">
                   <Link
                     href={niche.href}

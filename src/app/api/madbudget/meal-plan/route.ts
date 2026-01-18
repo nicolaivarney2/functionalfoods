@@ -52,20 +52,32 @@ export async function GET(request: NextRequest) {
     const mealPlanId = searchParams.get('id')
     const active = searchParams.get('active') === 'true'
 
-    let query = supabase
-      .from('user_meal_plans')
-      .select('*')
-      .eq('user_id', user.id)
+    let data: any = null
+    let error: any = null
 
     if (mealPlanId) {
-      query = query.eq('id', mealPlanId).single()
+      ({ data, error } = await supabase
+        .from('user_meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('id', mealPlanId)
+        .single())
     } else if (active) {
-      query = query.eq('is_active', true).order('week_start_date', { ascending: false }).limit(1)
+      ({ data, error } = await supabase
+        .from('user_meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('week_start_date', { ascending: false })
+        .limit(1))
     } else {
-      query = query.order('week_start_date', { ascending: false }).limit(10)
+      ({ data, error } = await supabase
+        .from('user_meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('week_start_date', { ascending: false })
+        .limit(10))
     }
-
-    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching meal plans:', error)

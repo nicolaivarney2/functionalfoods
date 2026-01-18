@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle, Droplet, Clock } from 'lucide-react'
+import { ArrowRight, ChevronLeft, Check, Scale, Moon, BookOpen, HelpCircle, Droplet, Clock } from 'lucide-react'
 
 export default function KetoWeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)

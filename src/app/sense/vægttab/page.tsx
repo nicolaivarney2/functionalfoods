@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, ArrowRight, Scale, Lightbulb, Hand, UtensilsCrossed, Target, TrendingDown, AlertCircle, CheckCircle2, XCircle, Clock, Leaf } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Scale, Hand, UtensilsCrossed, Target, AlertCircle, CheckCircle2, XCircle, Clock, Leaf } from 'lucide-react'
 
 export default function SenseWeightLossTheoryPage() {
   const [isVisible, setIsVisible] = useState(false)

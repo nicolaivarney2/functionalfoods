@@ -118,13 +118,6 @@ export default function SupermarketProducts({ recipeTitle, recipeIngredients = [
     setTimeout(() => setShowAddedMessage(null), 3000)
   }
 
-  /**
-   * Remove product from shopping list
-   */
-  const removeFromShoppingList = (productId: string) => {
-    setShoppingList(prev => prev.filter(item => item.id !== productId))
-  }
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('da-DK', {
       style: 'currency',

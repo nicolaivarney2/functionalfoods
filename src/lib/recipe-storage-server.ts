@@ -12,20 +12,3 @@ export async function getAllRecipesServer(): Promise<Recipe[]> {
 }
 
 // Database-based functions - no longer need file storage or importedRecipes
-
-function generateSlug(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[æøå]/g, (match) => {
-      const replacements: { [key: string]: string } = {
-        'æ': 'ae',
-        'ø': 'oe',
-        'å': 'aa'
-      }
-      return replacements[match] || match
-    })
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim()
-} 

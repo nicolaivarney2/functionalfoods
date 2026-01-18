@@ -1,7 +1,7 @@
 // Meal plan generation system types
 
 import { UserProfile, DietaryApproach, MacroTargets, EnergyNeeds } from '../dietary-system';
-import { Recipe, RecipeFilter } from '../ingredient-system';
+import { Recipe } from '../ingredient-system';
 
 export interface MealPlan {
   id: string;

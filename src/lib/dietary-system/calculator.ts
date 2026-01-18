@@ -1,6 +1,5 @@
 import { 
   UserProfile, 
-  ActivityLevel, 
   WeightGoal, 
   EnergyNeeds, 
   MacroTargets, 
@@ -140,6 +139,8 @@ export class DietaryCalculator {
     mealType: string
   ): MacroTargets {
     // This is a placeholder - will be implemented when we add meal distribution logic
+    void mealDistribution;
+    void mealType;
     return dailyMacros;
   }
 

@@ -8,7 +8,7 @@ interface Props {
   onNutritionUpdated?: (nutrition: any) => void
 }
 
-export default function RecipeNutritionRecalculator({ recipeId, recipeName, onNutritionUpdated }: Props) {
+export default function RecipeNutritionRecalculator({ recipeId, recipeName: _recipeName, onNutritionUpdated }: Props) {
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   const handleRecalculate = async () => {

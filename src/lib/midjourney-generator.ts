@@ -186,7 +186,6 @@ EXAMPLES:
         'rød peberfrugt': 'red bell pepper',
         'peberfrugt': 'bell pepper',
         'gulerod': 'carrot',
-        'gulerødder': 'carrots',
         'ovnbagte': 'roasted',
         'ovnbagt': 'roasted',
         'stegt': 'fried',

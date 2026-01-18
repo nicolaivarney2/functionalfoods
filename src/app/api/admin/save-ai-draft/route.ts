@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert recipe into database
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('recipes')
       .insert([recipeData])
 

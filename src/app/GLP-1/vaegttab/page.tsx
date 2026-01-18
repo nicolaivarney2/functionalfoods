@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, ArrowLeft, Brain, CheckCircle2, XCircle, Clock, UtensilsCrossed, Target, TrendingDown, HelpCircle, Heart, Zap, Shield, Scale } from 'lucide-react'
+import { ArrowLeft, Brain, CheckCircle2, XCircle, Clock, UtensilsCrossed, Target, Heart, Shield } from 'lucide-react'
 
 export default function GLP1WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)

@@ -130,7 +130,7 @@ export default function IngredientMatchesBox({ recipeSlug }: IngredientMatchesBo
       {/* Detailed List */}
       {showDetails && (
         <div className="space-y-2 max-h-64 overflow-y-auto">
-          {matches.map((match, index) => (
+          {matches.map((match) => (
             <div key={match.ingredient.id} className="bg-white rounded p-3 border border-blue-100">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">

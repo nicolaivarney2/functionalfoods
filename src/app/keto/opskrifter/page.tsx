@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Search, Filter } from 'lucide-react'
+import { ArrowRight, Target, ChevronLeft, Search, Filter } from 'lucide-react'
 import RecipeCard from '@/components/RecipeCard'
 
 interface Recipe {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronRight, Hand, UtensilsCrossed, Ban, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Leaf, Zap, Sparkles, ChevronRight, Hand, UtensilsCrossed, Ban, CheckCircle2, XCircle } from 'lucide-react'
 
 export default function SensePage() {
   const [isVisible, setIsVisible] = useState(false)

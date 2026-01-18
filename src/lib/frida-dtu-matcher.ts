@@ -78,38 +78,6 @@ export class FridaDTUMatcher {
   }
 
   /**
-   * Get nutrition data from frida_ingredients table
-   */
-  private async getFridaIngredientNutrition(fridaId: string): Promise<NutritionalInfo | null> {
-    try {
-      const { data: ingredient, error } = await supabase
-        .from('frida_ingredients')
-        .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
-        .eq('id', fridaId)
-        .limit(1)
-      
-      if (error || !ingredient || ingredient.length === 0) {
-        console.log(`❌ Failed to get nutrition for Frida ID: ${fridaId}`)
-        return null
-      }
-      
-      const ing = ingredient[0]
-      return {
-        calories: ing.calories || 0,
-        protein: ing.protein || 0,
-        carbs: ing.carbs || 0,
-        fat: ing.fat || 0,
-        fiber: ing.fiber || 0,
-        vitamins: ing.vitamins || {},
-        minerals: ing.minerals || {}
-      }
-    } catch (error) {
-      console.log(`❌ Error getting Frida nutrition: ${error}`)
-      return null
-    }
-  }
-
-  /**
    * Search for foods in Supabase database
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {

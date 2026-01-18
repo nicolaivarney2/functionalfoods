@@ -284,7 +284,7 @@ export async function importGomaProducts(options: ImportOptions) {
         console.log(`💾 Attempting to upsert ${productRows.length} products for ${storeName} page ${page}`)
         console.log(`💾 Sample product ID: ${productRows[0].id} (length: ${productRows[0].id.length}, is UUID: ${productRows[0].id.includes('-')})`)
         
-        const { error: productError, data: productData, count: productCount } = await supabase
+        const { error: productError, data: productData } = await supabase
           .from('products')
           .upsert(productRows, {
             onConflict: 'id',
@@ -376,7 +376,7 @@ export async function importGomaProducts(options: ImportOptions) {
 
       console.log(`🔄 Processing ${offerRows.length} offers for ${storeName} page ${page}`)
 
-      const { error: offerError, data: offerData } = await supabase.from('product_offers').upsert(offerRows, {
+      const { error: offerError } = await supabase.from('product_offers').upsert(offerRows, {
         onConflict: 'store_id,store_product_id',
       })
 

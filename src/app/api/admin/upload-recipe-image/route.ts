@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const filePath = `recipe-images/${fileName}`
 
     // Upload optimized image to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
       .from('recipe-images')
       .upload(filePath, optimizedBuffer, {
         contentType: 'image/webp',

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,13 +39,13 @@ export async function POST(
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) {
+        get() {
           return undefined
         },
-        set(name: string, value: string, options: any) {
+        set() {
           // Service role doesn't need cookies
         },
-        remove(name: string, options: any) {
+        remove() {
           // Service role doesn't need cookies
         },
       },
@@ -68,7 +67,7 @@ export async function POST(
     }
 
     // Check if user has already rated this recipe
-    const { data: existingRating, error: checkError } = await supabase
+    const { data: existingRating } = await supabase
       .from('recipe_ratings')
       .select('id, rating')
       .eq('recipe_id', recipe.id)

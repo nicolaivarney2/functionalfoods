@@ -21,7 +21,7 @@ interface CommentSystemProps {
   onCommentUpdate?: (count: number) => void
 }
 
-export default function CommentSystem({ recipeSlug, onCommentUpdate }: CommentSystemProps) {
+export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate }: CommentSystemProps) {
   const { user } = useAuth()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])

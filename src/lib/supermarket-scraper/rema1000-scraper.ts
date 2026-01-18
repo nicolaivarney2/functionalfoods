@@ -44,23 +44,6 @@ interface RemaProductResponse {
   }
 }
 
-interface RemaDepartment {
-  id: number
-  name: string
-  products_last_modified_at: string
-}
-
-// REMA 1000 specific categories we want to scrape
-const REMA_CATEGORIES = {
-  'Frugt og grønt': 20,
-  'Kød og fisk': 30,
-  'Køl': 40,
-  'Ost m.v.': 50,
-  'Frost': 60,
-  'Mejeri': 70,
-  'Kolonial': 80
-}
-
 // Known product IDs for testing and discovery
 const KNOWN_PRODUCT_IDS = [
   304020, // ØKO. BANANER FAIRTRADE
@@ -871,7 +854,7 @@ export class Rema1000Scraper implements SupermarketAPI {
       const jsonData = JSON.stringify(products, null, 2)
       const fileName = `rema/latest.json`
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('scraper-data')
         .upload(fileName, jsonData, {
           contentType: 'application/json',

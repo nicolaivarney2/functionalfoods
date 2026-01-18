@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseServiceClient } from '@/lib/supabase'
+// import { createSupabaseServiceClient } from '@/lib/supabase' // Not used
 
 export const dynamic = 'force-dynamic'
 
@@ -117,8 +117,7 @@ function generateAIMealPlan(
   console.log('🧠 Running AI meal plan generation...')
 
   // 1. Calculate family size and meal requirements
-  const totalFamilySize = familyProfile.adults + familyProfile.children
-  const mealsPerDay = 3 // breakfast, lunch, dinner
+  // const totalFamilySize = familyProfile.adults + familyProfile.children // Not used
   const daysInWeek = 7
 
   // 2. Score recipes based on offers and family preferences

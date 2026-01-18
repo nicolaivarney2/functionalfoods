@@ -2,39 +2,6 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { SupermarketProduct, StoredProduct, PriceHistory } from './types'
 
-// Create Supabase client dynamically to avoid build-time issues
-function createSupabaseServerClient() {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required Supabase environment variables')
-    }
-    
-    return createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          get(name: string) {
-            return undefined // Placeholder during build
-          },
-          set(name: string, value: string, options: any) {
-            // Placeholder during build
-          },
-          remove(name: string, options: any) {
-            // Placeholder during build
-          },
-        },
-      }
-    )
-  } catch (error) {
-    console.warn('Supabase client creation failed:', error)
-    return null
-  }
-}
-
 export class SupermarketDatabaseService {
   
   /**

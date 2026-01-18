@@ -282,11 +282,6 @@ export default function BlogCategoryHubPage() {
     const words = text.split(/\s+/).length
     return Math.max(1, Math.round(words / 200))
   }
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return ''
-    return new Date(dateString).toLocaleDateString('da-DK', { day: 'numeric', month: 'short' })
-  }
-
   const categoryBgColor = categoryCfg?.bgColor || '#FFFFFF'
 
   return (

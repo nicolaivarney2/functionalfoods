@@ -6,17 +6,11 @@ import {
   RecipeCompatibility,
   ValidationResult,
   IngredientSearchFilters,
-  RecipeSearchFilters,
-  BulkImportResult,
-  ImportError,
-  NutritionalInfo,
-  VitaminInfo,
-  MineralInfo
+  BulkImportResult
 } from './types';
 
 export class IngredientTaggingService {
   private ingredients: Map<string, IngredientTag> = new Map();
-  private recipes: Map<string, Recipe> = new Map();
 
   constructor() {
     this.initializeDefaultIngredients();
@@ -561,7 +555,7 @@ export class IngredientTaggingService {
       try {
         const validation = this.validateIngredientData(row);
         if (validation.isValid) {
-          const ingredient = this.createIngredientTag({
+          this.createIngredientTag({
             name: row.name,
             category: row.category as IngredientCategory,
             exclusions: row.exclusions || [],

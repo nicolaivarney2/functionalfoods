@@ -61,13 +61,11 @@ export async function POST(request: NextRequest) {
     // Process ingredients to remove duplicates
     console.log('🔍 Processing ingredients...')
     let newIngredients: any[] = []
-    let matchedIngredients: any[] = []
     let skippedCount = 0
     
     try {
       const result = await ingredientMatcher.processIngredients(ingredients)
       newIngredients = result.newIngredients
-      matchedIngredients = result.matchedIngredients
       skippedCount = result.skippedCount
       
       console.log('🔍 Ingredient matching results:')

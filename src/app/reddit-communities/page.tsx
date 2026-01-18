@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ExternalLink, Users, MessageCircle, Search, Filter } from 'lucide-react'
-import RedditCommunityWidget from '@/components/RedditCommunityWidget'
 
 interface RedditCommunity {
   name: string

@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabaseServer'
 export const dynamic = 'force-dynamic'
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {

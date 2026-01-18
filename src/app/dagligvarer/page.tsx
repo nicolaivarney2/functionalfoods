@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown, X, Clock, ChevronUp } from 'lucide-react'
+import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
 import ComingSoonWrapper from '@/components/ComingSoonWrapper'
 
 
@@ -31,7 +31,7 @@ interface ProductCounts {
 }
 
 // Helper function to format offer expiration date
-const formatOfferExpiration = (saleEndDate: string | null | undefined, store?: string): string | null => {
+const formatOfferExpiration = (saleEndDate: string | null | undefined): string | null => {
   if (!saleEndDate) return null
   
   const endDate = new Date(saleEndDate)
@@ -158,9 +158,9 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
             </div>
             
             {/* Offer expiration notice */}
-            {formatOfferExpiration(product.sale_end_date, product.store) && (
+            {formatOfferExpiration(product.sale_end_date) && (
               <div className="text-xs text-gray-600 mt-1">
-                {formatOfferExpiration(product.sale_end_date, product.store)}
+                {formatOfferExpiration(product.sale_end_date)}
               </div>
             )}
             
@@ -408,7 +408,6 @@ export default function DagligvarerPage() {
   const [showOnlyOffers, setShowOnlyOffers] = useState(true)
   const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(false)
   const [showOnlyOrganic, setShowOnlyOrganic] = useState(false)
-  const [groupByCategory, setGroupByCategory] = useState(false)
   
   // Data state
   const [products, setProducts] = useState<Product[]>([])
@@ -662,7 +661,6 @@ export default function DagligvarerPage() {
     setShowOnlyOffers(true) // Keep offers active by default
     setShowOnlyFoodProducts(false)
     setShowOnlyOrganic(false)
-    setGroupByCategory(false)
     setCurrentPage(1)
     fetchProducts(1, false)
   }
@@ -1314,9 +1312,9 @@ export default function DagligvarerPage() {
                       </div>
                       
                       {/* Offer expiration notice */}
-                      {formatOfferExpiration(selectedProduct.sale_end_date, selectedProduct.store) && (
+                      {formatOfferExpiration(selectedProduct.sale_end_date) && (
                         <div className="text-sm text-gray-600 mt-2">
-                          {formatOfferExpiration(selectedProduct.sale_end_date, selectedProduct.store)}
+                          {formatOfferExpiration(selectedProduct.sale_end_date)}
                         </div>
                       )}
                       

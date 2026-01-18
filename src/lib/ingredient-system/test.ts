@@ -1,4 +1,5 @@
 import { ingredientService, IngredientCategory } from './index';
+import { RecipeCategory } from './types';
 
 // Test the ingredient tagging system
 export function testIngredientSystem() {
@@ -71,7 +72,7 @@ export function testIngredientSystem() {
     prepTime: 15,
     cookTime: 20,
     servings: 4,
-    categories: ['main-course'],
+    categories: [RecipeCategory.MainCourse],
     dietaryApproaches: ['keto'],
     nutritionalInfo: {
       caloriesPer100g: 250,

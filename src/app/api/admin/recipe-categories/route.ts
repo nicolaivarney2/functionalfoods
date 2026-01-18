@@ -25,7 +25,7 @@ const DEFAULT_CATEGORIES = [
   'Dip og dressinger'
 ]
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) { return undefined },
-        set(name: string, value: string, options: any) {},
-        remove(name: string, options: any) {},
+        get() { return undefined },
+        set() {},
+        remove() {},
       },
     })
     
@@ -99,9 +99,9 @@ export async function POST(request: NextRequest) {
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) { return undefined },
-        set(name: string, value: string, options: any) {},
-        remove(name: string, options: any) {},
+        get() { return undefined },
+        set() {},
+        remove() {},
       },
     })
     

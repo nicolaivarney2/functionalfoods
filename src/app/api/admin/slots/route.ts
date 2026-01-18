@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { recipeId, recipeTitle, count = 1 } = await request.json()
+    const { recipeId, count = 1 } = await request.json()
     
     if (!recipeId) {
       return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 })

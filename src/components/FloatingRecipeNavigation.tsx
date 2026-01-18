@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { ChevronUp } from 'lucide-react'
 
 interface FloatingRecipeNavigationProps {
@@ -14,8 +13,6 @@ export default function FloatingRecipeNavigation({
   onInstructionsClick,
   activeSection
 }: FloatingRecipeNavigationProps) {
-  const [isVisible, setIsVisible] = useState(true)
-
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }

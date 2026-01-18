@@ -1,7 +1,6 @@
 import { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Clock, Star, MessageCircle } from 'lucide-react'
 import { databaseService } from '@/lib/database-service'
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import Script from 'next/script'
@@ -36,13 +35,6 @@ export default async function RecipePage({ params }: PageProps) {
         </Link>
       </div>
     )
-  }
-
-  const formatTime = (minutes: number) => {
-    if (minutes < 60) return `${minutes} MIN`
-    const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    return mins > 0 ? `${hours}T ${mins} MIN` : `${hours}T`
   }
 
   // Generate structured data for SEO

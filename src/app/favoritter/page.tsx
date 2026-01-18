@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Heart, Trash2, Clock, Star } from 'lucide-react'
+import { Heart, Trash2, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 interface FavoriteRecipe {

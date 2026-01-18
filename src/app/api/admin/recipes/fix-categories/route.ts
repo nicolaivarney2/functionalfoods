@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
@@ -178,7 +178,7 @@ function normalizeMainCategory(
   return 'Aftensmad'
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('🔧 Starting bulk category fix for recipes...')
     
@@ -193,9 +193,9 @@ export async function POST(request: NextRequest) {
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) { return undefined },
-        set(name: string, value: string, options: any) {},
-        remove(name: string, options: any) {},
+        get() { return undefined },
+        set() {},
+        remove() {},
       },
     })
     
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Using ${allowedCategories.length} allowed categories`)
     
     // Process each recipe
-    let fixedCount = 0
+    // let fixedCount = 0 // Not used
     const updates: Array<{ id: string; oldCategory: string; newCategory: string }> = []
     
     for (const recipe of recipes) {

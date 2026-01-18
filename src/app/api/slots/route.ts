@@ -20,13 +20,13 @@ export async function GET(request: NextRequest) {
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) {
+        get() {
           return undefined
         },
-        set(name: string, value: string, options: any) {
+        set() {
           // Service role doesn't need cookies
         },
-        remove(name: string, options: any) {
+        remove() {
           // Service role doesn't need cookies
         },
       },

@@ -72,7 +72,7 @@ export default function TestRecipesPage() {
         </div>
 
         <div className="grid gap-4">
-          {recipes.map((recipe, index) => (
+          {recipes.map((recipe) => (
             <div key={recipe.id} className="bg-white p-4 rounded-lg border">
               <h3 className="font-semibold text-lg">{recipe.title}</h3>
               <p className="text-gray-600 text-sm">{recipe.description}</p>

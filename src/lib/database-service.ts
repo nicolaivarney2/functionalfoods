@@ -293,6 +293,7 @@ export class DatabaseService {
       const now = new Date().toISOString() // Current time for filtering expired offers
 
       const offset = (page - 1) * limit
+      const categoryFilter = this.buildCategoryFilterList(categories, foodOnly)
 
       // Category filtering using the new product_offers structure
 
@@ -364,17 +365,17 @@ export class DatabaseService {
         }
       }
 
-      if (categories && categories.length > 0) {
+      if (categoryFilter.length > 0) {
         // Efficient approach: Query products table first to get matching IDs
         // Then filter product_offers by those IDs
         // This is more reliable than trying to filter on joined tables
         let productIds: string[] = []
         
         try {
-          productIds = await this.findProductIdsForCategories(categories)
+          productIds = await this.findProductIdsForCategories(categoryFilter)
           
           if (!productIds || productIds.length === 0) {
-            console.error(`[CATEGORY FILTER] No product IDs found for categories: ${categories.join(', ')}`)
+            console.error(`[CATEGORY FILTER] No product IDs found for categories: ${categoryFilter.join(', ')}`)
             return { products: [], total: 0, hasMore: false }
           }
           
@@ -544,7 +545,7 @@ export class DatabaseService {
             
             // Organic filter already applied via productIds intersection above
             
-            const { data: chunkData, error: chunkError, count: chunkCount } = await chunkQuery
+            const { data: chunkData, error: chunkError } = await chunkQuery
             
             if (chunkError) {
               console.error(`[CATEGORY FILTER] Error fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, chunkError)
@@ -701,7 +702,7 @@ export class DatabaseService {
         const p = row.products || {}
         
         // Debug: Log if products object is missing
-        if (!row.products && categories && categories.length > 0) {
+        if (!row.products && categoryFilter.length > 0) {
           console.warn(`⚠️ Missing products object for offer ${row.id}, product_id: ${row.product_id}`)
         }
 
@@ -778,8 +779,6 @@ export class DatabaseService {
     // OPTIMIZED: Try exact matches first (much faster), then fall back to partial matches
     for (const cat of categories) {
       const normalized = cat.trim()
-      const normalizedLower = normalized.toLowerCase()
-      
       // STEP 1: Try exact match on department first (most common and fastest)
       const { data: exactDept, error: deptErr } = await supabase
         .from('products')
@@ -930,14 +929,6 @@ export class DatabaseService {
     return [...this.FOOD_ONLY_CATEGORIES]
   }
 
-  private escapeIlikeTerm(value: string): string {
-    return value
-      .replace(/\\/g, '\\\\')
-      .replace(/%/g, '\\%')
-      .replace(/_/g, '\\_')
-      .replace(/,/g, '\\,')
-  }
-
   private getProductPlaceholderImage(): string {
     return '/images/recipe-placeholder.jpg'
   }
@@ -958,7 +949,7 @@ export class DatabaseService {
       
       // Fetch all products in batches of 1000
       while (hasMore) {
-        const { data, error, count } = await supabase
+        const { data, error } = await supabase
           .from('supermarket_products')
           .select('*', { count: 'exact' })
           // Process oldest-updated products first so likely-changed items are checked earlier
@@ -1033,9 +1024,6 @@ export class DatabaseService {
    */
   async getSupermarketProducts(page: number = 1, limit: number = 100, categories?: string[], offersOnly?: boolean, search?: string, stores?: string[]): Promise<{products: any[], total: number, hasMore: boolean}> {
     try {
-      // Use anon client for public API access
-      const supabase = createSupabaseClient()
-      
       // If only offers requested, use simple query
       if (offersOnly) {
         return this.getProductsWithSimpleQuery(page, limit, categories, true, search, stores)
@@ -1433,7 +1421,7 @@ export class DatabaseService {
         console.log('📋 First filtered recipe structure:', JSON.stringify(filteredRecipes[0], null, 2))
       }
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('recipes')
         .insert(filteredRecipes)
       
@@ -1491,7 +1479,7 @@ export class DatabaseService {
         console.log('📋 First filtered ingredient structure:', JSON.stringify(filteredIngredients[0], null, 2))
       }
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('ingredients')
         .upsert(filteredIngredients, { onConflict: 'id' })
       
@@ -1523,11 +1511,11 @@ export class DatabaseService {
       console.log('🔍 Checking database structure...')
       
       // Test if tables exist
-      const { data: recipesTable, error: recipesError } = await supabase
+      const { error: recipesError } = await supabase
         .from('recipes')
         .select('count', { count: 'exact', head: true })
       
-      const { data: ingredientsTable, error: ingredientsError } = await supabase
+      const { error: ingredientsError } = await supabase
         .from('ingredients')
         .select('count', { count: 'exact', head: true })
       
@@ -1637,7 +1625,7 @@ export class DatabaseService {
     const supabase = createSupabaseClient()
     try {
       console.log('🔍 Testing Supabase connection...')
-      const { data, error } = await supabase.from('recipes').select('count', { count: 'exact', head: true })
+      const { error } = await supabase.from('recipes').select('count', { count: 'exact', head: true })
       if (error) {
         console.error('❌ Connection test failed:', error)
         return false

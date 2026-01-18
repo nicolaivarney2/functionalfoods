@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export function useAdminCheck() {
-  const { user, session, loading } = useAuth()
+  const { user, loading } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
   const [checking, setChecking] = useState(true)
   const checkingRef = useRef(false)

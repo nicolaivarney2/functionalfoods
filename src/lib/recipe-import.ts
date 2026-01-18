@@ -1,5 +1,4 @@
-import { Recipe, Ingredient, RecipeStep } from '@/types/recipe'
-import { FridaDTUMatcher } from './frida-dtu-matcher'
+import { Recipe } from '@/types/recipe'
 import { downloadAndStoreImage } from './image-downloader'
 
 export interface RawRecipeData {
@@ -90,8 +89,6 @@ interface KetolivRecipe {
  * Convert Ketoliv JSON format to our RawRecipeData format
  */
 export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): RawRecipeData[] {
-  const fridaMatcher = new FridaDTUMatcher()
-  
   return ketolivRecipes.map(recipe => {
     console.log(`🔄 Converting Ketoliv recipe: ${recipe.name}`)
     console.log(`   Original image_url: ${recipe.image_url}`)
@@ -138,14 +135,6 @@ export function convertKetolivToRawRecipeData(ketolivRecipes: KetolivRecipe[]): 
       const descLower = (description || '').toLowerCase()
       const titleLower = (title || '').toLowerCase()
       const allText = `${titleLower} ${descLower} ${tagLower}`
-      
-      // Allowed categories from Ketoliv
-      const allowedCategories = [
-        'Aftensmad', 'Verden rundt', 'Frokost', 'Is og sommer', 'Salater',
-        'Fisk', 'Morgenmad', 'God til to dage', 'Vegetar', 'Tilbehør',
-        'Bagværk', 'Madpakke opskrifter', 'Desserter', 'Fatbombs',
-        'Food prep', 'Simre retter', 'Dip og dressinger'
-      ]
       
       // Check for specific category keywords (most specific first)
       if (allText.includes('madpakke')) return 'Madpakke opskrifter'
@@ -330,7 +319,7 @@ export async function importRecipesWithImages(rawData: RawRecipeData[]): Promise
 }
 
 export function importRecipes(rawData: RawRecipeData[]): Recipe[] {
-  return rawData.map((recipe, index) => {
+  return rawData.map((recipe) => {
     // Use original ID if provided, otherwise leave empty for database service to assign
     const id = recipe.id || ''
     const slug = generateSlug(recipe.title)

@@ -6,9 +6,8 @@ import { User, Lock, Save, CheckCircle, AlertCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export default function ProfilePage() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const [name, setName] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -80,7 +79,6 @@ export default function ProfilePage() {
       } else {
         setMessage('Password ændret!')
         setMessageType('success')
-        setCurrentPassword('')
         setNewPassword('')
         setConfirmPassword('')
       }

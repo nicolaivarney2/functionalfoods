@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
         console.log(`🔍 Existing product for ${product.external_id}:`, existingProduct ? 'EXISTS' : 'NOT FOUND')
         
         // Use upsert to insert or update product
-        const { data: upsertedProduct, error: upsertError } = await supabase
+        const { error: upsertError } = await supabase
           .from('supermarket_products')
           .upsert({
             external_id: product.external_id,

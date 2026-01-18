@@ -1,4 +1,4 @@
-import { DietaryApproach, MacroRatio, MealStructure, MealType, FoodCategory, FoodRestriction, NutritionalPriority } from './types';
+import { DietaryApproach, MealType, FoodCategory } from './types';
 
 export class DietaryApproachFactory {
   private dietaryApproaches: Map<string, DietaryApproach> = new Map();

@@ -4,7 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 export const revalidate = 0
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {

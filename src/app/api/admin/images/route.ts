@@ -1,49 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
 
-// Create Supabase client dynamically to avoid build-time issues
-function createSupabaseServerClient() {
-  try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required Supabase environment variables')
-    }
-    
-    // Don't call cookies() here - it causes build issues
-    // We'll call it inside the actual function when needed
-    
-    return createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          get(name: string) {
-            // This will be called at runtime, not build time
-            return undefined // Placeholder during build
-          },
-          set(name: string, value: string, options: any) {
-            // This will be called at runtime, not build time
-          },
-          remove(name: string, options: any) {
-            // This will be called at runtime, not build time
-          },
-        },
-      }
-    )
-  } catch (error) {
-    // During build, return a dummy client. During runtime, this will fail gracefully.
-    console.warn('Supabase client creation failed:', error)
-    return null
-  }
-}
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Create Supabase client with proper cookies context
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

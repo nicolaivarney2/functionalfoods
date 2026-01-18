@@ -1,13 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Users, Leaf, Brain, Zap, Sparkles, ChevronLeft, Check, X, AlertCircle, Scale, Flame, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, Leaf, Brain, Zap, Check, X, AlertCircle, Scale, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
-  const [openNiche, setOpenNiche] = useState<string | null>(null)
 
   useEffect(() => {
     setIsVisible(true)

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseClient } from '@/lib/supabase'
-import { ArrowLeft, Calendar, User, ExternalLink, CheckCircle, Info } from 'lucide-react'
+import { ArrowLeft, ExternalLink, CheckCircle, Info } from 'lucide-react'
 
 interface BlogPost {
   id: number
@@ -305,18 +305,6 @@ export default function BlogPostPage() {
       </div>
     )
   }
-
-  // Generate table of contents from content
-  const generateTableOfContents = () => {
-    if (!post?.content) return []
-    const headings = post.content.match(/<h1[^>]*>(.*?)<\/h1>/gi) || []
-    return headings.map((heading, index) => {
-      const text = heading.replace(/<[^>]*>/g, '').trim()
-      return { text, id: `heading-${index + 1}`, level: 1 }
-    })
-  }
-
-  const tableOfContents = generateTableOfContents()
 
   return (
     <div className="min-h-screen bg-gray-50">

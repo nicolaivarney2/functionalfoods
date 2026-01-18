@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Star, MessageCircle, Edit, Save, X } from 'lucide-react'
+import { Star, MessageCircle } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
 import RecipeActions from './RecipeActions'
 import DynamicIngredientsList from './DynamicIngredientsList'

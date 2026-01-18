@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Lightbulb, Bot, Edit, Save, X } from 'lucide-react'
+import { Bot, Edit, Save, X } from 'lucide-react'
 
 interface RecipeTipsProps {
   personalTips?: string

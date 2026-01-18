@@ -1,6 +1,6 @@
 'use client'
 
-import { ExternalLink, Users, MessageCircle } from 'lucide-react'
+import { ExternalLink, Users } from 'lucide-react'
 
 interface RedditCommunity {
   name: string

@@ -13,6 +13,9 @@ export default function RecipePopularity({
   pageViews = 0, 
   popularityScore = 0 
 }: RecipePopularityProps) {
+  void ketolivViews;
+  void pageViews;
+  void popularityScore;
   // Simpel page counter der skaber tillid
   const generateTrustScore = (): number => {
     // Baseret på recipe ID eller slug for at få et konsistent tal

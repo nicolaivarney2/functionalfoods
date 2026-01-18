@@ -1,7 +1,4 @@
 // Frontend-only image downloader - server-side processing handled by API route
-// Check if we're in a serverless environment (Vercel)
-const isServerless = process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-
 export interface ImageDownloadResult {
   success: boolean
   localPath?: string

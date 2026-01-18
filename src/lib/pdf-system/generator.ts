@@ -7,23 +7,12 @@ import {
   PDFMetadata, 
   PDFSecurity, 
   PDFStatus,
-  PDFQuality,
-  PDFFormat,
   SectionType,
-  EncryptionLevel,
-  CoverPageContent,
-  MealPlanContent,
-  ShoppingListContent,
-  NutritionalSummary,
-  EducationalContent,
-  ProgressTracking
+  EncryptionLevel
 } from './types';
 import { dietaryFactory } from '../dietary-system';
-import { mealPlanGenerator } from '../meal-plan-system';
 
 export class PDFGenerator {
-  private isInitialized = true;
-
   constructor() {
     // jsPDF doesn't need initialization
   }
@@ -193,7 +182,7 @@ export class PDFGenerator {
       case SectionType.ShoppingList:
         return this.generateShoppingListHTML(mealPlan);
       case SectionType.NutritionGuide:
-        return this.generateNutritionGuideHTML(mealPlan, userProfile);
+        return this.generateNutritionGuideHTML(mealPlan);
       case SectionType.ProgressTracking:
         return this.generateProgressTrackingHTML(userProfile);
       case SectionType.EducationalContent:
@@ -401,7 +390,7 @@ export class PDFGenerator {
     return html;
   }
 
-  private generateNutritionGuideHTML(mealPlan: any, userProfile: any): string {
+  private generateNutritionGuideHTML(mealPlan: any): string {
     return `
       <div class="nutrition-guide-section" style="page-break-after: always;">
         <h2 style="color: #333; font-size: 28px; margin-bottom: 30px;">Nutrition Guide</h2>

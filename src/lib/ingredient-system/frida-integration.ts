@@ -2,9 +2,6 @@ import { IngredientTag, IngredientCategory, NutritionalInfo, VitaminInfo, Minera
 
 // Frida API integration for Danish nutritional data
 export class FridaIntegration {
-  private baseUrl = 'https://frida.fooddata.dk/api/v1'
-  private cache = new Map<string, any>()
-  
   // Direct mapping of our ingredients to Frida data with correct values
   private ingredientToFridaData: Record<string, any> = {
     'svinemørbrad': {
@@ -271,6 +268,8 @@ export class FridaIntegration {
    * Add ingredient mapping (deprecated - now hardcoded)
    */
   addIngredientMapping(ingredientName: string, fridaFoodId: number): void {
+    void ingredientName;
+    void fridaFoodId;
     console.warn(`addIngredientMapping is deprecated. Use ingredientToFridaData directly.`)
   }
 

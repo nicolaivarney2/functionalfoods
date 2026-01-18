@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, Settings, Heart, ShoppingCart, TrendingUp, Share2, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search, CheckCircle } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, TrendingUp, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, Minus, Search, CheckCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
-import { dietaryFactory, DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system'
+import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 
 // Use the same Supabase client as the rest of the app
@@ -30,11 +30,6 @@ interface Product {
   store: string
   is_on_sale: boolean
   original_price?: number
-}
-
-interface Category {
-  name: string
-  slug: string
 }
 
 // Mock data for development
@@ -606,7 +601,6 @@ export default function MadbudgetPage() {
         // Calculate savings based on unused portions
         const existingAmount = parseFloat(existingIng.amount)
         const newAmount = parseFloat(newIng.amount)
-        const maxAmount = Math.max(existingAmount, newAmount)
         const minAmount = Math.min(existingAmount, newAmount)
         return total + (minAmount * newIng.price / newAmount)
       }
@@ -838,7 +832,8 @@ export default function MadbudgetPage() {
           adultsProfiles: familyProfile.adultsProfiles.map(p => ({
             dietaryApproach: p.dietaryApproach,
             mealsPerDay: p.mealsPerDay || ['dinner'],
-            weightGoal: p.weightGoal
+            weightGoal: p.weightGoal,
+            excludedFoods: []
           })),
           excludedIngredients: familyProfile.excludedIngredients,
           selectedStores: familyProfile.selectedStores,
@@ -876,16 +871,16 @@ export default function MadbudgetPage() {
             newMealPlan[dayKey][mealType] = {
               id: meal.recipe.id,
               title: meal.recipe.title,
-              image: meal.recipe.imageUrl,
+              image: meal.recipe.images?.[0] || '',
               ingredients: meal.recipe.ingredients.map((ing: any) => ({
                 name: ing.name || ing.ingredientName,
                 amount: ing.amount,
                 unit: ing.unit
               })),
               servings: meal.servings,
-              prepTime: meal.recipe.prepTime || '30 min',
-              category: meal.recipe.category || 'Dinner',
-              dietaryTags: meal.recipe.dietaryCategories || []
+              prepTime: meal.recipe.prepTime ? `${meal.recipe.prepTime} min` : '30 min',
+              category: meal.recipe.categories?.[0] || 'Dinner',
+              dietaryTags: meal.recipe.dietaryApproaches || []
             }
           }
         })
@@ -1042,7 +1037,7 @@ export default function MadbudgetPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Butikker:</span>
                   <span className="font-medium">
-                    {familyProfile.selectedStores.map((storeId, index) => {
+                    {familyProfile.selectedStores.map((storeId) => {
                       const store = mockStores.find(s => s.id === storeId)
                       return store?.name
                     }).filter(Boolean).join(', ')}

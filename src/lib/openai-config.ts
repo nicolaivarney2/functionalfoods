@@ -111,7 +111,7 @@ export function updateOpenAIConfig(updates: Partial<OpenAIConfig>): boolean {
         antiinflammatorisk: '',
         fleksitarisk: '',
         '5-2': '',
-        'meal-prep': ''
+        'proteinrig-kost': ''
       }
     }
     const newConfig = { ...currentConfig, ...updates }

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
@@ -20,13 +20,13 @@ export async function GET(
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) {
+        get() {
           return undefined
         },
-        set(name: string, value: string, options: any) {
+        set() {
           // Service role doesn't need cookies
         },
-        remove(name: string, options: any) {
+        remove() {
           // Service role doesn't need cookies
         },
       },
@@ -106,13 +106,13 @@ export async function PUT(
     
     const supabase = createServerClient(supabaseUrl, serviceRoleKey, {
       cookies: {
-        get(name: string) {
+        get() {
           return undefined
         },
-        set(name: string, value: string, options: any) {
+        set() {
           // Service role doesn't need cookies
         },
-        remove(name: string, options: any) {
+        remove() {
           // Service role doesn't need cookies
         },
       },

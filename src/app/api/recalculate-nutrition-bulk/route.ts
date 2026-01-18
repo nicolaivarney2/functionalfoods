@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
 import { createSupabaseClient } from '@/lib/supabase'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('🔄 Starting BULK nutrition recalculation for ALL recipes...')
 

@@ -1,9 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { Search, Filter, ChevronDown, ChevronUp, Sparkles, Target, ArrowRight } from 'lucide-react'
-import { recipeCategories, dietaryCategories } from '@/lib/sample-data'
+import { Search, Filter, Sparkles } from 'lucide-react'
 import RecipeCard from '@/components/RecipeCard'
 import MobileRecipeFilterBar from '@/components/MobileRecipeFilterBar'
 import { useState, useEffect } from 'react'
@@ -155,32 +153,6 @@ export default function RecipeOverviewPage() {
   const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
   const [showFilters, setShowFilters] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [showFloatingFilter, setShowFloatingFilter] = useState(false)
-
-  // Track scroll position for floating filter button
-  useEffect(() => {
-    const handleScroll = () => {
-      // Find the recipes section
-      const recipesSection = document.getElementById('recipes-section')
-      if (!recipesSection) return
-
-      const rect = recipesSection.getBoundingClientRect()
-      // Show floating button when recipes section is visible and user has scrolled past filters
-      const filtersSection = document.getElementById('filters-section')
-      if (filtersSection) {
-        const filtersRect = filtersSection.getBoundingClientRect()
-        // Show if recipes section is visible and filters section is above viewport
-        setShowFloatingFilter(rect.top < window.innerHeight && filtersRect.bottom < 0)
-      } else {
-        setShowFloatingFilter(rect.top < window.innerHeight)
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    handleScroll() // Check on mount
-
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
 
   // Load recipes on component mount
   useEffect(() => {

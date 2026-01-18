@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Scale, Lightbulb, Flame, Heart, Brain, TrendingDown, Check, AlertCircle, Zap, Target } from 'lucide-react'
+import { ArrowLeft, Scale, Flame, Heart, Brain, Check, Zap, Target } from 'lucide-react'
 
 export default function ProteinrigKostWeightLossTheoryPage() {
   const [isVisible, setIsVisible] = useState(false)

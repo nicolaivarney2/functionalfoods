@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, Plus, CheckCircle, XCircle } from 'lucide-react'
+import { Calendar, CheckCircle, XCircle } from 'lucide-react'
 
 interface PublishingSlot {
   date: string
@@ -114,7 +114,7 @@ export default function SlotScheduler({
   }
 
   const formatSlotTime = (time: string) => {
-    const [hours, minutes] = time.split(':')
+    const [hours] = time.split(':')
     const hour = parseInt(hours)
     
     if (hour === 7) return '07:00 (Morgen)'

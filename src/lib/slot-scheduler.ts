@@ -149,10 +149,8 @@ export class SlotScheduler {
    * Format slot time for display
    */
   static formatSlotTime(time: string): string {
-    const [hours, minutes] = time.split(':')
+    const [hours] = time.split(':')
     const hour = parseInt(hours)
-    const minute = parseInt(minutes)
-    
     if (hour === 7) return '07:00 (Morgen)'
     if (hour === 12) return '12:00 (Middag)'
     if (hour === 15) return '15:30 (Eftermiddag)'
