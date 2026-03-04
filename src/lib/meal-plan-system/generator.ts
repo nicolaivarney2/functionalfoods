@@ -50,6 +50,7 @@ export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
   private dailyUsedRecipes: Map<string, Set<string>> = new Map(); // Track per-day usage
+  private recipeLastUsed: Map<string, Date> = new Map(); // Track last used date per recipe
   private currentOffers: Map<string, any[]> = new Map(); // Cache for current offers by ingredient
   private selectedIngredientIds: Set<string> = new Set(); // Track selected ingredients for overlap scoring
 
@@ -67,17 +68,44 @@ export class MealPlanGenerator {
       const dbRecipes = await databaseService.getRecipes();
       
       if (dbRecipes && dbRecipes.length > 0) {
+        // Pre-load ingredient IDs for all recipe ingredients (one-time lookup)
+        const { createSupabaseClient } = await import('../supabase');
+        const supabase = createSupabaseClient();
+        
+        // Collect all unique ingredient names/IDs from recipes
+        const ingredientNamesFromRecipes = new Set<string>()
+        dbRecipes.forEach(recipe => {
+          recipe.ingredients?.forEach((ing: any) => {
+            if (ing.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ing.id)) {
+              // It's a name, not a UUID
+              ingredientNamesFromRecipes.add(ing.id)
+            }
+            if (ing.name) {
+              ingredientNamesFromRecipes.add(ing.name)
+            }
+          })
+        })
+        
+        // Look up ingredient IDs from database
+        const ingredientNameToIdMap = new Map<string, string>()
+        if (ingredientNamesFromRecipes.size > 0) {
+          const ingredientNamesArray = Array.from(ingredientNamesFromRecipes)
+          const chunkSize = 500
+          for (let i = 0; i < ingredientNamesArray.length; i += chunkSize) {
+            const chunk = ingredientNamesArray.slice(i, i + chunkSize)
+            const { data: ingredients } = await supabase
+              .from('ingredients')
+              .select('id, name')
+              .in('name', chunk)
+            
+            ingredients?.forEach(ing => {
+              ingredientNameToIdMap.set(ing.name.toLowerCase(), ing.id)
+            })
+          }
+        }
+        
         // Convert database recipes to the format expected by the meal plan system
         this.recipes = dbRecipes.map(recipe => {
-          // Debug dietary categories mapping
-          console.log(`🔍 Recipe ${recipe.title}:`, {
-            rawCategories: recipe.dietaryCategories,
-            type: typeof recipe.dietaryCategories,
-            length: recipe.dietaryCategories?.length,
-            mainCategory: recipe.mainCategory,
-            mappedCategory: this.mapCategory(recipe.mainCategory || 'Aftensmad')
-          });
-          
           // Fix dietary categories mapping
           let dietaryApproaches: string[] = [];
           if (recipe.dietaryCategories) {
@@ -97,11 +125,8 @@ export class MealPlanGenerator {
             const title = recipe.title.toLowerCase();
             if (title.includes('keto') || title.includes('low-carb') || title.includes('lav-carb')) {
               dietaryApproaches = ['keto'];
-              console.log(`🔧 Added 'keto' to ${recipe.title} based on title`);
             }
           }
-          
-          console.log(`✅ Final dietary approaches for ${recipe.title}:`, dietaryApproaches);
           
           return {
             id: recipe.id,
@@ -124,12 +149,30 @@ export class MealPlanGenerator {
                 }
               }
               
-              return {
-                ingredientId: ing.id || ing.name || ingredientName,
-                amount: ing.amount,
-                unit: ing.unit,
-                name: ingredientName || ing.name || ing.id // Preserve name for shopping list
-              }
+          // Get the actual ingredient ID - check if ing.id is UUID, otherwise look up in map
+          let actualIngredientId: string | undefined = undefined
+          
+          // Check if ing.id is already a UUID
+          if (ing.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ing.id)) {
+            actualIngredientId = ing.id
+          } else {
+            // ing.id is likely a name - look it up in the pre-loaded map
+            const lookupName = (ingredientName || ing.name || ing.id)?.toLowerCase()
+            actualIngredientId = lookupName ? ingredientNameToIdMap.get(lookupName) : undefined
+            
+            // Fallback to ingredientService if not in map
+            if (!actualIngredientId) {
+              const foundIngredient = ingredientService.getIngredientByName(ingredientName || ing.name || ing.id)
+              actualIngredientId = foundIngredient?.id
+            }
+          }
+          
+          return {
+            ingredientId: actualIngredientId || ing.id || ing.name || ingredientName, // Use actual ID if found
+            amount: ing.amount,
+            unit: ing.unit,
+            name: ingredientName || ing.name || ing.id // Preserve name for shopping list
+          }
             }) || [],
             instructions: recipe.instructions?.map(inst => inst.instruction) || [],
             prepTime: recipe.preparationTime || 0,
@@ -631,7 +674,7 @@ export class MealPlanGenerator {
     const scoredRecipes = await this.scoreRecipes(availableRecipes, mealDistribution, config);
     
     // Select the best recipe with meal type consideration
-    const selectedRecipe = this.selectRecipe(scoredRecipes, date, mealDistribution.mealType);
+    const selectedRecipe = this.selectRecipe(scoredRecipes, date, mealDistribution.mealType, config);
     
     // Calculate servings to meet macro targets
     const servings = this.calculateServings(selectedRecipe, mealDistribution);
@@ -659,9 +702,6 @@ export class MealPlanGenerator {
    * Filter recipes based on dietary approach, meal type, and exclusions
    */
   private filterRecipes(config: MealPlanConfig, mealType?: MealType): Recipe[] {
-    console.log(`🔍 Filtering ${this.recipes.length} recipes for dietary approach: ${config.dietaryApproach.id}${mealType ? `, meal type: ${mealType}` : ''}`);
-    console.log(`🔍 Available recipes:`, this.recipes.map(r => ({ title: r.title, approaches: r.dietaryApproaches, category: (r as any).mainCategory })));
-    
     // Map mealType to Danish category names
     const mealTypeToCategory: Record<string, string> = {
       'breakfast': 'Morgenmad',
@@ -670,13 +710,17 @@ export class MealPlanGenerator {
       'snack': 'Snack'
     }
     
+    let excludedByMealType = 0
+    let excludedByDietaryApproach = 0
+    let excludedByCarbs = 0
+    
     const filteredRecipes = this.recipes.filter(recipe => {
       // Filter by meal type if provided
       if (mealType) {
         const expectedCategory = mealTypeToCategory[mealType]
         const recipeCategory = (recipe as any).mainCategory || ''
         if (expectedCategory && recipeCategory.toLowerCase() !== expectedCategory.toLowerCase()) {
-          console.log(`❌ Recipe ${recipe.title} excluded: wrong meal type (expected ${expectedCategory}, got ${recipeCategory})`)
+          excludedByMealType++
           return false
         }
       }
@@ -689,7 +733,7 @@ export class MealPlanGenerator {
       });
       
       if (!hasDietaryApproach) {
-        console.log(`❌ Recipe ${recipe.title} excluded: no ${config.dietaryApproach.id} approach (has: ${recipe.dietaryApproaches.join(', ')})`);
+        excludedByDietaryApproach++
         return false;
       }
 
@@ -697,7 +741,7 @@ export class MealPlanGenerator {
       if (config.dietaryApproach.id.toLowerCase() === 'keto') {
         const carbsPer100g = recipe.nutritionalInfo.carbsPer100g || 0;
         if (carbsPer100g > 10) { // Keto: max 10g carbs per 100g
-          console.log(`❌ Recipe ${recipe.title} excluded: too high carbs (${carbsPer100g}g/100g) for keto`);
+          excludedByCarbs++
           return false;
         }
       }
@@ -705,7 +749,6 @@ export class MealPlanGenerator {
       // Check for excluded ingredients
       const violations = ingredientService.checkRecipeExclusions(recipe, config.excludedIngredients);
       if (violations.length > 0) {
-        console.log(`❌ Recipe ${recipe.title} excluded: contains excluded ingredients: ${violations.join(', ')}`);
         return false;
       }
 
@@ -716,16 +759,14 @@ export class MealPlanGenerator {
           return ingredientData?.allergens?.includes(allergy);
         });
         if (hasAllergy) {
-          console.log(`❌ Recipe ${recipe.title} excluded: contains allergy: ${allergy}`);
           return false;
         }
       }
 
-      console.log(`✅ Recipe ${recipe.title} passed all filters`);
       return true;
     });
     
-    console.log(`🔍 Filtered to ${filteredRecipes.length} suitable recipes`);
+    console.log(`🔍 Filtered ${this.recipes.length} recipes → ${filteredRecipes.length} suitable (excluded: ${excludedByMealType} meal type, ${excludedByDietaryApproach} dietary, ${excludedByCarbs} carbs)`);
     return filteredRecipes;
   }
 
@@ -888,7 +929,12 @@ export class MealPlanGenerator {
   /**
    * Select the best recipe with variety consideration
    */
-  private selectRecipe(scoredRecipes: RecipeScore[], date: Date, mealType: MealType): Recipe {
+  private selectRecipe(
+    scoredRecipes: RecipeScore[],
+    date: Date,
+    mealType: MealType,
+    config: MealPlanConfig
+  ): Recipe {
     if (scoredRecipes.length === 0) {
       throw new Error('No suitable recipes found');
     }
@@ -905,6 +951,15 @@ export class MealPlanGenerator {
     
     // Filter out recipes that have been used today
     const unusedTodayRecipes = scoredRecipes.filter(score => !dailyUsed.has(score.recipe.id));
+
+    // Avoid repeating recipes within maxRepeatDays if possible
+    const maxRepeatDays = config.varietyPreferences?.maxRepeatDays ?? 2
+    const cutoff = new Date(date)
+    cutoff.setDate(cutoff.getDate() - maxRepeatDays)
+    const avoidRecentlyUsed = unusedTodayRecipes.filter(score => {
+      const lastUsed = this.recipeLastUsed.get(score.recipe.id)
+      return !lastUsed || lastUsed < cutoff
+    })
     
     if (unusedTodayRecipes.length === 0) {
       // If all recipes used today, clear daily tracking and continue
@@ -913,9 +968,11 @@ export class MealPlanGenerator {
       return scoredRecipes[0].recipe;
     }
 
+    const candidates = avoidRecentlyUsed.length > 0 ? avoidRecentlyUsed : unusedTodayRecipes
+
     // Select from top 3 unused recipes today with some randomness
     // But prioritize recipes with ingredient overlap (smaller shopping list)
-    const topRecipes = unusedTodayRecipes.slice(0, Math.min(3, unusedTodayRecipes.length));
+    const topRecipes = candidates.slice(0, Math.min(3, candidates.length));
     
     // Sort by overlap score (recipes with more shared ingredients first)
     topRecipes.sort((a, b) => {
@@ -939,6 +996,7 @@ export class MealPlanGenerator {
     // Mark as used today
     dailyUsed.add(selectedRecipe.id);
     this.usedRecipes.add(selectedRecipe.id);
+    this.recipeLastUsed.set(selectedRecipe.id, date);
     
     console.log(`✅ Selected recipe for ${mealKey}: ${selectedRecipe.title} (overlap: ${this.countIngredientOverlap(selectedRecipe)} ingredients)`);
     console.log(`📊 Daily usage for ${dateKey}: ${dailyUsed.size} recipes used`);
@@ -1090,7 +1148,7 @@ export class MealPlanGenerator {
    * Generate shopping list for a week
    */
   private async generateShoppingList(weekNumber: number, days: DayPlan[]): Promise<ShoppingList> {
-    const ingredientMap = new Map<string, { amount: number; unit: string; name: string }>();
+    const ingredientMap = new Map<string, { amount: number; unit: string; name: string; ingredientId?: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
 
     // Aggregate ingredients from all meals
@@ -1122,12 +1180,18 @@ export class MealPlanGenerator {
           }
           
           const key = ingredientName.toLowerCase().trim()
-          const current = ingredientMap.get(key) || { amount: 0, unit: ingredient.unit || 'stk', name: ingredientName };
+          
+          // ingredient.ingredientId should already be a UUID (from recipe loading above)
+          // But if it's not, we'll resolve it in the DB lookup phase below
+          const ingredientId = ingredient.ingredientId
+          
+          const current = ingredientMap.get(key) || { amount: 0, unit: ingredient.unit || 'stk', name: ingredientName, ingredientId };
           
           ingredientMap.set(key, {
             amount: current.amount + (ingredient.amount * meal.servings),
             unit: ingredient.unit || current.unit,
-            name: ingredientName
+            name: ingredientName,
+            ingredientId: ingredientId || current.ingredientId // Use ID from recipe (should be UUID)
           });
         });
 
@@ -1161,45 +1225,243 @@ export class MealPlanGenerator {
     const categoryMap = new Map<string, ShoppingItem[]>();
     const supplementItems: ShoppingItem[] = [];
 
-    // Load product matches for ingredients to get categories
-    const ingredientIds = Array.from(new Set(
-      Array.from(ingredientMap.keys()).map(key => {
-        const ingredient = ingredientService.getIngredientById(key);
-        return ingredient?.id || key;
-      }).filter(id => id && !id.startsWith('temp-') && !id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))
-    ));
-    
+    // Load ingredient names/categories from DB to ensure correct grouping
+    const ingredientDbMap = new Map<string, { name: string; category: string | null; is_basis?: boolean }>()
+    const ingredientNameDbMap = new Map<string, { id: string; name: string; category: string | null; is_basis?: boolean }>()
+
+    const ingredientNames = Array.from(
+      new Set(
+        Array.from(ingredientMap.values())
+          .map((value) => String((value as any).name || '').trim())
+          .filter(Boolean)
+      )
+    )
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    if (ingredientNames.length > 0) {
+      try {
+        const { createSupabaseClient } = await import('../supabase');
+        const supabase = createSupabaseClient();
+
+        const chunk = <T,>(items: T[], size: number) => {
+          const chunks: T[][] = []
+          for (let i = 0; i < items.length; i += size) {
+            chunks.push(items.slice(i, i + size))
+          }
+          return chunks
+        }
+
+        for (const names of chunk(ingredientNames, 500)) {
+          const { data: ingredientsByName, error: nameError } = await supabase
+            .from('ingredients')
+            .select('id, name, category, is_basis')
+            .in('name', names)
+          if (nameError) {
+            console.error('Error loading ingredient categories by name:', nameError)
+            continue
+          }
+          for (const ing of ingredientsByName || []) {
+            ingredientNameDbMap.set(String(ing.name).toLowerCase(), {
+              id: ing.id, // Include ID for lookup
+              name: ing.name || 'Unknown Ingredient',
+              category: ing.category || null,
+              is_basis: ing.is_basis || false
+            })
+          }
+        }
+
+        // Fuzzy-name fallback for ingredients that don't match exactly by name
+        const unresolvedNames = ingredientNames.filter((n) => {
+          const key = String(n).toLowerCase().trim()
+          return !ingredientNameDbMap.has(key)
+        })
+
+        if (unresolvedNames.length > 0) {
+          const { data: allIngredients, error: allError } = await supabase
+            .from('ingredients')
+            .select('id, name, category, is_basis')
+            .limit(5000)
+
+          if (allError) {
+            console.error('Error loading ingredients for fuzzy name matching:', allError)
+          } else if (allIngredients) {
+            const normalize = (name: string) =>
+              name
+                .toLowerCase()
+                .replace(/^eks\.\s*/i, '') // remove leading "eks."
+                .split(',')[0] // part before comma (e.g. ", kan undlades")
+                .replace(/\s+kan\s+undlades/gi, '')
+                .trim()
+
+            const normalizedDb: { id: string; normalized: string; raw: any }[] = allIngredients.map(
+              (ing: any) => ({
+                id: ing.id,
+                normalized: normalize(ing.name || ''),
+                raw: ing,
+              }),
+            )
+
+            for (const originalName of unresolvedNames) {
+              const originalKey = String(originalName).toLowerCase().trim()
+              const norm = normalize(originalName)
+              if (!norm) continue
+
+              const match =
+                normalizedDb.find((ing) => ing.normalized === norm) ||
+                normalizedDb.find(
+                  (ing) =>
+                    ing.normalized &&
+                    (ing.normalized.includes(norm) || norm.includes(ing.normalized)),
+                )
+
+              if (match) {
+                const ing = match.raw
+                ingredientNameDbMap.set(originalKey, {
+                  id: ing.id,
+                  name: ing.name || 'Unknown Ingredient',
+                  category: ing.category || null,
+                  is_basis: ing.is_basis || false,
+                })
+              }
+            }
+          }
+        }
+
+        const resolvedIds = new Set<string>()
+        ingredientMap.forEach((value, key) => {
+          let ingredientId: string | undefined = (value as any).ingredientId
+          if (!ingredientId || !uuidRegex.test(ingredientId)) {
+            const nameKey = String((value as any).name || key).toLowerCase().trim()
+            const dbIngredientByName =
+              ingredientNameDbMap.get(nameKey) ||
+              ingredientNameDbMap.get(String(key).toLowerCase().trim()) ||
+              ingredientNameDbMap.get(String(ingredientId || '').toLowerCase().trim())
+            if (dbIngredientByName?.id) {
+              ingredientId = dbIngredientByName.id
+            }
+          }
+          if (ingredientId && uuidRegex.test(ingredientId)) {
+            resolvedIds.add(ingredientId)
+          }
+        })
+
+        if (resolvedIds.size > 0) {
+          for (const ids of chunk(Array.from(resolvedIds), 500)) {
+            const { data: ingredients, error } = await supabase
+              .from('ingredients')
+              .select('id, name, category, is_basis')
+              .in('id', ids)
+            if (error) {
+              console.error('Error loading ingredient categories:', error)
+              continue
+            }
+            for (const ing of ingredients || []) {
+              ingredientDbMap.set(String(ing.id), {
+                name: ing.name || 'Unknown Ingredient',
+                category: ing.category || null,
+                is_basis: ing.is_basis || false
+              })
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading ingredient categories:', error)
+      }
+    }
+
     // Get product matches for these ingredients to find categories
     const productCategoryMap = new Map<string, string>(); // ingredientId -> product category
-    
+
+    const ingredientIds = Array.from(ingredientDbMap.keys())
+
     if (ingredientIds.length > 0) {
       try {
         const { createSupabaseClient } = await import('../supabase');
         const supabase = createSupabaseClient();
-        
-        const { data: matches } = await supabase
-          .from('product_ingredient_matches')
-          .select(`
-            ingredient_id,
-            product_offers!inner(
-              products:product_id (
-                category,
-                department
-              )
-            )
-          `)
-          .in('ingredient_id', ingredientIds)
-          .limit(1000);
-        
-        if (matches) {
-          for (const match of matches) {
-            const offers = Array.isArray(match.product_offers) ? match.product_offers : [];
-            for (const offer of offers) {
-              if (offer && Array.isArray(offer.products) && offer.products.length > 0) {
-                const product = offer.products[0];
-                const category = product.category || product.department;
-                if (category && !productCategoryMap.has(match.ingredient_id)) {
-                  productCategoryMap.set(match.ingredient_id, category);
+
+        const chunk = <T,>(items: T[], size: number) => {
+          const chunks: T[][] = []
+          for (let i = 0; i < items.length; i += size) {
+            chunks.push(items.slice(i, i + size))
+          }
+          return chunks
+        }
+
+        // Fetch matches (ingredient_id -> product_external_id)
+        const matchesByProductId = new Map<string, Set<string>>() // product_external_id -> ingredientIds
+        for (const ids of chunk(ingredientIds, 500)) {
+          const { data: matches } = await supabase
+            .from('product_ingredient_matches')
+            .select('ingredient_id, product_external_id')
+            .in('ingredient_id', ids)
+            .limit(2000)
+
+          for (const match of matches || []) {
+            const productId = String(match.product_external_id || '').trim()
+            const ingredientId = String(match.ingredient_id || '').trim()
+            if (!productId || !ingredientId) continue
+            if (!matchesByProductId.has(productId)) {
+              matchesByProductId.set(productId, new Set())
+            }
+            matchesByProductId.get(productId)!.add(ingredientId)
+          }
+        }
+
+        const matchedProductIds = Array.from(matchesByProductId.keys())
+        if (matchedProductIds.length > 0) {
+          // New structure (Goma): product_offers.store_product_id -> products.category/department
+          for (const ids of chunk(matchedProductIds, 500)) {
+            const { data: offers } = await supabase
+              .from('product_offers')
+              .select(`
+                store_product_id,
+                products:product_id (
+                  category,
+                  department
+                )
+              `)
+              .in('store_product_id', ids)
+              .limit(2000)
+
+            for (const offer of offers || []) {
+              const productId = String(offer.store_product_id || '').trim()
+              if (!productId) continue
+              const ingredientSet = matchesByProductId.get(productId)
+              if (!ingredientSet) continue
+
+              const products = Array.isArray(offer.products) ? offer.products : (offer.products ? [offer.products] : [])
+              const product = products[0]
+              const category = product?.category || product?.department
+              if (!category) continue
+
+              for (const ingredientId of ingredientSet) {
+                if (!productCategoryMap.has(ingredientId)) {
+                  productCategoryMap.set(ingredientId, category)
+                }
+              }
+            }
+          }
+
+          // Old structure fallback: supermarket_products.external_id -> category
+          for (const ids of chunk(matchedProductIds, 500)) {
+            const { data: oldProducts } = await supabase
+              .from('supermarket_products')
+              .select('external_id, category, subcategory')
+              .in('external_id', ids)
+              .limit(2000)
+
+            for (const product of oldProducts || []) {
+              const productId = String(product.external_id || '').trim()
+              if (!productId) continue
+              const ingredientSet = matchesByProductId.get(productId)
+              if (!ingredientSet) continue
+              const category = product.category || product.subcategory
+              if (!category) continue
+
+              for (const ingredientId of ingredientSet) {
+                if (!productCategoryMap.has(ingredientId)) {
+                  productCategoryMap.set(ingredientId, category)
                 }
               }
             }
@@ -1215,20 +1477,59 @@ export class MealPlanGenerator {
       // Try to get ingredient name from service using the key (which might be ingredientId or name)
       let ingredientName = (value as any).name || key
       const ingredient = ingredientService.getIngredientById(key)
-      const ingredientId = ingredient?.id || key;
       
-      // If key is not an ID, try to find by name
-      if (!ingredient && key !== (value as any).name) {
-        // Key might be the name itself, so use it
-        ingredientName = key
+      // value.ingredientId should already be a UUID from recipe loading
+      // If it's not a UUID, look it up in the DB maps we just loaded
+      let ingredientId: string | undefined = value.ingredientId
+
+      // Helper: find DB ingredient by name (for cases where ingredientId is synthetic like "ingredient-...")
+      const lookupDbIngredientByName = () => {
+        const baseName = String(ingredientName || '').toLowerCase().trim()
+        const originalName = String((value as any).name || key).toLowerCase().trim()
+        const idLikeKey = String(value.ingredientId || key).toLowerCase().trim()
+
+        return (
+          ingredientNameDbMap.get(baseName) ||
+          ingredientNameDbMap.get(originalName) ||
+          ingredientNameDbMap.get(idLikeKey)
+        )
+      }
+
+      // If ingredientId is not a UUID, try to resolve it via name lookups
+      if (!ingredientId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ingredientId)) {
+        const dbIngredientByName = lookupDbIngredientByName()
+
+        if (dbIngredientByName?.id) {
+          ingredientId = dbIngredientByName.id
+          ingredientName = dbIngredientByName.name
+        }
+      }
+
+      // Get name from DB if available
+      const dbIngredient = ingredientId ? ingredientDbMap.get(ingredientId) : null
+      if (dbIngredient) {
+        ingredientName = dbIngredient.name
       } else if (ingredient) {
         ingredientName = ingredient.name
       }
-      
+
+      // Also allow basis-flag lookup by name in case ID resolution failed
+      const dbIngredientByNameForBasis = lookupDbIngredientByName()
+
+      // Check if ingredient is marked as basis (prefer ID-based match, then name-based)
+      const isBasis = !!(
+        (ingredientId && ingredientDbMap.get(ingredientId)?.is_basis) ??
+        dbIngredient?.is_basis ??
+        dbIngredientByNameForBasis?.is_basis ??
+        false
+      )
+
       const item: ShoppingItem = {
         name: ingredientName,
         amount: value.amount,
-        unit: value.unit
+        unit: value.unit,
+        ingredientId: ingredientId, // Should be UUID now
+        isBasis: isBasis
       };
 
       // Get category - first try ingredient category, then product category from matches
@@ -1236,8 +1537,8 @@ export class MealPlanGenerator {
       let categoryName = 'Andre';
       
       // First check if ingredient has a category
-      if (ingredient?.category) {
-        const dbCategory = (ingredient.category as string).toLowerCase();
+      if (dbIngredient?.category || ingredient?.category) {
+        const dbCategory = ((dbIngredient?.category || ingredient?.category) as string).toLowerCase();
         const categoryMap: Record<string, IngredientCategory> = {
           // Dagligvarer categories (matching product categories)
           'frugt og grønt': IngredientCategory.Groent,
@@ -1276,13 +1577,18 @@ export class MealPlanGenerator {
         
         if (Object.values(IngredientCategory).includes(dbCategory as IngredientCategory)) {
           category = dbCategory as IngredientCategory;
+          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
         } else if (categoryMap[dbCategory]) {
           category = categoryMap[dbCategory];
+          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
+        } else {
+          // If category doesn't match, default to 'Andre'
+          category = IngredientCategory.Andre;
+          categoryName = 'Andre';
         }
-        categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
       } else {
         // If no ingredient category, try to get from product match
-        const productCategory = productCategoryMap.get(ingredientId);
+        const productCategory = ingredientId ? productCategoryMap.get(ingredientId) : undefined;
         if (productCategory) {
           // Map product category to ingredient category
           const productCategoryLower = productCategory.toLowerCase();
@@ -1315,24 +1621,32 @@ export class MealPlanGenerator {
           // Try exact match first
           if (productToIngredientMap[productCategoryLower]) {
             category = productToIngredientMap[productCategoryLower];
+            categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
           } else {
             // Try partial match
             for (const [productCat, ingCat] of Object.entries(productToIngredientMap)) {
               if (productCategoryLower.includes(productCat) || productCat.includes(productCategoryLower)) {
                 category = ingCat;
+                categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
                 break;
               }
             }
+            // If no match found, keep default 'Andre'
+            if (!categoryName || categoryName === 'Andre') {
+              category = IngredientCategory.Andre;
+              categoryName = 'Andre';
+            }
           }
-          
-          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
         }
       }
       
-      if (!categoryMap.has(categoryName)) {
-        categoryMap.set(categoryName, []);
+      // If ingredient is basis, put it in special category
+      const finalCategoryName = isBasis ? 'Varer du måske allerede har' : categoryName
+      
+      if (!categoryMap.has(finalCategoryName)) {
+        categoryMap.set(finalCategoryName, []);
       }
-      categoryMap.get(categoryName)!.push(item);
+      categoryMap.get(finalCategoryName)!.push(item);
     });
 
     // Add supplements from kombi-opskrifter
@@ -1348,14 +1662,12 @@ export class MealPlanGenerator {
     });
 
     // Convert category map to sorted categories
-    // Define category order for better UX
+    // Define category order for better UX (using actual category names from INGREDIENT_CATEGORY_NAMES)
     const categoryOrder = [
       'Protein',
-      'Kød',
-      'Fisk',
-      'Mejeri',
       'Grøntsager',
       'Frugt',
+      'Mejeri',
       'Korn & Cerealer',
       'Fedt & Olie',
       'Nødder & Frø',
@@ -1364,6 +1676,7 @@ export class MealPlanGenerator {
       'Urter',
       'Forarbejdede fødevarer',
       'Drikkevarer',
+      'Varer du måske allerede har',
       'Andre'
     ];
 
@@ -1388,6 +1701,16 @@ export class MealPlanGenerator {
         items: supplementItems 
       });
     }
+
+    // Debug: log generated categories and item ingredientId/isBasis for troubleshooting
+    console.log('🧾 Generated shopping categories (debug):', categories.map((cat) => ({
+      name: cat.name,
+      items: cat.items.map((i) => ({
+        name: i.name,
+        ingredientId: i.ingredientId ?? null,
+        isBasis: i.isBasis ?? false,
+      })),
+    })));
 
     return {
       weekNumber,
@@ -1857,6 +2180,7 @@ export class MealPlanGenerator {
               current_price,
               normal_price,
               is_on_sale,
+              is_offer_active,
               discount_percentage,
               products:product_id (
                 id,
@@ -1867,7 +2191,7 @@ export class MealPlanGenerator {
             )
           `)
           .in('ingredient_id', ingredientIds)
-          .eq('product_offers.is_on_sale', true)
+          .eq('product_offers.is_offer_active', true)
           .eq('product_offers.is_available', true);
 
         if (!error && matches && matches.length > 0) {
@@ -1890,7 +2214,7 @@ export class MealPlanGenerator {
             
             for (const match of ingredientMatches) {
               const offer = match.product_offers;
-              if (offer && offer.is_on_sale) {
+              if (offer && offer.is_offer_active) {
                 // Check if offer is from a selected store (if we have that info)
                 const discount = offer.discount_percentage || 
                   (offer.normal_price && offer.current_price
@@ -1920,15 +2244,31 @@ export class MealPlanGenerator {
               // Base score: 10-30 points based on discount percentage
               let score = Math.min(30, Math.max(10, discount));
               
+              // PRIORITY: Extra bonus for "Kød og fisk" category offers
+              // This ensures recipes with meat/fish on sale get prioritized significantly
+              const isMeatOrFish = category.includes('kød') || category.includes('fisk') || 
+                                   category.includes('kød og fisk') || category.includes('fjerkræ') ||
+                                   category.includes('kylling') || category.includes('oksekød') ||
+                                   category.includes('svinekød') || category.includes('laks') ||
+                                   category.includes('torsk') || category.includes('tun');
+              
               // Bonus for expensive categories (especially meat/fish)
               if (isExpensive) {
-                score *= 2.5; // Increased multiplier for expensive items (was 2)
-                if (category.includes('kød') || category.includes('fisk')) {
-                  score *= 2; // Extra bonus for meat/fish (was 1.5)
+                score *= 2.5; // Increased multiplier for expensive items
+                if (isMeatOrFish) {
+                  score *= 3; // TRIPLE bonus for meat/fish (very high priority)
                   // Additional bonus for high discounts on meat/fish
-                  if (discount > 20) {
-                    score += 30; // Big bonus for >20% discount on meat/fish
+                  if (discount > 15) {
+                    score += 50; // Big bonus for >15% discount on meat/fish
+                  } else if (discount > 10) {
+                    score += 30; // Medium bonus for >10% discount on meat/fish
                   }
+                }
+              } else if (isMeatOrFish) {
+                // Even if not in expensive categories list, prioritize meat/fish
+                score *= 2.5; // High priority for meat/fish offers
+                if (discount > 15) {
+                  score += 40; // Bonus for good discounts
                 }
               }
               
@@ -1971,11 +2311,15 @@ export class MealPlanGenerator {
           const discount = bestOffer.discountPercentage || 0;
           
           let score = Math.min(30, Math.max(10, discount));
+          const isMeatOrFish = category.includes('kød') || category.includes('fisk') || 
+                               category.includes('kød og fisk') || category.includes('fjerkræ');
           if (isExpensive) {
             score *= 2;
-            if (category.includes('kød') || category.includes('fisk')) {
-              score *= 1.5;
+            if (isMeatOrFish) {
+              score *= 2.5; // High priority for meat/fish in fallback matching too
             }
+          } else if (isMeatOrFish) {
+            score *= 2; // Prioritize meat/fish even if not in expensive list
           }
           
           totalScore += score;

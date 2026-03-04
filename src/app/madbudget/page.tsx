@@ -252,7 +252,112 @@ export default function MadbudgetPage() {
   
   // Shopping list state
   const [shoppingList, setShoppingList] = useState<any>(null)
+  const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
+  const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
+  const [loadingPrices, setLoadingPrices] = useState(false)
+
+  // Removed excessive debug logging
   
+  const formatQuantity = (value: any) => {
+    const num = typeof value === 'number' ? value : parseFloat(value)
+    if (!Number.isFinite(num)) return value
+    const rounded = Math.round(num * 10) / 10
+    const formatted = rounded % 1 === 0 ? String(rounded.toFixed(0)) : String(rounded.toFixed(1))
+    return formatted.replace('.', ',')
+  }
+
+  // Fetch prices for shopping list items per store
+  const fetchStorePrices = async () => {
+    if (!shoppingList || !familyProfile.selectedStores || familyProfile.selectedStores.length === 0) {
+      console.log('⚠️ Cannot fetch prices: missing shoppingList or selectedStores')
+      return
+    }
+
+    setLoadingPrices(true)
+    try {
+      // Flatten shopping list items - include ingredientId if available
+      const items: any[] = []
+      let itemsWithId = 0
+        shoppingList.categories?.forEach((category: any) => {
+          category.items?.forEach((item: any) => {
+            if (item.ingredientId) itemsWithId++
+            items.push({
+              name: item.name,
+              amount: item.amount,
+              unit: item.unit,
+              ingredientId: item.ingredientId, // Include ingredientId for direct matching
+              isBasis: item.isBasis || false // Include isBasis flag
+            })
+          })
+        })
+
+      // Reduced logging - only log summary
+      if (itemsWithId < items.length) {
+        console.log(`📦 Fetching prices: ${items.length} items (${itemsWithId} with ingredientId)`)
+      }
+
+      const response = await fetch('/api/madbudget/shopping-list-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shoppingListItems: items,
+          selectedStoreIds: familyProfile.selectedStores
+        })
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('❌ API error:', response.status, errorText)
+        return
+      }
+
+      const data = await response.json()
+      
+      if (data.success && data.data) {
+        const storeKeys = Object.keys(data.data)
+        const totalItems = Object.values(data.data).reduce((sum: number, store: any) => sum + Object.keys(store).length, 0)
+        
+        if (totalItems === 0 && data.debug) {
+          console.warn('⚠️ No prices found. Debug info:', data.debug)
+        } else {
+          console.log(`✅ Prices loaded: ${totalItems} items across ${storeKeys.length} stores`)
+        }
+        
+        setStorePrices(data.data)
+      } else {
+        console.warn('⚠️ API returned success but no data')
+        if (data.debug) {
+          console.warn('Debug info:', data.debug)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching store prices:', error)
+    } finally {
+      setLoadingPrices(false)
+    }
+  }
+
+  // Fetch prices when shopping list changes
+  useEffect(() => {
+    if (shoppingList && familyProfile.selectedStores && familyProfile.selectedStores.length > 0) {
+      fetchStorePrices()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shoppingList])
+
+  // Debug: log what frontend received for shopping list (categories + ingredientId/isBasis per item)
+  useEffect(() => {
+    if (!shoppingList?.categories) return
+    console.log('🧾 ShoppingList from API (debug):', shoppingList.categories.map((cat: any) => ({
+      name: cat.name,
+      items: cat.items?.map((i: any) => ({
+        name: i.name,
+        ingredientId: i.ingredientId ?? null,
+        isBasis: i.isBasis ?? false,
+      })) ?? [],
+    })))
+  }, [shoppingList])
+
   // Basisvarer state
   const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
@@ -1471,51 +1576,281 @@ export default function MadbudgetPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Shopping list categories */}
-                  {shoppingList.categories?.map((category: any, catIndex: number) => (
-                    <div key={catIndex} className="border-b border-gray-200 pb-4 last:border-b-0">
-                      <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
-                      <ul className="space-y-2">
-                        {category.items?.map((item: any, itemIndex: number) => (
-                          <li key={itemIndex} className="flex items-center justify-between text-sm">
-                            <div className="flex items-center space-x-2 flex-1">
-                              {item.isOptional && (
-                                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Kombi</span>
+                  {/* Store Tabs */}
+                  {familyProfile.selectedStores && familyProfile.selectedStores.length > 0 && (
+                    <div className="border-b border-gray-200">
+                      <div className="flex space-x-1 overflow-x-auto">
+                        <button
+                          onClick={() => setSelectedStoreTab('all')}
+                          className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                            selectedStoreTab === 'all'
+                              ? 'border-blue-600 text-blue-600'
+                              : 'border-transparent text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          Alle butikker
+                        </button>
+                        {familyProfile.selectedStores.map((storeId: number) => {
+                          const store = mockStores.find(s => s.id === storeId)
+                          if (!store) return null
+                          
+                          const storeKey = storeId === 1 ? 'rema-1000' : 
+                                          storeId === 2 ? 'netto' :
+                                          storeId === 3 ? 'føtex' :
+                                          storeId === 4 ? 'bilka' :
+                                          storeId === 5 ? 'nemlig-com' :
+                                          storeId === 6 ? 'meny' :
+                                          storeId === 7 ? 'spar' :
+                                          storeId === 8 ? 'løvbjerg' : ''
+                          
+                          if (!storeKey) {
+                            console.warn('⚠️ Unknown store ID:', storeId)
+                            return null
+                          }
+                          
+                          // Calculate total for this store (using totalPrice which accounts for quantity needed)
+                          // Exclude basis ingredients from total
+                          let storeTotal = 0
+                          if (storePrices[storeKey]) {
+                            // Find which items are basis by checking shopping list
+                            const basisItemNames = new Set<string>()
+                            shoppingList.categories?.forEach((cat: any) => {
+                              cat.items?.forEach((item: any) => {
+                                if (item.isBasis) {
+                                  basisItemNames.add(item.name?.toLowerCase().trim() || '')
+                                }
+                              })
+                            })
+                            
+                            Object.entries(storePrices[storeKey]).forEach(([itemName, product]: [string, any]) => {
+                              // Skip basis ingredients
+                              if (basisItemNames.has(itemName.toLowerCase().trim())) {
+                                return
+                              }
+                              
+                              if (product.totalPrice) {
+                                storeTotal += product.totalPrice
+                              } else if (product.price) {
+                                // Fallback for old format
+                                storeTotal += product.price
+                              }
+                            })
+                          }
+                          
+                          return (
+                            <button
+                              key={storeId}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setSelectedStoreTab(storeKey)
+                              }}
+                              className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                                selectedStoreTab === storeKey
+                                  ? 'border-blue-600 text-blue-600'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              <div className={`w-3 h-3 rounded-full ${store.color}`}></div>
+                              <span>{store.name}</span>
+                              {storeTotal > 0 && (
+                                <span className="text-xs font-normal">
+                                  ({storeTotal.toFixed(2).replace('.', ',')} kr)
+                                </span>
                               )}
-                              <span className="text-gray-700">
-                                {item.name}
-                                {item.notes && (
-                                  <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
-                                )}
-                              </span>
-                            </div>
-                            <span className="text-gray-900 font-medium">
-                              {item.amount} {item.unit}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                  ))}
-                  
-                  {/* Basisvarer section */}
-                  {basisvarer.length > 0 && (
-                    <div className="border-t border-gray-200 pt-4 mt-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Basisvarer</h4>
-                      <ul className="space-y-2">
-                        {basisvarer.map((item) => (
-                          <li key={item.id} className="flex items-center justify-between text-sm">
-                            <span className="text-gray-700">{item.ingredient_name}</span>
-                            <span className="text-gray-900 font-medium">
-                              {item.quantity} {item.unit}
-                              {item.notes && (
-                                <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
-                              )}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
+                  )}
+
+                  {/* Shopping list content */}
+                  {loadingPrices ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Henter priser...</p>
                     </div>
+                  ) : (
+                    <>
+                      {/* Shopping list categories */}
+                      {shoppingList.categories?.map((category: any, catIndex: number) => {
+                        // Skip basis category from main display (it's shown separately)
+                        if (category.name === 'Varer du måske allerede har') {
+                          return null
+                        }
+                        return (
+                        <div key={catIndex} className="border-b border-gray-200 pb-4 last:border-b-0">
+                          <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
+                          <ul className="space-y-2">
+                            {category.items?.map((item: any, itemIndex: number) => {
+                              const itemNameLower = item.name?.toLowerCase().trim() || ''
+                              let productInfo: any = null
+                              
+                              // Get product info for selected store
+                              if (selectedStoreTab !== 'all' && storePrices[selectedStoreTab]) {
+                                productInfo = storePrices[selectedStoreTab][itemNameLower]
+                                if (!productInfo) {
+                                  // Try to find with different name variations
+                                  const keys = Object.keys(storePrices[selectedStoreTab])
+                                  const found = keys.find(key => 
+                                    key.includes(itemNameLower) || itemNameLower.includes(key)
+                                  )
+                                  if (found) {
+                                    productInfo = storePrices[selectedStoreTab][found]
+                                  }
+                                }
+                              }
+                              
+                              return (
+                                <li key={itemIndex} className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center space-x-2 flex-1">
+                                    {item.isOptional && (
+                                      <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Kombi</span>
+                                    )}
+                                    <div className="flex-1">
+                                      {productInfo ? (
+                                        <div>
+                                          <div className="text-gray-700 font-medium">
+                                            {productInfo.name}
+                                            {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                              <span className="text-sm font-normal text-gray-600 ml-2">
+                                                ({productInfo.quantityNeeded} stk)
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            {item.name}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-700">
+                                          {item.name}
+                                          {item.notes && (
+                                            <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-gray-900 font-medium">
+                                      {formatQuantity(item.amount)} {item.unit}
+                                    </div>
+                                    {productInfo && (productInfo.totalPrice || productInfo.price) && (
+                                      <div className="text-sm">
+                                        {productInfo.isOnSale ? (
+                                          <div>
+                                            <span className="text-green-600 font-semibold">
+                                              {(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                            </span>
+                                            {productInfo.totalNormalPrice && (
+                                              <span className="text-gray-400 line-through ml-1 text-xs">
+                                                {productInfo.totalNormalPrice.toFixed(2).replace('.', ',')} kr
+                                              </span>
+                                            )}
+                                            {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                              <div className="text-xs text-gray-500 mt-0.5">
+                                                ({productInfo.price.toFixed(2).replace('.', ',')} kr pr. stk)
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <span className="text-gray-700">
+                                              {(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                            </span>
+                                            {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                              <div className="text-xs text-gray-500 mt-0.5">
+                                                ({productInfo.price.toFixed(2).replace('.', ',')} kr pr. stk)
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                        )
+                      })}
+                      
+                      {/* Basis ingredients section - shown separately */}
+                      {shoppingList.categories?.find((cat: any) => cat.name === 'Varer du måske allerede har') && (
+                        <div className="border-t-2 border-gray-300 pt-4 mt-6">
+                          <h4 className="font-semibold text-gray-900 mb-3 text-lg">Varer du måske allerede har</h4>
+                          <ul className="space-y-2">
+                            {shoppingList.categories
+                              ?.find((cat: any) => cat.name === 'Varer du måske allerede har')
+                              ?.items?.map((item: any, itemIndex: number) => (
+                                <li key={itemIndex} className="flex items-center justify-between text-sm text-gray-600">
+                                  <div className="flex-1">
+                                    <span>{item.name}</span>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-gray-500">
+                                      {formatQuantity(item.amount)} {item.unit}
+                                    </div>
+                                  </div>
+                                </li>
+                              ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {/* Store total for selected tab */}
+                      {selectedStoreTab !== 'all' && storePrices[selectedStoreTab] && (
+                        <div className="border-t border-gray-200 pt-4 mt-4">
+                          <div className="flex items-center justify-between text-lg font-semibold">
+                            <span>Total:</span>
+                            <span className="text-blue-600">
+                              {(() => {
+                                const basisItemNames = new Set<string>()
+                                shoppingList.categories?.forEach((cat: any) => {
+                                  cat.items?.forEach((item: any) => {
+                                    if (item.isBasis) {
+                                      basisItemNames.add(item.name?.toLowerCase().trim() || '')
+                                    }
+                                  })
+                                })
+
+                                return Object.entries(storePrices[selectedStoreTab])
+                                  .reduce((sum: number, [itemName, product]: [string, any]) => {
+                                    if (basisItemNames.has(itemName.toLowerCase().trim())) {
+                                      return sum
+                                    }
+                                    return sum + (product.totalPrice || product.price || 0)
+                                  }, 0)
+                              })()
+                                .toFixed(2)
+                                .replace('.', ',')} kr
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Basisvarer section */}
+                      {basisvarer.length > 0 && (
+                        <div className="border-t border-gray-200 pt-4 mt-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">Basisvarer</h4>
+                          <ul className="space-y-2">
+                            {basisvarer.map((item) => (
+                              <li key={item.id} className="flex items-center justify-between text-sm">
+                                <span className="text-gray-700">{item.ingredient_name}</span>
+                                <span className="text-gray-900 font-medium">
+                                  {formatQuantity(item.quantity)} {item.unit}
+                                  {item.notes && (
+                                    <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
