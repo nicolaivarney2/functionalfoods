@@ -21,8 +21,25 @@ CREATE POLICY "Allow public read scraping_metadata" ON scraping_metadata FOR SEL
 -- Service role bypasser RLS – ingen ekstra INSERT/UPDATE policy nødvendig for scraping
 
 -- User data (kræver auth)
+-- VIGTIGT: Brug IKKE EXISTS (SELECT ... FROM user_profiles) i policies – giver uendelig RLS-rekursion.
+-- Brug check_user_is_admin() (SECURITY DEFINER) – se fix-user-profiles-rls-recursion.sql
+CREATE OR REPLACE FUNCTION public.check_user_is_admin()
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth, pg_catalog
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_profiles
+    WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+  );
+$$;
+REVOKE ALL ON FUNCTION public.check_user_is_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.check_user_is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.check_user_is_admin() TO service_role;
+
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
--- Hvis policies allerede findes, ignorer fejl – kør create-user-profiles-table.sql først
 DO $$
 BEGIN
   CREATE POLICY "Users can view own profile" ON user_profiles FOR SELECT USING (auth.uid() = id);
@@ -33,20 +50,10 @@ BEGIN
   CREATE POLICY "Users can update own profile" ON user_profiles FOR UPDATE USING (auth.uid() = id);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-DO $$
-BEGIN
-  CREATE POLICY "Admins can view all profiles" ON user_profiles FOR SELECT USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-  );
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
-DO $$
-BEGIN
-  CREATE POLICY "Admins can update all profiles" ON user_profiles FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-  );
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+DROP POLICY IF EXISTS "Admins can view all profiles" ON user_profiles;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON user_profiles;
+CREATE POLICY "Admins can view all profiles" ON user_profiles FOR SELECT USING (public.check_user_is_admin());
+CREATE POLICY "Admins can update all profiles" ON user_profiles FOR UPDATE USING (public.check_user_is_admin());
 
 -- family_basisvarer – bruger-specifik
 -- family_id kan være integer (FK til family_profiles.id) eller UUID (user_id)

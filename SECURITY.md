@@ -69,7 +69,9 @@ Kør disse SQL-migrations i Supabase (i rækkefølge):
 
 1. **fix-supabase-security-definer-views.sql** – Views fra SECURITY DEFINER → INVOKER
 2. **fix-supabase-function-search-path.sql** – Sæt search_path på funktioner
-3. **fix-supabase-rls-disabled.sql** – Aktiver RLS på 16 tabeller
+3. **fix-supabase-rls-disabled.sql** – Aktiver RLS på 16 tabeller (bruger `check_user_is_admin()` for at undgå RLS-rekursion på `user_profiles`)
+
+**Hvis admin-menu forsvinder:** Kør **fix-user-profiles-rls-recursion.sql** – retter policies der brugte `EXISTS (SELECT … FROM user_profiles …)` (uendelig rekursion).
 
 ### Manuelt
 
