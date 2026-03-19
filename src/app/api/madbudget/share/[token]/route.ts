@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 /** GET: Hent delt madplan (offentlig, ingen login) */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {

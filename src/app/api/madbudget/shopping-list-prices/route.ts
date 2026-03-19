@@ -322,7 +322,9 @@ export async function POST(request: NextRequest) {
               is_on_sale,
               is_offer_active,
               discount_percentage,
-              is_available
+              is_available,
+              amount,
+              unit
             `)
             .in('product_id', productIds)
             .in('store_id', dbStoreIds)

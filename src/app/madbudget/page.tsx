@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Users, ShoppingCart, Plus, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Minus, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2 } from 'lucide-react'
+import Link from 'next/link'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -73,135 +74,6 @@ const mockStores = [
   { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
   { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false }
-]
-
-// Enhanced mock recipes with images and detailed ingredients
-const mockRecipes = [
-  {
-    id: 1,
-    title: 'Kylling med grøntsager',
-    image: '/images/recipes/kylling-groentsager.jpg',
-    ingredients: [
-      { name: 'kylling', amount: '400g', unit: 'g', price: 25.00 },
-      { name: 'broccoli', amount: '1', unit: 'stk', price: 8.50 },
-      { name: 'gulerødder', amount: '4', unit: 'stk', price: 6.00 },
-      { name: 'løg', amount: '2', unit: 'stk', price: 3.00 },
-      { name: 'hvidløg', amount: '3', unit: 'fed', price: 2.00 },
-      { name: 'olivenolie', amount: '2', unit: 'spsk', price: 1.00 }
-    ],
-    totalPrice: 45.50,
-    savings: 15.30,
-    store: 'REMA 1000',
-    mealType: 'dinner',
-    prepTime: '25 min',
-    servings: 4,
-    category: 'Kylling',
-    dietaryTags: ['Proteinrig', 'Grøntsager']
-  },
-  {
-    id: 2,
-    title: 'Laks med spinat og citron',
-    image: '/images/recipes/laks-spinat.jpg',
-    ingredients: [
-      { name: 'laks', amount: '400g', unit: 'g', price: 35.00 },
-      { name: 'spinat', amount: '200g', unit: 'g', price: 12.00 },
-      { name: 'citron', amount: '1', unit: 'stk', price: 3.50 },
-      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
-      { name: 'olivenolie', amount: '1', unit: 'spsk', price: 0.50 },
-      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
-    ],
-    totalPrice: 52.80,
-    savings: 22.40,
-    store: 'Netto',
-    mealType: 'dinner',
-    prepTime: '20 min',
-    servings: 4,
-    category: 'Fisk',
-    dietaryTags: ['Omega-3', 'Proteinrig']
-  },
-  {
-    id: 3,
-    title: 'Havregrød med bær og honning',
-    image: '/images/recipes/havregrod-baer.jpg',
-    ingredients: [
-      { name: 'havregryn', amount: '200g', unit: 'g', price: 4.00 },
-      { name: 'mælk', amount: '400ml', unit: 'ml', price: 6.00 },
-      { name: 'bær', amount: '150g', unit: 'g', price: 12.00 },
-      { name: 'honning', amount: '2', unit: 'spsk', price: 3.00 },
-      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
-    ],
-    totalPrice: 18.90,
-    savings: 8.50,
-    store: 'REMA 1000',
-    mealType: 'breakfast',
-    prepTime: '15 min',
-    servings: 4,
-    category: 'Morgenmad',
-    dietaryTags: ['Fiberrig', 'Naturlig søde']
-  },
-  {
-    id: 4,
-    title: 'Pasta med tomater og pesto',
-    image: '/images/recipes/pasta-tomater.jpg',
-    ingredients: [
-      { name: 'pasta', amount: '400g', unit: 'g', price: 8.00 },
-      { name: 'tomater', amount: '6', unit: 'stk', price: 18.00 },
-      { name: 'pesto', amount: '100g', unit: 'g', price: 15.00 },
-      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
-      { name: 'olivenolie', amount: '2', unit: 'spsk', price: 1.00 },
-      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
-    ],
-    totalPrice: 43.80,
-    savings: 12.20,
-    store: 'Netto',
-    mealType: 'dinner',
-    prepTime: '20 min',
-    servings: 4,
-    category: 'Pasta',
-    dietaryTags: ['Vegetar', 'Hurtig']
-  },
-  {
-    id: 5,
-    title: 'Omelet med grøntsager',
-    image: '/images/recipes/omelet-groentsager.jpg',
-    ingredients: [
-      { name: 'æg', amount: '6', unit: 'stk', price: 18.00 },
-      { name: 'spinat', amount: '100g', unit: 'g', price: 6.00 },
-      { name: 'tomat', amount: '2', unit: 'stk', price: 6.00 },
-      { name: 'ost', amount: '100g', unit: 'g', price: 12.00 },
-      { name: 'olivenolie', amount: '1', unit: 'spsk', price: 0.50 },
-      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 }
-    ],
-    totalPrice: 42.97,
-    savings: 8.03,
-    store: 'REMA 1000',
-    mealType: 'breakfast',
-    prepTime: '15 min',
-    servings: 4,
-    category: 'Morgenmad',
-    dietaryTags: ['Proteinrig', 'Grøntsager']
-  },
-  {
-    id: 6,
-    title: 'Suppe med kylling og grøntsager',
-    image: '/images/recipes/suppe-kylling.jpg',
-    ingredients: [
-      { name: 'kylling', amount: '300g', unit: 'g', price: 18.75 },
-      { name: 'gulerødder', amount: '3', unit: 'stk', price: 4.50 },
-      { name: 'løg', amount: '2', unit: 'stk', price: 3.00 },
-      { name: 'hvidløg', amount: '2', unit: 'fed', price: 1.33 },
-      { name: 'salt', amount: '1', unit: 'knsp', price: 0.47 },
-      { name: 'peber', amount: '1', unit: 'knsp', price: 0.47 }
-    ],
-    totalPrice: 28.52,
-    savings: 5.48,
-    store: 'Føtex',
-    mealType: 'lunch',
-    prepTime: '30 min',
-    servings: 4,
-    category: 'Suppe',
-    dietaryTags: ['Varmende', 'Nærende']
-  }
 ]
 
 interface AdultProfile {
@@ -518,7 +390,7 @@ export default function MadbudgetPage() {
   const [basisTab, setBasisTab] = useState<'ingredient' | 'product'>('ingredient')
   const [productSearchText, setProductSearchText] = useState('') // søgning efter konkrete produkter
   const [productSearchResults, setProductSearchResults] = useState<Product[]>([])
-  const [loadingBasisvarer, setLoadingBasisvarer] = useState(false)
+  const [, setLoadingBasisvarer] = useState(false)
   const [loadingProductSearch, setLoadingProductSearch] = useState(false)
 
   // Load family profile from database on mount
@@ -933,7 +805,7 @@ export default function MadbudgetPage() {
     }
   }
 
-  const updateBasisvarerQuantity = async (basisvarerId: number, newQuantity: number) => {
+  const _updateBasisvarerQuantity = async (basisvarerId: number, newQuantity: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -965,7 +837,7 @@ export default function MadbudgetPage() {
     }
   }
 
-  const removeFromBasisvarer = async (basisvarerId: number) => {
+  const _removeFromBasisvarer = async (basisvarerId: number) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -987,6 +859,7 @@ export default function MadbudgetPage() {
       console.error('Error removing from basisvarer:', error)
     }
   }
+  void [_updateBasisvarerQuantity, _removeFromBasisvarer]
 
   // Get filtered recipes based on search, category, and meal type
   const getFilteredRecipes = () => {
@@ -1366,10 +1239,11 @@ export default function MadbudgetPage() {
     }
   }
 
-  const calculateSavings = () => {
+  const _calculateSavings = () => {
     // Calculate total savings logic will go here
     return { totalSavings: 156.80, percentageSavings: 18.5 }
   }
+  void _calculateSavings
 
   const nextDays = () => {
     setCurrentDayOffset(prev => Math.min(prev + 3, 4)) // Max 4 (so we can show days 5-7)
@@ -1484,7 +1358,7 @@ export default function MadbudgetPage() {
     const vegetarCount = countMatches(['salat', 'grønt', 'vegetar', 'bønner', 'linser', 'kikærter'])
     const pastaCount = countMatches(['pasta', 'ris', 'kartofler'])
 
-    const hasWeightLoss = adultsProfiles.some(p => p.weightGoal === 'weight-loss' || p.weightGoal === WeightGoal.WeightLoss)
+    const hasWeightLoss = adultsProfiles.some(p => (p.weightGoal as string | undefined) === 'weight-loss')
     const hasFamiliemad = adultsProfiles.some(p => p.dietaryApproach === 'familiemad')
     const isKetoOrLowCarb = adultsProfiles.some(p => ['keto', 'lchf-paleo', 'glp-1'].includes(p.dietaryApproach || ''))
 
@@ -2113,7 +1987,7 @@ export default function MadbudgetPage() {
                 <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">
                   <li>Husk, at når du spiser, så spis til du er mæt – Ikke mindre og IKKE mere.</li>
                   <li>Jo mere du bevæger dig, jo mere forbrænder du. En simpel gåtur i frokostpausen eller efter aftensmad GØR en forskel.</li>
-                  <li>Hold øje med, om du snacker for meget rundt om dine måltider. Få hjælp til bedre vaner under <a href="/blog/mentalt" className="text-green-600 hover:text-green-700 underline font-medium">Mentalt</a>.</li>
+                  <li>Hold øje med, om du snacker for meget rundt om dine måltider. Få hjælp til bedre vaner under <Link href="/blog/mentalt" className="text-green-600 hover:text-green-700 underline font-medium">Mentalt</Link>.</li>
                   <li>Periodisk faste hjælper på vægttab. Fx. ved at undgå snacking eller springe ét måltid over.</li>
                 </ul>
               </div>

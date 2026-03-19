@@ -33,12 +33,10 @@ export class DatabaseService {
   private readonly FOOD_ONLY_CATEGORIES = [
     'Frugt og grønt',
     'Brød og kager',
-    'Drikkevarer',
     'Kød og fisk',
     'Kolonial',
     'Mejeri og køl',
-    'Nemt og hurtigt',
-    'Slik og snacks'
+    'Nemt og hurtigt'
   ]
   /**
    * Get published recipes from database (for frontend use)
@@ -200,59 +198,18 @@ export class DatabaseService {
         return acc
       }, {})
       
-      // Get real offers count (where is_on_sale = true AND current_price < normal_price)
-      // Supabase doesn't support direct column comparison, so we fetch a sample and count
-      // For efficiency, we'll use a reasonable sample size and extrapolate
-      const sampleSize = Math.min(5000, total)
-      const { data: offersSample, error: offersError } = await supabase
+      // Use precomputed offer flag for fast counts
+      const { count: offersCount, error: offersError } = await supabase
         .from('product_offers')
-        .select('current_price, normal_price, is_on_sale')
+        .select('*', { count: 'exact', head: true })
         .eq('is_available', true)
-        .eq('is_on_sale', true)
-        .limit(sampleSize)
-      
-      let realOffersCount = 0
+        .eq('is_offer_active', true)
+
       if (offersError) {
-        console.error('Error getting offers sample:', offersError)
-        // Fallback: count all is_on_sale = true
-        const { count: fallbackCount } = await supabase
-          .from('product_offers')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_available', true)
-          .eq('is_on_sale', true)
-        
-        realOffersCount = fallbackCount || 0
-      } else if (offersSample && offersSample.length > 0) {
-        // Count real offers (where current_price < normal_price)
-        const realOffersInSample = offersSample.filter(offer => {
-          const currentPrice = offer.current_price || 0
-          const normalPrice = offer.normal_price || 0
-          return normalPrice > currentPrice && (normalPrice - currentPrice) > 0.01
-        }).length
-        
-        // If we sampled less than total, extrapolate
-        if (sampleSize < total) {
-          const ratio = realOffersInSample / offersSample.length
-          const { count: totalOnSale } = await supabase
-            .from('product_offers')
-            .select('*', { count: 'exact', head: true })
-            .eq('is_available', true)
-            .eq('is_on_sale', true)
-          
-          realOffersCount = Math.round((totalOnSale || 0) * ratio)
-        } else {
-          realOffersCount = realOffersInSample
-        }
-      } else {
-        // No offers in sample, count all is_on_sale = true as fallback
-        const { count: fallbackCount } = await supabase
-          .from('product_offers')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_available', true)
-          .eq('is_on_sale', true)
-        
-        realOffersCount = fallbackCount || 0
+        console.error('Error getting offers count (V2):', offersError)
       }
+
+      const realOffersCount = offersCount || 0
       
       return {
         total: totalCount || 0,
@@ -290,7 +247,25 @@ export class DatabaseService {
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
-      const now = new Date().toISOString() // Current time for filtering expired offers
+      // Safety filter for "foodOnly": remove obvious drinks/snacks even if source category is mislabeled.
+      const shouldExcludeFromFoodOnly = (name?: string | null, category?: string | null, subcategory?: string | null, department?: string | null) => {
+        if (!foodOnly) return false
+        const text = `${name || ''} ${category || ''} ${subcategory || ''} ${department || ''}`.toLowerCase()
+        const excludedPatterns = [
+          /\bchips?\b/,
+          /\bsnacks?\b/,
+          /\bslik\b/,
+          /\bsodavand\b/,
+          /\bjuice\b/,
+          /\benergidrik\b/,
+          /\bøl\b/,
+          /\bvin\b/,
+          /\bcider\b/,
+          /\bcocio\b/,
+          /\bice latte\b/,
+        ]
+        return excludedPatterns.some((pattern) => pattern.test(text))
+      }
 
       const offset = (page - 1) * limit
       const categoryFilter = this.buildCategoryFilterList(categories, foodOnly)
@@ -312,6 +287,7 @@ export class DatabaseService {
           normal_price,
           currency,
           is_on_sale,
+          is_offer_active,
           discount_percentage,
           price_per_unit,
           price_per_kilogram,
@@ -333,15 +309,15 @@ export class DatabaseService {
           { count: 'exact' }
         )
         .eq('is_available', true)
-        // Filter out expired offers: either no sale_valid_to OR sale_valid_to is in the future
-        .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
 
       if (stores && stores.length > 0) {
         query = query.in('store_id', this.mapStoreFilterToIds(stores))
       }
 
       if (offersOnly) {
-        query = query.eq('is_on_sale', true)
+        // Include both explicit sale flag and active-offer flag to avoid missing valid offers.
+        // Final offer truth is still computed in mapping/filtering below.
+        query = query.or('is_on_sale.eq.true,is_offer_active.eq.true')
       }
 
       // Filter by organic - find product IDs with organic labels first
@@ -379,6 +355,44 @@ export class DatabaseService {
             return { products: [], total: 0, hasMore: false }
           }
           
+          if (search && search.trim()) {
+            const term = search.trim()
+            const nameQuery = supabase
+              .from('product_offers')
+              .select('product_id')
+              .or(`name_store.ilike.%${term}%`)
+              .limit(1000)
+
+            let categoryQuery = supabase
+              .from('products')
+              .select('id')
+              .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
+              .limit(1000)
+
+            if (organicOnly) {
+              categoryQuery = categoryQuery.contains('labels', ['Økologi'])
+            }
+
+            const { data: nameMatches, error: nameErr } = await nameQuery
+            const { data: categoryMatches, error: catSearchErr } = await categoryQuery
+
+            const matchingProductIds = new Set<string>()
+
+            if (!nameErr && nameMatches) {
+              nameMatches.forEach((m: any) => m?.product_id && matchingProductIds.add(String(m.product_id)))
+            }
+
+            if (!catSearchErr && categoryMatches) {
+              categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(String(m.id)))
+            }
+
+            if (matchingProductIds.size > 0) {
+              productIds = productIds.filter(id => matchingProductIds.has(String(id)))
+            } else {
+              return { products: [], total: 0, hasMore: false }
+            }
+          }
+
           // If organic filter is active, intersect with organic product IDs
           if (organicProductIds) {
             const productIdsSet = new Set(productIds)
@@ -408,8 +422,17 @@ export class DatabaseService {
           chunks.push(productIds.slice(i, i + CHUNK_SIZE))
         }
         
-        // Fetch all matching offer IDs from chunks (with current filters applied)
-        const allMatchingOfferIds = new Set<string>()
+        // Fetch all matching offers metadata from chunks (with current filters applied)
+        // so we can sort globally BEFORE pagination.
+        const allMatchingOffers = new Map<string, {
+          id: string
+          is_on_sale: boolean
+          is_offer_active: boolean
+          discount_percentage: number | null
+          current_price: number | null
+          normal_price: number | null
+          sale_valid_to: string | null
+        }>()
         let chunkErrors = 0
         
         for (let i = 0; i < chunks.length; i++) {
@@ -419,18 +442,16 @@ export class DatabaseService {
             // Build query for this chunk with all filters
             let chunkQuery = supabase
               .from('product_offers')
-              .select('id')
+              .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to')
               .eq('is_available', true)
               .in('product_id', chunk)
-              // Filter out expired offers
-              .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
             
             if (stores && stores.length > 0) {
               chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
             }
             
             if (offersOnly) {
-              chunkQuery = chunkQuery.eq('is_on_sale', true)
+              chunkQuery = chunkQuery.or('is_on_sale.eq.true,is_offer_active.eq.true')
             }
             
             // Organic filter already applied via productIds intersection above
@@ -451,7 +472,18 @@ export class DatabaseService {
             }
             
             if (chunkOffers && chunkOffers.length > 0) {
-              chunkOffers.forEach(offer => offer?.id && allMatchingOfferIds.add(offer.id))
+              chunkOffers.forEach((offer: any) => {
+                if (!offer?.id) return
+                allMatchingOffers.set(String(offer.id), {
+                  id: String(offer.id),
+                  is_on_sale: !!offer.is_on_sale,
+                  is_offer_active: !!offer.is_offer_active,
+                  discount_percentage: offer.discount_percentage ?? null,
+                  current_price: offer.current_price ?? null,
+                  normal_price: offer.normal_price ?? null,
+                  sale_valid_to: offer.sale_valid_to ?? null,
+                })
+              })
             }
           } catch (error) {
             chunkErrors++
@@ -467,23 +499,55 @@ export class DatabaseService {
           console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
         }
         
-        const matchingOfferIdsArray = Array.from(allMatchingOfferIds)
-        
-        if (matchingOfferIdsArray.length === 0) {
+        const isRealOffer = (offer: {
+          is_on_sale: boolean
+          is_offer_active: boolean
+          discount_percentage: number | null
+          current_price: number | null
+          normal_price: number | null
+          sale_valid_to: string | null
+        }) => {
+          const price = Number(offer.current_price || 0)
+          const normalPrice = Number(offer.normal_price || 0)
+          const isOnSaleByPrice = normalPrice > price && normalPrice > 0
+          const isOfferDateValid = !offer.sale_valid_to || new Date(offer.sale_valid_to) >= new Date()
+          return isOfferDateValid && (offer.is_on_sale || offer.is_offer_active || isOnSaleByPrice)
+        }
+
+        let matchingOffersArray = Array.from(allMatchingOffers.values())
+        if (offersOnly) {
+          matchingOffersArray = matchingOffersArray.filter(isRealOffer)
+        }
+
+        // Global offer-first + discount + price sort before pagination
+        matchingOffersArray.sort((a, b) => {
+          const aOffer = isRealOffer(a)
+          const bOffer = isRealOffer(b)
+          if (aOffer && !bOffer) return -1
+          if (!aOffer && bOffer) return 1
+
+          const aDiscount = Number(a.discount_percentage || 0)
+          const bDiscount = Number(b.discount_percentage || 0)
+          if (bDiscount !== aDiscount) return bDiscount - aDiscount
+
+          return Number(a.current_price || 0) - Number(b.current_price || 0)
+        })
+
+        if (matchingOffersArray.length === 0) {
           return { products: [], total: 0, hasMore: false }
         }
         
         // Now we need to fetch the full offer data for the current page
-        // Since we have all matching offer IDs, we can paginate them in memory
+        // Since we have globally sorted offer IDs, we can paginate in memory.
         const pageStart = offset
-        const pageEnd = Math.min(offset + limit, matchingOfferIdsArray.length)
-        const pageOfferIds = matchingOfferIdsArray.slice(pageStart, pageEnd)
+        const pageEnd = Math.min(offset + limit, matchingOffersArray.length)
+        const pageOfferIds = matchingOffersArray.slice(pageStart, pageEnd).map((o) => o.id)
         
         if (pageOfferIds.length === 0) {
           return { 
             products: [], 
-            total: matchingOfferIdsArray.length, 
-            hasMore: pageEnd < matchingOfferIdsArray.length 
+            total: matchingOffersArray.length, 
+            hasMore: pageEnd < matchingOffersArray.length 
           }
         }
         
@@ -510,6 +574,7 @@ export class DatabaseService {
                 normal_price,
                 currency,
                 is_on_sale,
+                is_offer_active,
                 discount_percentage,
                 price_per_unit,
                 price_per_kilogram,
@@ -532,15 +597,13 @@ export class DatabaseService {
               )
               .in('id', offerChunk)
               .eq('is_available', true)
-              // Filter out expired offers
-              .or('sale_valid_to.is.null,sale_valid_to.gte.' + now)
             
             if (stores && stores.length > 0) {
               chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
             }
             
             if (offersOnly) {
-              chunkQuery.eq('is_on_sale', true)
+              chunkQuery.or('is_on_sale.eq.true,is_offer_active.eq.true')
             }
             
             // Organic filter already applied via productIds intersection above
@@ -574,30 +637,20 @@ export class DatabaseService {
           }
         }
         
-        // Sort the combined results
-        allPageData.sort((a, b) => {
-          // Offers first
-          if (a.is_on_sale && !b.is_on_sale) return -1
-          if (!a.is_on_sale && b.is_on_sale) return 1
-          // Then by discount
-          if (a.is_on_sale && b.is_on_sale) {
-            const aDiscount = a.discount_percentage || 0
-            const bDiscount = b.discount_percentage || 0
-            if (bDiscount !== aDiscount) return bDiscount - aDiscount
-          }
-          // Then by price
-          return (a.current_price || 0) - (b.current_price || 0)
-        })
-        
-        // Map the data
+        // Map the data first to determine which are actually on sale
         const mapped = allPageData.map((row: any) => {
           const p = row.products || {}
           const price = row.current_price || 0
           const originalPrice = row.normal_price || row.current_price || 0
-          const isOnSale = !!row.is_on_sale && originalPrice > price
+          const isOnSaleByFlag = !!row.is_on_sale
+          const isOnSaleByPrice = originalPrice > price && originalPrice > 0
+          const isOfferDateValid = !row.sale_valid_to || new Date(row.sale_valid_to) >= new Date()
+          // Real offer state must be date-valid AND either sale-flag OR price-discount.
+          // Do not blindly trust stale is_offer_active flags.
+          const isOfferActive = isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice)
           const priceDiff = originalPrice - price
           const discountPct =
-            isOnSale && originalPrice > 0 && priceDiff > 0.01
+            isOnSaleByPrice && priceDiff > 0.01
               ? Math.round((priceDiff / originalPrice) * 100)
               : null
 
@@ -610,7 +663,8 @@ export class DatabaseService {
             original_price: originalPrice,
             unit: p.unit || 'stk',
             unit_price: row.price_per_unit || row.price_per_kilogram || null,
-            is_on_sale: isOnSale,
+            is_on_sale: isOfferActive,
+            is_offer_active: isOfferActive,
             sale_end_date: row.sale_valid_to || null,
             discount_percentage: discountPct,
             image_url: p.image_url || this.getProductPlaceholderImage(),
@@ -619,10 +673,28 @@ export class DatabaseService {
           }
         })
         
+        const finalMapped = (offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped)
+          .filter((p) => !shouldExcludeFromFoodOnly(p.name, p.category, (p as { subcategory?: string }).subcategory, (p as { department?: string }).department))
+
+        // Sort the results
+        finalMapped.sort((a, b) => {
+          // Offers first
+          if (a.is_on_sale && !b.is_on_sale) return -1
+          if (!a.is_on_sale && b.is_on_sale) return 1
+          // Then by discount
+          if (a.is_on_sale && b.is_on_sale) {
+            const aDiscount = a.discount_percentage || 0
+            const bDiscount = b.discount_percentage || 0
+            if (bDiscount !== aDiscount) return bDiscount - aDiscount
+          }
+          // Then by price
+          return (a.price || 0) - (b.price || 0)
+        })
+        
         return { 
-          products: mapped, 
-          total: matchingOfferIdsArray.length, 
-          hasMore: pageEnd < matchingOfferIdsArray.length 
+          products: finalMapped, 
+          total: matchingOffersArray.length, 
+          hasMore: pageEnd < matchingOffersArray.length 
         }
       }
 
@@ -681,9 +753,12 @@ export class DatabaseService {
         query = query.in('product_id', organicProductIds)
       }
 
+      // NOTE: When offersOnly=true, we fetch all products and filter in application layer
+      // This ensures we catch products that are actually on sale (normal_price > current_price)
+      // even if the is_on_sale flag is incorrectly set to false
+      
       query = query
-        .or('sale_valid_to.is.null,sale_valid_to.gte.' + now) // Filter out expired offers
-        .order('is_on_sale', { ascending: false }) // tilbud først
+        .order('is_offer_active', { ascending: false }) // tilbud først
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
         .range(offset, offset + limit - 1)
@@ -695,9 +770,7 @@ export class DatabaseService {
         return { products: [], total: 0, hasMore: false }
       }
 
-      const total = count || 0
-      const hasMore = offset + limit < total
-
+        // Map the data first to determine which are actually on sale
       const mapped = (data || []).map((row: any) => {
         const p = row.products || {}
         
@@ -708,10 +781,15 @@ export class DatabaseService {
 
         const price = row.current_price || 0
         const originalPrice = row.normal_price || row.current_price || 0
-        const isOnSale = !!row.is_on_sale && originalPrice > price
+        const isOnSaleByFlag = !!row.is_on_sale
+        const isOnSaleByPrice = originalPrice > price && originalPrice > 0
+        const isOfferDateValid = !row.sale_valid_to || new Date(row.sale_valid_to) >= new Date()
+        // Real offer state must be date-valid AND either sale-flag OR price-discount.
+        // Do not blindly trust stale is_offer_active flags.
+        const isOfferActive = isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice)
         const priceDiff = originalPrice - price
         const discountPct =
-          isOnSale && originalPrice > 0 && priceDiff > 0.01
+          isOnSaleByPrice && priceDiff > 0.01
             ? Math.round((priceDiff / originalPrice) * 100)
             : null
 
@@ -725,16 +803,38 @@ export class DatabaseService {
           original_price: originalPrice,
           unit: p.unit || 'stk',
           unit_price: row.price_per_unit || row.price_per_kilogram || null,
-          is_on_sale: isOnSale,
+          is_on_sale: isOfferActive,
+          is_offer_active: isOfferActive,
           sale_end_date: row.sale_valid_to || null,
           discount_percentage: discountPct,
           image_url: p.image_url || this.getProductPlaceholderImage(),
           store: this.mapStoreIdToDisplayName(row.store_id),
           amount: p.amount ? String(p.amount) : null,
-        }
-      })
+          }
+        })
+        
+      const finalMapped = (offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped)
+        .filter((p) => !shouldExcludeFromFoodOnly(p.name, p.category, (p as { subcategory?: string }).subcategory, (p as { department?: string }).department))
 
-      return { products: mapped, total, hasMore }
+      // Sort the results
+      finalMapped.sort((a, b) => {
+        // Offers first
+        if (a.is_on_sale && !b.is_on_sale) return -1
+        if (!a.is_on_sale && b.is_on_sale) return 1
+        // Then by discount
+        if (a.is_on_sale && b.is_on_sale) {
+          const aDiscount = a.discount_percentage || 0
+          const bDiscount = b.discount_percentage || 0
+          if (bDiscount !== aDiscount) return bDiscount - aDiscount
+        }
+        // Then by price
+        return (a.price || 0) - (b.price || 0)
+      })
+      
+      const total = count || 0
+      const hasMore = offset + limit < total
+      
+      return { products: finalMapped, total, hasMore }
     } catch (error) {
       console.error('Error in getSupermarketProductsV2:', error)
       return { products: [], total: 0, hasMore: false }
