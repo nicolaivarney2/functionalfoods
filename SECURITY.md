@@ -63,6 +63,27 @@ Kør disse SQL-migrations i Supabase (i rækkefølge):
 
 ---
 
+## Supabase Database Linter (sikkerhed)
+
+### Fixes (kør i rækkefølge)
+
+1. **fix-supabase-security-definer-views.sql** – Views fra SECURITY DEFINER → INVOKER
+2. **fix-supabase-function-search-path.sql** – Sæt search_path på funktioner
+3. **fix-supabase-rls-disabled.sql** – Aktiver RLS på 16 tabeller
+
+### Manuelt
+
+- **frida_foods_complete**: Hent definition med `SELECT pg_get_viewdef('public.frida_foods_complete'::regclass, true)` og genopret med `WITH (security_invoker = on)`
+- **Auth**: Slå "Leaked password protection" til i Supabase Dashboard → Auth → Settings
+- **MFA**: Overvej at aktivere flere MFA-metoder
+- **Postgres**: Opgrader til nyeste version via Supabase Dashboard
+
+### RLS Policy Warnings (lav prioritet)
+
+Mange policies bruger `USING (true)` eller `WITH CHECK (true)` – det er bevidst for admin/API-tabeller. Stram op hvis du vil begrænse adgang yderligere.
+
+---
+
 ## Kontakt
 
 Ved sikkerhedsproblemer: [opdater med kontaktinfo]
