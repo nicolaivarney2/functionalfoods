@@ -2,14 +2,18 @@ import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabaseServer'
 
 export async function GET() {
+  // Kun tilgængelig i development – undgå info-leak i produktion
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not available' }, { status: 404 })
+  }
+
   try {
     console.log('🔍 Testing environment variables and Supabase connection...')
-    
-    // Check environment variables
+
+    // Check environment variables – aldrig returner faktiske nøgler
     const envCheck = {
       hasSupabaseUrl: !!(process.env as any).NEXT_PUBLIC_SUPABASE_URL,
       hasServiceRoleKey: !!(process.env as any).SUPABASE_SERVICE_ROLE_KEY,
-      supabaseUrl: (process.env as any).NEXT_PUBLIC_SUPABASE_URL,
       serviceRoleKeyLength: (process.env as any).SUPABASE_SERVICE_ROLE_KEY?.length || 0,
       nodeEnv: process.env.NODE_ENV,
       vercelEnv: (process.env as any).VERCEL_ENV

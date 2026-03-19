@@ -85,11 +85,13 @@ export interface ShoppingItem {
   name: string;
   amount: number;
   unit: string;
+  ingredientId?: string; // ID fra ingredients tabellen - bruges til at finde matched products
   estimatedCost?: number;
   notes?: string;
   isOptional?: boolean;
   isSupplement?: boolean; // Marker supplements fra kombi-opskrifter
   supplementReason?: string; // Forklaring til hvorfor supplementet er tilføjet
+  isBasis?: boolean; // Marker basisvarer som "Varer du måske allerede har"
 }
 
 export interface WeeklyNutrition {
@@ -166,6 +168,8 @@ export interface MealPlanConfig {
   varietyPreferences: VarietyPreferences;
   difficultyLevel: DifficultyLevel;
   timeConstraints: TimeConstraints;
+  /** Antal personer der spiser hvert måltid (fx { breakfast: 1, lunch: 1, dinner: 2 }) – bruges til portionsstørrelse og indkøbsliste */
+  peoplePerMeal?: Record<string, number>;
 }
 
 export interface MealStructureConfig {

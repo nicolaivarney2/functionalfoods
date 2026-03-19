@@ -506,6 +506,23 @@ export class MealPlanGenerator {
         profile.mealsPerDay.forEach(meal => mealsToGenerate.add(meal))
       }
     })
+
+    // Antal personer der spiser hvert måltid – bruges til portionsstørrelse og indkøbsliste
+    const peoplePerMeal: Record<string, number> = { breakfast: 0, lunch: 0, dinner: 0 }
+    familyProfile.adultsProfiles.forEach(profile => {
+      if (profile.mealsPerDay) {
+        profile.mealsPerDay.forEach(meal => {
+          peoplePerMeal[meal] = (peoplePerMeal[meal] || 0) + 1
+        })
+      }
+    })
+    // Hvis ingen profiler har mealsPerDay, antag at alle voksne spiser alle måltider
+    const hasAnyMealsPerDay = Object.values(peoplePerMeal).some(n => n > 0)
+    if (!hasAnyMealsPerDay && familyProfile.adults > 0) {
+      peoplePerMeal.breakfast = familyProfile.adults
+      peoplePerMeal.lunch = familyProfile.adults
+      peoplePerMeal.dinner = familyProfile.adults
+    }
     
     // Create meal structure that includes all selected meals
     const mealStructure = this.createMealStructure(dietaryApproach)
@@ -536,6 +553,7 @@ export class MealPlanGenerator {
         mealDistribution: filteredMealDistribution,
         mealsPerDay: Array.from(mealsToGenerate)
       },
+      peoplePerMeal,
       varietyPreferences: {
         maxRepeatDays: Math.max(1, 3 - variationLevel), // Higher variation = fewer repeat days
         preferredCuisines: [],
@@ -676,9 +694,12 @@ export class MealPlanGenerator {
     // Select the best recipe with meal type consideration
     const selectedRecipe = this.selectRecipe(scoredRecipes, date, mealDistribution.mealType, config);
     
-    // Calculate servings to meet macro targets
-    const servings = this.calculateServings(selectedRecipe, mealDistribution);
-    
+    // Calculate servings to meet macro targets (for 1 person)
+    const baseServings = this.calculateServings(selectedRecipe, mealDistribution);
+    // Skaler med antal personer der spiser dette måltid
+    const peopleEatingThisMeal = Math.max(1, config.peoplePerMeal?.[mealDistribution.mealType] ?? 1);
+    const servings = Math.round(baseServings * peopleEatingThisMeal * 10) / 10;
+
     // Calculate adjusted nutritional values
     const adjustedValues = this.calculateAdjustedNutrition(selectedRecipe, servings);
 
@@ -1150,6 +1171,15 @@ export class MealPlanGenerator {
   private async generateShoppingList(weekNumber: number, days: DayPlan[]): Promise<ShoppingList> {
     const ingredientMap = new Map<string, { amount: number; unit: string; name: string; ingredientId?: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
+    const normalizeUnit = (unit?: string | null) => {
+      const u = String(unit || '').toLowerCase().trim()
+      if (!u) return 'stk'
+      if (u === 'gram' || u === 'g') return 'gram'
+      if (u === 'kg' || u === 'kilo' || u === 'kilogram') return 'kg'
+      if (u === 'stk' || u === 'styk' || u === 'stykker') return 'stk'
+      if (u === 'bundter') return 'bundt'
+      return u
+    }
 
     // Aggregate ingredients from all meals
     days.forEach(day => {
@@ -1179,17 +1209,23 @@ export class MealPlanGenerator {
             }
           }
           
-          const key = ingredientName.toLowerCase().trim()
+          // IMPORTANT: include unit in aggregation key so we never add "gram" and "stk" together
+          // for the same ingredient (this caused values like "196,4 stk" for blomkål).
+          const normalizedUnit = normalizeUnit(ingredient.unit)
+          const key = `${ingredientName.toLowerCase().trim()}__${normalizedUnit}`
           
           // ingredient.ingredientId should already be a UUID (from recipe loading above)
           // But if it's not, we'll resolve it in the DB lookup phase below
           const ingredientId = ingredient.ingredientId
           
-          const current = ingredientMap.get(key) || { amount: 0, unit: ingredient.unit || 'stk', name: ingredientName, ingredientId };
+          const current = ingredientMap.get(key) || { amount: 0, unit: normalizedUnit || 'stk', name: ingredientName, ingredientId };
+          // Opskriftens ingredienser er for recipe.servings portioner – skalér med meal.servings/recipe.servings
+          const recipeServings = meal.recipe.servings || 4;
+          const scale = meal.servings / recipeServings;
           
           ingredientMap.set(key, {
-            amount: current.amount + (ingredient.amount * meal.servings),
-            unit: ingredient.unit || current.unit,
+            amount: current.amount + (ingredient.amount * scale),
+            unit: normalizedUnit || current.unit,
             name: ingredientName,
             ingredientId: ingredientId || current.ingredientId // Use ID from recipe (should be UUID)
           });
@@ -1225,149 +1261,95 @@ export class MealPlanGenerator {
     const categoryMap = new Map<string, ShoppingItem[]>();
     const supplementItems: ShoppingItem[] = [];
 
-    // Load ingredient names/categories from DB to ensure correct grouping
-    const ingredientDbMap = new Map<string, { name: string; category: string | null; is_basis?: boolean }>()
-    const ingredientNameDbMap = new Map<string, { id: string; name: string; category: string | null; is_basis?: boolean }>()
-
-    const ingredientNames = Array.from(
-      new Set(
-        Array.from(ingredientMap.values())
-          .map((value) => String((value as any).name || '').trim())
-          .filter(Boolean)
-      )
-    )
-
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-    if (ingredientNames.length > 0) {
-      try {
-        const { createSupabaseClient } = await import('../supabase');
-        const supabase = createSupabaseClient();
+    // Resolved ingredient from DB (single source of truth: id, name, category, is_basis)
+    type ResolvedIngredient = { id: string; name: string; category: string | null; is_basis: boolean }
+    const ingredientDbMap = new Map<string, ResolvedIngredient>()
+    const nameToResolvedId = new Map<string, string>()
 
-        const chunk = <T,>(items: T[], size: number) => {
-          const chunks: T[][] = []
-          for (let i = 0; i < items.length; i += size) {
-            chunks.push(items.slice(i, i + size))
-          }
-          return chunks
-        }
+    const chunk = <T,>(items: T[], size: number) => {
+      const chunks: T[][] = []
+      for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size))
+      return chunks
+    }
+    const addToMaps = (ing: { id: string; name: string | null; category: string | null; is_basis?: boolean | null }) => {
+      const id = String(ing.id)
+      const name = ing.name || 'Unknown Ingredient'
+      ingredientDbMap.set(id, { id, name, category: ing.category ?? null, is_basis: Boolean(ing.is_basis) })
+      nameToResolvedId.set(name.toLowerCase().trim(), id)
+    }
 
-        for (const names of chunk(ingredientNames, 500)) {
-          const { data: ingredientsByName, error: nameError } = await supabase
-            .from('ingredients')
-            .select('id, name, category, is_basis')
-            .in('name', names)
-          if (nameError) {
-            console.error('Error loading ingredient categories by name:', nameError)
+    try {
+      const { createSupabaseClient } = await import('../supabase')
+      const supabase = createSupabaseClient()
+      const values = Array.from(ingredientMap.values())
+      const idsToLoad = Array.from(
+        new Set(
+          values
+            .map((v) => (v as { ingredientId?: string }).ingredientId)
+            .filter((id): id is string => typeof id === 'string' && uuidRegex.test(id))
+        )
+      )
+      const namesUsed = Array.from(new Set(values.map((v) => String((v as { name?: string }).name || '').trim()).filter(Boolean)))
+
+      // 1) ID-first: load ingredients by UUID (canonical path)
+      if (idsToLoad.length > 0) {
+        for (const ids of chunk(idsToLoad, 500)) {
+          const { data: rows, error } = await supabase.from('ingredients').select('id, name, category, is_basis').in('id', ids)
+          if (error) {
+            console.error('Error loading ingredients by ID:', error)
             continue
           }
-          for (const ing of ingredientsByName || []) {
-            ingredientNameDbMap.set(String(ing.name).toLowerCase(), {
-              id: ing.id, // Include ID for lookup
-              name: ing.name || 'Unknown Ingredient',
-              category: ing.category || null,
-              is_basis: ing.is_basis || false
-            })
-          }
+          for (const ing of rows || []) addToMaps(ing)
         }
-
-        // Fuzzy-name fallback for ingredients that don't match exactly by name
-        const unresolvedNames = ingredientNames.filter((n) => {
-          const key = String(n).toLowerCase().trim()
-          return !ingredientNameDbMap.has(key)
-        })
-
-        if (unresolvedNames.length > 0) {
-          const { data: allIngredients, error: allError } = await supabase
-            .from('ingredients')
-            .select('id, name, category, is_basis')
-            .limit(5000)
-
-          if (allError) {
-            console.error('Error loading ingredients for fuzzy name matching:', allError)
-          } else if (allIngredients) {
-            const normalize = (name: string) =>
-              name
-                .toLowerCase()
-                .replace(/^eks\.\s*/i, '') // remove leading "eks."
-                .split(',')[0] // part before comma (e.g. ", kan undlades")
-                .replace(/\s+kan\s+undlades/gi, '')
-                .trim()
-
-            const normalizedDb: { id: string; normalized: string; raw: any }[] = allIngredients.map(
-              (ing: any) => ({
-                id: ing.id,
-                normalized: normalize(ing.name || ''),
-                raw: ing,
-              }),
-            )
-
-            for (const originalName of unresolvedNames) {
-              const originalKey = String(originalName).toLowerCase().trim()
-              const norm = normalize(originalName)
-              if (!norm) continue
-
-              const match =
-                normalizedDb.find((ing) => ing.normalized === norm) ||
-                normalizedDb.find(
-                  (ing) =>
-                    ing.normalized &&
-                    (ing.normalized.includes(norm) || norm.includes(ing.normalized)),
-                )
-
-              if (match) {
-                const ing = match.raw
-                ingredientNameDbMap.set(originalKey, {
-                  id: ing.id,
-                  name: ing.name || 'Unknown Ingredient',
-                  category: ing.category || null,
-                  is_basis: ing.is_basis || false,
-                })
-              }
-            }
-          }
-        }
-
-        const resolvedIds = new Set<string>()
-        ingredientMap.forEach((value, key) => {
-          let ingredientId: string | undefined = (value as any).ingredientId
-          if (!ingredientId || !uuidRegex.test(ingredientId)) {
-            const nameKey = String((value as any).name || key).toLowerCase().trim()
-            const dbIngredientByName =
-              ingredientNameDbMap.get(nameKey) ||
-              ingredientNameDbMap.get(String(key).toLowerCase().trim()) ||
-              ingredientNameDbMap.get(String(ingredientId || '').toLowerCase().trim())
-            if (dbIngredientByName?.id) {
-              ingredientId = dbIngredientByName.id
-            }
-          }
-          if (ingredientId && uuidRegex.test(ingredientId)) {
-            resolvedIds.add(ingredientId)
-          }
-        })
-
-        if (resolvedIds.size > 0) {
-          for (const ids of chunk(Array.from(resolvedIds), 500)) {
-            const { data: ingredients, error } = await supabase
-              .from('ingredients')
-              .select('id, name, category, is_basis')
-              .in('id', ids)
-            if (error) {
-              console.error('Error loading ingredient categories:', error)
-              continue
-            }
-            for (const ing of ingredients || []) {
-              ingredientDbMap.set(String(ing.id), {
-                name: ing.name || 'Unknown Ingredient',
-                category: ing.category || null,
-                is_basis: ing.is_basis || false
-              })
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading ingredient categories:', error)
       }
+
+      // 2) Name fallback: exact match for names not resolved by ID
+      const unresolvedNames = namesUsed.filter((n) => !nameToResolvedId.has(n.toLowerCase().trim()))
+      if (unresolvedNames.length > 0) {
+        for (const names of chunk(unresolvedNames, 500)) {
+          const { data: rows, error } = await supabase.from('ingredients').select('id, name, category, is_basis').in('name', names)
+          if (error) {
+            console.error('Error loading ingredients by name:', error)
+            continue
+          }
+          for (const ing of rows || []) addToMaps(ing)
+        }
+      }
+
+      // 3) Fuzzy fallback: e.g. "EKS. JOMFRU OLIVENOLIE" -> "olivenolie"
+      const stillUnresolved = namesUsed.filter((n) => !nameToResolvedId.has(n.toLowerCase().trim()))
+      if (stillUnresolved.length > 0) {
+        const { data: allIngredients, error: allError } = await supabase.from('ingredients').select('id, name, category, is_basis').limit(5000)
+        if (!allError && allIngredients?.length) {
+          const normalize = (name: string) =>
+            name.toLowerCase().replace(/^eks\.\s*/i, '').split(',')[0].replace(/\s+kan\s+undlades/gi, '').trim()
+          const normalizedDb = allIngredients.map((ing: { id: string; name: string | null; category: string | null; is_basis?: boolean | null }) => ({
+            id: ing.id,
+            normalized: normalize(ing.name || ''),
+            raw: ing,
+          }))
+          for (const originalName of stillUnresolved) {
+            const norm = normalize(originalName)
+            if (!norm) continue
+            const match =
+              normalizedDb.find((r: { normalized: string }) => r.normalized === norm) ||
+              normalizedDb.find((r: { normalized: string }) => r.normalized && (r.normalized.includes(norm) || norm.includes(r.normalized)))
+            if (match) addToMaps(match.raw)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading ingredient categories:', error)
+    }
+
+    const resolveIngredient = (value: { name: string; ingredientId?: string }, mapKey: string): ResolvedIngredient | null => {
+      const byId = value.ingredientId && uuidRegex.test(value.ingredientId) ? ingredientDbMap.get(value.ingredientId) : null
+      if (byId) return byId
+      const nameKey = String(value.name || mapKey).toLowerCase().trim()
+      const id = nameToResolvedId.get(nameKey) ?? nameToResolvedId.get(mapKey.toLowerCase().trim())
+      return id ? ingredientDbMap.get(id) ?? null : null
     }
 
     // Get product matches for these ingredients to find categories
@@ -1472,181 +1454,99 @@ export class MealPlanGenerator {
       }
     }
 
-    // Add regular ingredients
+    // DB category string -> IngredientCategory (used only when resolving category name)
+    const dbCategoryToIngredient: Record<string, IngredientCategory> = {
+      'frugt og grønt': IngredientCategory.Groent,
+      'kød og fisk': IngredientCategory.Protein,
+      'mejeri og køl': IngredientCategory.Mejeri,
+      'brød og kager': IngredientCategory.Korn,
+      'kolonial': IngredientCategory.Korn,
+      'frost': IngredientCategory.Forarbejdet,
+      'drikkevarer': IngredientCategory.Drikke,
+      'slik og snacks': IngredientCategory.Forarbejdet,
+      'kød': IngredientCategory.Protein,
+      'fisk': IngredientCategory.Protein,
+      'mejeri': IngredientCategory.Mejeri,
+      'grøntsager': IngredientCategory.Groent,
+      'frugt': IngredientCategory.Frugt,
+      'protein': IngredientCategory.Protein,
+      'groent': IngredientCategory.Groent,
+      'mælkeprodukter': IngredientCategory.Mejeri,
+      'krydderier': IngredientCategory.Krydderi,
+      'krydderi': IngredientCategory.Krydderi,
+      'fedtstoffer': IngredientCategory.Fedt,
+      'fedt': IngredientCategory.Fedt,
+      'nødder': IngredientCategory.Nodder,
+      'nodder': IngredientCategory.Nodder,
+      'frø': IngredientCategory.Fro,
+      'fro': IngredientCategory.Fro,
+      'korn': IngredientCategory.Korn,
+      'urter': IngredientCategory.Urter,
+      'bælgfrugter': IngredientCategory.Balg,
+      'balg': IngredientCategory.Balg,
+      'forarbejdet': IngredientCategory.Forarbejdet,
+      'drikke': IngredientCategory.Drikke,
+      'andre': IngredientCategory.Andre,
+    }
+    const productCategoryToIngredient: Record<string, IngredientCategory> = {
+      'kød': IngredientCategory.Protein,
+      'fisk': IngredientCategory.Protein,
+      'mejeri': IngredientCategory.Mejeri,
+      'æg': IngredientCategory.Protein,
+      'grøntsager': IngredientCategory.Groent,
+      'frugt': IngredientCategory.Frugt,
+      'tørvarer': IngredientCategory.Korn,
+      'konserves': IngredientCategory.Forarbejdet,
+      'krydderi & smag': IngredientCategory.Krydderi,
+      'krydderi og smag': IngredientCategory.Krydderi,
+      'frost': IngredientCategory.Forarbejdet,
+      'kød og fisk': IngredientCategory.Protein,
+      'fjerkræ': IngredientCategory.Protein,
+      'mejeri og køl': IngredientCategory.Mejeri,
+      'frugt og grønt': IngredientCategory.Groent,
+      'kolonial': IngredientCategory.Korn,
+      'brød og kager': IngredientCategory.Korn,
+      'fedt og olie': IngredientCategory.Fedt,
+      'krydderier': IngredientCategory.Krydderi,
+      'nødder': IngredientCategory.Nodder,
+      'drikkevarer': IngredientCategory.Drikke,
+    }
+
+    // Add regular ingredients: use only resolved DB data (ID first, then name fallback)
     ingredientMap.forEach((value, key) => {
-      // Try to get ingredient name from service using the key (which might be ingredientId or name)
-      let ingredientName = (value as any).name || key
-      const ingredient = ingredientService.getIngredientById(key)
-      
-      // value.ingredientId should already be a UUID from recipe loading
-      // If it's not a UUID, look it up in the DB maps we just loaded
-      let ingredientId: string | undefined = value.ingredientId
-
-      // Helper: find DB ingredient by name (for cases where ingredientId is synthetic like "ingredient-...")
-      const lookupDbIngredientByName = () => {
-        const baseName = String(ingredientName || '').toLowerCase().trim()
-        const originalName = String((value as any).name || key).toLowerCase().trim()
-        const idLikeKey = String(value.ingredientId || key).toLowerCase().trim()
-
-        return (
-          ingredientNameDbMap.get(baseName) ||
-          ingredientNameDbMap.get(originalName) ||
-          ingredientNameDbMap.get(idLikeKey)
-        )
-      }
-
-      // If ingredientId is not a UUID, try to resolve it via name lookups
-      if (!ingredientId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ingredientId)) {
-        const dbIngredientByName = lookupDbIngredientByName()
-
-        if (dbIngredientByName?.id) {
-          ingredientId = dbIngredientByName.id
-          ingredientName = dbIngredientByName.name
-        }
-      }
-
-      // Get name from DB if available
-      const dbIngredient = ingredientId ? ingredientDbMap.get(ingredientId) : null
-      if (dbIngredient) {
-        ingredientName = dbIngredient.name
-      } else if (ingredient) {
-        ingredientName = ingredient.name
-      }
-
-      // Also allow basis-flag lookup by name in case ID resolution failed
-      const dbIngredientByNameForBasis = lookupDbIngredientByName()
-
-      // Check if ingredient is marked as basis (prefer ID-based match, then name-based)
-      const isBasis = !!(
-        (ingredientId && ingredientDbMap.get(ingredientId)?.is_basis) ??
-        dbIngredient?.is_basis ??
-        dbIngredientByNameForBasis?.is_basis ??
-        false
-      )
+      const resolved = resolveIngredient(value, key)
+      const ingredientId = resolved?.id
+      const displayName = resolved?.name ?? (value as { name?: string }).name ?? key
+      const isBasis = resolved?.is_basis ?? false
 
       const item: ShoppingItem = {
-        name: ingredientName,
+        name: displayName,
         amount: value.amount,
         unit: value.unit,
-        ingredientId: ingredientId, // Should be UUID now
-        isBasis: isBasis
-      };
+        ingredientId: ingredientId ?? undefined,
+        isBasis,
+      }
 
-      // Get category - first try ingredient category, then product category from matches
-      let category: IngredientCategory = IngredientCategory.Andre;
-      let categoryName = 'Andre';
-      
-      // First check if ingredient has a category
-      if (dbIngredient?.category || ingredient?.category) {
-        const dbCategory = ((dbIngredient?.category || ingredient?.category) as string).toLowerCase();
-        const categoryMap: Record<string, IngredientCategory> = {
-          // Dagligvarer categories (matching product categories)
-          'frugt og grønt': IngredientCategory.Groent,
-          'kød og fisk': IngredientCategory.Protein,
-          'mejeri og køl': IngredientCategory.Mejeri,
-          'brød og kager': IngredientCategory.Korn,
-          'kolonial': IngredientCategory.Korn,
-          'frost': IngredientCategory.Forarbejdet,
-          'drikkevarer': IngredientCategory.Drikke,
-          'slik og snacks': IngredientCategory.Forarbejdet,
-          // Legacy/alternative names (for backwards compatibility)
-          'kød': IngredientCategory.Protein,
-          'fisk': IngredientCategory.Protein,
-          'mejeri': IngredientCategory.Mejeri,
-          'grøntsager': IngredientCategory.Groent,
-          'frugt': IngredientCategory.Frugt,
-          'protein': IngredientCategory.Protein,
-          'groent': IngredientCategory.Groent,
-          'mælkeprodukter': IngredientCategory.Mejeri,
-          'krydderier': IngredientCategory.Krydderi,
-          'krydderi': IngredientCategory.Krydderi,
-          'fedtstoffer': IngredientCategory.Fedt,
-          'fedt': IngredientCategory.Fedt,
-          'nødder': IngredientCategory.Nodder,
-          'nodder': IngredientCategory.Nodder,
-          'frø': IngredientCategory.Fro,
-          'fro': IngredientCategory.Fro,
-          'korn': IngredientCategory.Korn,
-          'urter': IngredientCategory.Urter,
-          'bælgfrugter': IngredientCategory.Balg,
-          'balg': IngredientCategory.Balg,
-          'forarbejdet': IngredientCategory.Forarbejdet,
-          'drikke': IngredientCategory.Drikke,
-          'andre': IngredientCategory.Andre
-        };
-        
-        if (Object.values(IngredientCategory).includes(dbCategory as IngredientCategory)) {
-          category = dbCategory as IngredientCategory;
-          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
-        } else if (categoryMap[dbCategory]) {
-          category = categoryMap[dbCategory];
-          categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
-        } else {
-          // If category doesn't match, default to 'Andre'
-          category = IngredientCategory.Andre;
-          categoryName = 'Andre';
+      let categoryName = 'Andre'
+      if (resolved?.category) {
+        const dbCat = resolved.category.toLowerCase()
+        if (Object.values(IngredientCategory).includes(dbCat as IngredientCategory)) {
+          categoryName = INGREDIENT_CATEGORY_NAMES[dbCat as IngredientCategory] || 'Andre'
+        } else if (dbCategoryToIngredient[dbCat]) {
+          categoryName = INGREDIENT_CATEGORY_NAMES[dbCategoryToIngredient[dbCat]] || 'Andre'
         }
-      } else {
-        // If no ingredient category, try to get from product match
-        const productCategory = ingredientId ? productCategoryMap.get(ingredientId) : undefined;
+      } else if (ingredientId) {
+        const productCategory = productCategoryMap.get(ingredientId)
         if (productCategory) {
-          // Map product category to ingredient category
-          const productCategoryLower = productCategory.toLowerCase();
-          const productToIngredientMap: Record<string, IngredientCategory> = {
-            // New ingredient categories
-            'kød': IngredientCategory.Protein,
-            'fisk': IngredientCategory.Protein,
-            'mejeri': IngredientCategory.Mejeri,
-            'æg': IngredientCategory.Protein,
-            'grøntsager': IngredientCategory.Groent,
-            'frugt': IngredientCategory.Frugt,
-            'tørvarer': IngredientCategory.Korn,
-            'konserves': IngredientCategory.Forarbejdet,
-            'krydderi & smag': IngredientCategory.Krydderi,
-            'krydderi og smag': IngredientCategory.Krydderi,
-            'frost': IngredientCategory.Forarbejdet,
-            // Legacy product categories (for backwards compatibility)
-            'kød og fisk': IngredientCategory.Protein,
-            'fjerkræ': IngredientCategory.Protein,
-            'mejeri og køl': IngredientCategory.Mejeri,
-            'frugt og grønt': IngredientCategory.Groent,
-            'kolonial': IngredientCategory.Korn,
-            'brød og kager': IngredientCategory.Korn,
-            'fedt og olie': IngredientCategory.Fedt,
-            'krydderier': IngredientCategory.Krydderi,
-            'nødder': IngredientCategory.Nodder,
-            'drikkevarer': IngredientCategory.Drikke
-          };
-          
-          // Try exact match first
-          if (productToIngredientMap[productCategoryLower]) {
-            category = productToIngredientMap[productCategoryLower];
-            categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
-          } else {
-            // Try partial match
-            for (const [productCat, ingCat] of Object.entries(productToIngredientMap)) {
-              if (productCategoryLower.includes(productCat) || productCat.includes(productCategoryLower)) {
-                category = ingCat;
-                categoryName = INGREDIENT_CATEGORY_NAMES[category] || 'Andre';
-                break;
-              }
-            }
-            // If no match found, keep default 'Andre'
-            if (!categoryName || categoryName === 'Andre') {
-              category = IngredientCategory.Andre;
-              categoryName = 'Andre';
-            }
-          }
+          const lower = productCategory.toLowerCase()
+          const ingCat = productCategoryToIngredient[lower] ?? (Object.entries(productCategoryToIngredient).find(([pc]) => lower.includes(pc) || pc.includes(lower))?.[1])
+          if (ingCat) categoryName = INGREDIENT_CATEGORY_NAMES[ingCat] || 'Andre'
         }
       }
-      
-      // If ingredient is basis, put it in special category
+
       const finalCategoryName = isBasis ? 'Varer du måske allerede har' : categoryName
-      
-      if (!categoryMap.has(finalCategoryName)) {
-        categoryMap.set(finalCategoryName, []);
-      }
-      categoryMap.get(finalCategoryName)!.push(item);
+      if (!categoryMap.has(finalCategoryName)) categoryMap.set(finalCategoryName, [])
+      categoryMap.get(finalCategoryName)!.push(item)
     });
 
     // Add supplements from kombi-opskrifter
@@ -1663,21 +1563,22 @@ export class MealPlanGenerator {
 
     // Convert category map to sorted categories
     // Define category order for better UX (using actual category names from INGREDIENT_CATEGORY_NAMES)
+    // Drikkevarer og slik/forarbejdede varer vises bevidst bagerst, da de fylder meget.
     const categoryOrder = [
       'Protein',
       'Grøntsager',
       'Frugt',
       'Mejeri',
-      'Korn & Cerealer',
+      'Kolonial & Diverse',
       'Fedt & Olie',
       'Nødder & Frø',
       'Bælgfrugter',
       'Krydderier',
       'Urter',
-      'Forarbejdede fødevarer',
-      'Drikkevarer',
       'Varer du måske allerede har',
-      'Andre'
+      'Andre',
+      'Forarbejdede fødevarer',
+      'Drikkevarer'
     ];
 
     // Add categories in order

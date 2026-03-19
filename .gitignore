@@ -24,6 +24,8 @@ yarn-error.log*
 
 # Local env files
 .env*.local
+.env*.backup
+.env.local.backup
 
 # OpenAI config (contains API keys)
 .openai-config.json
@@ -41,6 +43,9 @@ logs
 dev-debug.log
 # Environment variables
 .env
+
+# Database backups (kan indeholde sensitiv data)
+backups/
 # Editor directories and files
 .idea
 .vscode

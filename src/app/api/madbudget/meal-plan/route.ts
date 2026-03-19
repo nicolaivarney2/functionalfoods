@@ -6,47 +6,69 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    // Create Supabase client with cookies for user session
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !serviceKey) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
     
-    const cookieStore = await cookies()
+    // Try Authorization header first (like family-profile route)
+    const authHeader = request.headers.get('authorization')
+    let user: any = null
     
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            try {
-              cookieStore.set({ name, value, ...options })
-            } catch (error) {
-              // Ignore errors in read-only contexts
-            }
-          },
-          remove(name: string, options: any) {
-            try {
-              cookieStore.set({ name, value: '', ...options })
-            } catch (error) {
-              // Ignore errors in read-only contexts
-            }
-          },
-        },
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(supabaseUrl, serviceKey)
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token)
+      if (!tokenError && tokenUser) {
+        user = tokenUser
       }
-    )
+    }
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Fallback to cookies if no Authorization header or token user
+    if (!user) {
+      const cookieStore = await cookies()
+      const supabase = createServerClient(
+        supabaseUrl,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+            set(name: string, value: string, options: any) {
+              try {
+                cookieStore.set({ name, value, ...options })
+              } catch (error) {
+                // Ignore errors in read-only contexts
+              }
+            },
+            remove(name: string, options: any) {
+              try {
+                cookieStore.set({ name, value: '', ...options })
+              } catch (error) {
+                // Ignore errors in read-only contexts
+              }
+            },
+          },
+        }
+      )
+      
+      const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser()
+      if (!cookieError && cookieUser) {
+        user = cookieUser
+      }
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Use service role client for DB operations
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, serviceKey)
 
     const { searchParams } = new URL(request.url)
     const mealPlanId = searchParams.get('id')
@@ -93,47 +115,68 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Create Supabase client with cookies for user session
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     
-    if (!supabaseUrl || !supabaseKey) {
+    if (!supabaseUrl || !serviceKey) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
     }
     
-    const cookieStore = await cookies()
+    // Auth like family-profile: header first, then cookies
+    const authHeader = request.headers.get('authorization')
+    let user: any = null
     
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            try {
-              cookieStore.set({ name, value, ...options })
-            } catch (error) {
-              // Ignore errors in read-only contexts
-            }
-          },
-          remove(name: string, options: any) {
-            try {
-              cookieStore.set({ name, value: '', ...options })
-            } catch (error) {
-              // Ignore errors in read-only contexts
-            }
-          },
-        },
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(supabaseUrl, serviceKey)
+      const token = authHeader.replace('Bearer ', '')
+      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token)
+      if (!tokenError && tokenUser) {
+        user = tokenUser
       }
-    )
+    }
     
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    if (!user) {
+      const cookieStore = await cookies()
+      const supabase = createServerClient(
+        supabaseUrl,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) {
+              return cookieStore.get(name)?.value
+            },
+            set(name: string, value: string, options: any) {
+              try {
+                cookieStore.set({ name, value, ...options })
+              } catch (error) {
+                // Ignore errors in read-only contexts
+              }
+            },
+            remove(name: string, options: any) {
+              try {
+                cookieStore.set({ name, value: '', ...options })
+              } catch (error) {
+                // Ignore errors in read-only contexts
+              }
+            },
+          },
+        }
+      )
+      
+      const { data: { user: cookieUser }, error: cookieError } = await supabase.auth.getUser()
+      if (!cookieError && cookieUser) {
+        user = cookieUser
+      }
+    }
+
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Use service role client for DB writes
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, serviceKey)
 
     const body = await request.json()
     const {
