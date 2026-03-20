@@ -1,7 +1,9 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react'
-import { User, Session } from '@supabase/supabase-js'
+import { User, Session, AuthError } from '@supabase/supabase-js'
+
+export type SignUpResult = { error: AuthError | null; session: Session | null }
 import { createSupabaseClient } from '@/lib/supabase'
 
 interface AuthContextType {
@@ -9,7 +11,7 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string, name: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string, name: string) => Promise<SignUpResult>
   signOut: () => Promise<void>
 }
 
@@ -83,14 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error }
   }
 
-  const signUp = async (email: string, password: string, name: string) => {
-    // Save current URL before signup
+  const signUp = async (email: string, password: string, name: string): Promise<SignUpResult> => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth_redirect_url', window.location.href)
     }
 
     const supabase = supabaseRef.current || createSupabaseClient()
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
       },
     })
-    return { error }
+    return { error, session: data.session ?? null }
   }
 
   const signOut = async () => {

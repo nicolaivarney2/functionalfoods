@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, LogOut, Settings, Heart, Shield } from 'lucide-react'
+import { Search, Menu, X, User, LogOut, Settings, Heart, Shield, LayoutGrid } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
@@ -112,6 +112,15 @@ export default function Header() {
                         </div>
                         
                         <Link
+                          href="/overblik"
+                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <LayoutGrid size={16} />
+                          <span>Dit overblik</span>
+                        </Link>
+
+                        <Link
                           href="/profil"
                           className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -161,13 +170,21 @@ export default function Header() {
                     )}
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setIsLoginModalOpen(true)}
-                    className="flex items-center space-x-2 text-white hover:text-gray-300 transition-colors"
-                  >
-                    <User size={20} />
-                    <span className="hidden md:block text-sm">Log ind</span>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href="/kom-i-gang"
+                      className="hidden sm:inline text-sm text-white hover:text-gray-300 transition-colors font-medium"
+                    >
+                      Kom i gang
+                    </Link>
+                    <button
+                      onClick={() => setIsLoginModalOpen(true)}
+                      className="flex items-center space-x-2 text-white hover:text-gray-300 transition-colors"
+                    >
+                      <User size={20} />
+                      <span className="hidden md:block text-sm">Log ind</span>
+                    </button>
+                  </div>
                 )}
                 
                 {/* Mobile Menu Button */}
@@ -248,6 +265,15 @@ export default function Header() {
                     
                     <div className="space-y-2">
                       <Link
+                        href="/overblik"
+                        className="flex items-center space-x-2 text-emerald-700 font-medium"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <LayoutGrid size={16} />
+                        <span>Dit overblik</span>
+                      </Link>
+
+                      <Link
                         href="/profil"
                         className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
                         onClick={() => setIsMobileMenuOpen(false)}
@@ -284,13 +310,21 @@ export default function Header() {
                     </div>
                   </div>
                 ) : (
-                  <div className="border-t border-gray-200 pt-4">
+                  <div className="border-t border-gray-200 pt-4 space-y-2">
+                    <Link
+                      href="/kom-i-gang"
+                      className="flex items-center space-x-2 text-emerald-700 font-medium"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <User size={16} />
+                      <span>Kom i gang</span>
+                    </Link>
                     <button
                       onClick={() => {
                         setIsMobileMenuOpen(false)
                         setIsLoginModalOpen(true)
                       }}
-                      className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
+                      className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 w-full text-left"
                     >
                       <User size={16} />
                       <span>Log ind</span>

@@ -110,12 +110,14 @@ export async function importGomaProducts(options: ImportOptions) {
   let totalImported = 0
 
   for (const storeName of options.stores) {
+    const storeId = storeName.toLowerCase().replace(/\s+/g, '-')
+
     // Upsert store row
     await supabase
       .from('stores')
       .upsert(
         {
-          id: storeName.toLowerCase().replace(/\s+/g, '-'),
+          id: storeId,
           name: storeName,
           updated_at: new Date().toISOString(),
         },
@@ -320,7 +322,6 @@ export async function importGomaProducts(options: ImportOptions) {
       }
 
       // Upsert offers (dedupe by store_id + store_product_id within this batch)
-      const storeId = storeName.toLowerCase().replace(/\s+/g, '-')
       const offerMap = new Map<string, { productId: string; product: GomaProduct }>()
       for (const p of products) {
         // Skip products without a global/base id – we can't link them korrekt til products-tabellen
@@ -341,7 +342,19 @@ export async function importGomaProducts(options: ImportOptions) {
         
         // Check if offer has expired - if sale_valid_to is in the past, mark as not on sale
         let isOnSale = p.is_on_sale
-        if (p.is_on_sale && p.sale_valid_to) {
+        
+        // IMPORTANT: Also check if current_price < normal_price to determine if on sale
+        // Goma's is_on_sale flag might not always be accurate
+        if (p.normal_price && p.current_price && p.normal_price > p.current_price) {
+          // Price difference indicates it's on sale
+          isOnSale = true
+        } else if (p.normal_price && p.current_price && p.normal_price <= p.current_price) {
+          // No price difference - not on sale
+          isOnSale = false
+        }
+        
+        // Check if sale has expired
+        if (isOnSale && p.sale_valid_to) {
           const saleEndDate = new Date(p.sale_valid_to)
           const now = new Date()
           if (saleEndDate < now) {
@@ -349,6 +362,16 @@ export async function importGomaProducts(options: ImportOptions) {
             isOnSale = false
             console.log(`⏰ Offer expired for ${p.product_name}: sale_valid_to was ${p.sale_valid_to}`)
           }
+        }
+
+        const nowDate = new Date()
+        const isOfferDateValid = !p.sale_valid_to || new Date(p.sale_valid_to) >= nowDate
+        const isOfferActive = isOnSale && isOfferDateValid
+        
+        // Calculate discount percentage if on sale
+        let discountPercentage = null
+        if (isOnSale && p.normal_price && p.current_price && p.normal_price > p.current_price) {
+          discountPercentage = Math.round(((p.normal_price - p.current_price) / p.normal_price) * 100)
         }
         
         return {
@@ -359,8 +382,9 @@ export async function importGomaProducts(options: ImportOptions) {
           product_url: p.product_url,
           current_price: p.current_price,
           normal_price: p.normal_price,
-          is_on_sale: isOnSale, // Use checked value
-          discount_percentage: isOnSale ? p.discount_percentage : null, // Clear discount if not on sale
+          is_on_sale: isOnSale, // Use calculated value based on price difference
+          is_offer_active: isOfferActive, // Active offer flag for fast filtering
+          discount_percentage: discountPercentage || (isOnSale ? p.discount_percentage : null), // Use calculated or Goma's value
           price_per_unit: p.price_per_unit,
           price_per_kilogram: p.price_per_kilogram,
           amount: p.amount,
@@ -416,6 +440,42 @@ export async function importGomaProducts(options: ImportOptions) {
       if (products.length < limit) {
         break
       }
+    }
+
+    // Cleanup stale Goma offers for this store
+    try {
+      const days = 10
+      const staleThreshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+      console.log(
+        `🧹 Cleaning up stale Goma offers for ${storeId} last seen before ${staleThreshold}`,
+      )
+
+      const { error: cleanupError } = await supabase
+        .from('product_offers')
+        .update({
+          is_on_sale: false,
+          is_offer_active: false,
+          discount_percentage: null,
+        })
+        .eq('store_id', storeId)
+        .eq('source', 'goma')
+        .eq('is_offer_active', true)
+        .lt('last_seen_at', staleThreshold)
+
+      if (cleanupError) {
+        console.error(
+          `⚠️ Error cleaning up stale Goma offers for ${storeId}:`,
+          cleanupError,
+        )
+      } else {
+        console.log(`✅ Cleanup of stale Goma offers completed for ${storeId}`)
+      }
+    } catch (error) {
+      console.error(
+        `⚠️ Unexpected error during stale offer cleanup for store ${storeId}:`,
+        error,
+      )
     }
   }
 

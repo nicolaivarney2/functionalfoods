@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -170,7 +171,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         </form>
 
         {/* Toggle sign up/login */}
-        <div className="mt-6 text-center">
+        <div className="mt-6 text-center space-y-2">
           <p className="text-gray-600">
             {isSignUp ? 'Har du allerede en konto?' : 'Har du ikke en konto?'}
             <button
@@ -181,9 +182,20 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               }}
               className="ml-1 text-green-600 hover:text-green-700 font-medium"
             >
-              {isSignUp ? 'Log ind' : 'Opret konto'}
+              {isSignUp ? 'Log ind' : 'Hurtig oprettelse her'}
             </button>
           </p>
+          {!isSignUp && (
+            <p className="text-sm text-gray-500">
+              <Link
+                href="/kom-i-gang"
+                onClick={onClose}
+                className="text-green-600 hover:text-green-700 font-medium underline-offset-2 hover:underline"
+              >
+                Eller: fuld velkomstside med valgfri støtte (0 kr muligt)
+              </Link>
+            </p>
+          )}
         </div>
 
         {/* Benefits */}

@@ -17,129 +17,168 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseServiceClient()
 
     // Get existing matches WITHOUT joins first (joins can fail if foreign keys don't match)
-    // Load ALL matches (not paginated) since we need to show all for each ingredient
+    // Supabase/PostgREST defaults to 1000 rows, so we fetch in batches.
     console.log('🔍 Fetching all matches from product_ingredient_matches...')
-    const { data: matches, error: matchesError } = await supabase
-      .from('product_ingredient_matches')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const allMatches: any[] = []
+    const batchSize = 1000
+    let offset = 0
 
-    if (matchesError) {
-      console.error('❌ Error fetching matches:', matchesError)
-      throw new Error(`Failed to fetch matches: ${matchesError.message}`)
+    while (true) {
+      const { data: batch, error: matchesError } = await supabase
+        .from('product_ingredient_matches')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(offset, offset + batchSize - 1)
+
+      if (matchesError) {
+        console.error('❌ Error fetching matches:', matchesError)
+        throw new Error(`Failed to fetch matches: ${matchesError.message}`)
+      }
+
+      if (!batch || batch.length === 0) {
+        break
+      }
+
+      allMatches.push(...batch)
+      offset += batchSize
+
+      if (batch.length < batchSize) {
+        break
+      }
     }
 
-    console.log(`📦 Found ${matches?.length || 0} raw matches in database`)
+    const matches = allMatches
+    console.log(`📦 Found ${matches.length} raw matches in database`)
 
-    // Transform data for frontend
-    // Manually load product and ingredient data for each match
-    const transformedMatches = await Promise.all((matches || []).map(async (match) => {
-      // Load ingredient data
-      let ingredientName = 'Unknown Ingredient'
-      let ingredientCategory = 'Andre'
-      
-      try {
-        const { data: ingredient, error: ingredientError } = await supabase
-          .from('ingredients')
-          .select('id, name, category')
-          .eq('id', match.ingredient_id)
-          .single()
-        
-        if (!ingredientError && ingredient) {
-          ingredientName = ingredient.name || 'Unknown Ingredient'
-          ingredientCategory = ingredient.category || 'Andre'
-        }
-      } catch (err) {
-        console.warn(`⚠️ Could not load ingredient ${match.ingredient_id}:`, err)
+    const chunk = <T,>(items: T[], size: number) => {
+      const chunks: T[][] = []
+      for (let i = 0; i < items.length; i += size) {
+        chunks.push(items.slice(i, i + size))
       }
-      
-      // Load product data using standardized format
-      let productName = 'Unknown Product'
-      let productCategory = 'Andre'
-      let productStore = 'Unknown Store'
-      let productPrice = 0
-      let productOriginalPrice: number | null = null
-      let productIsOnSale = false
-      
-      console.log(`🔍 Loading product for match ${match.id}: product_external_id="${match.product_external_id}"`)
+      return chunks
+    }
 
-      // Strategy:
-      // 1) Try old structure: supermarket_products.external_id === product_external_id
-      // 2) Try new structure: product_offers.store_product_id === product_external_id
-      try {
-        const { data: products, error: productError } = await supabase
-          .from('supermarket_products')
-          .select('external_id, name, category, store, price, original_price, is_on_sale')
-          .eq('external_id', match.product_external_id)
-          .limit(1)
+    const ingredientIds = Array.from(new Set((matches || []).map(m => m.ingredient_id).filter(Boolean)))
+    const productExternalIds = Array.from(new Set((matches || []).map(m => m.product_external_id).filter(Boolean)))
 
-        if (!productError && products && products.length > 0) {
-          const product = products[0]
-          productName = product.name || 'Unknown Product'
-          productCategory = product.category || 'Andre'
-          productStore = product.store || 'Unknown Store'
-          productPrice = product.price || 0
-          productOriginalPrice = product.original_price
-          productIsOnSale = product.is_on_sale || false
-          console.log(`✅ Found product in supermarket_products: ${productName} (${productStore})`)
-        }
-      } catch (err) {
-        console.warn(`⚠️ Exception loading supermarket_products product:`, err)
+    const ingredientMap = new Map<string, { name: string; category: string }>()
+    for (const ids of chunk(ingredientIds, 500)) {
+      const { data: ingredients, error } = await supabase
+        .from('ingredients')
+        .select('id, name, category')
+        .in('id', ids)
+      if (error) {
+        console.warn('⚠️ Error loading ingredients batch:', error.message)
+        continue
+      }
+      for (const ing of ingredients || []) {
+        ingredientMap.set(String(ing.id), {
+          name: ing.name || 'Unknown Ingredient',
+          category: ing.category || 'Andre'
+        })
+      }
+    }
+
+    const supermarketProductMap = new Map<string, {
+      name: string
+      category: string
+      store: string
+      price: number
+      originalPrice: number | null
+      isOnSale: boolean
+    }>()
+
+    for (const ids of chunk(productExternalIds, 500)) {
+      const { data: products, error } = await supabase
+        .from('supermarket_products')
+        .select('external_id, name, category, store, price, original_price, is_on_sale')
+        .in('external_id', ids)
+      if (error) {
+        console.warn('⚠️ Error loading supermarket_products batch:', error.message)
+        continue
+      }
+      for (const product of products || []) {
+        supermarketProductMap.set(String(product.external_id), {
+          name: product.name || 'Unknown Product',
+          category: product.category || 'Andre',
+          store: product.store || 'Unknown Store',
+          price: product.price || 0,
+          originalPrice: product.original_price,
+          isOnSale: product.is_on_sale || false
+        })
+      }
+    }
+
+    const offerProductMap = new Map<string, {
+      name: string
+      category: string
+      store: string
+      price: number
+      originalPrice: number | null
+      isOnSale: boolean
+    }>()
+
+    for (const ids of chunk(productExternalIds, 200)) {
+      const { data: offers, error } = await supabase
+        .from('product_offers')
+        .select(
+          `
+          store_product_id,
+          store_id,
+          name_store,
+          current_price,
+          normal_price,
+          is_on_sale,
+          products:product_id (
+            name_generic,
+            category,
+            department
+          )
+        `
+        )
+        .in('store_product_id', ids)
+      if (error) {
+        console.warn('⚠️ Error loading product_offers batch:', error.message)
+        continue
+      }
+      for (const offer of offers || []) {
+        const prod = Array.isArray(offer.products) ? offer.products[0] : offer.products
+        const storeDisplay = databaseService['mapStoreIdToDisplayName']
+          ? // @ts-ignore internal helper
+            databaseService['mapStoreIdToDisplayName'](offer.store_id)
+          : offer.store_id
+        offerProductMap.set(String(offer.store_product_id), {
+          name: offer.name_store || prod?.name_generic || 'Unknown Product',
+          category: prod?.category || prod?.department || 'Andre',
+          store: storeDisplay || 'Unknown Store',
+          price: offer.current_price || 0,
+          originalPrice: offer.normal_price,
+          isOnSale: offer.is_on_sale || false
+        })
+      }
+    }
+
+    const transformedMatches = (matches || []).map((match) => {
+      const ingredient = ingredientMap.get(String(match.ingredient_id)) || {
+        name: 'Unknown Ingredient',
+        category: 'Andre'
       }
 
-      if (productName === 'Unknown Product') {
-        try {
-          const { data: offerRows, error: offerError } = await supabase
-            .from('product_offers')
-            .select(
-              `
-              store_product_id,
-              store_id,
-              name_store,
-              current_price,
-              normal_price,
-              is_on_sale,
-              products:product_id (
-                name_generic,
-                category,
-                department
-              )
-            `
-            )
-            .eq('store_product_id', match.product_external_id)
-            .limit(1)
+      const supermarketProduct = supermarketProductMap.get(String(match.product_external_id))
+      const offerProduct = offerProductMap.get(String(match.product_external_id))
+      const product = supermarketProduct || offerProduct
 
-          if (offerError) {
-            console.warn(`⚠️ Error loading product_offers:`, offerError.message)
-          }
+      const productName = product?.name || 'Unknown Product'
+      const productCategory = product?.category || 'Andre'
+      const productStore = product?.store || 'Unknown Store'
+      const productPrice = product?.price || 0
+      const productOriginalPrice = product?.originalPrice ?? null
+      const productIsOnSale = product?.isOnSale || false
 
-          if (!offerError && offerRows && offerRows.length > 0) {
-            const offer = offerRows[0]
-            const prod = Array.isArray(offer.products) ? offer.products[0] : offer.products
-
-            const storeDisplay = databaseService['mapStoreIdToDisplayName']
-              ? // @ts-ignore internal helper
-                databaseService['mapStoreIdToDisplayName'](offer.store_id)
-              : offer.store_id
-
-            productName = offer.name_store || prod?.name_generic || 'Unknown Product'
-            productCategory = prod?.category || prod?.department || 'Andre'
-            productStore = storeDisplay || 'Unknown Store'
-            productPrice = offer.current_price || 0
-            productOriginalPrice = offer.normal_price
-            productIsOnSale = offer.is_on_sale || false
-            console.log(`✅ Found product in product_offers: ${productName} (${productStore})`)
-          }
-        } catch (err) {
-          console.warn(`⚠️ Exception loading product_offers product:`, err)
-        }
-      }
-      
-      // If still unknown, log it for debugging
       if (productName === 'Unknown Product') {
         console.error(`❌ Could not find product for match ${match.id} with product_external_id: ${match.product_external_id}`)
       }
-      
+
       return {
         id: match.id,
         product_external_id: match.product_external_id,
@@ -155,10 +194,10 @@ export async function GET(request: NextRequest) {
         product_price: productPrice,
         product_original_price: productOriginalPrice,
         product_is_on_sale: productIsOnSale,
-        ingredient_name: ingredientName,
-        ingredient_category: ingredientCategory
+        ingredient_name: ingredient.name,
+        ingredient_category: ingredient.category
       }
-    }))
+    })
 
     // Count how many matches have unknown products
     const unknownCount = transformedMatches.filter(m => m.product_name === 'Unknown Product').length

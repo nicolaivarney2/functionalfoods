@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { ChevronDownIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
@@ -9,6 +9,8 @@ interface Ingredient {
   name: string
   category: string
   description?: string
+  is_basis?: boolean
+  grams_per_unit?: number | null
 }
 
 interface GroceryProduct {
@@ -38,6 +40,18 @@ interface ExistingMatch {
   product_is_on_sale: boolean
 }
 
+const categoryOptions = [
+  'Frugt og grønt',
+  'Kød og fisk',
+  'Mejeri og køl',
+  'Brød og kager',
+  'Kolonial',
+  'Frost',
+  'Drikkevarer',
+  'Slik og snacks',
+  'Andre'
+]
+
 export default function ProductIngredientMatchingPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [groceryProducts, setGroceryProducts] = useState<GroceryProduct[]>([])
@@ -48,6 +62,11 @@ export default function ProductIngredientMatchingPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
   const [selectedStore, setSelectedStore] = useState('all')
+  const [pendingMatchIds, setPendingMatchIds] = useState<Set<string>>(new Set())
+  const [isSyncingMatches, setIsSyncingMatches] = useState(false)
+  const [copySourceByIngredient, setCopySourceByIngredient] = useState<Record<string, string>>({})
+  const [gramsDraftByIngredient, setGramsDraftByIngredient] = useState<Record<string, string>>({})
+  const [savingGramsByIngredient, setSavingGramsByIngredient] = useState<Record<string, boolean>>({})
   const [stats, setStats] = useState({
     total: 0,
     confirmed: 0,
@@ -85,15 +104,19 @@ export default function ProductIngredientMatchingPage() {
       // Load existing matches from database
       console.log('🔗 Loading existing matches...')
       const existingMatchesData = await loadExistingMatches()
-      console.log(`✅ Loaded ${existingMatchesData.length} existing matches`)
+      if (existingMatchesData) {
+      console.log(`✅ Loaded ${existingMatchesData?.length ?? 0} existing matches`)
+      }
       
       // Set all data
       setIngredients(allIngredients)
       setGroceryProducts(allProducts)
-      setExistingMatches(existingMatchesData)
+      if (existingMatchesData) {
+        setExistingMatches(existingMatchesData)
+      }
       
       console.log(`📊 Loaded ${allProducts.length} grocery products`)
-      console.log(`📋 Loaded ${existingMatchesData.length} existing matches`)
+      console.log(`📋 Loaded ${existingMatchesData?.length ?? 0} existing matches`)
       
       // Log store distribution
       const storeCounts = allProducts.reduce((acc: any, prod: any) => {
@@ -124,7 +147,9 @@ export default function ProductIngredientMatchingPage() {
             id: ing.id,
             name: ing.name,
             category: ing.category || 'Andre',
-            description: `${ing.name} - importeret fra opskrifter`
+            description: `${ing.name} - importeret fra opskrifter`,
+            is_basis: ing.is_basis || false,
+            grams_per_unit: ing.grams_per_unit ?? null
           })))
           
           hasMore = data.data.pagination.hasMore
@@ -147,7 +172,7 @@ export default function ProductIngredientMatchingPage() {
     return []
   }
 
-  const loadExistingMatches = async (): Promise<ExistingMatch[]> => {
+  const loadExistingMatches = async (): Promise<ExistingMatch[] | null> => {
     try {
       console.log('🔄 Loading existing matches from API...')
       const response = await fetch(`/api/admin/existing-matches?t=${Date.now()}`)
@@ -178,10 +203,10 @@ export default function ProductIngredientMatchingPage() {
         return matches
       }
       console.warn('⚠️ API returned success: false', data)
-      return []
+      return null
     } catch (error) {
       console.error('❌ Error loading existing matches:', error)
-      return []
+      return null
     }
   }
 
@@ -194,67 +219,171 @@ export default function ProductIngredientMatchingPage() {
     setStats({ total, confirmed, rejected, pending })
   }
 
+  const getGramsInputValue = (ingredient: Ingredient): string => {
+    const draft = gramsDraftByIngredient[ingredient.id]
+    if (draft !== undefined) return draft
+    if (ingredient.grams_per_unit === null || ingredient.grams_per_unit === undefined) return ''
+    return String(ingredient.grams_per_unit)
+  }
+
+  const saveGramsPerUnit = async (ingredient: Ingredient) => {
+    const raw = getGramsInputValue(ingredient).trim()
+    const parsed = raw === '' ? null : Number(raw)
+    if (parsed !== null && (!Number.isFinite(parsed) || parsed < 0)) {
+      alert('Vægt pr. stk skal være et positivt tal')
+      return
+    }
+
+    const current = ingredient.grams_per_unit ?? null
+    if (current === parsed) return
+
+    setSavingGramsByIngredient((prev) => ({ ...prev, [ingredient.id]: true }))
+    try {
+      const response = await fetch(`/api/ingredients/${ingredient.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grams_per_unit: parsed })
+      })
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setIngredients((prev) =>
+          prev.map((ing) =>
+            ing.id === ingredient.id ? { ...ing, grams_per_unit: parsed } : ing
+          )
+        )
+      } else {
+        console.error('❌ Failed to update grams_per_unit:', data.error)
+        alert(`Failed to update: ${data.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('❌ Error updating grams_per_unit:', error)
+      alert('Error updating grams per unit')
+    } finally {
+      setSavingGramsByIngredient((prev) => ({ ...prev, [ingredient.id]: false }))
+    }
+  }
+
+  const matchesByIngredient = useMemo(() => {
+    const map = new Map<string, ExistingMatch[]>()
+    for (const match of existingMatches) {
+      const key = String(match.ingredient_id).trim()
+      const existing = map.get(key)
+      if (existing) {
+        existing.push(match)
+      } else {
+        map.set(key, [match])
+      }
+    }
+    return map
+  }, [existingMatches])
+
+  const ingredientOptions = useMemo(
+    () =>
+      ingredients
+        .map((ing) => ({ id: ing.id, name: ing.name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [ingredients]
+  )
+
   // Get products matched to a specific ingredient
   const getProductsForIngredient = (ingredientId: string): ExistingMatch[] => {
-    // Try both exact match and string comparison (in case of type mismatches)
-    const matches = existingMatches.filter(match => {
-      const matchId = String(match.ingredient_id).trim()
-      const searchId = String(ingredientId).trim()
-      return matchId === searchId
-    })
-    
-    if (matches.length === 0 && existingMatches.length > 0) {
-      console.log(`⚠️ No matches found for ingredient ${ingredientId}`)
-      console.log(`📋 Available ingredient_ids in matches:`, [...new Set(existingMatches.map(m => m.ingredient_id))])
-      console.log(`🔍 Searching for: "${ingredientId}" (type: ${typeof ingredientId})`)
-      console.log(`📋 First match ingredient_id: "${existingMatches[0]?.ingredient_id}" (type: ${typeof existingMatches[0]?.ingredient_id})`)
-    }
-    
-    return matches
+    const key = String(ingredientId).trim()
+    return matchesByIngredient.get(key) || []
   }
 
   // Add a product match to an ingredient
-  const addProductMatch = async (ingredientId: string, product: GroceryProduct) => {
-    try {
-      // Check if match already exists
-      const existingMatch = existingMatches.find(match => 
-        match.ingredient_id === ingredientId && match.product_external_id === product.id
-      )
-      
-      if (existingMatch) {
-        console.log('⚠️ Match already exists:', existingMatch)
-        alert('This product is already matched to this ingredient')
-        return
-      }
-      
-      const response = await fetch('/api/admin/add-product-match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingredient_id: ingredientId,
-          product_external_id: product.id,
-          confidence: 100,
-          match_type: 'manual'
+  const matchQueueRef = useRef<Array<{ ingredientId: string; product: GroceryProduct; tempId: string }>>([])
+  const isProcessingQueueRef = useRef(false)
+
+  const processMatchQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) return
+    isProcessingQueueRef.current = true
+
+    while (matchQueueRef.current.length > 0) {
+      const next = matchQueueRef.current.shift()
+      if (!next) continue
+
+      try {
+        const response = await fetch('/api/admin/add-product-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ingredient_id: next.ingredientId,
+            product_external_id: next.product.id,
+            confidence: 100,
+            match_type: 'manual'
+          })
         })
-      })
-      
-      const data = await response.json()
-      
-      if (response.ok && data.success) {
-        // Reload existing matches to get the new one from database
-        const updatedMatches = await loadExistingMatches()
-        setExistingMatches(updatedMatches)
-        console.log('✅ Product match added successfully')
-      } else {
-        console.error('❌ Failed to add product match:', data)
-        const errorMessage = data.details || data.message || 'Unknown error'
-        const errorHint = data.hint ? `\n\nHint: ${data.hint}` : ''
-        alert(`Failed to add product match: ${errorMessage}${errorHint}`)
+
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          setExistingMatches(prev =>
+            prev.map(match =>
+              match.id === next.tempId && data.data?.id
+                ? { ...match, id: data.data.id }
+                : match
+            )
+          )
+        } else {
+          const errorMessage = data.details || data.message || 'Unknown error'
+          const errorHint = data.hint ? `\n\nHint: ${data.hint}` : ''
+          setExistingMatches(prev => prev.filter(match => match.id !== next.tempId))
+          alert(`Failed to add product match: ${errorMessage}${errorHint}`)
+        }
+      } catch (error) {
+        console.error('❌ Error adding product match:', error)
+        setExistingMatches(prev => prev.filter(match => match.id !== next.tempId))
+        alert('Error adding product match')
+      } finally {
+        setPendingMatchIds(prev => {
+          const nextSet = new Set(prev)
+          nextSet.delete(next.tempId)
+          return nextSet
+        })
       }
-    } catch (error) {
-      console.error('❌ Error adding product match:', error)
-      alert('Error adding product match')
     }
+
+    isProcessingQueueRef.current = false
+  }, [])
+
+  const addProductMatch = async (ingredientId: string, product: GroceryProduct): Promise<boolean> => {
+    const existingMatch = existingMatches.find(match => 
+      match.ingredient_id === ingredientId && match.product_external_id === product.id
+    )
+    if (existingMatch) {
+      alert('This product is already matched to this ingredient')
+      return true
+    }
+
+    const ingredient = ingredients.find(ing => ing.id === ingredientId)
+    const tempId = `pending-${Date.now()}-${ingredientId}-${product.id}`
+
+    const newMatch: ExistingMatch = {
+      id: tempId,
+      ingredient_id: ingredientId,
+      product_external_id: product.id,
+      confidence: 100,
+      match_type: 'manual',
+      ingredient_name: ingredient?.name || '',
+      product_name: product.name,
+      product_category: product.category,
+      product_store: product.store,
+      product_price: product.price,
+      product_original_price: product.originalPrice,
+      product_is_on_sale: product.isOnSale
+    }
+
+    setExistingMatches(prev => [newMatch, ...prev])
+    setPendingMatchIds(prev => {
+      const nextSet = new Set(prev)
+      nextSet.add(tempId)
+      return nextSet
+    })
+
+    matchQueueRef.current.push({ ingredientId, product, tempId })
+    processMatchQueue()
+    return true
   }
 
   // Remove a product match from an ingredient
@@ -285,18 +414,27 @@ export default function ProductIngredientMatchingPage() {
   }
 
   // Filter ingredients based on search and category
-  const filteredIngredients = ingredients.filter(ingredient => {
-    const matchesSearch = ingredient.name && 
-      ingredient.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+  const filteredIngredients = useMemo(() => {
+    const searchLower = searchTerm.toLowerCase()
+    return ingredients.filter(ingredient => {
+      const matchesSearch = ingredient.name &&
+        ingredient.name.toLowerCase().includes(searchLower)
+      const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
+      return matchesSearch && matchesCategory
+    })
+  }, [ingredients, searchTerm, selectedCategory])
 
   // Pagination
-  const totalPages = Math.ceil(filteredIngredients.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentIngredients = filteredIngredients.slice(startIndex, endIndex)
+  const totalPages = useMemo(
+    () => Math.ceil(filteredIngredients.length / itemsPerPage),
+    [filteredIngredients.length]
+  )
+  const startIndex = useMemo(() => (currentPage - 1) * itemsPerPage, [currentPage])
+  const endIndex = useMemo(() => startIndex + itemsPerPage, [startIndex])
+  const currentIngredients = useMemo(
+    () => filteredIngredients.slice(startIndex, endIndex),
+    [filteredIngredients, startIndex, endIndex]
+  )
 
   if (isLoading) {
     return (
@@ -352,6 +490,23 @@ export default function ProductIngredientMatchingPage() {
           </div>
         </div>
 
+        <div className="flex items-center justify-end mb-6">
+          <button
+            onClick={async () => {
+              setIsSyncingMatches(true)
+              const updatedMatches = await loadExistingMatches()
+              if (updatedMatches) {
+                setExistingMatches(updatedMatches)
+              }
+              setIsSyncingMatches(false)
+            }}
+            className="px-4 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-60"
+            disabled={isSyncingMatches}
+          >
+            {isSyncingMatches ? 'Syncing matches...' : 'Sync all matches'}
+          </button>
+        </div>
+
         {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow mb-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -381,15 +536,9 @@ export default function ProductIngredientMatchingPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="all">All Categories</option>
-                <option value="Frugt og grønt">Frugt og grønt</option>
-                <option value="Kød og fisk">Kød og fisk</option>
-                <option value="Mejeri og køl">Mejeri og køl</option>
-                <option value="Brød og kager">Brød og kager</option>
-                <option value="Kolonial">Kolonial</option>
-                <option value="Frost">Frost</option>
-                <option value="Drikkevarer">Drikkevarer</option>
-                <option value="Slik og snacks">Slik og snacks</option>
-                <option value="Andre">Andre</option>
+                {categoryOptions.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
               </select>
             </div>
             
@@ -425,15 +574,49 @@ export default function ProductIngredientMatchingPage() {
         <div className="space-y-4">
           {currentIngredients.map((ingredient) => {
             const matchedProducts = getProductsForIngredient(ingredient.id)
-            console.log(`📦 Ingredient "${ingredient.name}" (${ingredient.id}): ${matchedProducts.length} matched products`)
-            
             return (
               <div key={ingredient.id} className="bg-white rounded-lg shadow">
                 <div className="p-6">
                   {/* Ingredient Header */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">{ingredient.name}</h3>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-semibold text-gray-900">{ingredient.name}</h3>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ingredient.is_basis || false}
+                            onChange={async (e) => {
+                              const newIsBasis = e.target.checked
+                              try {
+                                const response = await fetch(`/api/ingredients/${ingredient.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ is_basis: newIsBasis })
+                                })
+                                const data = await response.json()
+                                if (response.ok && data.success) {
+                                  // Update local state
+                                  setIngredients(prev => prev.map(ing => 
+                                    ing.id === ingredient.id 
+                                      ? { ...ing, is_basis: newIsBasis }
+                                      : ing
+                                  ))
+                                  console.log(`✅ Updated basis flag for ${ingredient.name} to ${newIsBasis}`)
+                                } else {
+                                  console.error('❌ Failed to update basis flag:', data.error)
+                                  alert(`Failed to update basis flag: ${data.error || 'Unknown error'}`)
+                                }
+                              } catch (error) {
+                                console.error('❌ Error updating basis flag:', error)
+                                alert('Error updating basis flag')
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Basis</span>
+                        </label>
+                      </div>
                       <div className="flex items-center gap-3 mt-1">
                         <div className="text-sm text-gray-600">
                           Category:
@@ -468,16 +651,35 @@ export default function ProductIngredientMatchingPage() {
                           }}
                           className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
-                          <option value="Frugt og grønt">Frugt og grønt</option>
-                          <option value="Kød og fisk">Kød og fisk</option>
-                          <option value="Mejeri og køl">Mejeri og køl</option>
-                          <option value="Brød og kager">Brød og kager</option>
-                          <option value="Kolonial">Kolonial</option>
-                          <option value="Frost">Frost</option>
-                          <option value="Drikkevarer">Drikkevarer</option>
-                          <option value="Slik og snacks">Slik og snacks</option>
-                          <option value="Andre">Andre</option>
+                          {categoryOptions.map(category => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
                         </select>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <label htmlFor={`grams-${ingredient.id}`}>Vægt pr. stk (g):</label>
+                          <input
+                            id={`grams-${ingredient.id}`}
+                            type="number"
+                            min={0}
+                            step={1}
+                            placeholder="—"
+                            value={getGramsInputValue(ingredient)}
+                            onChange={(e) => {
+                              const raw = e.target.value
+                              setGramsDraftByIngredient((prev) => ({ ...prev, [ingredient.id]: raw }))
+                            }}
+                            onBlur={() => {
+                              saveGramsPerUnit(ingredient)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.currentTarget.blur()
+                              }
+                            }}
+                            disabled={savingGramsByIngredient[ingredient.id] === true}
+                            className="w-20 text-sm border border-gray-300 rounded-md px-2 py-1 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
                       {ingredient.description && (
                         <div className="text-sm text-gray-500 mt-1">
@@ -500,40 +702,112 @@ export default function ProductIngredientMatchingPage() {
                         onClick={async () => {
                           console.log('🔄 Manually reloading matches...')
                           const updatedMatches = await loadExistingMatches()
-                          setExistingMatches(updatedMatches)
-                          console.log(`✅ Reloaded ${updatedMatches.length} matches`)
+                          if (updatedMatches) {
+                            setExistingMatches(updatedMatches)
+                            console.log(`✅ Reloaded ${updatedMatches.length} matches`)
+                          }
                         }}
                         className="text-sm text-blue-600 hover:text-blue-800 underline"
                       >
                         Reload matches
                       </button>
                     </div>
-                    {matchedProducts.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {matchedProducts.map((match) => (
-                          <div key={match.id} className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex items-center space-x-2">
-                            <span className="text-sm font-medium text-blue-900">{match.product_name}</span>
+                    <div className="flex flex-wrap gap-1 h-20 overflow-y-auto pr-1">
+                      {matchedProducts.length > 0 ? (
+                        matchedProducts.map((match) => (
+                          <div
+                            key={match.id}
+                            className={`bg-blue-50 border border-blue-200 rounded px-2 py-1 flex items-center space-x-1 ${
+                              pendingMatchIds.has(match.id) ? 'opacity-60' : ''
+                            }`}
+                          >
+                            <span className="text-xs font-medium text-blue-900">{match.product_name}</span>
                             <span className="text-xs text-blue-600">({match.product_store})</span>
                             <span className="text-xs text-gray-500">{match.product_price} kr</span>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                removeProductMatch(match.id)
-                              }}
-                              className="text-red-500 hover:text-red-700 ml-1 p-1 rounded hover:bg-red-100"
-                              title="Remove product match"
-                            >
-                              <XMarkIcon className="h-4 w-4" />
-                            </button>
+                            {!pendingMatchIds.has(match.id) && (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  removeProductMatch(match.id)
+                                }}
+                                className="text-red-500 hover:text-red-700 p-0.5 rounded hover:bg-red-100"
+                                title="Remove product match"
+                              >
+                                <XMarkIcon className="h-3 w-3" />
+                              </button>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500 italic">
-                        Ingen matches endnu. Tilføj et produkt nedenfor.
-                      </div>
-                    )}
+                        ))
+                      ) : (
+                        <div className="text-xs text-gray-500 italic">
+                          Ingen matches endnu. Tilføj et produkt nedenfor.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Copy Matches */}
+                  <div className="mb-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-2">
+                      <label className="text-sm text-gray-700">Copy matches from:</label>
+                      <select
+                        value={copySourceByIngredient[ingredient.id] || ''}
+                        onChange={(e) =>
+                          setCopySourceByIngredient((prev) => ({
+                            ...prev,
+                            [ingredient.id]: e.target.value
+                          }))
+                        }
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select ingredient...</option>
+                        {ingredientOptions
+                          .filter((opt) => opt.id !== ingredient.id)
+                          .map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.name}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        onClick={async () => {
+                          const sourceId = copySourceByIngredient[ingredient.id]
+                          if (!sourceId) return
+
+                          const sourceMatches = getProductsForIngredient(sourceId)
+                          const existingIds = new Set(
+                            matchedProducts.map((m) => m.product_external_id)
+                          )
+                          const matchesToCopy = sourceMatches.filter(
+                            (m) => !existingIds.has(m.product_external_id)
+                          )
+
+                          if (matchesToCopy.length === 0) {
+                            alert('No new matches to copy.')
+                            return
+                          }
+
+                          for (const match of matchesToCopy) {
+                            await addProductMatch(ingredient.id, {
+                              id: match.product_external_id,
+                              name: match.product_name,
+                              category: match.product_category,
+                              store: match.product_store,
+                              price: match.product_price,
+                              originalPrice: match.product_original_price ?? undefined,
+                              isOnSale: match.product_is_on_sale,
+                              unit: 'stk',
+                              quantity: 1
+                            })
+                          }
+                        }}
+                        className="px-3 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-60"
+                        disabled={!copySourceByIngredient[ingredient.id]}
+                      >
+                        Copy products
+                      </button>
+                    </div>
                   </div>
 
                   {/* Add Product Dropdown */}
@@ -592,6 +866,7 @@ export default function ProductIngredientMatchingPage() {
 // Simple cache for search results (shared across all instances to reduce duplicate requests)
 const searchCache = new Map<string, { products: GroceryProduct[], timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const SEARCH_CACHE_VERSION = 'v2'
 
 // Component for selecting grocery products
 function GroceryProductSelector({ 
@@ -603,7 +878,7 @@ function GroceryProductSelector({
 }: {
   groceryProducts: GroceryProduct[]
   selectedProduct: GroceryProduct | null
-  onSelect: (product: GroceryProduct) => void
+  onSelect: (product: GroceryProduct) => Promise<boolean>
   placeholder: string
   ingredientId: string
 }) {
@@ -611,8 +886,9 @@ function GroceryProductSelector({
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState<GroceryProduct[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [hiddenProductIds, setHiddenProductIds] = useState<Set<string>>(new Set())
+  const [productCategoryFilter, setProductCategoryFilter] = useState('')
 
   // Reset local state when switching ingredient (each ingredient has its own dropdown)
   useEffect(() => {
@@ -620,17 +896,18 @@ function GroceryProductSelector({
     setSearchResults([])
     setHiddenProductIds(new Set())
     setIsSearching(false)
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-      setSearchTimeout(null)
+    setProductCategoryFilter('')
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+      searchTimeoutRef.current = null
     }
   }, [ingredientId])
   
   // Search products on-demand when user types (minimum 2 characters)
   useEffect(() => {
     // Clear previous timeout
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
     }
     
     // Only search if user has typed at least 2 characters
@@ -644,8 +921,8 @@ function GroceryProductSelector({
     setIsSearching(true)
     const timeout = setTimeout(async () => {
       try {
-        // Check cache first (cache key includes search term only, not ingredientId, since products are the same)
-        const cacheKey = searchTerm.toLowerCase().trim()
+        // Check cache first (scoped by ingredient to avoid stale cross-ingredient exclusions)
+        const cacheKey = `${SEARCH_CACHE_VERSION}::${ingredientId}::${searchTerm.toLowerCase().trim()}`
         const cached = searchCache.get(cacheKey)
         const now = Date.now()
         
@@ -695,7 +972,7 @@ function GroceryProductSelector({
       }
     }, 500) // Increased debounce to 500ms
     
-    setSearchTimeout(timeout)
+    searchTimeoutRef.current = timeout
     
     return () => {
       if (timeout) clearTimeout(timeout)
@@ -704,6 +981,7 @@ function GroceryProductSelector({
   }, [searchTerm, ingredientId]) // Added ingredientId to dependencies
   
   // Use search results if available, otherwise filter from groceryProducts
+  const normalizedCategoryFilter = productCategoryFilter.trim().toLowerCase()
   const filteredProducts = (searchTerm.length >= 2 
     ? searchResults 
     : groceryProducts.filter(product => {
@@ -714,6 +992,10 @@ function GroceryProductSelector({
         const storeMatch = product.store && product.store.toLowerCase().includes(searchLower)
         return nameMatch || categoryMatch || storeMatch
       }))
+    .filter(product => {
+      if (!normalizedCategoryFilter) return true
+      return product.category?.toLowerCase().includes(normalizedCategoryFilter)
+    })
     // Instantly hide items user already clicked in this session (better UX on large lists)
     .filter(p => !hiddenProductIds.has(p.id))
 
@@ -744,8 +1026,8 @@ function GroceryProductSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-          <div className="p-2">
+        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-96 overflow-auto">
+          <div className="p-2 space-y-2">
             <input
               type="text"
               placeholder="Search products..."
@@ -754,9 +1036,16 @@ function GroceryProductSelector({
               className="product-search-input w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               autoFocus
             />
+            <input
+              type="text"
+              placeholder="Filter by product category (fx grø, kolonial)"
+              value={productCategoryFilter}
+              onChange={(e) => setProductCategoryFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
           
-          <div className="max-h-48 overflow-auto">
+          <div className="max-h-80 overflow-auto">
             {isSearching && searchTerm.length >= 2 && (
               <div className="px-3 py-2 text-gray-500 text-center text-sm">
                 Søger efter "{searchTerm}"...
@@ -775,7 +1064,7 @@ function GroceryProductSelector({
             {!isSearching && filteredProducts.map((product) => (
               <button
                 key={product.id}
-                onClick={() => {
+                onClick={async () => {
                   // Hide immediately in UI so it's easy to pick many without clutter
                   setHiddenProductIds(prev => {
                     const next = new Set(prev)
@@ -783,7 +1072,15 @@ function GroceryProductSelector({
                     return next
                   })
                   setSearchResults(prev => prev.filter(p => p.id !== product.id))
-                  onSelect(product)
+                  const success = await onSelect(product)
+                  if (!success) {
+                    setHiddenProductIds(prev => {
+                      const next = new Set(prev)
+                      next.delete(product.id)
+                      return next
+                    })
+                    setSearchResults(prev => [product, ...prev])
+                  }
                   // Don't close dropdown - allow multiple selections
                   // setIsOpen(false)
                   // setSearchTerm('')

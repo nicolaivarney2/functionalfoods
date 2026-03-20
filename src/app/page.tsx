@@ -9,7 +9,8 @@ import { Recipe } from '@/types/recipe'
 // Updated hero section with recipe focus and new design
 
 export default function Home() {
-  const [isVisible, setIsVisible] = useState(false)
+  /** Altid synligt: opacity-0 ved første render gjorde siden “tom” hvis JS var langsom eller fejlede */
+  const isVisible = true
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [latestRecipes, setLatestRecipes] = useState<Recipe[]>([])
@@ -17,10 +18,6 @@ export default function Home() {
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([])
   const [showSearchDropdown, setShowSearchDropdown] = useState(false)
   const [searchResults, setSearchResults] = useState<Recipe[]>([])
-
-  useEffect(() => {
-    setIsVisible(true)
-  }, [])
 
   // Load all recipes for search
   useEffect(() => {
@@ -914,11 +911,17 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
-                href="/opskriftsoversigt"
+                href="/kom-i-gang"
                 className="inline-flex items-center justify-center gap-2 bg-white text-green-600 px-8 py-4 rounded-lg font-semibold hover:shadow-xl transition-all group"
               >
-                Find opskrifter
+                Opret konto
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link 
+                href="/opskriftsoversigt"
+                className="inline-flex items-center justify-center gap-2 bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white/10 transition-all"
+              >
+                Find opskrifter
               </Link>
               <Link 
                 href="/vægttab"

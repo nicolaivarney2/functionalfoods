@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        category
+        category,
+        is_basis,
+        grams_per_unit
       `)
       .order('name')
       .range(offset, offset + limit - 1)

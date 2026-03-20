@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -139,6 +141,11 @@ export default function MadbudgetPage() {
   const [shareLoading, setShareLoading] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+
+  const router = useRouter()
+  const [shopSurveyOpen, setShopSurveyOpen] = useState(false)
+  const [shopSurveyStores, setShopSurveyStores] = useState<{ id: number; name: string }[]>([])
+  const [shopSurveyToken, setShopSurveyToken] = useState('')
 
   const getMealTypeFromRecipe = (recipe: any): MealType | undefined => {
     const labelPool = [
@@ -565,6 +572,44 @@ export default function MadbudgetPage() {
     }
     
     loadMealPlans()
+  }, [])
+
+  // Ugentlig indkøbsundersøgelse: ny uge + madplan sidste uge, eller ?shopSurvey=1 til test
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session || cancelled) {
+          if (!session) setShopSurveyOpen(false)
+          return
+        }
+        const force =
+          typeof window !== 'undefined' &&
+          new URLSearchParams(window.location.search).get('shopSurvey') === '1'
+        const url = force ? '/api/madbudget/shop-survey/status?force=1' : '/api/madbudget/shop-survey/status'
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!res.ok || cancelled) return
+        const j = await res.json()
+        if (!j.success || cancelled || !j.showSurvey) return
+        setShopSurveyStores(Array.isArray(j.storeOptions) ? j.storeOptions : [])
+        setShopSurveyToken(session.access_token)
+        setShopSurveyOpen(true)
+      } catch {
+        // fx. manglende SQL-migration — ignorer stille
+      }
+    }
+    run()
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) run()
+      else setShopSurveyOpen(false)
+    })
+    return () => {
+      cancelled = true
+      sub.subscription.unsubscribe()
+    }
   }, [])
   
   // Function to load a specific week's meal plan
@@ -1433,45 +1478,60 @@ export default function MadbudgetPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-col gap-4">
+            <div className="min-w-0">
               <h1 className="text-3xl font-bold text-gray-900 mb-1">Madbudget</h1>
               <p className="text-gray-600 text-sm sm:text-base">Din ugentlige madplan. Din personlige madplan — lav ny madplan med ét klik. Ernæringsberegnet og personlig.</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {activePlanRef?.id && !isGeneratingMealPlan && (
+            <div className="flex w-full min-w-0 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex min-w-full flex-nowrap items-center justify-between gap-3">
+                <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
                 <button
-                  onClick={handleSharePlan}
-                  disabled={shareLoading}
-                  className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
-                  title="Del madplan"
+                  onClick={() => setViewMode(v => v === 'week' ? 'day' : 'week')}
+                  className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+                  title={viewMode === 'week' ? 'Skift til dagvisning' : 'Skift til ugevisning'}
                 >
-                  <Share2 size={18} />
-                  <span className="hidden sm:inline">{shareCopied ? 'Kopieret!' : 'Del'}</span>
+                  {viewMode === 'week' ? <LayoutGrid size={18} /> : <Calendar size={18} />}
+                  <span className="hidden sm:inline">Skift visning</span>
                 </button>
-              )}
-              <button
-                onClick={() => setViewMode(v => v === 'week' ? 'day' : 'week')}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
-                title={viewMode === 'week' ? 'Skift til dagvisning' : 'Skift til ugevisning'}
-              >
-                {viewMode === 'week' ? <LayoutGrid size={18} /> : <Calendar size={18} />}
-                <span className="hidden sm:inline">Skift visning</span>
-              </button>
-              <button
-                onClick={() => { setBasisTab('ingredient'); setShowBasisvarerModal(true) }}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
-              >
-                <ShoppingCart size={18} />
-                <span className="hidden sm:inline">Basisvarer</span>
-              </button>
-              <button
-                onClick={() => setShowFamilySettings(true)}
-                className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <Users size={18} />
-                <span>Familieindstillinger</span>
-              </button>
+                <button
+                  onClick={() => { setBasisTab('ingredient'); setShowBasisvarerModal(true) }}
+                  className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+                >
+                  <ShoppingCart size={18} />
+                  <span className="hidden sm:inline">Basisvarer</span>
+                </button>
+                <button
+                  onClick={() => setShowFamilySettings(true)}
+                  className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <Users size={18} />
+                  <span>Familieindstillinger</span>
+                </button>
+                </div>
+                <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
+                {activePlanRef?.id && !isGeneratingMealPlan && (
+                  <button
+                    onClick={handleSharePlan}
+                    disabled={shareLoading}
+                    className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
+                    title="Del madplan"
+                  >
+                    <Share2 size={18} />
+                    <span className="hidden sm:inline">{shareCopied ? 'Kopieret!' : 'Del'}</span>
+                  </button>
+                )}
+                <Link
+                  href="/vaegt-tracker"
+                  className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+                  title="Vægt tracker"
+                  aria-label="Vægt tracker"
+                >
+                  <Scale size={18} className="shrink-0" aria-hidden />
+                  <span className="hidden sm:inline">Vægt tracker</span>
+                </Link>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3804,6 +3864,19 @@ export default function MadbudgetPage() {
           </div>
         </div>
       )}
+
+      <MadbudgetShopSurveyModal
+        open={shopSurveyOpen}
+        storeOptions={shopSurveyStores}
+        accessToken={shopSurveyToken}
+        onSubmitted={() => {
+          router.replace('/madbudget', { scroll: false })
+        }}
+        onClose={() => {
+          setShopSurveyOpen(false)
+          router.replace('/madbudget', { scroll: false })
+        }}
+      />
     </div>
   )
 }

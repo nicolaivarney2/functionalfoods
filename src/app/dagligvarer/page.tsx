@@ -406,7 +406,7 @@ export default function DagligvarerPage() {
   const [selectedStores, setSelectedStores] = useState<string[]>([])
   const [sortBy, setSortBy] = useState('discount')
   const [showOnlyOffers, setShowOnlyOffers] = useState(true)
-  const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(false)
+  const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(true)
   const [showOnlyOrganic, setShowOnlyOrganic] = useState(false)
   
   // Data state
@@ -523,25 +523,28 @@ export default function DagligvarerPage() {
       setLoading(false)
       loadingRef.current = false
     }
-  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyFoodProducts, sortBy])
+  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, sortBy])
 
-  // Sort products function - ALWAYS prioritize offers first
+  // Sort products function: tilbud først, derefter valgt sortering
   const sortProducts = (products: Product[], sortBy: string): Product[] => {
     const sorted = [...products]
     
     return sorted.sort((a, b) => {
-      // 🔥 ALWAYS show offers first, regardless of sort option
+      // 🔥 ALWAYS show offers first
       if (a.is_on_sale && !b.is_on_sale) return -1
       if (!a.is_on_sale && b.is_on_sale) return 1
-      
-      // Both are offers OR both are non-offers - apply secondary sorting
+
+      // Sekundært: brug valgt sortering
       switch (sortBy) {
         case 'discount':
-          // If both are on sale, sort by highest discount percentage
-          if (a.is_on_sale && b.is_on_sale && a.discount_percentage && b.discount_percentage) {
-            return b.discount_percentage - a.discount_percentage
+          // Sort consistently by discount percentage (missing discount treated as 0)
+          // so 30% always comes before 20%.
+          const aDiscount = a.discount_percentage || 0
+          const bDiscount = b.discount_percentage || 0
+          if (bDiscount !== aDiscount) {
+            return bDiscount - aDiscount
           }
-          // Fall back to name sorting
+          // If equal discount, fall back to name sorting
           return a.name.localeCompare(b.name)
         case 'price_low_to_high':
           return a.price - b.price

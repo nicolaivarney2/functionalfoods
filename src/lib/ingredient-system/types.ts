@@ -37,7 +37,7 @@ export const INGREDIENT_CATEGORY_NAMES: Record<IngredientCategory, string> = {
   [IngredientCategory.Protein]: 'Protein',
   [IngredientCategory.Groent]: 'Grøntsager',
   [IngredientCategory.Frugt]: 'Frugt',
-  [IngredientCategory.Korn]: 'Korn & Cerealer',
+  [IngredientCategory.Korn]: 'Kolonial & Diverse',
   [IngredientCategory.Mejeri]: 'Mejeri',
   [IngredientCategory.Fedt]: 'Fedt & Olie',
   [IngredientCategory.Krydderi]: 'Krydderier',

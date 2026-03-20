@@ -463,12 +463,14 @@ export default function BlogCategoryHubPage() {
       <section className="py-16 bg-gray-900 text-white">
         <div className="container text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Planlæg din mad / vægttab ud fra ugens tilbud</h2>
-          <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">Opret gratis profil og udfyld familieindstillinger</p>
+          <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
+            Opret profil og udfyld familieindstillinger – også 0 kr de første 120 dage
+          </p>
           <Link 
-            href="/madbudget"
+            href="/kom-i-gang"
             className="inline-block px-8 py-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-lg transition-colors"
           >
-            Opret gratis profil
+            Kom i gang
           </Link>
         </div>
       </section>

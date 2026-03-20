@@ -28,7 +28,6 @@ interface Product {
   temperature_zone: string | null
   nutrition_info: any
   labels: string[]
-  source: string
   last_updated: string
   metadata: any
   discount_percentage?: number
@@ -792,7 +791,6 @@ export default function ProductPage() {
             <div className="p-6 border-t border-gray-200 bg-gray-50">
               <h3 className="text-sm font-medium text-gray-900 mb-2">Produktdetaljer</h3>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>Kilde: {product.source}</div>
                 <div>Sidst opdateret: {new Date(product.last_updated).toLocaleString('da-DK')}</div>
                 {product.metadata.rema_id && <div>REMA ID: {product.metadata.rema_id}</div>}
                 {product.metadata.brand && <div>Mærke: {product.metadata.brand}</div>}

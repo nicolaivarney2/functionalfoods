@@ -33,6 +33,7 @@ export async function GET(
         normal_price,
         currency,
         is_on_sale,
+        is_offer_active,
         discount_percentage,
         price_per_unit,
         price_per_kilogram,
@@ -81,10 +82,15 @@ export async function GET(
 
     const price = offer.current_price || 0
     const originalPrice = offer.normal_price || offer.current_price || 0
-    const isOnSale = !!offer.is_on_sale && originalPrice > price
+    const isOnSaleByFlag = !!offer.is_on_sale
+    const isOnSaleByPrice = originalPrice > price && originalPrice > 0
+    const isOfferDateValid = !offer.sale_valid_to || new Date(offer.sale_valid_to) >= new Date()
+    const isOfferActive = offer.is_offer_active === true
+      ? true
+      : (isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice))
     const priceDiff = originalPrice - price
     const discountPct =
-      isOnSale && originalPrice > 0 && priceDiff > 0.01
+      isOnSaleByPrice && originalPrice > 0 && priceDiff > 0.01
         ? Math.round((priceDiff / originalPrice) * 100)
         : null
 
@@ -106,7 +112,8 @@ export async function GET(
       amount: p.amount || null,
       quantity: null,
       unit_price: offer.price_per_unit || offer.price_per_kilogram || null,
-      is_on_sale: isOnSale,
+      is_on_sale: isOfferActive,
+      is_offer_active: isOfferActive,
       sale_end_date: offer.sale_valid_to,
       currency: offer.currency || 'DKK',
       store: storeDisplay,
@@ -116,7 +123,6 @@ export async function GET(
       temperature_zone: null,
       nutrition_info: null,
       labels: [] as string[],
-      source: 'goma',
       last_updated: offer.updated_at || offer.last_seen_at || new Date().toISOString(),
       metadata: {
         product_id: offer.product_id,
@@ -140,6 +146,7 @@ export async function GET(
         normal_price,
         currency,
         is_on_sale,
+        is_offer_active,
         discount_percentage,
         price_per_unit,
         price_per_kilogram,
@@ -187,10 +194,15 @@ export async function GET(
     const mapOfferToProduct = (o: any): any => {
         const priceO = o.current_price || 0
         const originalO = o.normal_price || o.current_price || 0
-        const isOnSaleO = !!o.is_on_sale && originalO > priceO
+        const isOnSaleByFlag = !!o.is_on_sale
+        const isOnSaleByPrice = originalO > priceO && originalO > 0
+        const isOfferDateValid = !o.sale_valid_to || new Date(o.sale_valid_to) >= new Date()
+        const isOfferActive = o.is_offer_active === true
+          ? true
+          : (isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice))
         const diffO = originalO - priceO
         const discountO =
-          isOnSaleO && originalO > 0 && diffO > 0.01
+          isOnSaleByPrice && originalO > 0 && diffO > 0.01
             ? Math.round((diffO / originalO) * 100)
             : null
 
@@ -212,7 +224,8 @@ export async function GET(
           amount: mainProduct.amount,
           quantity: null,
           unit_price: o.price_per_unit || o.price_per_kilogram || null,
-          is_on_sale: isOnSaleO,
+          is_on_sale: isOfferActive,
+          is_offer_active: isOfferActive,
           sale_end_date: o.sale_valid_to,
           currency: o.currency || 'DKK',
           store: storeName,
@@ -222,7 +235,6 @@ export async function GET(
           temperature_zone: null,
           nutrition_info: null,
           labels: [] as string[],
-          source: 'goma',
           last_updated: mainProduct.last_updated,
           metadata: {
             product_id: o.product_id,

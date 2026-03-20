@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { MessageCircle, ChevronDown, ChevronUp, Heart, Star, Bell, User } from 'lucide-react'
 
 interface CommentCTAProps {
@@ -101,14 +102,14 @@ export default function CommentCTA({ onLoginClick }: CommentCTAProps) {
           </div>
           
           <div className="mt-4 pt-4 border-t border-gray-200">
-            <button
-              onClick={onLoginClick}
-              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+            <Link
+              href="/kom-i-gang"
+              className="block w-full text-center bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
             >
-              Opret gratis konto nu
-            </button>
+              Opret konto – kom i gang
+            </Link>
             <p className="text-xs text-gray-500 text-center mt-2">
-              Det tager kun 30 sekunder og er helt gratis
+              Med valgfri støtte – også 0 kr de første 120 dage
             </p>
           </div>
         </div>
