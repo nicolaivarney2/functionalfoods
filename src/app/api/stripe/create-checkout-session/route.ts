@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
             currency: 'dkk',
             product_data: {
               name: 'Støtte – betal det du kan',
-              description:
-                'Frivillig støtte til Functional Foods. De første 120 dage: du vælger selv beløbet.',
+              description: 'Frivillig støtte til Functional Foods – du vælger beløbet.',
             },
             unit_amount: unitAmountOre,
           },

@@ -16,14 +16,18 @@ export async function getAuthenticatedUser(request: NextRequest): Promise<User |
   if (!supabaseUrl || !anonKey) return null
 
   const authHeader = request.headers.get('authorization')
-  if (authHeader?.startsWith('Bearer ') && serviceKey) {
+  if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.replace('Bearer ', '')
-    const supabase = createClient(supabaseUrl, serviceKey)
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token)
-    if (!error && user) return user
+    // Service role foretrækkes; anon virker også til getUser(jwt) (fx når SERVICE_ROLE_KEY ikke er sat i miljøet).
+    const key = serviceKey || anonKey
+    if (key) {
+      const supabase = createClient(supabaseUrl, key)
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token)
+      if (!error && user) return user
+    }
   }
 
   const cookieStore = await cookies()

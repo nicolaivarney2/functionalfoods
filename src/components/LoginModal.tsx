@@ -1,18 +1,40 @@
 'use client'
 
-import { useState } from 'react'
-import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAdminCheck } from '@/hooks/useAdminCheck'
 
 interface LoginModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string
+          callback?: (token: string) => void
+          'expired-callback'?: () => void
+          'error-callback'?: () => void
+          theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'compact'
+        }
+      ) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId?: string) => void
+    }
+  }
+}
+
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  const turnstileElRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,22 +43,114 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
 
   const { signIn, signUp } = useAuth()
-  const { isAdmin } = useAdminCheck()
   const router = useRouter()
+
+  // Kun ved oprettelse: bot-beskyttelse er vigtigst her; ved login undgår vi friktion (samme mønster som mange sites).
+  useEffect(() => {
+    if (!isOpen || !turnstileSiteKey || !isSignUp) {
+      if (turnstileWidgetIdRef.current && typeof window !== 'undefined' && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetIdRef.current)
+        } catch {
+          /* ignore */
+        }
+        turnstileWidgetIdRef.current = null
+      }
+      setCaptchaToken('')
+      return
+    }
+
+    let cancelled = false
+    const timeouts: number[] = []
+
+    const removeWidget = () => {
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetIdRef.current)
+        } catch {
+          /* ignore */
+        }
+        turnstileWidgetIdRef.current = null
+      }
+      setCaptchaToken('')
+    }
+
+    const schedule = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms)
+      timeouts.push(id)
+    }
+
+    const renderTurnstile = () => {
+      if (cancelled || !turnstileElRef.current || !window.turnstile || turnstileWidgetIdRef.current) return
+      const compact = typeof window !== 'undefined' && window.innerWidth < 520
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileElRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        size: compact ? 'compact' : 'normal',
+        callback: (token: string) => setCaptchaToken(token),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken(''),
+      })
+    }
+
+    const cleanup = () => {
+      cancelled = true
+      timeouts.forEach((id) => window.clearTimeout(id))
+      removeWidget()
+    }
+
+    const existing = document.querySelector('script[data-turnstile="true"]')
+    if (window.turnstile) {
+      renderTurnstile()
+      schedule(() => renderTurnstile(), 200)
+      return cleanup
+    }
+
+    if (!existing) {
+      const script = document.createElement('script')
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+      script.async = true
+      script.defer = true
+      script.dataset.turnstile = 'true'
+      script.onload = () => {
+        if (cancelled) return
+        renderTurnstile()
+        schedule(() => renderTurnstile(), 300)
+      }
+      document.head.appendChild(script)
+      return cleanup
+    }
+
+    existing.addEventListener('load', renderTurnstile, { once: true })
+    return () => {
+      existing.removeEventListener('load', renderTurnstile)
+      cleanup()
+    }
+  }, [isOpen, turnstileSiteKey, isSignUp])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
+    if (turnstileSiteKey && isSignUp && !captchaToken) {
+      setError('Bekræft venligst, at du ikke er en robot.')
+      setLoading(false)
+      return
+    }
 
     try {
       if (isSignUp) {
-        const { error } = await signUp(email, password, name)
+        const { error } = await signUp(email, password, name, captchaToken || undefined)
         if (error) {
           setError(error.message)
+          if (turnstileWidgetIdRef.current && window.turnstile) {
+            window.turnstile.reset(turnstileWidgetIdRef.current)
+            setCaptchaToken('')
+          }
         } else {
           setSuccess('Tjek din email for at bekræfte din konto! Du vil blive sendt tilbage til denne side efter bekræftelse.')
         }
@@ -44,12 +158,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         const { error } = await signIn(email, password)
         if (error) {
           setError(error.message)
+          if (turnstileWidgetIdRef.current && window.turnstile) {
+            window.turnstile.reset(turnstileWidgetIdRef.current)
+            setCaptchaToken('')
+          }
         } else {
           onClose()
-          // Redirect admin users to admin panel
-          if (isAdmin) {
-            router.push('/admin')
-          }
+          router.refresh()
         }
       }
     } catch (err) {
@@ -61,11 +176,17 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+  return createPortal(
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="login-modal-title"
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative">
         {/* Close button */}
         <button
+          type="button"
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
         >
@@ -74,7 +195,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         {/* Header */}
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 id="login-modal-title" className="text-2xl font-bold text-gray-900 mb-2">
             {isSignUp ? 'Opret konto' : 'Log ind'}
           </h2>
           <p className="text-gray-600">
@@ -147,6 +268,19 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </div>
           </div>
 
+          {turnstileSiteKey && isSignUp && (
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+              <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
+              <div className="flex justify-center min-h-[68px] w-full items-center">
+                <div ref={turnstileElRef} className="min-h-[65px] w-full max-w-[300px]" />
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
+                Vi bruger Cloudflare Turnstile ved <strong className="font-medium text-slate-600">oprettelse</strong> – ikke
+                ved hvert login.
+              </p>
+            </div>
+          )}
+
           {/* Error/Success messages */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -175,27 +309,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           <p className="text-gray-600">
             {isSignUp ? 'Har du allerede en konto?' : 'Har du ikke en konto?'}
             <button
+              type="button"
               onClick={() => {
                 setIsSignUp(!isSignUp)
                 setError('')
                 setSuccess('')
+                if (turnstileWidgetIdRef.current && window.turnstile) {
+                  window.turnstile.reset(turnstileWidgetIdRef.current)
+                }
+                setCaptchaToken('')
               }}
               className="ml-1 text-green-600 hover:text-green-700 font-medium"
             >
-              {isSignUp ? 'Log ind' : 'Hurtig oprettelse her'}
+              {isSignUp ? 'Log ind' : 'Opret dig her'}
             </button>
           </p>
-          {!isSignUp && (
-            <p className="text-sm text-gray-500">
-              <Link
-                href="/kom-i-gang"
-                onClick={onClose}
-                className="text-green-600 hover:text-green-700 font-medium underline-offset-2 hover:underline"
-              >
-                Eller: fuld velkomstside med valgfri støtte (0 kr muligt)
-              </Link>
-            </p>
-          )}
         </div>
 
         {/* Benefits */}
@@ -208,19 +336,24 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </li>
             <li className="flex items-center">
               <span className="text-green-500 mr-2">✓</span>
-              Skriv kommentarer og få svar
+              Ubegrænsede personlige madplaner
             </li>
             <li className="flex items-center">
               <span className="text-green-500 mr-2">✓</span>
-              Få gratis sparring til vægttab
+              Madplaner ud fra tilbud i butikkerne
             </li>
             <li className="flex items-center">
               <span className="text-green-500 mr-2">✓</span>
-              Personlige anbefalinger
+              Vægt-tracker
+            </li>
+            <li className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span>
+              Personlige anbefalinger og hjælp til vægttab
             </li>
           </ul>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 } 

@@ -35,6 +35,7 @@ declare global {
           'expired-callback'?: () => void
           'error-callback'?: () => void
           theme?: 'light' | 'dark' | 'auto'
+          size?: 'normal' | 'compact'
         }
       ) => string
       reset: (widgetId?: string) => void
@@ -75,21 +76,50 @@ function KomIGangInner() {
   useEffect(() => {
     if (!turnstileSiteKey) return
 
+    let cancelled = false
+    const timeouts: number[] = []
+
+    const removeWidget = () => {
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.remove(turnstileWidgetIdRef.current)
+        } catch {
+          /* ignore */
+        }
+        turnstileWidgetIdRef.current = null
+      }
+      setCaptchaToken('')
+    }
+
+    const schedule = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms)
+      timeouts.push(id)
+    }
+
     const renderTurnstile = () => {
-      if (!turnstileElRef.current || !window.turnstile || turnstileWidgetIdRef.current) return
+      if (cancelled || !turnstileElRef.current || !window.turnstile || turnstileWidgetIdRef.current) return
+      const compact = typeof window !== 'undefined' && window.innerWidth < 520
       turnstileWidgetIdRef.current = window.turnstile.render(turnstileElRef.current, {
         sitekey: turnstileSiteKey,
         theme: 'light',
+        size: compact ? 'compact' : 'normal',
         callback: (token: string) => setCaptchaToken(token),
         'expired-callback': () => setCaptchaToken(''),
         'error-callback': () => setCaptchaToken(''),
       })
     }
 
+    const cleanup = () => {
+      cancelled = true
+      timeouts.forEach((id) => window.clearTimeout(id))
+      removeWidget()
+    }
+
     const existing = document.querySelector('script[data-turnstile="true"]')
     if (window.turnstile) {
       renderTurnstile()
-      return
+      schedule(() => renderTurnstile(), 200)
+      return cleanup
     }
     if (!existing) {
       const script = document.createElement('script')
@@ -97,12 +127,19 @@ function KomIGangInner() {
       script.async = true
       script.defer = true
       script.dataset.turnstile = 'true'
-      script.onload = () => renderTurnstile()
+      script.onload = () => {
+        if (cancelled) return
+        renderTurnstile()
+        schedule(() => renderTurnstile(), 300)
+      }
       document.head.appendChild(script)
-      return
+      return cleanup
     }
     existing.addEventListener('load', renderTurnstile, { once: true })
-    return () => existing.removeEventListener('load', renderTurnstile)
+    return () => {
+      existing.removeEventListener('load', renderTurnstile)
+      cleanup()
+    }
   }, [turnstileSiteKey])
 
   const resolvedAmountKr = (): number => {
@@ -518,8 +555,8 @@ function KomIGangInner() {
               {turnstileSiteKey && (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
                   <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
-                  <div className="flex justify-center min-h-[65px] items-center">
-                    <div ref={turnstileElRef} className="min-h-[65px]" />
+                  <div className="flex justify-center min-h-[68px] w-full items-center">
+                    <div ref={turnstileElRef} className="min-h-[65px] w-full max-w-[300px]" />
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
                     Vi bruger <strong className="font-medium text-slate-600">Cloudflare Turnstile</strong> (ikke Google

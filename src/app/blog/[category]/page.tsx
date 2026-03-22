@@ -464,7 +464,7 @@ export default function BlogCategoryHubPage() {
         <div className="container text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Planlæg din mad / vægttab ud fra ugens tilbud</h2>
           <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
-            Opret profil og udfyld familieindstillinger – også 0 kr de første 120 dage
+            Opret profil og udfyld familieindstillinger – betal det du kan, også 0 kr
           </p>
           <Link 
             href="/kom-i-gang"

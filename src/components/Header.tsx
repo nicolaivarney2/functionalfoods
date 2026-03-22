@@ -13,7 +13,7 @@ const mainMenuItems = [
   { name: 'MADBUDGET', href: '/madbudget' },
   { name: 'VÆGTTAB', href: '/vægttab' },
   { name: 'MENTALT', href: '/blog/mentalt' },
-  { name: 'BAG OM FF', href: '/bag-om-ff' },
+  { name: 'OM OS', href: '/bag-om-ff' },
 ]
 
 const dietaryCategories = [
@@ -82,7 +82,7 @@ export default function Header() {
 
               {/* Search and User Menu */}
               <div className="flex items-center space-x-4">
-                <button className="text-white hover:text-gray-300 transition-colors">
+                <button type="button" className="text-white hover:text-gray-300 transition-colors">
                   <Search size={20} />
                 </button>
                 
@@ -90,6 +90,7 @@ export default function Header() {
                 {user ? (
                   <div className="relative" ref={userMenuRef}>
                     <button
+                      type="button"
                       onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                       className="flex items-center space-x-2 text-white hover:text-gray-300 transition-colors"
                     >
@@ -160,6 +161,7 @@ export default function Header() {
                         )}
                         
                         <button
+                          type="button"
                           onClick={handleSignOut}
                           className="flex items-center space-x-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
                         >
@@ -175,9 +177,10 @@ export default function Header() {
                       href="/kom-i-gang"
                       className="hidden sm:inline text-sm text-white hover:text-gray-300 transition-colors font-medium"
                     >
-                      Kom i gang
+                      Opret dig
                     </Link>
                     <button
+                      type="button"
                       onClick={() => setIsLoginModalOpen(true)}
                       className="flex items-center space-x-2 text-white hover:text-gray-300 transition-colors"
                     >
@@ -189,6 +192,7 @@ export default function Header() {
                 
                 {/* Mobile Menu Button */}
                 <button
+                  type="button"
                   className="md:hidden text-white"
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 >
@@ -301,6 +305,7 @@ export default function Header() {
                       </Link>
                       
                       <button
+                        type="button"
                         onClick={handleSignOut}
                         className="flex items-center space-x-2 text-red-600 hover:text-red-700 w-full text-left"
                       >
@@ -317,9 +322,10 @@ export default function Header() {
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
                       <User size={16} />
-                      <span>Kom i gang</span>
+                      <span>Opret dig</span>
                     </Link>
                     <button
+                      type="button"
                       onClick={() => {
                         setIsMobileMenuOpen(false)
                         setIsLoginModalOpen(true)

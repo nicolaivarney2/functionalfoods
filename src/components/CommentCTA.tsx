@@ -109,7 +109,7 @@ export default function CommentCTA({ onLoginClick }: CommentCTAProps) {
               Opret konto – kom i gang
             </Link>
             <p className="text-xs text-gray-500 text-center mt-2">
-              Med valgfri støtte – også 0 kr de første 120 dage
+              Pris? Betal det du kan – også 0 kr
             </p>
           </div>
         </div>
