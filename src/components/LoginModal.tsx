@@ -85,11 +85,11 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
     const renderTurnstile = () => {
       if (cancelled || !turnstileElRef.current || !window.turnstile || turnstileWidgetIdRef.current) return
-      const compact = typeof window !== 'undefined' && window.innerWidth < 520
+      // Altid compact i modal: "normal" giver ofte meget høj iframe + dårlig scroll på mobil.
       turnstileWidgetIdRef.current = window.turnstile.render(turnstileElRef.current, {
         sitekey: turnstileSiteKey,
         theme: 'light',
-        size: compact ? 'compact' : 'normal',
+        size: 'compact',
         callback: (token: string) => setCaptchaToken(token),
         'expired-callback': () => setCaptchaToken(''),
         'error-callback': () => setCaptchaToken(''),
@@ -178,12 +178,13 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200] p-4"
+      className="fixed inset-0 z-[200] overflow-y-auto bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="login-modal-title"
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative">
+      <div className="flex min-h-full items-center justify-center py-2 sm:py-6">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[min(92dvh,880px)] overflow-y-auto overscroll-contain p-6 relative">
         {/* Close button */}
         <button
           type="button"
@@ -271,8 +272,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           {turnstileSiteKey && isSignUp && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
               <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
-              <div className="flex justify-center min-h-[68px] w-full items-center">
-                <div ref={turnstileElRef} className="min-h-[65px] w-full max-w-[300px]" />
+              <div className="flex justify-center w-full">
+                <div ref={turnstileElRef} className="w-full max-w-[300px] min-h-0" />
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
                 Vi bruger Cloudflare Turnstile ved <strong className="font-medium text-slate-600">oprettelse</strong> – ikke
@@ -351,6 +352,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
               Personlige anbefalinger og hjælp til vægttab
             </li>
           </ul>
+        </div>
         </div>
       </div>
     </div>,

@@ -11,9 +11,6 @@ import {
   Scale,
   ArrowRight,
   CheckCircle2,
-  Check,
-  Shield,
-  Mail,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -387,38 +384,6 @@ function KomIGangInner() {
                 </p>
               </div>
             </div>
-
-            {/* Ikke flex direkte på li med flere <strong> – wrap tekst i én span (undgår “stablet” layout) */}
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <Shield className="text-emerald-600 shrink-0" size={18} aria-hidden />
-                Tryghed – ikke &quot;quick fix&quot;-scam
-              </h3>
-              <ul className="text-sm text-slate-600 space-y-2.5">
-                <li className="flex gap-2.5 items-start">
-                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
-                  <span className="min-w-0 flex-1 leading-relaxed">
-                    Betaling kører gennem <strong className="text-slate-800">Stripe</strong> – vi ser ikke dit
-                    kortnummer.
-                  </span>
-                </li>
-                <li className="flex gap-2.5 items-start">
-                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
-                  <span className="min-w-0 flex-1 leading-relaxed">
-                    De første <strong className="text-slate-800">120 dage</strong>: &quot;betal det du kan&quot;. De
-                    fleste har valgt omkring <strong className="text-slate-800">60 kr</strong> – du bestemmer helt
-                    selv, også <strong className="text-slate-800">0 kr</strong>.
-                  </span>
-                </li>
-                <li className="flex gap-2.5 items-start">
-                  <Mail className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
-                  <span className="min-w-0 flex-1 leading-relaxed">
-                    E-mail om <strong className="text-slate-800">opdateringer til produktet</strong> kun hvis du
-                    krydser af – ingen reklamer.
-                  </span>
-                </li>
-              </ul>
-            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 sm:p-8 relative z-10 min-w-0 pointer-events-auto">
@@ -555,8 +520,8 @@ function KomIGangInner() {
               {turnstileSiteKey && (
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
                   <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
-                  <div className="flex justify-center min-h-[68px] w-full items-center">
-                    <div ref={turnstileElRef} className="min-h-[65px] w-full max-w-[300px]" />
+                  <div className="flex justify-center w-full">
+                    <div ref={turnstileElRef} className="w-full max-w-[300px] min-h-0" />
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
                     Vi bruger <strong className="font-medium text-slate-600">Cloudflare Turnstile</strong> (ikke Google
