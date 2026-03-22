@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -67,6 +67,22 @@ interface PlannerRecipe {
 }
 
 // Mock data for development
+const STORE_KEY_BY_ID: Record<number, string> = {
+  1: 'rema-1000',
+  2: 'netto',
+  3: 'føtex',
+  4: 'bilka',
+  5: 'nemlig-com',
+  6: 'meny',
+  7: 'spar',
+  8: 'løvbjerg',
+}
+
+function storeIdFromTabKey(tab: string): number | null {
+  const found = Object.entries(STORE_KEY_BY_ID).find(([, k]) => k === tab)
+  return found ? Number(found[0]) : null
+}
+
 const mockStores = [
   { id: 1, name: 'REMA 1000', color: 'bg-blue-600', isSelected: true },
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
@@ -100,7 +116,9 @@ export default function MadbudgetPage() {
     prioritizeAnimalOrganic: false,
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
     selectedStores: [1, 2, 8], // REMA 1000, Netto, Løvbjerg
-    adultsProfiles: [] as AdultProfile[] // New: profiles for each adult
+    adultsProfiles: [] as AdultProfile[], // New: profiles for each adult
+    /** Valgfrit max-indkøb pr. uge (kr); null = intet loft */
+    weeklyBudgetKr: null as number | null
   })
   
   type MealType = 'breakfast' | 'lunch' | 'dinner'
@@ -115,6 +133,21 @@ export default function MadbudgetPage() {
     saturday: { breakfast: null, lunch: null, dinner: null },
     sunday: { breakfast: null, lunch: null, dinner: null }
   })
+
+  const smartShoppingWeekMeta: { dayKey: DayKey; dayLabel: string }[] = [
+    { dayKey: 'monday', dayLabel: 'Mandag' },
+    { dayKey: 'tuesday', dayLabel: 'Tirsdag' },
+    { dayKey: 'wednesday', dayLabel: 'Onsdag' },
+    { dayKey: 'thursday', dayLabel: 'Torsdag' },
+    { dayKey: 'friday', dayLabel: 'Fredag' },
+    { dayKey: 'saturday', dayLabel: 'Lørdag' },
+    { dayKey: 'sunday', dayLabel: 'Søndag' },
+  ]
+  const smartShoppingMealSlots: { mealKey: MealType; label: string }[] = [
+    { mealKey: 'breakfast', label: 'Morgenmad' },
+    { mealKey: 'lunch', label: 'Frokost' },
+    { mealKey: 'dinner', label: 'Aftensmad' },
+  ]
   
   const [savedMealPlans, setSavedMealPlans] = useState<any[]>([])
   const [activePlanRef, setActivePlanRef] = useState<any>(null)
@@ -288,6 +321,46 @@ export default function MadbudgetPage() {
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
   const [loadingPrices, setLoadingPrices] = useState(false)
 
+  const [shoppingMode, setShoppingMode] = useState(false)
+  const [shoppingChecked, setShoppingChecked] = useState<Record<string, boolean>>({})
+  const [showSmsModal, setShowSmsModal] = useState(false)
+  const [smsPhoneDigits, setSmsPhoneDigits] = useState('')
+  const [smsSending, setSmsSending] = useState(false)
+  const [smsError, setSmsError] = useState('')
+  const [pendingSmartToken, setPendingSmartToken] = useState<string | null>(null)
+  const [pendingSmartUrl, setPendingSmartUrl] = useState<string | null>(null)
+  const [smartLinkCopied, setSmartLinkCopied] = useState(false)
+  const [creatingSmartLink, setCreatingSmartLink] = useState(false)
+  const [smartShareError, setSmartShareError] = useState('')
+
+  const shoppingCheckStorageKey = `ff_madbudget_shop_${activePlanRef?.id || 'draft'}`
+
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem('ff_smart_shopping_phone_digits')
+      if (p) setSmsPhoneDigits(p)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(shoppingCheckStorageKey)
+      if (raw) setShoppingChecked(JSON.parse(raw))
+    } catch {
+      setShoppingChecked({})
+    }
+  }, [shoppingCheckStorageKey])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(shoppingCheckStorageKey, JSON.stringify(shoppingChecked))
+    } catch {
+      /* ignore */
+    }
+  }, [shoppingChecked, shoppingCheckStorageKey])
+
   // Removed excessive debug logging
   
   const formatQuantity = (value: any) => {
@@ -390,6 +463,145 @@ export default function MadbudgetPage() {
     })))
   }, [shoppingList])
 
+  const toggleShoppingItem = (key: string) => {
+    setShoppingChecked((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const openSmartShoppingFlow = async () => {
+    if (!shoppingList) return
+    setSmartShareError('')
+    if (selectedStoreTab === 'all') {
+      setSmartShareError('Vælg en butik-fane (fx Netto eller REMA) først – så ved vi hvilken butik du handler i.')
+      return
+    }
+    const sid = storeIdFromTabKey(selectedStoreTab)
+    if (!sid) {
+      setSmartShareError('Ukendt butik.')
+      return
+    }
+    const store = mockStores.find((s) => s.id === sid)
+    if (!store) return
+    setCreatingSmartLink(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) {
+        setSmartShareError('Log ind for at sende link til mobil.')
+        return
+      }
+      const pricesSlice = storePrices[selectedStoreTab]
+        ? { [selectedStoreTab]: storePrices[selectedStoreTab], _fetchedAt: new Date().toISOString() }
+        : null
+      const res = await fetch('/api/smart-shopping/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          mealPlanId: activePlanRef?.id ?? null,
+          storeId: sid,
+          storeKey: selectedStoreTab,
+          storeName: store.name,
+          shoppingList,
+          shoppingListPrices: pricesSlice,
+          mealSummary: {
+            title: `Madplan uge ${selectedWeekNumber ?? currentWeekNumber}`,
+            days: smartShoppingWeekMeta.map(({ dayKey, dayLabel }) => ({
+              dayLabel,
+              meals: smartShoppingMealSlots.map(({ mealKey, label }) => ({
+                slot: label,
+                title: mealPlan[dayKey][mealKey]?.title ?? null,
+              })),
+            })),
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setSmartShareError(json.error || 'Kunne ikke oprette link')
+        return
+      }
+      const shareUrl =
+        typeof json.url === 'string' && json.url.length > 0
+          ? json.url
+          : `${typeof window !== 'undefined' ? window.location.origin : ''}/indkob/${json.token}`
+      setPendingSmartToken(json.token)
+      setPendingSmartUrl(shareUrl)
+      setSmsError('')
+      setShowSmsModal(true)
+    } finally {
+      setCreatingSmartLink(false)
+    }
+  }
+
+  const copyPendingSmartLink = async () => {
+    if (!pendingSmartUrl) return
+    try {
+      await navigator.clipboard.writeText(pendingSmartUrl)
+      setSmartLinkCopied(true)
+      window.setTimeout(() => setSmartLinkCopied(false), 2000)
+    } catch {
+      setSmsError('Kunne ikke kopiere – vælg linket manuelt.')
+    }
+  }
+
+  const sendSmartSms = async () => {
+    const digits = smsPhoneDigits.replace(/\D/g, '')
+    if (!pendingSmartToken || digits.length !== 8) {
+      setSmsError('Skriv 8 cifre (dansk mobil)')
+      return
+    }
+    if (pendingSmartUrl) {
+      try {
+        await navigator.clipboard.writeText(pendingSmartUrl)
+        setSmartLinkCopied(true)
+        window.setTimeout(() => setSmartLinkCopied(false), 2000)
+      } catch {
+        /* SMS forsøges alligevel */
+      }
+    }
+    setSmsSending(true)
+    setSmsError('')
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session) {
+        setSmsError('Log ind igen.')
+        return
+      }
+      const res = await fetch('/api/smart-shopping/send-sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          token: pendingSmartToken,
+          phoneDigits: digits,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setSmsError(json.error || 'SMS fejlede')
+        return
+      }
+      try {
+        localStorage.setItem('ff_smart_shopping_phone_digits', digits)
+      } catch {
+        /* ignore */
+      }
+      setShowSmsModal(false)
+      setPendingSmartToken(null)
+      setPendingSmartUrl(null)
+      alert('SMS sendt – tjek din telefon.')
+    } finally {
+      setSmsSending(false)
+    }
+  }
+
   // Basisvarer state
   const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
@@ -424,7 +636,11 @@ export default function MadbudgetPage() {
                 prioritizeOrganic: result.data.familyProfile.prioritize_organic ?? prev.prioritizeOrganic,
                 prioritizeAnimalOrganic: result.data.familyProfile.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
                 excludedIngredients: result.data.familyProfile.excluded_ingredients || prev.excludedIngredients,
-                selectedStores: result.data.familyProfile.selected_stores || prev.selectedStores
+                selectedStores: result.data.familyProfile.selected_stores || prev.selectedStores,
+                weeklyBudgetKr:
+                  result.data.familyProfile.weekly_budget_kr != null
+                    ? result.data.familyProfile.weekly_budget_kr
+                    : prev.weeklyBudgetKr
               }))
               setVariationLevel(result.data.familyProfile.variation_level || 2)
             }
@@ -480,7 +696,8 @@ export default function MadbudgetPage() {
                   prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
                   excludedIngredients: familyProfile.excludedIngredients,
                   selectedStores: familyProfile.selectedStores,
-                  variationLevel
+                  variationLevel,
+                  weeklyBudgetKr: familyProfile.weeklyBudgetKr
                 },
                 adultProfiles: familyProfile.adultsProfiles
               })
@@ -1044,7 +1261,8 @@ export default function MadbudgetPage() {
               prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
               excludedIngredients: familyProfile.excludedIngredients,
               selectedStores: familyProfile.selectedStores,
-              variationLevel
+              variationLevel,
+              weeklyBudgetKr: familyProfile.weeklyBudgetKr
             },
             adultProfiles: updatedProfiles
           })
@@ -1141,7 +1359,8 @@ export default function MadbudgetPage() {
           })),
           excludedIngredients: familyProfile.excludedIngredients,
           selectedStores: familyProfile.selectedStores,
-          prioritizeOrganic: familyProfile.prioritizeOrganic
+          prioritizeOrganic: familyProfile.prioritizeOrganic,
+          weeklyBudgetKr: familyProfile.weeklyBudgetKr
         },
         variationLevel
       )
@@ -1243,7 +1462,8 @@ export default function MadbudgetPage() {
                 children: familyProfile.children,
                 childrenAges: familyProfile.childrenAges,
                 adultsProfiles: familyProfile.adultsProfiles,
-                selectedStores: familyProfile.selectedStores
+                selectedStores: familyProfile.selectedStores,
+                weeklyBudgetKr: familyProfile.weeklyBudgetKr
               },
               mealPlanData: newMealPlan, // Save the UI format
               shoppingList: weekPlan.shoppingList,
@@ -2232,10 +2452,40 @@ export default function MadbudgetPage() {
 
             {/* Shopping List */}
             <div className="bg-white p-6 rounded-lg shadow-sm mt-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <ShoppingCart size={20} className="mr-2" />
-                Indkøbsliste
-              </h2>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <ShoppingCart size={20} className="mr-2" />
+                  Indkøbsliste
+                </h2>
+                {shoppingList && (
+                  <div className="flex flex-col gap-2 sm:items-end">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={shoppingMode}
+                          onChange={(e) => setShoppingMode(e.target.checked)}
+                        />
+                        <ListChecks size={16} className="text-gray-600" />
+                        Indkøbs-mode (kryds af i butikken)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void openSmartShoppingFlow()}
+                        disabled={creatingSmartLink || !shoppingList}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Smartphone size={16} />
+                        {creatingSmartLink ? 'Opretter link…' : 'Send til mobil (SMS)'}
+                      </button>
+                    </div>
+                    {smartShareError && (
+                      <p className="text-sm text-red-600 max-w-md">{smartShareError}</p>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {!shoppingList ? (
                 <div className="text-center py-8 text-gray-500">
@@ -2349,6 +2599,8 @@ export default function MadbudgetPage() {
                           <ul className="space-y-2">
                             {category.items?.map((item: any, itemIndex: number) => {
                               const itemNameLower = item.name?.toLowerCase().trim() || ''
+                              const rowKey = `m-${catIndex}-${itemIndex}-${category.name}`
+                              const rowDone = shoppingMode && !!shoppingChecked[rowKey]
                               let productInfo: any = null
                               
                               // Get product info for selected store
@@ -2367,15 +2619,24 @@ export default function MadbudgetPage() {
                               }
                               
                               return (
-                                <li key={itemIndex} className="flex items-center justify-between text-sm">
-                                  <div className="flex items-center space-x-2 flex-1">
+                                <li key={itemIndex} className={`flex items-center justify-between gap-2 text-sm ${rowDone ? 'opacity-65' : ''}`}>
+                                  <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                    {shoppingMode && (
+                                      <input
+                                        type="checkbox"
+                                        className="h-4 w-4 shrink-0 rounded border-gray-300 mt-0.5"
+                                        checked={!!shoppingChecked[rowKey]}
+                                        onChange={() => toggleShoppingItem(rowKey)}
+                                        aria-label={`Kryds af ${item.name}`}
+                                      />
+                                    )}
                                     {item.isOptional && (
                                       <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Kombi</span>
                                     )}
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-w-0">
                                       {productInfo ? (
                                         <div>
-                                          <div className="text-gray-700 font-medium">
+                                          <div className={`text-gray-700 font-medium ${rowDone ? 'line-through text-gray-500' : ''}`}>
                                             {productInfo.name}
                                             {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
                                               <span className="text-sm font-normal text-gray-600 ml-2">
@@ -2383,12 +2644,12 @@ export default function MadbudgetPage() {
                                               </span>
                                             )}
                                           </div>
-                                          <div className="text-xs text-gray-500">
+                                          <div className={`text-xs text-gray-500 ${rowDone ? 'line-through' : ''}`}>
                                             {item.name}
                                           </div>
                                         </div>
                                       ) : (
-                                        <span className="text-gray-700">
+                                        <span className={`text-gray-700 ${rowDone ? 'line-through text-gray-500' : ''}`}>
                                           {item.name}
                                           {item.notes && (
                                             <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
@@ -2449,18 +2710,30 @@ export default function MadbudgetPage() {
                           <ul className="space-y-2">
                             {shoppingList.categories
                               ?.find((cat: any) => cat.name === 'Varer du måske allerede har')
-                              ?.items?.map((item: any, itemIndex: number) => (
-                                <li key={itemIndex} className="flex items-center justify-between text-sm text-gray-600">
-                                  <div className="flex-1">
-                                    <span>{item.name}</span>
+                              ?.items?.map((item: any, itemIndex: number) => {
+                                const rowKey = `maybe-${itemIndex}-${item.name}`
+                                const rowDone = shoppingMode && !!shoppingChecked[rowKey]
+                                return (
+                                <li key={itemIndex} className={`flex items-center justify-between gap-2 text-sm text-gray-600 ${rowDone ? 'opacity-65' : ''}`}>
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    {shoppingMode && (
+                                      <input
+                                        type="checkbox"
+                                        className="h-4 w-4 shrink-0 rounded border-gray-300"
+                                        checked={!!shoppingChecked[rowKey]}
+                                        onChange={() => toggleShoppingItem(rowKey)}
+                                        aria-label={`Kryds af ${item.name}`}
+                                      />
+                                    )}
+                                    <span className={rowDone ? 'line-through text-gray-500' : ''}>{item.name}</span>
                                   </div>
-                                  <div className="text-right">
-                                    <div className="text-gray-500">
+                                  <div className="text-right shrink-0">
+                                    <div className={`text-gray-500 ${rowDone ? 'line-through' : ''}`}>
                                       {formatQuantity(item.amount)} {item.unit}
                                     </div>
                                   </div>
                                 </li>
-                              ))}
+                              )})}
                           </ul>
                         </div>
                       )}
@@ -2501,17 +2774,31 @@ export default function MadbudgetPage() {
                         <div className="border-t border-gray-200 pt-4 mt-4">
                           <h4 className="font-semibold text-gray-900 mb-3">Basisvarer (tilføjes altid til indkøbslisten)</h4>
                           <ul className="space-y-2">
-                            {basisvarer.map((item) => (
-                              <li key={item.id} className="flex items-center justify-between text-sm">
-                                <span className="text-gray-700">{item.ingredient_name}</span>
-                                <span className="text-gray-900 font-medium">
+                            {basisvarer.map((item) => {
+                              const rowKey = `basis-${item.id}`
+                              const rowDone = shoppingMode && !!shoppingChecked[rowKey]
+                              return (
+                              <li key={item.id} className={`flex items-center justify-between gap-2 text-sm ${rowDone ? 'opacity-65' : ''}`}>
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  {shoppingMode && (
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 shrink-0 rounded border-gray-300"
+                                      checked={!!shoppingChecked[rowKey]}
+                                      onChange={() => toggleShoppingItem(rowKey)}
+                                      aria-label={`Kryds af ${item.ingredient_name}`}
+                                    />
+                                  )}
+                                  <span className={`text-gray-700 ${rowDone ? 'line-through text-gray-500' : ''}`}>{item.ingredient_name}</span>
+                                </div>
+                                <span className={`text-gray-900 font-medium shrink-0 ${rowDone ? 'line-through text-gray-500' : ''}`}>
                                   {formatQuantity(item.quantity)} {item.unit}
                                   {item.notes && (
                                     <span className="text-xs text-gray-500 ml-2">({item.notes})</span>
                                   )}
                                 </span>
                               </li>
-                            ))}
+                            )})}
                           </ul>
                         </div>
                       )}
@@ -2888,6 +3175,106 @@ export default function MadbudgetPage() {
         </div>
       )}
 
+      {/* Smart shopping SMS modal */}
+      {showSmsModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
+          <div
+            className="absolute inset-0"
+            aria-hidden
+            onClick={() => {
+              if (!smsSending) {
+                setShowSmsModal(false)
+                setPendingSmartToken(null)
+                setPendingSmartUrl(null)
+                setSmsError('')
+              }
+            }}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Send indkøbsliste til mobil</h3>
+              <button
+                type="button"
+                className="text-gray-400 hover:text-gray-600"
+                disabled={smsSending}
+                onClick={() => {
+                  setShowSmsModal(false)
+                  setPendingSmartToken(null)
+                  setPendingSmartUrl(null)
+                  setSmsError('')
+                }}
+              >
+                <X size={22} />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-gray-600">
+              Vi sender et kort link til din telefon via SMS (sms.dk). Nummeret gemmes kun i denne browser til næste gang.
+            </p>
+            {pendingSmartUrl && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-2 text-xs text-emerald-900">
+                  Test uden SMS-credits: kopier linket her, eller tryk &quot;Send SMS&quot; – linket kopieres automatisk til udklipsholder.
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    readOnly
+                    value={pendingSmartUrl}
+                    className="min-w-0 flex-1 rounded-md border border-emerald-200 bg-white px-2 py-1.5 font-mono text-xs text-gray-800"
+                    onFocus={(e) => e.target.select()}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void copyPendingSmartLink()}
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    {smartLinkCopied ? <Check size={16} /> : <Copy size={16} />}
+                    {smartLinkCopied ? 'Kopieret' : 'Kopier link'}
+                  </button>
+                </div>
+              </div>
+            )}
+            <label className="mb-2 block text-sm font-medium text-gray-700">Mobilnummer</label>
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500">
+              <span className="text-gray-600 select-none">+45</span>
+              <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel-national"
+                placeholder="12 34 56 78"
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-gray-900 outline-none"
+                value={smsPhoneDigits.replace(/\D/g, '').slice(0, 8)}
+                onChange={(e) => setSmsPhoneDigits(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                disabled={smsSending}
+              />
+            </div>
+            {smsError && <p className="mb-3 text-sm text-red-600">{smsError}</p>}
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                disabled={smsSending}
+                onClick={() => {
+                  setShowSmsModal(false)
+                  setPendingSmartToken(null)
+                  setPendingSmartUrl(null)
+                  setSmsError('')
+                }}
+              >
+                Annuller
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                disabled={smsSending || smsPhoneDigits.replace(/\D/g, '').length !== 8}
+                onClick={() => void sendSmartSms()}
+              >
+                {smsSending ? 'Sender…' : 'Send SMS'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Family Settings Modal */}
       {showFamilySettings && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
@@ -3010,6 +3397,36 @@ export default function MadbudgetPage() {
                   Disse butikker bruges til at beregne besparelser og generere madplaner
                 </p>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Budgetloft pr. uge (valgfrit)
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Vi prøver at lægge planen, så den rammer dit loft, ved at prioritere tilbud. Ved meget lave beløb er det ikke altid muligt at få det til at hænge sammen.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    step={50}
+                    placeholder="Fx 1200"
+                    value={familyProfile.weeklyBudgetKr === null ? '' : familyProfile.weeklyBudgetKr}
+                    onChange={(e) => {
+                      const raw = e.target.value.trim()
+                      if (raw === '') {
+                        setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: null }))
+                        return
+                      }
+                      const n = parseInt(raw, 10)
+                      if (!Number.isFinite(n) || n < 0) return
+                      setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: Math.min(500_000, n) }))
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <span className="text-sm text-gray-600 shrink-0">kr</span>
+                </div>
+              </div>
               
               {/* Vægttabsprofiler for voksne */}
               {familyProfile.adults > 0 && (
@@ -3129,7 +3546,8 @@ export default function MadbudgetPage() {
                           prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
                           excludedIngredients: familyProfile.excludedIngredients,
                           selectedStores: familyProfile.selectedStores,
-                          variationLevel
+                          variationLevel,
+                          weeklyBudgetKr: familyProfile.weeklyBudgetKr
                         },
                         adultProfiles: familyProfile.adultsProfiles
                       })
