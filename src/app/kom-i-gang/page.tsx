@@ -441,7 +441,7 @@ function KomIGangInner() {
                 <p className="text-sm font-medium text-slate-800 mb-1">
                   Pris: Betal det du kan støtte os med. Du vælger selv.
                 </p>
-                <p className="text-sm text-slate-500 mb-3">Gennemsnitligt bidrag ca. 68,5 kr.</p>
+                <p className="text-sm text-slate-500 mb-3">Gennemsnitligt bidrag pr. bruger: 68,5 kr.</p>
                 <div className="flex flex-wrap gap-2">
                   {PRESETS.map(({ kr, label }) => (
                     <button
@@ -524,8 +524,7 @@ function KomIGangInner() {
                     <div ref={turnstileElRef} className="w-full max-w-[300px] min-h-0" />
                   </div>
                   <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
-                    Vi bruger <strong className="font-medium text-slate-600">Cloudflare Turnstile</strong> (ikke Google
-                    reCAPTCHA) mod automatiserede oprettelser.
+                    Vi bruger et sikkerhedstjek for at undgå bots.
                   </p>
                 </div>
               )}

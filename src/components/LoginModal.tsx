@@ -276,8 +276,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 <div ref={turnstileElRef} className="w-full max-w-[300px] min-h-0" />
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
-                Vi bruger Cloudflare Turnstile ved <strong className="font-medium text-slate-600">oprettelse</strong> – ikke
-                ved hvert login.
+                Vi bruger et sikkerhedstjek ved oprettelse for at undgå bots – ikke ved hvert login.
               </p>
             </div>
           )}
