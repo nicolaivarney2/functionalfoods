@@ -170,6 +170,8 @@ export interface MealPlanConfig {
   timeConstraints: TimeConstraints;
   /** Antal personer der spiser hvert måltid (fx { breakfast: 1, lunch: 1, dinner: 2 }) – bruges til portionsstørrelse og indkøbsliste */
   peoplePerMeal?: Record<string, number>;
+  /** Valgfrit budgetloft pr. uge (kr). Når sat, vægtes opskrifter med aktuelle tilbud højere (lavere loft → stærkere prioritering). */
+  weeklyBudgetKr?: number | null;
 }
 
 export interface MealStructureConfig {

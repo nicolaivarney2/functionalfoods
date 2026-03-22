@@ -460,6 +460,8 @@ export class MealPlanGenerator {
       excludedIngredients: string[]
       selectedStores: number[]
       prioritizeOrganic: boolean
+      /** Valgfrit max-indkøb pr. uge (kr). Styrker scoring af opskrifter med tilbud. */
+      weeklyBudgetKr?: number | null
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
@@ -566,11 +568,20 @@ export class MealPlanGenerator {
         maxCookTime: 60,
         preferredCookingDays: ['monday', 'wednesday', 'friday'],
         batchCookingAllowed: true
-      }
+      },
+      weeklyBudgetKr:
+        familyProfile.weeklyBudgetKr != null && familyProfile.weeklyBudgetKr > 0
+          ? familyProfile.weeklyBudgetKr
+          : null
     };
 
     // Load current offers from selected stores
     console.log(`🛒 Loading offers from stores: ${familyProfile.selectedStores.join(', ')}`);
+    if (familyProfile.weeklyBudgetKr != null && familyProfile.weeklyBudgetKr > 0) {
+      console.log(
+        `💶 Budgetloft: ${familyProfile.weeklyBudgetKr} kr/uge – tilbud vægtes stærkere (faktor op til ~${Math.min(2.2, Math.max(1, 1200 / familyProfile.weeklyBudgetKr)).toFixed(2)})`
+      )
+    }
     await this.loadCurrentOffers(familyProfile.selectedStores);
 
     // Generate 1 week of meal plans
@@ -804,8 +815,15 @@ export class MealPlanGenerator {
       const baseScore = this.calculateOverallScore(compatibility);
       
       // Add offer-based scoring (async)
-      const offerScore = await this.calculateOfferScore(recipe);
-      
+      let offerScore = await this.calculateOfferScore(recipe);
+
+      // Budgetloft: jo lavere ugentligt loft, jo mere vægtes tilbud (samme retning som "køb efter tilbud")
+      const budgetKr = config.weeklyBudgetKr
+      if (budgetKr != null && budgetKr > 0 && offerScore > 0) {
+        const pressure = Math.min(2.2, Math.max(1, 1200 / budgetKr))
+        offerScore *= pressure
+      }
+
       // Add ingredient overlap scoring (bonus for shared ingredients)
       const overlapScore = this.calculateIngredientOverlapScore(recipe);
       
