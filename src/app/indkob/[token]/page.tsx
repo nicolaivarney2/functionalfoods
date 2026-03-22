@@ -151,22 +151,24 @@ export default function IndkobTokenPage() {
   }
 
   const listSection = (
-    <div className="bg-white rounded-2xl shadow-xl text-slate-900 overflow-hidden">
-      <div className="bg-emerald-600 px-4 py-3 flex items-center gap-2 text-white">
-        <ShoppingCart className="w-5 h-5" />
-        <span className="font-semibold">Indkøbsliste</span>
+    <div className="bg-white rounded-xl shadow-lg text-slate-900 overflow-hidden border border-slate-200/80">
+      <div className="bg-emerald-600 px-3 py-2 flex items-center gap-1.5 text-white">
+        <ShoppingCart className="w-4 h-4 shrink-0" />
+        <span className="text-sm font-semibold">Indkøbsliste</span>
       </div>
-      <div className="p-4 space-y-6">
+      <div className="p-2.5 sm:p-3 space-y-3">
         {sortedCategories.map((category, catIndex) => {
           const items = (category as { items?: unknown[] }).items || []
           if (items.length === 0) return null
           return (
             <div
               key={`${category.name}-${catIndex}`}
-              className="border-b border-slate-100 last:border-0 pb-5 last:pb-0"
+              className="border-b border-slate-100 last:border-0 pb-3 last:pb-0"
             >
-              <h2 className="text-sm font-semibold text-emerald-900 uppercase tracking-wide mb-3">{category.name}</h2>
-              <ul className="space-y-2">
+              <h2 className="text-[11px] font-semibold text-emerald-900 uppercase tracking-wide mb-1.5 px-0.5">
+                {category.name}
+              </h2>
+              <ul className="space-y-1">
                 {(items as Record<string, unknown>[]).map((item, itemIndex) => {
                   const name = String(item.name || '')
                   const key = `${catIndex}-${itemIndex}-${name}`
@@ -183,48 +185,48 @@ export default function IndkobTokenPage() {
                   return (
                     <li
                       key={key}
-                      className={`flex items-start gap-3 rounded-xl border p-3 transition-colors ${
+                      className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
                         isDone ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-slate-200'
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => toggle(key)}
-                        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 ${
+                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${
                           isDone
                             ? 'border-emerald-600 bg-emerald-600 text-white'
                             : 'border-slate-300 bg-white'
                         }`}
                         aria-pressed={isDone}
                       >
-                        {isDone && <Check className="w-4 h-4" strokeWidth={3} />}
+                        {isDone && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                       </button>
                       <div className="flex-1 min-w-0">
                         <div
-                          className={`font-medium text-slate-900 ${isDone ? 'line-through text-slate-500' : ''}`}
+                          className={`text-sm font-medium leading-snug text-slate-900 ${isDone ? 'line-through text-slate-500' : ''}`}
                         >
                           {pi && (pi as { name?: string }).name ? (pi as { name: string }).name : name}
                         </div>
                         {pi && (pi as { name?: string }).name && (
-                          <div className="text-xs text-slate-500">{name}</div>
+                          <div className="text-[11px] text-slate-500 leading-tight">{name}</div>
                         )}
                         {purchaseHint ? (
                           <div
-                            className={`text-sm font-medium text-emerald-800 mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}`}
+                            className={`text-xs font-medium text-emerald-800 mt-0.5 leading-tight ${isDone ? 'line-through text-slate-500' : ''}`}
                           >
                             Køb: {purchaseHint}
                           </div>
                         ) : null}
                         <div
-                          className={`mt-0.5 ${purchaseHint ? 'text-xs text-slate-500' : 'text-sm text-slate-600'} ${isDone ? 'line-through' : ''}`}
+                          className={`mt-0.5 leading-tight ${purchaseHint ? 'text-[11px] text-slate-500' : 'text-xs text-slate-600'} ${isDone ? 'line-through' : ''}`}
                         >
-                          {purchaseHint ? 'Til opskrift: ' : null}
+                          {purchaseHint ? 'Opskrift: ' : null}
                           {formatQty(item.amount)} {String(item.unit || '')}
                         </div>
                         {pi &&
                           ((pi as { isOnSale?: boolean }).isOnSale ||
                             (pi as { totalPrice?: number }).totalPrice) && (
-                            <div className="text-sm mt-1">
+                            <div className="text-xs mt-0.5 tabular-nums">
                               {(pi as { isOnSale?: boolean }).isOnSale ? (
                                 <span className="text-emerald-700 font-semibold">
                                   {(pi as { totalPrice?: number; price?: number }).totalPrice != null
@@ -233,7 +235,7 @@ export default function IndkobTokenPage() {
                                         .toFixed(2)
                                         .replace('.', ',')}{' '}
                                   kr
-                                  <span className="ml-1 text-xs font-normal text-amber-700">tilbud</span>
+                                  <span className="ml-1 font-normal text-amber-700">tilbud</span>
                                 </span>
                               ) : (
                                 <span className="text-slate-700">
@@ -262,27 +264,27 @@ export default function IndkobTokenPage() {
   )
 
   const mealPlanSection = (
-    <div className="bg-white rounded-2xl shadow-xl text-slate-900 overflow-hidden">
-      <div className="bg-slate-700 px-4 py-3 flex items-center gap-2 text-white">
-        <Calendar className="w-5 h-5" />
-        <span className="font-semibold">Ugens madplan</span>
+    <div className="bg-white rounded-xl shadow-lg text-slate-900 overflow-hidden border border-slate-200/80">
+      <div className="bg-slate-700 px-3 py-2 flex items-center gap-1.5 text-white">
+        <Calendar className="w-4 h-4 shrink-0" />
+        <span className="text-sm font-semibold">Ugens madplan</span>
       </div>
-      <div className="p-4 max-h-[min(70vh,520px)] overflow-y-auto">
+      <div className="p-2.5 sm:p-3 max-h-[min(72vh,560px)] overflow-y-auto">
         {!mealDays?.length ? (
-          <p className="text-sm text-slate-600">Ingen madplan gemt på dette link.</p>
+          <p className="text-xs text-slate-600">Ingen madplan gemt på dette link.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {mealDays.map((day) => {
               const withTitles = day.meals?.filter((m) => m.title && String(m.title).trim()) ?? []
               if (withTitles.length === 0) return null
               return (
-                <div key={day.dayLabel} className="border-b border-slate-100 pb-3 last:border-0">
-                  <h3 className="text-sm font-semibold text-emerald-900">{day.dayLabel}</h3>
-                  <ul className="mt-2 space-y-1.5">
+                <div key={day.dayLabel} className="border-b border-slate-100 pb-2 last:border-0">
+                  <h3 className="text-xs font-semibold text-emerald-900">{day.dayLabel}</h3>
+                  <ul className="mt-1 space-y-0.5">
                     {withTitles.map((m) => (
-                      <li key={`${day.dayLabel}-${m.slot}`} className="flex gap-2 text-sm text-slate-800">
-                        <span className="text-slate-400 shrink-0 w-20">{m.slot}</span>
-                        <span className="min-w-0 flex-1 leading-snug">{m.title}</span>
+                      <li key={`${day.dayLabel}-${m.slot}`} className="flex gap-1.5 text-xs text-slate-800 leading-snug">
+                        <span className="text-slate-400 shrink-0 w-[4.25rem]">{m.slot}</span>
+                        <span className="min-w-0 flex-1">{m.title}</span>
                       </li>
                     ))}
                   </ul>
@@ -291,63 +293,60 @@ export default function IndkobTokenPage() {
             })}
           </div>
         )}
-        <p className="text-xs text-slate-500 mt-4">
-          Swipe eller brug fanerne ovenfor for at skifte tilbage til indkøbslisten.
-        </p>
+        <p className="text-[10px] text-slate-500 mt-2 leading-snug">Swipe eller faner ↑ for indkøb</p>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-950 to-slate-900 text-white pb-12">
-      <div className="max-w-lg mx-auto px-4 pt-8 pb-4">
-        <div className="flex items-center gap-2 text-emerald-200 text-sm mb-2">
-          <Store className="w-4 h-4" />
+    <div className="min-h-screen bg-gradient-to-b from-emerald-950 to-slate-900 text-white pb-8">
+      <div className="max-w-lg mx-auto px-3 pt-4 pb-2 sm:px-4">
+        <div className="flex items-center gap-1.5 text-emerald-200/90 text-xs mb-1">
+          <Store className="w-3.5 h-3.5" />
           Indkøb
         </div>
-        <h1 className="text-2xl font-bold leading-tight">
+        <h1 className="text-lg sm:text-xl font-bold leading-snug">
           {data.mealSummary?.title || 'Din indkøbsliste'}
         </h1>
-        <p className="mt-2 text-emerald-100/90 text-sm flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-white font-medium">
+        <p className="mt-1.5 text-emerald-100/85 text-xs flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-medium">
             {data.storeName}
           </span>
-          <span>
-            Kryds af i butikken
-            {hasMealPlanPanel ? ' · Swipe for madplan' : ''}
+          <span className="text-emerald-100/80">
+            Kryds af{hasMealPlanPanel ? ' · swipe for madplan' : ''}
           </span>
         </p>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 space-y-4">
+      <div className="max-w-lg mx-auto px-3 sm:px-4 space-y-2">
         {hasMealPlanPanel ? (
           <>
-            <div className="flex rounded-xl bg-white/10 p-1 backdrop-blur-sm">
+            <div className="flex rounded-lg bg-white/10 p-0.5 backdrop-blur-sm">
               <button
                 type="button"
                 onClick={() => scrollToPanel(0)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-colors ${
-                  activePanel === 0 ? 'bg-white text-emerald-900 shadow' : 'text-emerald-100/90'
+                className={`flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                  activePanel === 0 ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100/90'
                 }`}
               >
-                <ShoppingCart className="w-4 h-4" />
+                <ShoppingCart className="w-3.5 h-3.5" />
                 Indkøb
               </button>
               <button
                 type="button"
                 onClick={() => scrollToPanel(1)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-medium transition-colors ${
-                  activePanel === 1 ? 'bg-white text-emerald-900 shadow' : 'text-emerald-100/90'
+                className={`flex flex-1 items-center justify-center gap-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
+                  activePanel === 1 ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-100/90'
                 }`}
               >
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-3.5 h-3.5" />
                 Madplan
               </button>
             </div>
-            <div className="flex items-center justify-center gap-2 text-emerald-200/80 text-xs">
-              <ChevronLeft className="w-4 h-4 opacity-50" />
-              <span>Swipe mellem faner</span>
-              <ChevronRight className="w-4 h-4 opacity-50" />
+            <div className="flex items-center justify-center gap-1 text-emerald-200/70 text-[10px]">
+              <ChevronLeft className="w-3 h-3 opacity-60" />
+              <span>Swipe</span>
+              <ChevronRight className="w-3 h-3 opacity-60" />
             </div>
             <div
               ref={scrollerRef}
@@ -362,13 +361,12 @@ export default function IndkobTokenPage() {
           listSection
         )}
 
-        <p className="text-center text-emerald-200/80 text-xs px-2">
-          Functional Foods · Linket åbner din gemte liste til den valgte butik. Vi registrerer at listen blev åbnet, så vi
-          kan forbedre produktet.
+        <p className="text-center text-emerald-200/65 text-[10px] px-1 leading-snug pt-1">
+          Functional Foods · Liste til valgt butik. Vi registrerer åbning for at forbedre produktet.
         </p>
-        <div className="text-center">
-          <Link href="/madbudget" className="text-white underline text-sm">
-            Åbn Madbudget på computer
+        <div className="text-center pb-2">
+          <Link href="/madbudget" className="text-emerald-200/80 underline text-xs">
+            Madbudget på computer
           </Link>
         </div>
       </div>
