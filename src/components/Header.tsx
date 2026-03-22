@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, LogOut, Settings, Heart, Shield, LayoutGrid } from 'lucide-react'
+import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
@@ -85,9 +85,13 @@ export default function Header() {
                 {/* User Menu */}
                 {user ? (
                   <>
-                    <button type="button" className="text-white hover:text-gray-300 transition-colors">
-                      <Search size={20} />
-                    </button>
+                    <Link
+                      href="/opskriftsoversigt"
+                      className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
+                      aria-label="Søg og gennemse opskrifter"
+                    >
+                      <Search size={20} aria-hidden />
+                    </Link>
                   <div className="relative" ref={userMenuRef}>
                     <button
                       type="button"
@@ -174,21 +178,20 @@ export default function Header() {
                   </>
                 ) : (
                   <>
-                    <div className="inline-flex items-center gap-2 rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 hover:bg-white/5 transition-colors">
-                      <button
-                        type="button"
-                        className="text-white hover:text-gray-200 transition-colors shrink-0"
-                        aria-label="Søg"
-                      >
-                        <Search size={20} />
-                      </button>
-                      <Link
-                        href="/kom-i-gang"
-                        className="hidden sm:inline text-sm text-white hover:text-gray-200 transition-colors font-medium whitespace-nowrap"
-                      >
-                        Opret dig
-                      </Link>
-                    </div>
+                    <Link
+                      href="/opskriftsoversigt"
+                      className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
+                      aria-label="Søg og gennemse opskrifter"
+                    >
+                      <Search size={20} aria-hidden />
+                    </Link>
+                    <Link
+                      href="/kom-i-gang"
+                      className="inline-flex items-center gap-2 rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-sm font-medium text-white hover:bg-white/5 transition-colors"
+                    >
+                      <UserPlus size={20} className="shrink-0" aria-hidden />
+                      <span className="hidden sm:inline whitespace-nowrap">Opret dig</span>
+                    </Link>
                     <div className="inline-flex items-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 hover:bg-white/5 transition-colors">
                       <button
                         type="button"
