@@ -1,32 +1,55 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  Check,
-  Shield,
   Lock,
   Sparkles,
   ShoppingBasket,
   Users,
   Scale,
-  Mail,
   ArrowRight,
+  CheckCircle2,
+  Check,
+  Shield,
+  Mail,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 
 const PRESETS = [
-  { kr: 0, label: '0 kr – kom i gang gratis' },
+  { kr: 0, label: '0 kr' },
   { kr: 60, label: '60 kr' },
   { kr: 100, label: '100 kr' },
   { kr: 200, label: '200 kr' },
 ] as const
 
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string
+          callback?: (token: string) => void
+          'expired-callback'?: () => void
+          'error-callback'?: () => void
+          theme?: 'light' | 'dark' | 'auto'
+        }
+      ) => string
+      reset: (widgetId?: string) => void
+      remove: (widgetId?: string) => void
+    }
+  }
+}
+
 function KomIGangInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { signUp, user, session, loading: authLoading } = useAuth()
+  const { signUp, user, session } = useAuth()
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  const turnstileElRef = useRef<HTMLDivElement | null>(null)
+  const turnstileWidgetIdRef = useRef<string | null>(null)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -34,11 +57,12 @@ function KomIGangInner() {
   const [amountKr, setAmountKr] = useState<number>(60)
   const [customAmount, setCustomAmount] = useState('')
   const [useCustom, setUseCustom] = useState(false)
-  const [acceptTerms, setAcceptTerms] = useState(false)
-  const [productUpdatesConsent, setProductUpdatesConsent] = useState(false)
+  const [acceptTerms, setAcceptTerms] = useState(true)
+  const [productUpdatesConsent, setProductUpdatesConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
 
   const cancelled = searchParams.get('betaling') === 'annulleret'
 
@@ -47,6 +71,39 @@ function KomIGangInner() {
       setInfo('Betaling blev annulleret. Din konto er stadig oprettet – du kan prøve igen senere under din profil.')
     }
   }, [cancelled])
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+
+    const renderTurnstile = () => {
+      if (!turnstileElRef.current || !window.turnstile || turnstileWidgetIdRef.current) return
+      turnstileWidgetIdRef.current = window.turnstile.render(turnstileElRef.current, {
+        sitekey: turnstileSiteKey,
+        theme: 'light',
+        callback: (token: string) => setCaptchaToken(token),
+        'expired-callback': () => setCaptchaToken(''),
+        'error-callback': () => setCaptchaToken(''),
+      })
+    }
+
+    const existing = document.querySelector('script[data-turnstile="true"]')
+    if (window.turnstile) {
+      renderTurnstile()
+      return
+    }
+    if (!existing) {
+      const script = document.createElement('script')
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+      script.async = true
+      script.defer = true
+      script.dataset.turnstile = 'true'
+      script.onload = () => renderTurnstile()
+      document.head.appendChild(script)
+      return
+    }
+    existing.addEventListener('load', renderTurnstile, { once: true })
+    return () => existing.removeEventListener('load', renderTurnstile)
+  }, [turnstileSiteKey])
 
   const resolvedAmountKr = (): number => {
     if (useCustom) {
@@ -78,8 +135,13 @@ function KomIGangInner() {
       setError('Valgfri støtte under 5 kr kan ikke betales online – vælg 0 kr eller mindst 5 kr.')
       return
     }
+    if (turnstileSiteKey && !captchaToken) {
+      setError('Bekræft venligst, at du ikke er en robot.')
+      return
+    }
 
     setSubmitting(true)
+    let skipSubmittingReset = false
     try {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_redirect_url')
@@ -88,13 +150,22 @@ function KomIGangInner() {
       const { error: signErr, session: newSession } = await signUp(
         email.trim(),
         password,
-        name.trim() || email.trim().split('@')[0]
+        name.trim() || email.trim().split('@')[0],
+        captchaToken || undefined
       )
 
       if (signErr) {
         setError(signErr.message)
+        if (turnstileWidgetIdRef.current && window.turnstile) {
+          window.turnstile.reset(turnstileWidgetIdRef.current)
+          setCaptchaToken('')
+        }
         setSubmitting(false)
         return
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_redirect_url')
       }
 
       const activeSession = newSession ?? session
@@ -102,7 +173,7 @@ function KomIGangInner() {
 
       if (!accessToken) {
         setInfo(
-          'Tjek din email for at bekræfte kontoen. Når du er logget ind, kan du bruge Madbudget og frivilligt støtte os senere.'
+          'Konto oprettet, men email-bekræftelse er stadig aktiv. Slå "Confirm email" fra i Supabase Auth for oprettelse med det samme.'
         )
         setSubmitting(false)
         return
@@ -142,6 +213,7 @@ function KomIGangInner() {
           setSubmitting(false)
           return
         }
+        skipSubmittingReset = true
         window.location.href = payJson.url
         return
       }
@@ -150,19 +222,28 @@ function KomIGangInner() {
     } catch {
       setError('Noget gik galt. Prøv igen om lidt.')
     } finally {
-      setSubmitting(false)
+      if (!skipSubmittingReset) {
+        setSubmitting(false)
+      }
     }
   }
 
-  if (authLoading) {
+  if (user && submitting) {
+    const goingToPay = resolvedAmountKr() > 0
     return (
-      <div className="min-h-[50vh] flex items-center justify-center bg-slate-50">
-        <p className="text-slate-600 text-sm">Indlæser…</p>
+      <div className="bg-slate-50 min-h-screen py-16 px-4">
+        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Et øjeblik…</h1>
+          <p className="text-slate-600 text-sm">
+            {goingToPay ? 'Går til betaling…' : 'Opretter din konto…'}
+          </p>
+        </div>
       </div>
     )
   }
 
-  if (user) {
+  // Efter signup kan Stripe fejle: user er sat, submitting false, error sat – vis IKKE "allerede logget ind" (det skjuler fejlen).
+  if (user && !submitting && !error && !info) {
     return (
       <div className="bg-slate-50 min-h-screen py-16 px-4">
         <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
@@ -198,41 +279,46 @@ function KomIGangInner() {
             Functional Foods · Madbudget
           </p>
           <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-4">
-            Personlige madplaner – bygget omkring <span className="text-amber-300">rigtige tilbud</span> i
-            dagligvarebutikkerne
+            Personlige vægttabs-madplaner – bygget omkring{' '}
+            <span className="text-amber-300">aktuelle madtilbud</span> i butikkerne.
           </h1>
-          <p className="text-emerald-100 text-lg max-w-2xl mx-auto">
-            Særligt stærkt til vægttab: ugeplaner der matcher din familie, smag og kalorier – og som tager
-            udgangspunkt i det, der faktisk er på tilbud hos Netto, REMA, Bilka m.fl.
+          <p className="text-emerald-50 text-base sm:text-lg font-medium max-w-2xl mx-auto mb-3">
+            Nu er vægttab ikke længere en økonomisk falliterklæring.
           </p>
+          <p className="text-emerald-100 text-lg max-w-2xl mx-auto mb-3">
+            Vægttabs ugeplaner der matcher din familie, smag og tilpasset dit kaloriebehov – og som tager
+            udgangspunkt i det, der faktisk er på tilbud hos danske butikker som Netto, REMA, Bilka m.fl.
+          </p>
+          <p className="text-emerald-200/90 text-sm max-w-2xl mx-auto">Kom i gang på ca. 30 sekunder.</p>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-12 max-w-5xl">
-        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start">
-          <div>
+        {/* min-w-0 + isolate: undgå at venstre kolonne overlapper højre i grid (klik blokeres ellers i nogle browsere) */}
+        <div className="grid lg:grid-cols-2 gap-10 lg:gap-14 items-start min-w-0 isolate">
+          <div className="min-w-0 relative z-0">
             <h2 className="text-xl font-semibold text-slate-900 mb-4">Det får du</h2>
             <ul className="space-y-4">
               {[
                 {
                   icon: Sparkles,
                   title: 'Madbudget med ét klik',
-                  text: 'Ugeplan laves ud fra familieindstillinger, alder, vægt og energibehov – plus det I kan lide at spise.',
+                  text: 'Vægttabsplan laves ud fra familieindstillinger, tilbud, alder, vægt og energibehov – og de madvarer I kan lide.',
                 },
                 {
                   icon: ShoppingBasket,
                   title: 'Tilbuds-drevne planer',
-                  text: 'Systemet kobler på aktuelle tilbud, så du ikke betaler for dyr “madplan-magi”, der ignorerer butikkernes priser.',
+                  text: 'Planerne tager udgangspunkt i aktuelle tilbud i de butikker, du har valgt – så hverdagen og indkøbet hænger sammen med virkeligheden i netop dine kæder.',
                 },
                 {
                   icon: Scale,
                   title: 'Vægttab i fokus',
-                  text: 'Struktur og kalorier, der understøtter et realistisk forbrug – stadig med plads til hverdagsfamilien.',
+                  text: 'Struktur og en klar plan, der understøtter et realistisk liv – fleksibel og dynamisk tilpasset hverdagen.',
                 },
                 {
                   icon: Users,
                   title: 'Hele husstanden',
-                  text: 'Indstil antal voksne og børn, allergier og butikker – én plan, I kan følge sammen.',
+                  text: 'Indstil antal voksne og børn, allergier og butikker – én plan, I kan følge sammen, tilpasset dit vægttab.',
                 },
               ].map(({ icon: Icon, title, text }) => (
                 <li key={title} className="flex gap-3">
@@ -247,33 +333,59 @@ function KomIGangInner() {
               ))}
             </ul>
 
-            <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mt-8 rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/90 to-slate-50/80 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">Sådan fungerer det</h3>
+              <div className="space-y-3 text-sm text-slate-600 leading-relaxed">
+                <p>
+                  <span className="font-semibold text-emerald-900">1.</span> Du opretter en konto med e-mail og
+                  adgangskode – fornavn er valgfrit.
+                </p>
+                <p>
+                  <span className="font-semibold text-emerald-900">2.</span> Du vælger selv, hvad du vil bidrage med – beløbet
+                  er helt op til dig.
+                </p>
+                <p>
+                  <span className="font-semibold text-emerald-900">3.</span> Derefter lander du på dit overblik og kan åbne
+                  Madbudget, sætte familie og butikker, og lave vægttabs-madplaner ud fra tilbud.
+                </p>
+              </div>
+            </div>
+
+            {/* Ikke flex direkte på li med flere <strong> – wrap tekst i én span (undgår “stablet” layout) */}
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                <Shield className="text-emerald-600" size={18} />
-                Tryghed – ikke “quick fix”-scam
+                <Shield className="text-emerald-600 shrink-0" size={18} aria-hidden />
+                Tryghed – ikke &quot;quick fix&quot;-scam
               </h3>
-              <ul className="text-sm text-slate-600 space-y-2">
-                <li className="flex gap-2">
-                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} />
-                  Betaling kører gennem <strong className="text-slate-800">Stripe</strong> – vi ser ikke dit kortnummer.
+              <ul className="text-sm text-slate-600 space-y-2.5">
+                <li className="flex gap-2.5 items-start">
+                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
+                  <span className="min-w-0 flex-1 leading-relaxed">
+                    Betaling kører gennem <strong className="text-slate-800">Stripe</strong> – vi ser ikke dit
+                    kortnummer.
+                  </span>
                 </li>
-                <li className="flex gap-2">
-                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} />
-                  De første <strong className="text-slate-800">120 dage</strong>: “betal det du kan”. De fleste har valgt omkring{' '}
-                  <strong className="text-slate-800">60 kr</strong> – du bestemmer helt selv, også <strong>0 kr</strong>.
+                <li className="flex gap-2.5 items-start">
+                  <Check className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
+                  <span className="min-w-0 flex-1 leading-relaxed">
+                    De første <strong className="text-slate-800">120 dage</strong>: &quot;betal det du kan&quot;. De
+                    fleste har valgt omkring <strong className="text-slate-800">60 kr</strong> – du bestemmer helt
+                    selv, også <strong className="text-slate-800">0 kr</strong>.
+                  </span>
                 </li>
-                <li className="flex gap-2">
-                  <Mail className="text-emerald-600 shrink-0 mt-0.5" size={16} />
-                  E-mail om <strong className="text-slate-800">opdateringer til produktet</strong> kun hvis du krydser af –
-                  ingen reklamer.
+                <li className="flex gap-2.5 items-start">
+                  <Mail className="text-emerald-600 shrink-0 mt-0.5" size={16} aria-hidden />
+                  <span className="min-w-0 flex-1 leading-relaxed">
+                    E-mail om <strong className="text-slate-800">opdateringer til produktet</strong> kun hvis du
+                    krydser af – ingen reklamer.
+                  </span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 sm:p-8">
-            <h2 className="text-lg font-semibold text-slate-900 mb-1">Opret konto</h2>
-            <p className="text-sm text-slate-500 mb-6">Kun det nødvendige – typisk under ét minut.</p>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-lg p-6 sm:p-8 relative z-10 min-w-0 pointer-events-auto">
+            <h2 className="text-lg font-semibold text-slate-900 mb-6">Opret konto</h2>
 
             {info && (
               <div className="mb-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm px-4 py-3">
@@ -324,11 +436,10 @@ function KomIGangInner() {
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <p className="text-sm font-medium text-slate-800 mb-3">Frivillig støtte (første 120 dage)</p>
-                <p className="text-xs text-slate-500 mb-3">
-                  Gennemsnit blandt dem der har støttet: ca. <strong>60 kr</strong>. Vælg 0 kr hvis du vil prøve først –
-                  helt ok.
+                <p className="text-sm font-medium text-slate-800 mb-1">
+                  Pris: Betal det du kan støtte os med. Du vælger selv.
                 </p>
+                <p className="text-sm text-slate-500 mb-3">Gennemsnitligt bidrag ca. 68,5 kr.</p>
                 <div className="flex flex-wrap gap-2">
                   {PRESETS.map(({ kr, label }) => (
                     <button
@@ -386,8 +497,8 @@ function KomIGangInner() {
                   Jeg accepterer{' '}
                   <Link href="/indstillinger" className="text-emerald-700 underline hover:text-emerald-800">
                     betingelser og brug af konto
-                  </Link>{' '}
-                  (krævet).
+                  </Link>
+                  .
                 </span>
               </label>
 
@@ -404,13 +515,30 @@ function KomIGangInner() {
                 </span>
               </label>
 
+              {turnstileSiteKey && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+                  <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
+                  <div className="flex justify-center min-h-[65px] items-center">
+                    <div ref={turnstileElRef} className="min-h-[65px]" />
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
+                    Vi bruger <strong className="font-medium text-slate-600">Cloudflare Turnstile</strong> (ikke Google
+                    reCAPTCHA) mod automatiserede oprettelser.
+                  </p>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={submitting}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white font-semibold py-3.5 hover:bg-emerald-700 disabled:opacity-60 transition-colors"
               >
                 <Lock size={18} />
-                {submitting ? 'Arbejder…' : resolvedAmountKr() > 0 ? 'Opret og gå til sikker betaling' : 'Opret og gå til Madbudget'}
+                {submitting
+                  ? 'Arbejder…'
+                  : resolvedAmountKr() > 0
+                    ? 'Opret og gå til betaling'
+                    : 'Opret og videre'}
               </button>
             </form>
 
@@ -419,6 +547,121 @@ function KomIGangInner() {
             </p>
           </div>
         </div>
+
+        <section className="mt-14 border-t border-slate-200 pt-10 space-y-8">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-slate-900 text-center">
+              Fem grunde til at prøve
+            </h2>
+            <p className="text-slate-600 text-center mt-3 max-w-3xl mx-auto">
+              Vægttab, tilbud, personlig plan – og et hold i Danmark. Kort sagt: mindre snak, mere handling.
+            </p>
+          </div>
+
+          <div className="max-w-5xl mx-auto space-y-6">
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
+              <div>
+                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 1 · Vægttab</p>
+                <h3 className="text-xl font-semibold text-slate-900 mt-1">Vægttab uden gætteri</h3>
+                <p className="text-slate-600 mt-3">
+                  Struktur og kalorier, der matcher dit liv. Du ved, hvad du skal spise – ikke bare hvad der er
+                  &quot;sundt&quot;.
+                </p>
+              </div>
+              <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
+                Illustration: Vægttab med plan
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
+              <div className="order-2 lg:order-1 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
+                Illustration: Tilbud + madbudget
+              </div>
+              <div className="order-1 lg:order-2">
+                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 2 · Tilbud</p>
+                <h3 className="text-xl font-semibold text-slate-900 mt-1">Tilbud der betyder noget på tallerkenen</h3>
+                <p className="text-slate-600 mt-3">
+                  Planerne bygger på aktuelle tilbud hos Netto, REMA, Bilka m.fl. Mindre budget-stress. Mere madplan.
+                </p>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
+              <div>
+                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 3 · Personlig plan</p>
+                <h3 className="text-xl font-semibold text-slate-900 mt-1">Din familie. Din smag. Én plan.</h3>
+                <p className="text-slate-600 mt-3">
+                  Alder, vægt, energibehov og favoritter samlet ét sted. Ikke tre apps. Ikke tre lister.
+                </p>
+              </div>
+              <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
+                Illustration: Familie + personlig tilpasning
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
+              <div className="order-2 lg:order-1 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
+                Illustration: Dynamisk ugeplan
+              </div>
+              <div className="order-1 lg:order-2">
+                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 4 · Fleksibilitet</p>
+                <h3 className="text-xl font-semibold text-slate-900 mt-1">Ny uge? Ny plan. Få klik.</h3>
+                <p className="text-slate-600 mt-3">
+                  Tilbud skifter. Behov skifter. Lav en ny madplan uden at starte fra nul hver gang.
+                </p>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
+              <div>
+                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 5 · Tryghed</p>
+                <h3 className="text-xl font-semibold text-slate-900 mt-1">Bygget i Danmark – til dansk hverdag</h3>
+                <p className="text-slate-700 mt-3">
+                  Ikke et callcenter i udlandet. Vi bygger til familier, indkøb og vægttab i den virkelige verden.
+                </p>
+                <p className="text-sm text-slate-600 mt-3">
+                  Læs mere{' '}
+                  <Link href="/bag-om-ff" className="text-emerald-700 underline hover:text-emerald-800">
+                    om os
+                  </Link>
+                  .
+                </p>
+              </div>
+              <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-white/70 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
+                Illustration: Team / troværdighed
+              </div>
+            </article>
+          </div>
+
+          <div className="max-w-5xl mx-auto">
+            <section className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+              <h3 className="text-xl font-semibold text-slate-900">Det får du som medlem</h3>
+              <p className="text-slate-600 mt-2">Ét sted. Én plan. Klar til at bruge med det samme.</p>
+
+              <ul className="mt-5 grid sm:grid-cols-2 gap-3">
+                {[
+                  'Vægttabs-madplan på få klik',
+                  'Tilbud fra dine butikker direkte i planen',
+                  'Familie, smag og kalorier tilpasset dig',
+                  'Ny plan når uge, tilbud eller behov skifter',
+                  'Indkøb og struktur – ikke bare opskrifter',
+                  'Dansk team – almindelige mennesker',
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-slate-700">
+                    <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm">{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-emerald-900 text-sm font-medium">
+                  Pris: Betal det du kan støtte os med. Du vælger selv – også 0 kr.
+                </p>
+              </div>
+            </section>
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -428,8 +671,19 @@ export default function KomIGangPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-600 text-sm">
-          Indlæser…
+        <div className="bg-slate-50 min-h-screen">
+          <div className="bg-gradient-to-b from-emerald-900 to-emerald-800 text-white">
+            <div className="container mx-auto px-4 py-14 max-w-3xl text-center">
+              <p className="text-emerald-200 text-sm mb-4">Functional Foods · Madbudget</p>
+              <div className="h-32 rounded-lg bg-white/10 animate-pulse max-w-xl mx-auto" />
+            </div>
+          </div>
+          <div className="container mx-auto px-4 py-12 max-w-5xl">
+            <div className="grid lg:grid-cols-2 gap-10">
+              <div className="h-64 bg-slate-200/80 rounded-2xl animate-pulse" />
+              <div className="h-96 bg-white border border-slate-200 rounded-2xl animate-pulse" />
+            </div>
+          </div>
         </div>
       }
     >
