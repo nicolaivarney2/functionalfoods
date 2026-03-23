@@ -48,9 +48,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { signIn, signUp } = useAuth()
   const router = useRouter()
 
-  // Supabase Auth kan være sat til at kræve Turnstile ved både signUp og signIn – vis widget når nøgle findes.
+  // Turnstile kun ved oprettelse. Kræver at Supabase kun kræver CAPTCHA ved signup (ikke ved password-login) – se env.example.
   useEffect(() => {
-    if (!isOpen || !turnstileSiteKey) {
+    if (!isOpen || !turnstileSiteKey || !isSignUp) {
       if (turnstileWidgetIdRef.current && typeof window !== 'undefined' && window.turnstile) {
         try {
           window.turnstile.remove(turnstileWidgetIdRef.current)
@@ -129,14 +129,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       existing.removeEventListener('load', renderTurnstile)
       cleanup()
     }
-  }, [isOpen, turnstileSiteKey])
+  }, [isOpen, turnstileSiteKey, isSignUp])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     setSuccess('')
-    if (turnstileSiteKey && !captchaToken) {
+    if (turnstileSiteKey && isSignUp && !captchaToken) {
       setError('Bekræft venligst, at du ikke er en robot.')
       setLoading(false)
       return
@@ -155,7 +155,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           setSuccess('Tjek din email for at bekræfte din konto! Du vil blive sendt tilbage til denne side efter bekræftelse.')
         }
       } else {
-        const { error } = await signIn(email, password, captchaToken || undefined)
+        const { error } = await signIn(email, password)
         if (error) {
           setError(error.message)
           if (turnstileWidgetIdRef.current && window.turnstile) {
@@ -269,14 +269,14 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             </div>
           </div>
 
-          {turnstileSiteKey && (
+          {turnstileSiteKey && isSignUp && (
             <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
               <p className="text-xs font-medium text-slate-700 mb-2">Sikkerhedstjek</p>
               <div className="flex justify-center w-full">
                 <div ref={turnstileElRef} className="w-full max-w-[300px] min-h-0" />
               </div>
               <p className="text-[11px] leading-relaxed text-slate-500 mt-2">
-                Bekræft her før du logger ind eller opretter – kræves af vores login-system.
+                Vi bruger et sikkerhedstjek ved oprettelse for at undgå bots. Log ind uden dette trin.
               </p>
             </div>
           )}
