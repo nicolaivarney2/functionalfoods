@@ -1,8 +1,37 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { ArrowRight, ChevronLeft, Check, Scale, Moon, BookOpen, HelpCircle, Droplet, Clock } from 'lucide-react'
+
+/** Udvalgte keto-opskrifter (billeder fra samme kilde som opskriftssiderne) */
+const KETO_SHOWCASE_RECIPES = [
+  {
+    slug: 'sproed-keto-pizza-bedre-end-fathead',
+    title: 'Sprød Keto pizza: Bedre end fathead',
+    image:
+      'https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/sproed-keto-pizza-bedre-end-fathead-d16b840a.webp',
+  },
+  {
+    slug: 'efteraars-omelet-med-feta-asparges-og-mynte',
+    title: 'Efterårs omelet med feta, asparges og mynte',
+    image:
+      'https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/efteraars-omelet-med-feta-asparges-og-mynte-53b5b97e.webp',
+  },
+  {
+    slug: 'ristet-chorizo-avocado-og-feta-salat',
+    title: 'Ristet chorizo, avocado og feta salat',
+    image:
+      'https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/ristet-chorizo-avocado-og-feta-salat-cb15f142.webp',
+  },
+  {
+    slug: 'sommerlig-keto-salat-med-kyllingespyd-og-mozzarella',
+    title: 'Sommerlig keto salat med kyllingespyd og mozzarella',
+    image:
+      'https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/sommerlig-keto-salat-med-kyllingespyd-og-mozzarella-c98d9447.webp',
+  },
+] as const
 
 export default function KetoWeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -86,9 +115,37 @@ export default function KetoWeightLossPage() {
                 </p>
               </div>
 
-              {/* Illustration placeholder */}
-              <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-                <p className="text-gray-500 text-sm mb-2">Illustration: Venn-diagram der viser overlap mellem "mættende mad", "god smag" og "vægttab" – Keto er i midten</p>
+              <div className="mt-12">
+                <p className="text-sm font-medium text-gray-700 mb-4">
+                  Inspiration: fire mættende keto-retter med god smag – perfekt når du vil tabe dig uden at gå på kompromis.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {KETO_SHOWCASE_RECIPES.map((r) => (
+                    <Link
+                      key={r.slug}
+                      href={`/opskrift/${r.slug}`}
+                      className="group flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:border-purple-300 hover:shadow-md"
+                    >
+                      <div className="relative aspect-[4/3] w-full bg-gray-100">
+                        <Image
+                          src={r.image}
+                          alt={r.title}
+                          fill
+                          className="object-cover transition group-hover:opacity-95"
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="p-4">
+                        <p className="font-semibold text-gray-900 group-hover:text-purple-700 leading-snug">{r.title}</p>
+                        <p className="mt-2 text-sm text-purple-600 font-medium inline-flex items-center gap-1">
+                          Se opskrift
+                          <ArrowRight className="w-4 h-4" aria-hidden />
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -118,10 +175,19 @@ export default function KetoWeightLossPage() {
                 </p>
               </div>
 
-              {/* Illustration placeholder */}
-              <div className="mb-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-                <p className="text-gray-500 text-sm mb-2">Illustration: Infografik der viser transformationen fra dieselbil til elbil – analogi for kroppens omstilling fra kulhydrat- til fedtforbrænding</p>
-              </div>
+              <figure className="mb-12 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <Image
+                  src="/billeder/nicher/keto/keto-skridt-1-2-3.jpg"
+                  alt="Infografik: tre trin fra dieselbil til elbil – analogi for kroppens omstilling fra kulhydrat- til fedtforbrænding på keto"
+                  width={1200}
+                  height={675}
+                  className="w-full h-auto object-cover"
+                  unoptimized
+                />
+                <figcaption className="px-4 py-3 text-center text-sm text-gray-500">
+                  Fra kulhydrat som &quot;diesel&quot; til fedtforbrænding som &quot;strøm&quot; – tre trin i omstillingen.
+                </figcaption>
+              </figure>
 
               <div className="bg-white rounded-2xl p-8 border-2 border-purple-200 mb-8">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Sådan kommer vi i gang</h3>
@@ -197,24 +263,33 @@ export default function KetoWeightLossPage() {
                       1
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-900 mb-3">Kend til Keto (starten)</h3>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-3">Lær om Keto (starten)</h3>
                     </div>
                   </div>
                   
                   <div className="prose max-w-none text-gray-700 leading-relaxed space-y-4">
                     <p>
-                      Når man starter på Keto, sker der nogle fysiologiske ændringer i kroppen. Du spiser, som bekendt, ganske få kulhydrater, og det gør, at din krop udskiller en del væske i starten, fordi den opbruger kroppens sukkerdepoter. Kald hvad du vil, men det er en stor motivationsfaktor for hjernen, at blive belønnet så hurtigt, og det er med til, at styrke forholdet til Keto.
+                      Når man starter på Keto, sker der nogle fysiologiske ændringer i kroppen. Du spiser, som bekendt, ganske få kulhydrater, og det gør, at din krop udskiller en del væske i starten, fordi den opbruger kroppens sukkerdepoter. Kald det hvad du vil, men det er en stor motivationsfaktor for hjernen, at blive belønnet så hurtigt, og det er med til, at styrke forholdet til Keto.
                     </p>
 
                     <p>
-                      Hastigheden af vægttabet som man ser i starten, er for de fleste ikke noget der fortsætter. Mange kan godt ligge omkring 0,5 kg om ugen, men der fortsætter, men det giver os tid, til at fange idéen bag Keto, og lære maden at kende.
+                      Hastigheden af det voldsomme vægttab man ser i starten fortsætter ikke i samme grad, men når du har fundet ro i maden og følger planen, så kommer det tilbage. Her fanger vi idéen om keto og lærer maden at kende.
                     </p>
                   </div>
 
-                  {/* Illustration placeholder */}
-                  <div className="mt-6 bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-300 text-center">
-                    <p className="text-gray-500 text-sm">Illustration: Graf der viser vægttab over tid – hurtigt fald i første uge (væske), derefter jævnere kurve</p>
-                  </div>
+                  <figure className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <Image
+                      src="/billeder/nicher/keto/keto-step-1.png"
+                      alt="Graf der viser vægttab over tid: hurtigt fald i første uge (væske), derefter en jævnere kurve"
+                      width={1904}
+                      height={640}
+                      className="w-full h-auto"
+                      unoptimized
+                    />
+                    <figcaption className="px-4 py-3 text-center text-sm text-gray-500">
+                      Illustration: Graf der viser vægttab over tid – hurtigt fald i første uge (væske), derefter jævnere kurve
+                    </figcaption>
+                  </figure>
                 </div>
 
                 {/* Fase 2 */}
@@ -230,7 +305,7 @@ export default function KetoWeightLossPage() {
                   
                   <div className="prose max-w-none text-gray-700 leading-relaxed space-y-4">
                     <p>
-                      Du oplever overgangssymptomer på vej i ketose. Ketose er der hvor din fedtforbrænding er størst, din sultundertrykkelse er højest, og hvor du derfor, får nemmest ved at tabe dig. Overgangssymptomerne varierer fra person til person, og du kan læse meget mere om dem i vores begynderguide.
+                      Du oplever overgangssymptomer på vej i ketose. Ketose er der hvor din fedtforbrænding er størst, din sultundertrykkelse er højest, og her får du nemmest ved at tabe dig, fordi du ikke oplever den samme sult. Overgangssymptomerne varierer fra person til person, men man er tom for energi og kan godt føle det lidt som influenza.
                     </p>
 
                     <p className="bg-yellow-50 rounded-xl p-4 border-l-4 border-yellow-600">
