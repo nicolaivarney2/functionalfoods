@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, Leaf, Brain, Zap, Check, X, AlertCircle, Scale, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
+import { ArrowRight, Target, Leaf, Brain, Zap, Check, X, AlertCircle, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -55,7 +55,7 @@ export default function WeightLossPage() {
         </div>
       </section>
 
-      {/* Sandheder om vægttab - Myteknuser */}
+      {/* Vinderkriterier */}
       <section className="py-20 bg-gray-50">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -64,64 +64,52 @@ export default function WeightLossPage() {
                 Hvorfor er vægttab så forvirrende?
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Fordi alle siger noget forskelligt. Men i virkeligheden handler vægttab ikke om religion – det handler om forståelse.
+                Fordi alle siger noget forskelligt. Men i virkeligheden handler vægttab ikke om religion.
+                Vi har identificeret de 3 vinderkriterier, du får af os:
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               {[
                 {
-                  myth: "Du kan tabe dig uden at TÆNKE på kalorier",
-                  truth: "Kalorier betyder stadig noget – uanset hvilken kostretning du følger. Men næringsrig mad gør dig mere mæt, så du naturligt spiser mindre.",
-                  icon: Scale
+                  title: "Personlig plan hver uge",
+                  text: "Planen er tilpasset dig med fokus på det vigtigste først, og med nemme opskrifter der fungerer til vægttab i en travl hverdag.",
+                  icon: Target,
+                  color: "bg-green-100 text-green-600"
                 },
                 {
-                  myth: "Du kan ikke snyde kroppen med quick fixes",
-                  truth: "Du kan ikke snyde kroppen – men du kan forstå den. Mæthedshormoner, stofskifte og vaner styrer alt.",
-                  icon: Brain
+                  title: "Spar penge og tab dig",
+                  text: "Planen bliver lavet ud fra dagligvarebutikkernes tilbud, så den passer til dit liv og budget - ikke omvendt.",
+                  icon: ShoppingCart,
+                  color: "bg-blue-100 text-blue-600"
                 },
                 {
-                  myth: "Mindre mad = automatisk vægttab",
-                  truth: "Det handler ikke om at spise mindre – men smartere. 500 kcal fra grøntsager fylder anderledes end 500 kcal fra hvidt brød.",
-                  icon: Leaf
-                },
-                {
-                  myth: "Den bedste kost er den, der virker for alle",
-                  truth: "Den bedste kost er den, der virker for dig. Vedholdenhed slår perfektion hver gang.",
-                  icon: Heart
+                  title: "Støtte fra start til slut",
+                  text: "Vi sætter et mål sammen, lærer dig alt det vigtigste undervejs og støtter dig personligt hele vejen igennem.",
+                  icon: Heart,
+                  color: "bg-purple-100 text-purple-600"
                 }
               ].map((item, idx) => (
-                <div key={idx} className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 border border-gray-100 hover:shadow-lg transition-shadow">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
-                        <X className="w-6 h-6 text-red-600" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 mb-2">{item.myth}</h3>
-                      <div className="flex items-start gap-3 mt-3 pt-3 border-t border-gray-200">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Check className="w-5 h-5 text-green-600" />
-                        </div>
-                        <p className="text-gray-700 leading-relaxed">{item.truth}</p>
-                      </div>
-                    </div>
+                <div key={idx} className="bg-white rounded-2xl p-6 border-2 border-gray-100 hover:shadow-lg transition-shadow">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${item.color}`}>
+                    <item.icon className="w-6 h-6" />
                   </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-3">{item.title}</h3>
+                  <p className="text-gray-700 leading-relaxed">{item.text}</p>
                 </div>
               ))}
             </div>
 
-            {/* Opsummering efter de 4 bokse */}
+            {/* Opsummering */}
             <div className="mt-12 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-8 border-2 border-green-200 text-center">
               <p className="text-lg text-gray-800 leading-relaxed mb-4">
-                Det er væsentligt hvor du får din kalorier fra, hvor mange kalorier du spiser, og så, at vi finder den spiseform, der virker for dig. Vores system hjælper dig med at forstå, og gør rejsen overskuelig.
+                Vi kombinerer tilbud, data og dine præferencer til en personlig plan, som er realistisk at følge uge efter uge.
               </p>
               <Link
-                href="/medlem"
+                href="/kom-i-gang"
                 className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
               >
-                Læs mere
+                Kom i gang nu
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
@@ -190,7 +178,7 @@ export default function WeightLossPage() {
               </div>
             </div>
 
-            {/* Placeholder for søvn/stress/motion illustration */}
+            {/* Søvn/stress/motion */}
             <div className="grid md:grid-cols-4 gap-4">
               {[
                 { icon: Moon, title: "Søvn", desc: "Påvirker appetit og forbrænding" },
@@ -392,17 +380,17 @@ export default function WeightLossPage() {
                 Vil du bruge værktøjer, der gør det nemmere?
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Når du forstår principperne, handler det bare om at gøre dem mulige i praksis
+                Vi bruger tilbud, adfærdsdata og ernæring i samme system, så du får en plan der faktisk passer til dit liv.
               </p>
-                  </div>
+            </div>
                   
             <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 md:p-12 border-2 border-green-200 mb-8">
               <div className="grid md:grid-cols-4 gap-6 mb-8">
                 {[
-                  { icon: Target, label: "Planlægning" },
-                  { icon: BookOpen, label: "Overblik" },
-                  { icon: ShoppingCart, label: "Opskrifter" },
-                  { icon: Zap, label: "Indkøb" }
+                  { icon: ShoppingCart, label: "Madplaner ud fra tilbud" },
+                  { icon: Brain, label: "Vægttabsrejse fra 50+ parametre" },
+                  { icon: Leaf, label: "Makro + mikro beregnede opskrifter" },
+                  { icon: BookOpen, label: "5000 opskrifter i 8 nicher" }
                 ].map((item, idx) => (
                   <div key={idx} className="text-center">
                     <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-md">
@@ -415,32 +403,27 @@ export default function WeightLossPage() {
 
               <div className="text-center">
                 <p className="text-lg text-gray-800 mb-6 leading-relaxed">
-                  <strong>FunctionalFoods</strong> samler opskrifter, tilbud og madplaner fra mange kostretninger og gør det let at spise sundt uden at bruge mere tid eller penge.
+                  <strong>FunctionalFoods</strong> samler alt det svære i ét flow: mål, præferencer, butikstilbud, ernæring og ugeplan.
                 </p>
                 <p className="text-gray-600 text-sm mb-8">
-                  Men du kan sagtens bruge alt, du har lært her – helt uden os.
+                  Du får konkrete valg i stedet for gætteri, så du kan holde kursen i hverdagen.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Link
                     href="/madbudget"
                     className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
                   >
-                    Se madbudget system
+                    Prøv Madbudget
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                   <Link
-                    href="/opskriftsoversigt"
+                    href="/dagligvarer"
                     className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors border-2 border-gray-200"
                   >
-                    Se alle opskrifter
+                    Se tilbud i butikker
                     <BookOpen className="w-5 h-5" />
                   </Link>
                 </div>
-              </div>
-
-              {/* Placeholder for madplan mockup */}
-              <div className="mt-8 bg-white rounded-xl p-6 border-2 border-dashed border-gray-300 text-center">
-                <p className="text-gray-500 text-sm">Neutralt screenshot/mockup af en madplan – ikke reklame, men kontekst</p>
               </div>
             </div>
           </div>
@@ -702,23 +685,59 @@ export default function WeightLossPage() {
               {[
                 {
                   q: "Skal jeg tælle kalorier for at tabe mig?",
-                  a: "Nej – men du skal forstå dem. Det er forskellen. Nogle kan tabe sig uden at tælle, andre har brug for præcision. Find din vej."
+                  a: "Ikke altid. Du skal forstå energibalancen. Nogle klarer sig med struktur og portionsstyring, andre får mere kontrol ved at tracke i perioder."
                 },
                 {
                   q: "Hvilken kostretning er bedst?",
-                  a: "Den, der passer til dit liv. Keto, Sense, GLP-1 kost – alle kan virke, hvis du kan leve med dem. Det handler om konsistens, ikke perfektion."
+                  a: "Den, du faktisk kan holde. Keto, Sense, GLP-1 kost, 5:2 og fleksitarisk kan alle virke, når planen passer til din hverdag."
                 },
                 {
-                  q: "Hvordan holder jeg vægten bagefter?",
-                  a: "Ved at lære dine vaner at kende og finde en rytme, du kan leve med. Det er ikke en diæt, det er en livsstil."
+                  q: "Hvordan bruger I butikstilbud i planerne?",
+                  a: "Vi matcher dine præferencer med ugens tilbud i valgte butikker, så madplanen både er realistisk, billigere og lettere at følge."
                 },
                 {
-                  q: "Hvad hvis jeg ikke kan lide at træne?",
-                  a: "Bevægelse hjælper, men mad er vigtigst. Start med at gå en tur hver dag. Det behøver ikke være hårdt for at virke."
+                  q: "Kan jeg fravælge råvarer jeg ikke kan lide?",
+                  a: "Ja. Du kan vælge præferencer og fravalg, så forslag og planer tager højde for smag, vaner og familieliv."
                 },
                 {
-                  q: "Hvordan kombinerer jeg vægttab og familieliv?",
-                  a: "Find en kost, der passer til hele familien. Proteinrig kost, planlægning og at gøre det praktisk er nøglen. Det er ikke perfektion, det er konsistens."
+                  q: "Er opskrifterne ernæringsberegnede?",
+                  a: "Ja. Opskrifterne er beregnet på makro- og mikronæringsstoffer med danske fødevaredata, så du kan træffe beslutninger på et oplyst grundlag."
+                },
+                {
+                  q: "Hvor hurtigt kan jeg forvente resultater?",
+                  a: "Det varierer. Et stabilt og sundt tempo er ofte omkring 0,3–0,8 kg om ugen. Vi fokuserer på holdbar fremgang frem for hurtige udsving."
+                },
+                {
+                  q: "Hvad gør jeg, hvis vægten står stille?",
+                  a: "Plateauer er normale. Vi justerer portionsstørrelser, aktivitetsniveau, søvn og planstruktur, så du kommer videre uden at starte forfra."
+                },
+                {
+                  q: "Skal jeg træne hårdt for at tabe mig?",
+                  a: "Nej. Daglig bevægelse og simple rutiner virker. Kosten er stadig den vigtigste løftestang i et varigt vægttabsforløb."
+                },
+                {
+                  q: "Hvordan håndterer jeg cravings og aftensult?",
+                  a: "Stabilt protein, nok fiber, planlagte måltider og realistiske valg reducerer cravings markant. Perfektion er ikke nødvendig for fremgang."
+                },
+                {
+                  q: "Kan jeg bruge FunctionalFoods uden medlemskab?",
+                  a: "Ja, du kan læse meget indhold frit. De mest personlige planfunktioner kræver profil, så systemet kan tilpasse til dig."
+                },
+                {
+                  q: "Virker det også i en travl familiehverdag?",
+                  a: "Ja, det er netop målet. Planer, indkøbslister og opskrifter er designet til tidspres, budget og forskellige behov i samme husstand."
+                },
+                {
+                  q: "Hvad hvis jeg mister rytmen i en uge?",
+                  a: "Så genstarter vi roligt ved næste måltid. Konsistens over måneder slår perfektion på enkelte dage."
+                },
+                {
+                  q: "Hvilke funktioner får jeg i Madbudget?",
+                  a: "Du får AI-madplaner, tilbudsbaseret forslag, indkøbslister, præferencefiltrering og løbende justering af planen efter dine mål."
+                },
+                {
+                  q: "Kan jeg følge min udvikling over tid?",
+                  a: "Ja, planen er bygget til iteration uge for uge, så du kan se hvad der virker og justere uden at miste overblik."
                 }
               ].map((faq, idx) => (
                 <details key={idx} className="bg-gray-50 rounded-xl p-6 border border-gray-200 group">

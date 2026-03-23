@@ -138,7 +138,7 @@ export default function Home() {
     <main className="min-h-screen bg-white">
       {/* New Hero Section with Image */}
       <section className="relative bg-white">
-        <div className="relative h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
+        <div className="relative h-[400px] md:h-[500px] lg:h-[600px]">
           {/* Background Image */}
           <div className="absolute inset-0">
             <Image
@@ -286,20 +286,20 @@ export default function Home() {
             {[
               {
                 icon: FileText,
-                title: 'Gratis opskrifter inden for alle mad kategorier',
-                description: 'Keto, Sense, GLP-1 kost, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og klar til brug.',
+                title: 'Gratis opskrifter til vægttab inden for alle mad kategorier',
+                description: 'Keto, Sense, GLP-1 kost, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og gennemtestet. Ernæringsudregnet fra den danske fødevaredatabase ned til mindste detalje.',
                 color: 'from-green-500 to-green-600'
               },
               {
                 icon: Calculator,
-                title: 'Videnskabelig ernæringsanalyse',
-                description: 'Alle tal beregnes ud fra Fødevareinstituttets FRIDA-database. Vi viser vitaminer, mineraler og næringsstoffer ned til det mindste detalje.',
+                title: 'Revolutionerende vægttabsplan',
+                description: 'Du får en vægttabsplan planlagt ud fra dagligvarebutikkernes tilbud, dit vægttabsønske, madpræferencer, aktivitetsniveau, familieliv og meget mere.',
                 color: 'from-blue-500 to-blue-600'
               },
               {
                 icon: Calendar,
-                title: 'AI-madplaner tilpasset familien',
-                description: 'Snart: Planlæg ud fra budget, butik og smag. Alt beregnet ud fra danske råvarer og reelle priser.',
+                title: 'Vi støtter dig til du når dit mål',
+                description: 'Ikke nok med, at vores system giver dig personlige madplaner hver uge - tilpasset dit liv - så er vi her for at støtte dig hver dag fuldt ud personligt (på sms).',
                 color: 'from-purple-500 to-purple-600'
               }
             ].map((feature, index) => (
@@ -319,6 +319,33 @@ export default function Home() {
                 </p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10">
+            <div className="max-w-4xl mx-auto rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-blue-50 p-6 md:p-8 shadow-sm">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 mb-2">
+                    Klar til at komme i gang?
+                  </p>
+                  <h3 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
+                    Har du vægttabsplaner?
+                  </h3>
+                  <p className="mt-2 text-gray-700 text-base leading-relaxed max-w-2xl">
+                    Vi laver en personlig plan ud fra ugens tilbud og halvtreds andre parametre. Prøv det nu.
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <Link
+                    href="/kom-i-gang"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white hover:bg-emerald-700 transition-colors"
+                  >
+                    Prøv det nu
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -728,16 +755,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Hvad kan du NU på FunctionalFoods? */}
+      {/* Hvorfor kan FunctionalFoods hjælpe dig så godt? */}
       <section className="py-16 lg:py-20 bg-gradient-to-br from-white to-green-50/30">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
-                Hvad kan du NU på FunctionalFoods?
+                Hvorfor kan FunctionalFoods hjælpe dig så godt?
               </h2>
               <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-                Udfyld profil om madønsker, vægttab og familievaner, og lav AI madplaner hver uge
+                Udfyld profil om madønsker, vægttab og familievaner, og så bruger vi AI algoritmer til at kombinere de bedste tilbud i butikkerne med dine mål og ønsker.
               </p>
             </div>
 
@@ -745,16 +772,16 @@ export default function Home() {
               <div className="grid md:grid-cols-2 gap-8 items-center">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                    Din personlige AI madplaner
+                    AI teknikken designer, vi vejleder dig.
                   </h3>
                   <p className="text-gray-700 leading-relaxed mb-6">
-                    Vores AI madplans-system lærer dig at kende, og er skræddersyet til dig og din familie, dine madpræferencer, vægttabsmål og livsstil - Og selvfølgelig næste ugens tilbud!
+                    Vores AI madplans-system lærer dig at kende, og er skræddersyet til dig og din familie, dine madpræferencer, vægttabsmål og livsstil - og det bedste: ugens tilbud i butikkerne!
                   </p>
                   <Link
                     href="/premium"
                     className="inline-flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all transform hover:-translate-y-1"
                   >
-                    Prøv gratis i 7 dage
+                    Opret dig gratis i dag
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                 </div>
@@ -789,6 +816,12 @@ export default function Home() {
                   color: "bg-purple-100 text-purple-600 border-purple-200"
                 },
                 {
+                  title: "Lavet ud fra tilbud",
+                  description: "Funktion kommer i 2026: Madplaner baseret på næste uges tilbud i valgte dagligvarerbutikker",
+                  icon: Building2,
+                  color: "bg-gray-100 text-gray-600 border-gray-200"
+                },
+                {
                   title: "Fuld ernæringsberegnet",
                   description: "Vitaminer, omega-3, protein og alle næringsstoffer er optimeret",
                   icon: Leaf,
@@ -799,12 +832,6 @@ export default function Home() {
                   description: "Få automatisk genereret indkøbsliste til hele ugen",
                   icon: FileText,
                   color: "bg-pink-100 text-pink-600 border-pink-200"
-                },
-                {
-                  title: "Lavet ud fra tilbud",
-                  description: "Funktion kommer i 2026: Madplaner baseret på næste uges tilbud i valgte dagligvarerbutikker",
-                  icon: Building2,
-                  color: "bg-gray-100 text-gray-600 border-gray-200"
                 }
               ].map((benefit, index) => (
                 <div
@@ -829,7 +856,7 @@ export default function Home() {
           <div className={`max-w-3xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
               <Brain className="w-4 h-4" />
-              Kommer i 2026
+              120 dages gratis beta-test
             </div>
             
             <h2 className="text-3xl md:text-4xl font-bold mb-6 text-gray-900">
@@ -837,20 +864,26 @@ export default function Home() {
             </h2>
             
             <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-              Snart kan du lave personlige madplaner baseret på næste uges tilbud, dine præferencer og familiens behov.
+              Nu kan du lave personlige madplaner baseret på næste uges tilbud, dine præferencer, dit vægttabsmål og familiens behov.
             </p>
             
             <p className="text-base text-gray-600 mb-8">
-              Alt beregnet ud fra danske råvarer og reelle priser.
+              Alt er beregnet ud fra danske råvarer, reelle priser og din hverdag.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-all">
-                Følg udviklingen
-              </button>
-              <button className="inline-flex items-center justify-center gap-2 bg-white border-2 border-gray-200 text-gray-900 px-6 py-3 rounded-lg font-semibold hover:border-gray-300 transition-all">
-                Bliv testbruger 2026
-              </button>
+              <Link
+                href="/kom-i-gang"
+                className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-800 transition-all"
+              >
+                Opret dig gratis i dag
+              </Link>
+              <Link
+                href="/vaegttab"
+                className="inline-flex items-center justify-center gap-2 bg-white border-2 border-gray-200 text-gray-900 px-6 py-3 rounded-lg font-semibold hover:border-gray-300 transition-all"
+              >
+                Mere om vægttab
+              </Link>
             </div>
           </div>
         </div>

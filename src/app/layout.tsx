@@ -4,6 +4,7 @@ import './globals.css'
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -38,6 +39,7 @@ export default function RootLayout({
             <AuthProvider>
               <Header />
               {children}
+              <Footer />
             </AuthProvider>
           </AnalyticsProvider>
         </div>
