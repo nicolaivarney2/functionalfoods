@@ -6,6 +6,7 @@ import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, Layou
 import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
+import RecipeSearchModal from './RecipeSearchModal'
 
 const mainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
@@ -31,6 +32,7 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+  const [isRecipeSearchOpen, setIsRecipeSearchOpen] = useState(false)
   const { user, signOut } = useAuth()
   const { isAdmin } = useAdminCheck()
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -85,13 +87,14 @@ export default function Header() {
                 {/* User Menu */}
                 {user ? (
                   <>
-                    <Link
-                      href="/opskriftsoversigt"
+                    <button
+                      type="button"
+                      onClick={() => setIsRecipeSearchOpen(true)}
                       className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
-                      aria-label="Søg og gennemse opskrifter"
+                      aria-label="Søg opskrifter"
                     >
                       <Search size={20} aria-hidden />
-                    </Link>
+                    </button>
                   <div className="relative" ref={userMenuRef}>
                     <button
                       type="button"
@@ -178,13 +181,14 @@ export default function Header() {
                   </>
                 ) : (
                   <>
-                    <Link
-                      href="/opskriftsoversigt"
+                    <button
+                      type="button"
+                      onClick={() => setIsRecipeSearchOpen(true)}
                       className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
-                      aria-label="Søg og gennemse opskrifter"
+                      aria-label="Søg opskrifter"
                     >
                       <Search size={20} aria-hidden />
-                    </Link>
+                    </button>
                     <Link
                       href="/kom-i-gang"
                       className="inline-flex items-center gap-2 rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-sm font-medium text-white hover:bg-white/5 transition-colors"
@@ -372,6 +376,8 @@ export default function Header() {
           </div>
         )}
       </header>
+
+      <RecipeSearchModal isOpen={isRecipeSearchOpen} onClose={() => setIsRecipeSearchOpen(false)} />
 
       {/* Login Modal */}
       <LoginModal 
