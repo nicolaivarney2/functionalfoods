@@ -61,21 +61,21 @@ export default function Header() {
       <header className="bg-white border-b border-gray-200">
         {/* Top Menu - Black Background */}
         <div className="bg-black text-white">
-          <div className="container">
-            <div className="flex items-center justify-between h-16">
+          <div className="container px-3 sm:px-4">
+            <div className="flex items-center justify-between h-16 gap-3">
               {/* Logo */}
-              <Link href="/" className="flex items-center space-x-3">
+              <Link href="/" className="flex items-center space-x-2.5 shrink-0">
                 <div className="text-2xl font-bold">FF</div>
-                <span className="text-lg font-medium">Functional Foods</span>
+                <span className="text-base lg:text-lg font-medium">Functional Foods</span>
               </Link>
 
               {/* Desktop Main Menu */}
-              <nav className="hidden md:flex items-center space-x-8">
+              <nav className="hidden md:flex items-center justify-center flex-1 gap-6 lg:gap-8 px-3">
                 {mainMenuItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="text-white hover:text-gray-300 transition-colors text-sm"
+                    className="text-white hover:text-gray-300 transition-colors text-[13px] font-medium tracking-wide whitespace-nowrap"
                   >
                     {item.name}
                   </Link>
@@ -83,17 +83,17 @@ export default function Header() {
               </nav>
 
               {/* Search and User Menu */}
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* User Menu */}
                 {user ? (
                   <>
                     <button
                       type="button"
                       onClick={() => setIsRecipeSearchOpen(true)}
-                      className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
+                      className="inline-flex items-center justify-center rounded-md border border-white/70 px-2 py-1 sm:px-2.5 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
                       aria-label="Søg opskrifter"
                     >
-                      <Search size={20} aria-hidden />
+                      <Search size={18} className="sm:w-5 sm:h-5" aria-hidden />
                     </button>
                   <div className="relative" ref={userMenuRef}>
                     <button
@@ -104,7 +104,7 @@ export default function Header() {
                       <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
                         <User size={16} />
                       </div>
-                      <span className="hidden md:block text-sm">
+                      <span className="hidden md:block text-sm max-w-[9rem] truncate">
                         {user.user_metadata?.name || user.email?.split('@')[0]}
                       </span>
                     </button>
@@ -184,25 +184,25 @@ export default function Header() {
                     <button
                       type="button"
                       onClick={() => setIsRecipeSearchOpen(true)}
-                      className="inline-flex items-center justify-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
+                      className="inline-flex items-center justify-center rounded-md border border-white/70 px-2 py-1 sm:px-2.5 sm:py-1.5 text-white hover:bg-white/5 transition-colors"
                       aria-label="Søg opskrifter"
                     >
-                      <Search size={20} aria-hidden />
+                      <Search size={18} className="sm:w-5 sm:h-5" aria-hidden />
                     </button>
                     <Link
                       href="/kom-i-gang"
-                      className="inline-flex items-center gap-2 rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 text-sm font-medium text-white hover:bg-white/5 transition-colors"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 rounded-md border border-white/70 px-2 py-1 sm:px-2.5 sm:py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-white/5 transition-colors"
                     >
-                      <UserPlus size={20} className="shrink-0" aria-hidden />
+                      <UserPlus size={18} className="shrink-0 sm:w-5 sm:h-5" aria-hidden />
                       <span className="hidden sm:inline whitespace-nowrap">Opret dig</span>
                     </Link>
-                    <div className="inline-flex items-center rounded-md border border-white/75 px-2.5 py-1 sm:px-3 sm:py-1.5 hover:bg-white/5 transition-colors">
+                    <div className="inline-flex items-center rounded-md border border-white/70 px-2 py-1 sm:px-2.5 sm:py-1.5 hover:bg-white/5 transition-colors">
                       <button
                         type="button"
                         onClick={() => setIsLoginModalOpen(true)}
-                        className="flex items-center gap-2 text-white hover:text-gray-200 transition-colors text-sm font-medium"
+                        className="flex items-center gap-1.5 sm:gap-2 text-white hover:text-gray-200 transition-colors text-xs sm:text-sm font-medium"
                       >
-                        <User size={20} className="shrink-0" aria-hidden />
+                        <User size={18} className="shrink-0 sm:w-5 sm:h-5" aria-hidden />
                         <span className="hidden md:inline">Log ind</span>
                       </button>
                     </div>
@@ -227,8 +227,8 @@ export default function Header() {
           <div className="container">
             <div className="relative">
               {/* Scrollable Navigation */}
-              <nav className="flex items-center h-12 text-sm font-medium overflow-x-auto scrollbar-hide hover:cursor-grab active:cursor-grabbing">
-                <div className="flex items-center space-x-8 min-w-max px-4">
+              <nav className="flex items-center h-11 text-[13px] font-medium overflow-x-auto scrollbar-hide hover:cursor-grab active:cursor-grabbing">
+                <div className="flex items-center gap-x-6 min-w-max px-3 sm:px-4">
                   {dietaryCategories.map((category) => (
                     <Link
                       key={category.name}

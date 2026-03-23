@@ -182,17 +182,23 @@ export default function IndkobTokenPage() {
                   const pi = productInfo as Record<string, unknown> | undefined
                   const purchaseHint = formatPurchaseHint(pi)
                   const isDone = checked[key]
+                  const isOnSale = Boolean((pi as { isOnSale?: boolean } | undefined)?.isOnSale)
+                  const rawPrice =
+                    (pi as { totalPrice?: number } | undefined)?.totalPrice ??
+                    (pi as { price?: number } | undefined)?.price
+                  const hasPrice = typeof rawPrice === 'number' && Number.isFinite(rawPrice)
+                  const priceText = hasPrice ? `${Number(rawPrice).toFixed(2).replace('.', ',')} kr` : null
                   return (
                     <li
                       key={key}
-                      className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
+                      className={`flex items-start gap-2 rounded-lg border px-2 py-1 transition-colors ${
                         isDone ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-slate-200'
                       }`}
                     >
                       <button
                         type="button"
                         onClick={() => toggle(key)}
-                        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 ${
+                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 ${
                           isDone
                             ? 'border-emerald-600 bg-emerald-600 text-white'
                             : 'border-slate-300 bg-white'
@@ -202,55 +208,37 @@ export default function IndkobTokenPage() {
                         {isDone && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-sm font-medium leading-snug text-slate-900 ${isDone ? 'line-through text-slate-500' : ''}`}
-                        >
-                          {pi && (pi as { name?: string }).name ? (pi as { name: string }).name : name}
+                        <div className="flex items-start justify-between gap-2">
+                          <div
+                            className={`text-[13px] font-semibold leading-tight text-slate-900 ${isDone ? 'line-through text-slate-500' : ''}`}
+                          >
+                            {pi && (pi as { name?: string }).name ? (pi as { name: string }).name : name}
+                          </div>
+                          {priceText ? (
+                            <div className="shrink-0 text-[13px] leading-tight tabular-nums text-right">
+                              <span className={isOnSale ? 'text-emerald-700 font-semibold' : 'text-slate-700'}>
+                                {priceText}
+                              </span>
+                              {isOnSale ? <span className="ml-1 text-[10px] text-amber-700">tilbud</span> : null}
+                            </div>
+                          ) : null}
                         </div>
                         {pi && (pi as { name?: string }).name && (
-                          <div className="text-[11px] text-slate-500 leading-tight">{name}</div>
+                          <div className="text-[10px] text-slate-500 leading-tight mt-0.5">{name}</div>
                         )}
                         {purchaseHint ? (
                           <div
-                            className={`text-xs font-medium text-emerald-800 mt-0.5 leading-tight ${isDone ? 'line-through text-slate-500' : ''}`}
+                            className={`text-[11px] font-medium text-emerald-800 mt-0.5 leading-tight ${isDone ? 'line-through text-slate-500' : ''}`}
                           >
                             Køb: {purchaseHint}
                           </div>
                         ) : null}
                         <div
-                          className={`mt-0.5 leading-tight ${purchaseHint ? 'text-[11px] text-slate-500' : 'text-xs text-slate-600'} ${isDone ? 'line-through' : ''}`}
+                          className={`mt-0.5 leading-tight ${purchaseHint ? 'text-[10px] text-slate-500' : 'text-[11px] text-slate-600'} ${isDone ? 'line-through' : ''}`}
                         >
                           {purchaseHint ? 'Opskrift: ' : null}
                           {formatQty(item.amount)} {String(item.unit || '')}
                         </div>
-                        {pi &&
-                          ((pi as { isOnSale?: boolean }).isOnSale ||
-                            (pi as { totalPrice?: number }).totalPrice) && (
-                            <div className="text-xs mt-0.5 tabular-nums">
-                              {(pi as { isOnSale?: boolean }).isOnSale ? (
-                                <span className="text-emerald-700 font-semibold">
-                                  {(pi as { totalPrice?: number; price?: number }).totalPrice != null
-                                    ? Number((pi as { totalPrice: number }).totalPrice).toFixed(2).replace('.', ',')
-                                    : Number((pi as { price?: number }).price || 0)
-                                        .toFixed(2)
-                                        .replace('.', ',')}{' '}
-                                  kr
-                                  <span className="ml-1 font-normal text-amber-700">tilbud</span>
-                                </span>
-                              ) : (
-                                <span className="text-slate-700">
-                                  {Number(
-                                    (pi as { totalPrice?: number }).totalPrice ||
-                                      (pi as { price?: number }).price ||
-                                      0
-                                  )
-                                    .toFixed(2)
-                                    .replace('.', ',')}{' '}
-                                  kr
-                                </span>
-                              )}
-                            </div>
-                          )}
                       </div>
                     </li>
                   )
