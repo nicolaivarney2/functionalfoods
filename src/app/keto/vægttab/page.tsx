@@ -286,8 +286,8 @@ export default function KetoWeightLossPage() {
                       className="w-full h-auto"
                       unoptimized
                     />
-                    <figcaption className="px-4 py-3 text-center text-sm text-gray-500">
-                      Illustration: Graf der viser vægttab over tid – hurtigt fald i første uge (væske), derefter jævnere kurve
+                    <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
+                      Når du starter Keto, skal du give dig tid til at lære om maden, og acceptere at al nyt kræver tilvænning
                     </figcaption>
                   </figure>
                 </div>
@@ -379,10 +379,19 @@ export default function KetoWeightLossPage() {
                     </div>
                   </div>
 
-                  {/* Illustration placeholder */}
-                  <div className="mt-6 bg-gray-50 rounded-xl p-6 border-2 border-dashed border-gray-300 text-center">
-                    <p className="text-gray-500 text-sm">Illustration: Tallerkenmodellen – 50% grøntsager, 40% protein, 10% fedt med eksempler på hver kategori</p>
-                  </div>
+                  <figure className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <Image
+                      src="/billeder/nicher/keto/functionalfoods-tallerkenmodellen.png"
+                      alt="Tallerkenmodellen: 50% grøntsager, 40% protein, 10% fedt"
+                      width={1514}
+                      height={658}
+                      className="w-full h-auto"
+                      unoptimized
+                    />
+                    <figcaption className="px-4 py-3 text-center text-sm text-gray-600">
+                      Tallerkenmodellen – 50% grøntsager, 40% protein, 10% fedt - Et simpelt spiseprincip.
+                    </figcaption>
+                  </figure>
                 </div>
 
                 {/* Fase 4 */}
