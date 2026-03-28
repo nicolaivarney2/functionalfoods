@@ -8,6 +8,13 @@ export class DatabaseService {
   private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
   private allRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
 
+  /** Short TTL: counts change nightly; avoids repeated heavy work on page refresh. */
+  private readonly PRODUCT_COUNTS_CACHE_TTL_MS = 45_000
+  private productCountsCache: {
+    data: { total: number; categories: { [key: string]: number }; offers: number }
+    expiresAt: number
+  } | null = null
+
   private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
     'frugt & grønt': 'Frugt og grønt',
     'frugt og grønt': 'Frugt og grønt',
@@ -172,31 +179,64 @@ export class DatabaseService {
     return transformedIngredients
   }
 
+  private parseProductCountsRpc(data: unknown): {
+    total: number
+    categories: { [key: string]: number }
+    offers: number
+  } | null {
+    if (data == null) return null
+    let obj: Record<string, unknown> = {}
+    if (typeof data === 'string') {
+      try {
+        obj = JSON.parse(data) as Record<string, unknown>
+      } catch {
+        return null
+      }
+    } else if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+      obj = data as Record<string, unknown>
+    } else {
+      return null
+    }
+    const total = Number(obj.total)
+    const offers = Number(obj.offers)
+    if (!Number.isFinite(total) || !Number.isFinite(offers)) return null
+    const categories: { [key: string]: number } = {}
+    const rawCats = obj.categories
+    if (rawCats && typeof rawCats === 'object' && rawCats !== null && !Array.isArray(rawCats)) {
+      for (const [k, v] of Object.entries(rawCats as Record<string, unknown>)) {
+        const n = Number(v)
+        if (Number.isFinite(n)) categories[k] = n
+      }
+    }
+    return { total, offers, categories }
+  }
+
   /**
-   * NEW: Get product counts from new structure (product_offers + products)
+   * Legacy: many batched selects (slow on large catalogs). Kept as fallback if RPC is missing.
    */
-  async getProductCountsV2(): Promise<{total: number, categories: {[key: string]: number}, offers: number}> {
+  private async getProductCountsV2Legacy(): Promise<{
+    total: number
+    categories: { [key: string]: number }
+    offers: number
+  }> {
     try {
       const supabase = createSupabaseClient()
-      
-      // Get total count of available offers
+
       const { count: totalCount, error: totalError } = await supabase
         .from('product_offers')
         .select('*', { count: 'exact', head: true })
         .eq('is_available', true)
-      
+
       if (totalError) {
         console.error('Error getting total count (V2):', totalError)
         return { total: 0, categories: {}, offers: 0 }
       }
-      
-      // Get category counts by joining with products table
-      // Use pagination to handle large datasets
+
       let allCategoryData: any[] = []
       let start = 0
       const batchSize = 1000
       const total = totalCount || 0
-      
+
       while (start < total) {
         const end = Math.min(start + batchSize - 1, total - 1)
         const { data: batchData, error: batchError } = await supabase
@@ -209,34 +249,31 @@ export class DatabaseService {
           `)
           .eq('is_available', true)
           .range(start, end)
-        
+
         if (batchError) {
           console.error(`Error getting category batch ${start}-${end}:`, batchError)
           break
         }
-        
+
         if (batchData) {
           allCategoryData = [...allCategoryData, ...batchData]
         }
-        
+
         start += batchSize
-        
-        // Safety break
+
         if (start > 50000) {
           console.warn('Breaking category fetch at 50000 to prevent infinite loop')
           break
         }
       }
-      
-      // Count categories (use department first, fallback to category)
-      const categoryCounts = allCategoryData.reduce((acc: {[key: string]: number}, offer: any) => {
+
+      const categoryCounts = allCategoryData.reduce((acc: { [key: string]: number }, offer: any) => {
         const product = offer.products || {}
         const category = product.department || product.category || 'Ukategoriseret'
         acc[category] = (acc[category] || 0) + 1
         return acc
       }, {})
-      
-      // Use precomputed offer flag for fast counts
+
       const { count: offersCount, error: offersError } = await supabase
         .from('product_offers')
         .select('*', { count: 'exact', head: true })
@@ -247,17 +284,53 @@ export class DatabaseService {
         console.error('Error getting offers count (V2):', offersError)
       }
 
-      const realOffersCount = offersCount || 0
-      
       return {
         total: totalCount || 0,
         categories: categoryCounts,
-        offers: realOffersCount
+        offers: offersCount || 0,
       }
     } catch (error) {
-      console.error('Error in getProductCountsV2:', error)
+      console.error('Error in getProductCountsV2Legacy:', error)
       return { total: 0, categories: {}, offers: 0 }
     }
+  }
+
+  /**
+   * NEW: Get product counts from new structure (product_offers + products).
+   * Prefers Postgres RPC (single query); falls back to legacy batched reads if RPC unavailable.
+   */
+  async getProductCountsV2(): Promise<{ total: number; categories: { [key: string]: number }; offers: number }> {
+    const now = Date.now()
+    if (this.productCountsCache && this.productCountsCache.expiresAt > now) {
+      return this.productCountsCache.data
+    }
+
+    try {
+      const supabase = createSupabaseClient()
+      const { data, error } = await supabase.rpc('get_product_counts_v2')
+      if (!error && data != null) {
+        const parsed = this.parseProductCountsRpc(data)
+        if (parsed) {
+          this.productCountsCache = {
+            data: parsed,
+            expiresAt: now + this.PRODUCT_COUNTS_CACHE_TTL_MS,
+          }
+          return parsed
+        }
+      }
+      if (error) {
+        console.warn('get_product_counts_v2 RPC unavailable, using legacy counts:', error.message)
+      }
+    } catch (e) {
+      console.warn('get_product_counts_v2 RPC exception, using legacy counts:', e)
+    }
+
+    const legacy = await this.getProductCountsV2Legacy()
+    this.productCountsCache = {
+      data: legacy,
+      expiresAt: now + this.PRODUCT_COUNTS_CACHE_TTL_MS,
+    }
+    return legacy
   }
 
   /**
