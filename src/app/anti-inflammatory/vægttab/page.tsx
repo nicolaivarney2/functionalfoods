@@ -90,7 +90,7 @@ export default function AntiInflammatoryWeightLossTheoryPage() {
               <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center">
                 <Shield className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Inflammation kort fortalt</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Hvad betyder inflammation i praksis?</h2>
             </div>
             <div className="prose prose-lg max-w-none text-gray-700 space-y-6 leading-relaxed">
               <p>

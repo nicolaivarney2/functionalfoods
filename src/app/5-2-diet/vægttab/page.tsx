@@ -114,7 +114,7 @@ export default function FiveTwoDietWeightLossTheoryPage() {
               <div className="w-12 h-12 bg-amber-600 rounded-xl flex items-center justify-center">
                 <Calculator className="w-6 h-6 text-white" />
               </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Byg fastedagen med næring</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900">Byg lavkaloriedagen med næring</h2>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-8 mb-8">
               <ul className="space-y-3 text-gray-800">
@@ -158,7 +158,7 @@ export default function FiveTwoDietWeightLossTheoryPage() {
             </div>
             <p className="text-gray-700 leading-relaxed space-y-4">
               Gravide, ammende, personer med diabetes (især på insulin), spiseforstyrrelser eller medicin der kræver mad bør
-              tale med læge eller diætist før faste-dage. Børn og teenagere skal som udgangspunkt ikke faste efter voksenmodel.
+              tale med læge eller diætist før lavkaloriedage. Børn og teenagere skal som udgangspunkt ikke følge 5:2 efter voksenmodel.
             </p>
           </div>
         </div>
