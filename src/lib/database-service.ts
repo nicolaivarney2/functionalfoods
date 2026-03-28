@@ -47,8 +47,24 @@ export class DatabaseService {
     'Kød og fisk',
     'Kolonial',
     'Mejeri og køl',
-    'Nemt og hurtigt'
+    'Nemt og hurtigt',
   ]
+
+  /**
+   * Ekstra department-strenge fra Goma/REMA m.fl. der er fødevarer, men ikke identiske med FOOD_ONLY_CATEGORIES.
+   * Bruges når "Kun fødevarer" er valgt uden kategori — filtrering sker på join (ikke findProductIdsForCategories),
+   * ellers mangler fx REMA-varer med "Køl", "Frost", "Kød & fisk" osv.
+   */
+  private readonly FOOD_ONLY_DEPARTMENT_EXTRA = [
+    'Frost',
+    'Køl',
+    'Mejeri',
+    'Ost m.v.',
+    'Kød & fisk',
+    'Kød, fisk & fjerkræ',
+    'Brød',
+    'Frugt & grønt',
+  ] as const
   /**
    * Get published recipes from database (for frontend use)
    */
@@ -381,6 +397,13 @@ export class DatabaseService {
       const offset = (page - 1) * limit
       const categoryFilter = this.buildCategoryFilterList(categories, foodOnly)
 
+      // Kun fødevarer + ugyldig kategori (fx kun Drikkevarer): ingen resultater
+      if (foodOnly && this.hasUserCategorySelection(categories) && categoryFilter.length === 0) {
+        return { products: [], total: 0, hasMore: false }
+      }
+
+      const implicitFoodOnly = Boolean(foodOnly && !this.hasUserCategorySelection(categories))
+
       // Category filtering using the new product_offers structure
 
       // Base query: offers + join til products
@@ -450,6 +473,11 @@ export class DatabaseService {
         if (!organicProductIds || organicProductIds.length === 0) {
           return { products: [], total: 0, hasMore: false }
         }
+      }
+
+      if (categoryFilter.length === 0 && implicitFoodOnly) {
+        const allow = this.getFoodOnlyDepartmentAllowList()
+        query = query.in('products.department', allow)
       }
 
       if (categoryFilter.length > 0) {
@@ -956,6 +984,28 @@ export class DatabaseService {
    * Helper: find product_ids whose department/category matches any of the provided categories.
    * Uses iterative ilike to avoid brittle OR strings and supports URL-decoded variants.
    */
+  /** Synonymer pr. kanonisk kategori — matcher fx REMA "Kød & fisk" mod UI "Kød og fisk". */
+  private getDepartmentAliasesForCanonicalCategory(canonical: string): string[] {
+    const map: Record<string, string[]> = {
+      'Kød og fisk': ['Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød fisk'],
+      'Mejeri og køl': ['Køl', 'Mejeri', 'Ost m.v.'],
+      'Brød og kager': ['Brød', 'Kager'],
+      'Frugt og grønt': ['Frugt & grønt'],
+    }
+    return map[canonical] || []
+  }
+
+  private getFoodOnlyDepartmentAllowList(): string[] {
+    return Array.from(new Set([...this.FOOD_ONLY_CATEGORIES, ...this.FOOD_ONLY_DEPARTMENT_EXTRA]))
+  }
+
+  private hasUserCategorySelection(categories?: string[]): boolean {
+    const normalized = (categories || [])
+      .map((cat) => this.normalizeCategoryInput(cat))
+      .filter((cat): cat is string => Boolean(cat))
+    return normalized.length > 0
+  }
+
   private async findProductIdsForCategories(categories: string[]): Promise<string[]> {
     const supabase = createSupabaseClient()
     const seen = new Set<string>()
@@ -990,34 +1040,45 @@ export class DatabaseService {
     // OPTIMIZED: Try exact matches first (much faster), then fall back to partial matches
     for (const cat of categories) {
       const normalized = cat.trim()
-      // STEP 1: Try exact match on department first (most common and fastest)
-      const { data: exactDept, error: deptErr } = await supabase
-        .from('products')
-        .select('id')
-        .ilike('department', normalized)
-        .limit(10000)
-      
-      if (!deptErr && exactDept && exactDept.length > 0) {
-        exactDept.forEach(r => r?.id && seen.add(r.id))
-        continue // Found exact match, skip to next category
+      const aliasesToTry = Array.from(
+        new Set([normalized, ...this.getDepartmentAliasesForCanonicalCategory(normalized)])
+      )
+
+      let matchedThisCategory = false
+      for (const alias of aliasesToTry) {
+        const { data: exactDept, error: deptErr } = await supabase
+          .from('products')
+          .select('id')
+          .ilike('department', alias)
+          .limit(10000)
+
+        if (!deptErr && exactDept && exactDept.length > 0) {
+          exactDept.forEach((r) => r?.id && seen.add(r.id))
+          matchedThisCategory = true
+          break
+        }
+
+        const { data: exactCat, error: catErr } = await supabase
+          .from('products')
+          .select('id')
+          .ilike('category', alias)
+          .limit(10000)
+
+        if (!catErr && exactCat && exactCat.length > 0) {
+          exactCat.forEach((r) => r?.id && seen.add(r.id))
+          matchedThisCategory = true
+          break
+        }
       }
-      
-      // STEP 2: Try exact match on category
-      const { data: exactCat, error: catErr } = await supabase
-        .from('products')
-        .select('id')
-        .ilike('category', normalized)
-        .limit(10000)
-      
-      if (!catErr && exactCat && exactCat.length > 0) {
-        exactCat.forEach(r => r?.id && seen.add(r.id))
-        continue // Found exact match, skip to next category
+
+      if (matchedThisCategory) {
+        continue
       }
-      
-      // STEP 3: If no exact match, try a few key variants with OR query (faster than multiple separate queries)
+
+      // STEP 3: If no exact match, try variants with OR query (faster than multiple separate queries)
       const variants = expandedVariants(cat)
-      const keyVariants = Array.from(new Set(variants)).filter(Boolean).slice(0, 3) // Only top 3 variants
-      
+      const keyVariants = Array.from(new Set(variants)).filter(Boolean)
+
       if (keyVariants.length > 0) {
         // Use OR query to search all fields at once (much faster than separate queries)
         const orConditions = keyVariants.map(v => 
@@ -1120,7 +1181,8 @@ export class DatabaseService {
       const allowed = this.getFoodOnlyCategories()
       const allowedSet = new Set(allowed)
       if (unique.length === 0) {
-        return allowed
+        // Tom = "alle fødevarer": ikke brug findProductIdsForCategories (undermatcher butiksnavne som REMA)
+        return []
       }
       return unique.filter(cat => allowedSet.has(cat))
     }
