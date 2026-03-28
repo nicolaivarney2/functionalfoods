@@ -154,13 +154,13 @@ export default function FiveTwoDietPage() {
                 </div>
                 
                 <div className="bg-orange-100 border border-orange-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-orange-800 mb-2">2 faste dage</h4>
+                  <h4 className="font-semibold text-orange-800 mb-2">2 lavkaloriedage</h4>
                   <p className="text-orange-700">Begræns kalorier til 500-600 kalorier 2 dage om ugen (ikke sammenhængende).</p>
                 </div>
                 
                 <div className="bg-yellow-100 border border-yellow-200 rounded-2xl p-6">
                   <h4 className="font-semibold text-yellow-800 mb-2">Fleksibilitet</h4>
-                  <p className="text-yellow-700">Vælg selv hvilke 2 dage du vil faste - perfekt til travle livsstile.</p>
+                  <p className="text-yellow-700">Vælg selv hvilke 2 dage der skal være lavkaloriedage - perfekt til travle livsstile.</p>
                 </div>
               </div>
             </div>
@@ -191,7 +191,7 @@ export default function FiveTwoDietPage() {
                       <div className="w-24 h-2 bg-gray-200 rounded-full">
                         <div className="w-8 h-2 bg-orange-500 rounded-full"></div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">Fast</span>
+                      <span className="text-sm font-medium text-gray-900">Lavkalorie</span>
                     </div>
                   </div>
                   
@@ -211,7 +211,7 @@ export default function FiveTwoDietPage() {
                       <div className="w-24 h-2 bg-gray-200 rounded-full">
                         <div className="w-8 h-2 bg-orange-500 rounded-full"></div>
                       </div>
-                      <span className="text-sm font-medium text-gray-900">Fast</span>
+                      <span className="text-sm font-medium text-gray-900">Lavkalorie</span>
                     </div>
                   </div>
                 </div>

@@ -79,9 +79,6 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   sizes="(max-width: 896px) 100vw, 896px"
                 />
               </div>
-              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
-                <span className="font-medium text-gray-800">Illustration:</span> En tallerken illustreret i to versioner – én med almindelig fordeling (mindre protein, mere pasta/ris) og én med proteinrig fordeling (større stykke kylling/fisk eller bønner, mindre stivelse). Dette viser visuelt, hvordan en proteinrig kost adskiller sig fra en typisk tallerkenfordeling.
-              </figcaption>
             </figure>
           </div>
         </div>
@@ -145,9 +142,6 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   sizes="(max-width: 896px) 100vw, 896px"
                 />
               </div>
-              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
-                <span className="font-medium text-gray-800">Illustration:</span> En simpel graf over mæthedskurver for to måltider – ét rigt på protein og ét rigt på kulhydrat. Grafen viser fx at kurven for proteinmåltidet holder sig høj (man er mæt) i længere tid, mens kurven for kulhydratmåltidet falder hurtigere (man bliver hurtigere sulten igen). Alternativt en illustration af en person med fuld mave efter et proteinrigt måltid vs. en sulten person kort tid efter et højkulhydrat måltid.
-              </figcaption>
             </figure>
           </div>
         </div>
@@ -222,9 +216,6 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   sizes="(max-width: 768px) 100vw, 768px"
                 />
               </div>
-              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
-                <span className="font-medium text-gray-800">Illustration:</span> En illustration med to forløb af vægttab – ét for en person på almindelig kost og ét for en person på høj-proteinkost. Begge viser vægttab, men ved den proteinrige kost bevares musklerne (illustreret ved fx en figur hvor muskelmassen er intakt) mens fedtprocenten går ned; i den anden ser man både muskler og fedt svinde ind. Alternativt to silhuetter efter vægttab: den ene lidt “ranglet” (muskeltab) og den anden mere “fit” (muskler bevaret).
-              </figcaption>
             </figure>
           </div>
         </div>
@@ -303,9 +294,6 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   sizes="(max-width: 896px) 100vw, 896px"
                 />
               </div>
-              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
-                <span className="font-medium text-gray-800">Illustration:</span> Den termiske effekt af føde (TEF) for protein, kulhydrat og fedt – typiske intervaller; de præcise tal varierer med fødevarevalg og målemetode.
-              </figcaption>
             </figure>
           </div>
         </div>
@@ -372,9 +360,6 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   sizes="(max-width: 896px) 100vw, 896px"
                 />
               </div>
-              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
-                <span className="font-medium text-gray-800">Illustration:</span> Blodsukker over tid efter to måltider – ét med højt proteinindhold og ét med højt sukkerindhold. Proteinkurven stiger typisk mere moderat og kan være mere stabil, mens et måltid rigt på hurtigt sukker ofte giver et højere top og et hurtigere fald (mulig “crash”-fornemmelse).
-              </figcaption>
             </figure>
           </div>
         </div>

@@ -133,13 +133,13 @@ export default function FiveTwoDietWeightLossTheoryPage() {
               </ul>
             </div>
             <p className="text-gray-700 leading-relaxed mb-6">
-              På FunctionalFoods kan du filtrere opskrifter og lægge dem i{' '}
+              På FunctionalFoods vælger du blot{' '}
               <Link href="/madbudget" className="text-amber-700 font-semibold hover:underline">
                 Madbudget
-              </Link>
-              : lav en ugeplan hvor du markerer hvilke dage der er &quot;2&quot; og hvilke der er &quot;5&quot;, så kalorier og
-              makroer stemmer med dit mål. (Vi arbejder på tydelige mærkater &quot;5&quot; og &quot;2&quot; på opskrifter –
-              indtil da: vælg lette retter med høj mæthed pr. kalorie.)
+              </Link>{' '}
+              og sætter 5:2 som kostplan. Så klarer systemet resten og bygger en præcis ugeplan, der er
+              ernæringsberegnet, vægttabsoptimeret og sammensat ud fra tilbud i de butikker, du har valgt. Det gør 5:2 langt
+              lettere at følge i praksis, fordi du ikke selv skal sidde og regne kalorier, fordeling eller indkøb sammen.
             </p>
           </div>
         </div>
