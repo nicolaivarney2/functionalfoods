@@ -66,32 +66,18 @@ export default function KetoRecipesPage() {
   useEffect(() => {
     const loadRecipes = async () => {
       try {
-        console.log('🔄 Loading keto recipes from API...')
-        const response = await fetch('/api/recipes')
+        const response = await fetch('/api/recipes?diet=keto')
         
         if (response.ok) {
           const responseData = await response.json()
           const recipes = responseData.recipes || responseData
-          console.log(`✅ Loaded ${recipes.length} recipes from API`)
-          
-          // Filter for keto recipes
-          const ketoRecipes = recipes.filter((recipe: Recipe) => {
-            if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
-              return false
-            }
-            return recipe.dietaryCategories.some(cat => 
-              cat.toLowerCase().includes('keto')
-            )
-          })
-          
-          console.log(`🥑 Found ${ketoRecipes.length} keto recipes`)
-          setAllRecipes(ketoRecipes)
-          setFilteredRecipes(ketoRecipes)
+          setAllRecipes(recipes)
+          setFilteredRecipes(recipes)
         } else {
-          console.error('❌ Failed to load recipes:', response.status, response.statusText)
+          console.error('Failed to load keto recipes:', response.status, response.statusText)
         }
       } catch (error) {
-        console.error('❌ Error loading recipes:', error)
+        console.error('Error loading keto recipes:', error)
       } finally {
         setIsLoading(false)
       }

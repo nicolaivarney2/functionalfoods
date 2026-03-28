@@ -66,32 +66,18 @@ export default function GLP1RecipesPage() {
   useEffect(() => {
     const loadRecipes = async () => {
       try {
-        console.log('🔄 Loading GLP-1 recipes from API...')
-        const response = await fetch('/api/recipes')
+        const response = await fetch('/api/recipes?diet=glp-1')
         
         if (response.ok) {
           const responseData = await response.json()
           const recipes = responseData.recipes || responseData
-          console.log(`✅ Loaded ${recipes.length} recipes from API`)
-          
-          // Filter for GLP-1 recipes
-          const glp1Recipes = recipes.filter((recipe: Recipe) => {
-            if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
-              return false
-            }
-            return recipe.dietaryCategories.some(cat => 
-              cat.toLowerCase().includes('glp-1') || cat.toLowerCase().includes('glp1')
-            )
-          })
-          
-          console.log(`🧠 Found ${glp1Recipes.length} GLP-1 recipes`)
-          setAllRecipes(glp1Recipes)
-          setFilteredRecipes(glp1Recipes)
+          setAllRecipes(recipes)
+          setFilteredRecipes(recipes)
         } else {
-          console.error('❌ Failed to load recipes:', response.status, response.statusText)
+          console.error('Failed to load GLP-1 recipes:', response.status, response.statusText)
         }
       } catch (error) {
-        console.error('❌ Error loading recipes:', error)
+        console.error('Error loading GLP-1 recipes:', error)
       } finally {
         setIsLoading(false)
       }

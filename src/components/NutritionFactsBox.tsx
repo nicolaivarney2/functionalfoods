@@ -56,11 +56,11 @@ export default function NutritionFactsBox({
     const vitaminData: { [key: string]: { amount: number, unit: string, dailyValue: number, percentage: number } } = {}
     const mineralData: { [key: string]: { amount: number, unit: string, dailyValue: number, percentage: number } } = {}
 
-    // Process vitamins - divider med antal portioner
+    // Process vitamins - værdierne fra API er allerede pr. portion
     Object.entries(vitamins).forEach(([vitaminKey, amount]) => {
       const dailyVal = dailyValues[vitaminKey as keyof typeof dailyValues]
       if (dailyVal && amount > 0) {
-        const perServing = amount / servings // Divider med antal portioner
+        const perServing = amount
         const percentage = Math.round((perServing / dailyVal.amount) * 100)
         const displayName = vitaminKey === 'B12' ? 'Vitamin B12' : 
                            vitaminKey === 'B6' ? 'Vitamin B6' :
@@ -79,11 +79,11 @@ export default function NutritionFactsBox({
       }
     })
 
-    // Process minerals - divider med antal portioner
+    // Process minerals - værdierne fra API er allerede pr. portion
     Object.entries(minerals).forEach(([mineralKey, amount]) => {
       const dailyVal = dailyValues[mineralKey as keyof typeof dailyValues]
       if (dailyVal && amount > 0) {
-        const perServing = amount / servings // Divider med antal portioner
+        const perServing = amount
         const percentage = Math.round((perServing / dailyVal.amount) * 100)
         const displayName = mineralKey === 'calcium' ? 'Calcium' :
                            mineralKey === 'iron' ? 'Jern' :

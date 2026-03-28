@@ -19,7 +19,7 @@ export function generateRecipeStructuredData(recipe: Recipe) {
     "recipeYield": `${recipe.servings} servings`,
     "recipeCategory": recipe.mainCategory,
     "recipeCuisine": "Danish",
-    "suitableForDiet": recipe.dietaryCategories ? recipe.dietaryCategories.map(category => {
+    "suitableForDiet": recipe.dietaryCategories ? recipe.dietaryCategories.filter((c): c is string => typeof c === 'string').map(category => {
       // Map dietary categories to schema.org diet types
       const dietMap: { [key: string]: string } = {
         'Keto': 'https://schema.org/LowCarbDiet',
@@ -54,7 +54,7 @@ export function generateRecipeStructuredData(recipe: Recipe) {
     "recipeServings": recipe.servings,
     "recipeDifficulty": recipe.difficulty,
     "cookingMethod": "stovetop", // You can make this dynamic based on recipe type
-    "additionalProperty": recipe.dietaryCategories ? recipe.dietaryCategories.map(category => ({
+    "additionalProperty": recipe.dietaryCategories ? recipe.dietaryCategories.filter((c): c is string => typeof c === 'string').map(category => ({
       "@type": "PropertyValue",
       "name": "dietary_category",
       "value": category
@@ -109,12 +109,13 @@ export function generateBreadcrumbStructuredData(recipe: Recipe) {
 }
 
 export function generateRecipeCollectionStructuredData(category: string, recipes: Recipe[]) {
+  const cat = category || 'opskrifter'
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    "name": `${category} opskrifter`,
-    "description": `Alle ${category.toLowerCase()} opskrifter fra Functional Foods`,
-    "url": `https://functionalfoods.dk/opskrifter/${category.toLowerCase()}`,
+    "name": `${cat} opskrifter`,
+    "description": `Alle ${cat.toLowerCase()} opskrifter fra Functional Foods`,
+    "url": `https://functionalfoods.dk/opskrifter/${cat.toLowerCase()}`,
     "mainEntity": {
       "@type": "ItemList",
       "numberOfItems": recipes.length,

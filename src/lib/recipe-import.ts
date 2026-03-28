@@ -570,8 +570,10 @@ function generateMetaDescription(recipe: RawRecipeData): string {
 
 function generateKeywords(recipe: RawRecipeData): string[] {
   const baseKeywords = [
-    recipe.mainCategory.toLowerCase(),
-    ...(recipe.dietaryCategories || []).map(cat => cat.toLowerCase()),
+    (recipe.mainCategory || '').toLowerCase(),
+    ...(recipe.dietaryCategories || [])
+      .filter((cat): cat is string => typeof cat === 'string')
+      .map((cat) => cat.toLowerCase()),
     'vægttab',
     'sunde opskrifter'
   ]

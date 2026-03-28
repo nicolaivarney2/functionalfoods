@@ -65,8 +65,11 @@ export default function Home() {
 
   // Get recipe category name
   const getRecipeCategory = (recipe: Recipe): string => {
-    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
-      const category = recipe.dietaryCategories[0]
+    const first =
+      recipe.dietaryCategories?.find((c): c is string => typeof c === 'string' && c.trim() !== '') ??
+      null
+    if (first) {
+      const category = first
       const categoryMap: { [key: string]: string } = {
         'keto': 'Keto',
         'sense': 'Sense',
@@ -85,8 +88,9 @@ export default function Home() {
   }
 
   const getCategoryHref = (recipe: Recipe): string => {
-    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
-      const category = recipe.dietaryCategories[0].toLowerCase()
+    const raw = recipe.dietaryCategories?.find((c): c is string => typeof c === 'string' && c.trim() !== '')
+    if (raw) {
+      const category = raw.toLowerCase()
       const hrefMap: { [key: string]: string } = {
         'keto': '/keto/opskrifter',
         'sense': '/sense/opskrifter',

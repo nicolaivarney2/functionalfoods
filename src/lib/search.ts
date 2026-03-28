@@ -38,9 +38,10 @@ export function searchRecipes(recipes: Recipe[], filters: SearchFilters): Recipe
       if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
         return false
       }
-      const hasMatchingDietary = filters.dietary.some(dietary =>
-        recipe.dietaryCategories.some(cat => 
-          cat.toLowerCase() === dietary.toLowerCase()
+      const hasMatchingDietary = filters.dietary.some((dietary) =>
+        recipe.dietaryCategories.some(
+          (cat) =>
+            typeof cat === 'string' && cat.toLowerCase() === dietary.toLowerCase()
         )
       )
       if (!hasMatchingDietary) return false

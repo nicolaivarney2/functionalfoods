@@ -3,6 +3,23 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const revalidate = 0
 
+/** Samme logik som ved opslag i ingredients — mængde/enhed fjernes, så vi kan matche række → basisnavn */
+function cleanRecipeIngredientName(raw: string): string {
+  let s = raw.toLowerCase().trim()
+  s = s
+    .replace(/^\d+[.,]?\d*\s*(stk|st|styk|stykker|dl|ml|l|g|gram|kg|mg|tsk|tesk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/i, '')
+    .replace(/^\d+[.,]?\d*\s*/, '')
+    .trim()
+  return s
+}
+
+function isPersistentIngredientId(id: string | undefined): id is string {
+  if (!id) return false
+  const v = String(id).trim()
+  if (!v) return false
+  return !v.toLowerCase().startsWith('temp-')
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -25,22 +42,17 @@ export async function GET(
     // If not found by slug, try to find by ID (fallback for imported recipes)
     if (recipeError || !recipe) {
       console.log(`🔍 Recipe not found by slug "${slug}", trying to find by ID...`)
-      
-      // Check if slug is actually an ID (UUID format)
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug)
-      
-      if (isUUID) {
-        const { data: recipeById, error: recipeByIdError } = await supabase
-          .from('recipes')
-          .select('id, title, ingredients, slug')
-          .eq('id', slug)
-          .single()
-        
-        if (!recipeByIdError && recipeById) {
-          recipe = recipeById
-          recipeError = null
-          console.log(`✅ Found recipe by ID: ${recipe.title}`)
-        }
+
+      const { data: recipeById, error: recipeByIdError } = await supabase
+        .from('recipes')
+        .select('id, title, ingredients, slug')
+        .eq('id', slug)
+        .single()
+
+      if (!recipeByIdError && recipeById) {
+        recipe = recipeById
+        recipeError = null
+        console.log(`✅ Found recipe by ID: ${recipe.title}`)
       }
     }
 
@@ -68,82 +80,19 @@ export async function GET(
       })
     }
 
-    // Extract ingredient names from recipe ingredients (remove amount and unit)
-    const ingredientNames = recipeIngredients.map((ing: any) => {
-      // Remove amount and unit from ingredient name
-      // "1 stk avocado" -> "avocado"
-      // "2 dl mælk" -> "mælk"
-      // "500 g gulerødder" -> "gulerødder"
-      const name = ing.name.toLowerCase().trim()
-      
-      // Remove common amount patterns
-      const cleanedName = name
-        .replace(/^\d+\s*(stk|st|styk|stykker|dl|ml|l|g|kg|tsk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/, '')
-        .replace(/^\d+\s*/, '') // Remove any remaining numbers
-        .trim()
-      
-      return cleanedName
-    }).filter(Boolean)
-    
-    if (ingredientNames.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          recipeId: recipe.id,
-          recipeTitle: recipe.title,
-          ingredientMatches: [],
-          totalIngredients: 0,
-          matchedIngredients: 0,
-          unmatchedIngredients: 0
-        }
-      })
-    }
+    /**
+     * Primær sti: opskriftslinjer har `id` = ingredients.id → vi henter produktmatch direkte på ingredient_id.
+     * (Tidligere bug: opslag med fuld tekst "10 stk oksepølser" mod nøgle "oksepølser" → næsten alt fejlede.)
+     */
+    const ingredientIdsFromRecipe = [
+      ...new Set(
+        recipeIngredients
+          .map((ing: { id?: string }) => ing.id)
+          .filter((id: string | undefined): id is string => isPersistentIngredientId(id))
+      ),
+    ]
 
-    // Find matching ingredients in the ingredients table by name
-    const { data: matchingIngredients, error: ingredientsError } = await supabase
-      .from('ingredients')
-      .select('id, name')
-      .in('name', ingredientNames)
-
-    if (ingredientsError) {
-      console.error('Error fetching matching ingredients:', ingredientsError)
-      return NextResponse.json({
-        success: false,
-        message: 'Failed to fetch matching ingredients'
-      }, { status: 500 })
-    }
-
-    const matchingIngredientIds = matchingIngredients?.map(ing => ing.id) || []
-    
-    if (matchingIngredientIds.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          recipeId: recipe.id,
-          recipeTitle: recipe.title,
-          ingredientMatches: recipeIngredients.map((ing: any) => ({
-            ingredient: {
-              id: ing.id,
-              name: ing.name,
-              amount: ing.amount,
-              unit: ing.unit
-            },
-            isMatched: false,
-            matches: [],
-            totalMatches: 0,
-            bestMatch: null
-          })),
-          totalIngredients: recipeIngredients.length,
-          matchedIngredients: 0,
-          unmatchedIngredients: recipeIngredients.length
-        }
-      })
-    }
-
-    // Get matches for these ingredients
-    const { data: matches, error: matchesError } = await supabase
-      .from('product_ingredient_matches')
-      .select(`
+    const selectProductMatch = `
         ingredient_id,
         product_external_id,
         confidence,
@@ -158,62 +107,126 @@ export async function GET(
           is_on_sale,
           image_url
         )
-      `)
-      .in('ingredient_id', matchingIngredientIds)
+      `
 
-    if (matchesError) {
-      console.error('Error fetching matches:', matchesError)
-      return NextResponse.json({
-        success: false,
-        message: 'Failed to fetch ingredient matches'
-      }, { status: 500 })
+    let matches: any[] = []
+
+    if (ingredientIdsFromRecipe.length > 0) {
+      const { data: byIdMatches, error: matchesError } = await supabase
+        .from('product_ingredient_matches')
+        .select(selectProductMatch)
+        .in('ingredient_id', ingredientIdsFromRecipe)
+
+      if (matchesError) {
+        console.error('Error fetching matches:', matchesError)
+        return NextResponse.json({
+          success: false,
+          message: 'Failed to fetch ingredient matches',
+        }, { status: 500 })
+      }
+      matches = byIdMatches || []
     }
 
-    // Create a map of ingredient name to ingredient ID for matching
-    const ingredientNameToId = new Map()
-    matchingIngredients?.forEach(ing => {
-      ingredientNameToId.set(ing.name.toLowerCase().trim(), ing.id)
-    })
-    
-    console.log(`🔍 Extracted ingredient names:`, ingredientNames)
-    console.log(`🔍 Found matching ingredients:`, matchingIngredients?.map(ing => ing.name))
+    const matchesByIngredientId = new Map<
+      string,
+      Array<{ product: Record<string, unknown>; confidence: number; matchType: string }>
+    >()
 
-    // Group matches by ingredient name
-    const matchesByIngredientName = new Map()
-    
-    matches?.forEach(match => {
-      // Find the ingredient name that matches this ingredient_id
-      const ingredientName = matchingIngredients?.find(ing => ing.id === match.ingredient_id)?.name
-      if (ingredientName) {
-        const normalizedName = ingredientName.toLowerCase().trim()
-        if (!matchesByIngredientName.has(normalizedName)) {
-          matchesByIngredientName.set(normalizedName, [])
-        }
-        matchesByIngredientName.get(normalizedName).push({
-          product: match.supermarket_products,
-          confidence: match.confidence,
-          matchType: match.match_type
-        })
+    for (const m of matches) {
+      const iid = String(m.ingredient_id)
+      if (!matchesByIngredientId.has(iid)) {
+        matchesByIngredientId.set(iid, [])
       }
-    })
+      matchesByIngredientId.get(iid)!.push({
+        product: m.supermarket_products,
+        confidence: m.confidence,
+        matchType: m.match_type,
+      })
+    }
 
-    // Create ingredient match summary
+    /** Fallback: linjer uden `id` — find ingredients-række med ilike på renset navn */
+    const matchesByCleanedName = new Map<
+      string,
+      Array<{ product: Record<string, unknown>; confidence: number; matchType: string }>
+    >()
+
+    type RecipeIng = { id?: string; name: string }
+    const withoutId = (recipeIngredients as RecipeIng[]).filter((ing) => !isPersistentIngredientId(ing.id))
+    const uniqueCleaned: string[] = [
+      ...new Set(
+        withoutId
+          .map((ing) => cleanRecipeIngredientName(ing.name))
+          .filter((n) => n.length > 0)
+      ),
+    ]
+
+    if (uniqueCleaned.length > 0) {
+      const resolvedIds = await Promise.all(
+        uniqueCleaned.map(async (cleaned: string) => {
+          const { data: ingRow } = await supabase
+            .from('ingredients')
+            .select('id')
+            .ilike('name', cleaned)
+            .limit(1)
+            .maybeSingle()
+          return { cleaned, ingredientId: ingRow?.id as string | undefined }
+        })
+      )
+
+      const fallbackIds = [...new Set(resolvedIds.map((r) => r.ingredientId).filter(Boolean) as string[])]
+      if (fallbackIds.length > 0) {
+        const { data: fbMatches } = await supabase
+          .from('product_ingredient_matches')
+          .select(selectProductMatch)
+          .in('ingredient_id', fallbackIds)
+
+        const byIngId = new Map<string, any[]>()
+        for (const m of fbMatches || []) {
+          const iid = String((m as { ingredient_id: string }).ingredient_id)
+          if (!byIngId.has(iid)) byIngId.set(iid, [])
+          byIngId.get(iid)!.push(m)
+        }
+
+        for (const { cleaned, ingredientId } of resolvedIds) {
+          if (!ingredientId) continue
+          const arr = (byIngId.get(String(ingredientId)) || []).map((x: any) => ({
+            product: x.supermarket_products,
+            confidence: x.confidence,
+            matchType: x.match_type,
+          }))
+          matchesByCleanedName.set(cleaned, arr)
+        }
+      }
+    }
+
     const ingredientMatches = recipeIngredients.map((ingredient: any) => {
-      const normalizedName = ingredient.name.toLowerCase().trim()
-      const matches = matchesByIngredientName.get(normalizedName) || []
-      const isMatched = matches.length > 0
-      
+      let rowMatches: Array<{ product: Record<string, unknown>; confidence: number; matchType: string }> = []
+
+      if (ingredient.id) {
+        if (isPersistentIngredientId(ingredient.id)) {
+          rowMatches = matchesByIngredientId.get(String(ingredient.id)) || []
+        } else {
+          const cleaned = cleanRecipeIngredientName(ingredient.name)
+          rowMatches = matchesByCleanedName.get(cleaned) || []
+        }
+      } else {
+        const cleaned = cleanRecipeIngredientName(ingredient.name)
+        rowMatches = matchesByCleanedName.get(cleaned) || []
+      }
+
+      const isMatched = rowMatches.length > 0
+
       return {
         ingredient: {
           id: ingredient.id,
           name: ingredient.name,
           amount: ingredient.amount,
-          unit: ingredient.unit
+          unit: ingredient.unit,
         },
         isMatched,
-        matches: matches.slice(0, 3), // Show top 3 matches
-        totalMatches: matches.length,
-        bestMatch: matches.length > 0 ? matches[0] : null
+        matches: rowMatches.slice(0, 3),
+        totalMatches: rowMatches.length,
+        bestMatch: rowMatches.length > 0 ? rowMatches[0] : null,
       }
     })
 

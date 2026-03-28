@@ -6,6 +6,7 @@ import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import IngredientMatchesBox from '@/components/IngredientMatchesBox'
+import FridaIngredientMatchStatus from '@/components/FridaIngredientMatchStatus'
 import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Pencil, Plus, X } from 'lucide-react'
@@ -48,6 +49,8 @@ export default function AdminPublishingPage() {
   const [editingInstructions, setEditingInstructions] = useState(false)
   const [editedIngredients, setEditedIngredients] = useState<any[]>([])
   const [editedInstructions, setEditedInstructions] = useState<any[]>([])
+  const [editingServings, setEditingServings] = useState(false)
+  const [servingsInput, setServingsInput] = useState<number>(1)
 
   useEffect(() => {
     loadRecipes()
@@ -141,6 +144,7 @@ export default function AdminPublishingPage() {
     setEditingCategories(false)
     setEditingIngredients(false)
     setEditingInstructions(false)
+    setEditingServings(false)
     
     // Sæt de oprindelige værdier fra opskriften
     setDescription(recipe.description || '')
@@ -158,6 +162,7 @@ export default function AdminPublishingPage() {
     // Sæt ingredienser og instruktioner til redigering
     setEditedIngredients(recipe.ingredients || [])
     setEditedInstructions(recipe.instructions || [])
+    setServingsInput(Math.max(1, Math.round(Number(recipe.servings) || 1)))
     
     // Sæt selectedDate og selectedTime baseret på eksisterende planlægning
     const existingSchedule = schedules.find(s => s.recipeId === recipe.id)
@@ -445,6 +450,44 @@ export default function AdminPublishingPage() {
     } catch (error) {
       console.error('❌ Error saving instructions:', error)
       alert('Kunne ikke gemme instruktioner. Prøv igen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const saveServings = async () => {
+    if (!selectedRecipe) return
+
+    try {
+      setSaving(true)
+      const normalizedServings = Math.max(1, Math.round(Number(servingsInput) || 1))
+      const response = await fetch(`/api/admin/recipes?timestamp=${new Date().getTime()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+        },
+        body: JSON.stringify({
+          recipeId: selectedRecipe.id,
+          servings: normalizedServings,
+        }),
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Kunne ikke gemme portioner')
+      }
+
+      const updatedRecipe = { ...selectedRecipe, servings: normalizedServings }
+      setSelectedRecipe(updatedRecipe)
+      setRecipes((prev) => prev.map((r) => (r.id === selectedRecipe.id ? updatedRecipe : r)))
+      setServingsInput(normalizedServings)
+      setEditingServings(false)
+      alert('✅ Portioner gemt!')
+    } catch (error) {
+      console.error('❌ Error saving servings:', error)
+      alert('Kunne ikke gemme portioner. Prøv igen.')
     } finally {
       setSaving(false)
     }
@@ -1130,6 +1173,52 @@ export default function AdminPublishingPage() {
                       </div>
                     </div>
 
+                    {/* Portioner */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-md font-medium text-gray-900">Portioner</h4>
+                        {!editingServings && (
+                          <button
+                            onClick={() => setEditingServings(true)}
+                            className="text-blue-600 hover:text-blue-700 text-sm"
+                          >
+                            Rediger
+                          </button>
+                        )}
+                      </div>
+
+                      {editingServings ? (
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={servingsInput}
+                            onChange={(e) => setServingsInput(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-24 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <button
+                            onClick={saveServings}
+                            disabled={saving}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {saving ? 'Gemmer...' : 'Gem'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingServings(false)
+                              setServingsInput(Math.max(1, Math.round(Number(selectedRecipe.servings) || 1)))
+                            }}
+                            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                          >
+                            Annuller
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600">{selectedRecipe.servings || 1} portioner</p>
+                      )}
+                    </div>
+
                     <div className="flex gap-2">
                       {(selectedRecipe.status === 'draft' || selectedRecipe.status === 'scheduled') && (
                         <button
@@ -1224,10 +1313,14 @@ export default function AdminPublishingPage() {
                         recipeId={selectedRecipe.id} 
                         recipeName={selectedRecipe.title}
                       />
-                      
-                      {/* Ingredient Matches Box */}
+
                       <div className="mt-4">
-                        <IngredientMatchesBox recipeSlug={selectedRecipe.slug} />
+                        <FridaIngredientMatchStatus recipeSlug={selectedRecipe.slug || selectedRecipe.id} />
+                      </div>
+                      
+                      {/* Dagligvarer / produktmatch (ikke Frida) */}
+                      <div className="mt-4">
+                        <IngredientMatchesBox recipeSlug={selectedRecipe.slug || selectedRecipe.id} />
                       </div>
                     </div>
 

@@ -67,9 +67,9 @@ export default function IngredientMatchesBox({ recipeSlug }: IngredientMatchesBo
       <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
         <div className="flex items-center space-x-2 mb-3">
           <ShoppingCart size={16} className="text-blue-500" />
-          <h3 className="text-sm font-medium text-blue-900">INGREDIENS MATCHES</h3>
+          <h3 className="text-sm font-medium text-blue-900">Dagligvarer (indkøb)</h3>
         </div>
-        <div className="text-sm text-blue-700">Loading ingredient matches...</div>
+        <div className="text-sm text-blue-700">Loading…</div>
       </div>
     )
   }
@@ -79,7 +79,7 @@ export default function IngredientMatchesBox({ recipeSlug }: IngredientMatchesBo
       <div className="bg-red-50 rounded-lg p-4 border border-red-200">
         <div className="flex items-center space-x-2 mb-3">
           <XCircle size={16} className="text-red-500" />
-          <h3 className="text-sm font-medium text-red-900">INGREDIENS MATCHES</h3>
+          <h3 className="text-sm font-medium text-red-900">Dagligvarer (indkøb)</h3>
         </div>
         <div className="text-sm text-red-700">Error: {error}</div>
       </div>
@@ -96,23 +96,28 @@ export default function IngredientMatchesBox({ recipeSlug }: IngredientMatchesBo
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
           <ShoppingCart size={16} className="text-blue-500" />
-          <h3 className="text-sm font-medium text-blue-900">INGREDIENS MATCHES</h3>
+          <h3 className="text-sm font-medium text-blue-900">Dagligvarer (indkøb)</h3>
         </div>
         <div className="text-xs text-blue-700">
-          {matchedCount}/{totalCount} matchet ({matchPercentage}%)
+          {matchedCount}/{totalCount} med produkt ({matchPercentage}%)
         </div>
       </div>
+
+      <p className="text-xs text-blue-800 mb-2">
+        Kobler opskriftens ingredienser til <strong>supermarkedets varer</strong> (priser, butik). Det er{' '}
+        <strong>ikke</strong> det samme som Frida til næring — se boksen «Frida / næring» ovenfor.
+      </p>
 
       {/* Summary */}
       <div className="text-sm text-blue-700 mb-3">
         {matchedCount === totalCount ? (
           <span className="flex items-center space-x-1">
             <CheckCircle size={14} className="text-green-500" />
-            <span>Alle ingredienser er matchet med dagligvarer!</span>
+            <span>Alle ingredienser har mindst ét produkt-match!</span>
           </span>
         ) : (
           <span>
-            {matchedCount} af {totalCount} ingredienser er matchet med dagligvarer
+            {matchedCount} af {totalCount} ingredienser har produkt-match i dagligvare-databasen
           </span>
         )}
       </div>

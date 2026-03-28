@@ -7,25 +7,41 @@ export interface UserBehavior {
   categoriesViewed: string[]
 }
 
+const defaultUserBehavior: UserBehavior = {
+  source: 'direct',
+  interests: [],
+  timeOnSite: 0,
+  pagesViewed: [],
+  recipesViewed: [],
+  categoriesViewed: [],
+}
+
+function readUserBehaviorFromStorage(): Partial<UserBehavior> {
+  try {
+    const raw = localStorage.getItem('userBehavior')
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<UserBehavior>) : {}
+  } catch {
+    return {}
+  }
+}
+
 export function trackUserBehavior(data: Partial<UserBehavior>) {
   // Send to your analytics service
   console.log('User behavior tracked:', data)
   
   // Store in localStorage for personalization
-  const existing = JSON.parse(localStorage.getItem('userBehavior') || '{}')
+  const existing = readUserBehaviorFromStorage()
   const updated = { ...existing, ...data }
   localStorage.setItem('userBehavior', JSON.stringify(updated))
 }
 
 export function getUserProfile(): UserBehavior {
-  const stored = localStorage.getItem('userBehavior')
-  return stored ? JSON.parse(stored) : {
-    source: 'direct',
-    interests: [],
-    timeOnSite: 0,
-    pagesViewed: [],
-    recipesViewed: [],
-    categoriesViewed: []
+  const parsed = readUserBehaviorFromStorage()
+  return {
+    ...defaultUserBehavior,
+    ...parsed,
   }
 }
 
@@ -53,7 +69,9 @@ export function getPersonalizedRecommendations(): string[] {
   
   // Add interests from viewed categories
   profile.categoriesViewed.forEach(category => {
-    interests.add(category.toLowerCase())
+    if (typeof category === 'string' && category) {
+      interests.add(category.toLowerCase())
+    }
   })
   
   // Add interests from viewed recipes

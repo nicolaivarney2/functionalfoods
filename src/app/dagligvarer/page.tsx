@@ -651,7 +651,8 @@ export default function DagligvarerPage() {
   useEffect(() => {
     setCurrentPage(1)
     fetchProducts(1, false)
-  }, [showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, selectedCategories, selectedStores, fetchProducts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, selectedCategories, selectedStores])
 
 
 

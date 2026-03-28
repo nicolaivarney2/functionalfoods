@@ -1,25 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 
+const MAX_PAGE = 10_000
+const MAX_LIMIT = 100
+const MAX_FILTER_VALUES = 20
+const MAX_SEARCH_LENGTH = 120
+
+function parseBoundedInt(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
+function parseListParam(value: string | null): string[] | undefined {
+  if (!value) return undefined
+  const items = value
+    .split(',')
+    .map((part) => decodeURIComponent(part.trim()))
+    .filter((part) => part.length > 0)
+    .slice(0, MAX_FILTER_VALUES)
+  return items.length > 0 ? items : undefined
+}
+
+function buildCacheControl({
+  countsOnly,
+  hasSearch,
+}: {
+  countsOnly: boolean
+  hasSearch: boolean
+}): string {
+  if (countsOnly) {
+    // Counts change slowly and can be aggressively cached.
+    return 'public, s-maxage=3600, stale-while-revalidate=86400'
+  }
+  if (hasSearch) {
+    // Search responses vary more; keep shorter CDN cache.
+    return 'public, s-maxage=120, stale-while-revalidate=600'
+  }
+  // Listing/filter responses are hot paths on dagligvarer.
+  return 'public, s-maxage=900, stale-while-revalidate=43200'
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Parse query parameters
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '100')
+    const page = parseBoundedInt(searchParams.get('page'), 1, 1, MAX_PAGE)
+    const limit = parseBoundedInt(searchParams.get('limit'), MAX_LIMIT, 1, MAX_LIMIT)
     
     // Decode category parameters (they may be URL-encoded)
     const categoryParam = searchParams.get('category')
     const category = categoryParam ? decodeURIComponent(categoryParam) : undefined // Legacy support
     
-    const categoriesParam = searchParams.get('categories')
-    const categories = categoriesParam 
-      ? categoriesParam.split(',').map(c => decodeURIComponent(c.trim())).filter(Boolean)
-      : undefined
+    const categories = parseListParam(searchParams.get('categories'))
     
-    const stores = searchParams.get('stores')?.split(',').map(s => decodeURIComponent(s.trim())).filter(Boolean) || undefined
+    const stores = parseListParam(searchParams.get('stores'))
     const offers = searchParams.get('offers') === 'true'
-    const search = searchParams.get('search') ? decodeURIComponent(searchParams.get('search')!) : undefined
+    const rawSearch = searchParams.get('search')
+      ? decodeURIComponent(searchParams.get('search') || '')
+      : undefined
+    const search = rawSearch ? rawSearch.trim().slice(0, MAX_SEARCH_LENGTH) : undefined
     const countsOnly = searchParams.get('counts') === 'true'
     const foodOnly = searchParams.get('foodOnly') === 'true'
     const organic = searchParams.get('organic') === 'true'
@@ -32,18 +77,18 @@ export async function GET(request: NextRequest) {
         success: true,
         counts: counts,
         timestamp: new Date().toISOString()
+      }, {
+        headers: {
+          'Cache-Control': buildCacheControl({ countsOnly: true, hasSearch: false }),
+        },
       })
     }
     
     // Get products from new global structure
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
     
-    console.log(`[API] Fetching products - page: ${page}, limit: ${limit}, categories: ${finalCategory?.join(', ') || 'none'}, offers: ${offers}, stores: ${stores?.join(', ') || 'none'}, organic: ${organic}`)
-    
     const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly, organic)
-    
-    console.log(`[API] Returning ${result.products.length} products (total: ${result.total})`)
-    
+
     return NextResponse.json({
       success: true,
       products: result.products,
@@ -55,6 +100,10 @@ export async function GET(request: NextRequest) {
         hasMore: result.hasMore
       },
       timestamp: new Date().toISOString()
+    }, {
+      headers: {
+        'Cache-Control': buildCacheControl({ countsOnly: false, hasSearch: Boolean(search && search.trim()) }),
+      },
     })
     
   } catch (error) {

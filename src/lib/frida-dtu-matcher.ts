@@ -79,25 +79,58 @@ export class FridaDTUMatcher {
 
   /**
    * Search for foods in Supabase database
+   *
+   * VIGTIGT: Brug IKKE normalizeIngredientName() til SQL — den omskriver æøå til ae/oe/aa,
+   * så ilike('%roedloeg%') ikke matcher kolonnen "Rødløg" i frida_ingredients.
    */
   private async searchFoods(searchTerm: string): Promise<FridaFood[]> {
     try {
-      console.log(`🔍 Searching for: "${searchTerm}" in frida_ingredients`)
-      
-      const normalizedTerm = this.normalizeIngredientName(searchTerm)
-      
-      // Search in frida_ingredients table - removed source filter since all have source = 'frida_dtu'
-      const { data, error } = await supabase
-        .from('frida_ingredients')
-        .select('id, name, category')
-        .ilike('name', `%${normalizedTerm}%`)
-        .limit(20) // Increased limit for better matching
-      
-      if (error) {
-        console.error('❌ Error searching foods:', error)
-        return []
+      const term = searchTerm.trim()
+      console.log(`🔍 Searching for: "${term}" in frida_ingredients`)
+
+      const fetchByPattern = async (pattern: string) => {
+        const { data, error } = await supabase
+          .from('frida_ingredients')
+          .select('id, name, category')
+          .ilike('name', `%${pattern}%`)
+          .limit(20)
+
+        if (error) {
+          console.error('❌ Error searching foods:', error)
+          return [] as { id: string; name: string; category: string }[]
+        }
+        return data || []
       }
-      
+
+      let data = await fetchByPattern(term)
+
+      // Flere ord / komma: prøv enkeltord — længste ord først (fx "hakkede tomater" → "tomater" før "hakkede")
+      if (!data.length) {
+        const words = term
+          .split(/[\s,]+/)
+          .filter((w) => w.length >= 3)
+          .sort((a, b) => b.length - a.length)
+        for (const w of words) {
+          if (w === term) continue
+          data = await fetchByPattern(w)
+          if (data.length) break
+        }
+      }
+
+      // Sammensatte danske ord uden mellemrum — Frida har ofte "Kylling, bryst …"
+      if (!data.length && !term.includes(' ') && term.length >= 8) {
+        const meat = term.match(/^(kylling|svin|okse|laks|torsk|kalv|lam)(e|)/i)
+        if (meat) {
+          data = await fetchByPattern(meat[0])
+        }
+        if (!data.length) {
+          const blom = term.match(/^(blomkål|blomkal)/i)
+          if (blom) {
+            data = await fetchByPattern(blom[0])
+          }
+        }
+      }
+
       console.log(`🔍 Found ${data?.length || 0} matches for "${searchTerm}"`)
       
       // Transform data to match FridaFood interface
@@ -318,6 +351,40 @@ export class FridaDTUMatcher {
       nutrition,
       match: bestMatch.name,
       score: bestMatch.score
+    }
+  }
+
+  /**
+   * Match direkte via gemt Frida-id (fx "frida-1234" eller "1234")
+   */
+  public async matchByFridaIngredientId(
+    fridaIngredientId: string | number
+  ): Promise<{ nutrition: NutritionalInfo | null; match: string | null; score: number }> {
+    const raw = String(fridaIngredientId || '').trim()
+    const foodId = parseInt(raw.replace(/^frida-/i, ''), 10)
+    if (!Number.isFinite(foodId)) {
+      return { nutrition: null, match: null, score: 0 }
+    }
+
+    const cacheKey = `frida-id:${foodId}`
+    if (this.ingredientCache.has(cacheKey)) {
+      return {
+        nutrition: this.ingredientCache.get(cacheKey)!,
+        match: raw,
+        score: 1.0,
+      }
+    }
+
+    const nutrition = await this.getNutritionalInfo(foodId)
+    if (!nutrition) {
+      return { nutrition: null, match: null, score: 0 }
+    }
+
+    this.ingredientCache.set(cacheKey, nutrition)
+    return {
+      nutrition,
+      match: raw,
+      score: 1.0,
     }
   }
 

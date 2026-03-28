@@ -14,6 +14,17 @@ interface FavoriteRecipe {
   savedAt: string
 }
 
+function getFavoriteRecipesFromStorage(): FavoriteRecipe[] {
+  try {
+    const raw = localStorage.getItem('favorite_recipes')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as FavoriteRecipe[]) : []
+  } catch {
+    return []
+  }
+}
+
 export default function FavoritesPage() {
   const { user } = useAuth()
   const [favorites, setFavorites] = useState<FavoriteRecipe[]>([])
@@ -21,7 +32,7 @@ export default function FavoritesPage() {
 
   useEffect(() => {
     if (user) {
-      const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+      const savedRecipes = getFavoriteRecipesFromStorage()
       setFavorites(savedRecipes)
       setLoading(false)
     }

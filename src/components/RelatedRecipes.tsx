@@ -12,6 +12,17 @@ interface RelatedRecipesProps {
   currentRecipeId: string
 }
 
+function getFavoriteRecipesFromStorage(): any[] {
+  try {
+    const raw = localStorage.getItem('favorite_recipes')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedRecipesProps) {
   const { user } = useAuth()
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
@@ -23,7 +34,7 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
   // Load favorites from localStorage
   useEffect(() => {
     if (user) {
-      const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+      const savedRecipes = getFavoriteRecipesFromStorage()
       const favoriteIds = new Set<string>(savedRecipes.map((recipe: any) => recipe.id as string))
       setFavorites(favoriteIds)
     }
@@ -38,7 +49,7 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
       return
     }
 
-    const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+    const savedRecipes = getFavoriteRecipesFromStorage()
     
     if (favorites.has(recipeId)) {
       // Remove from favorites

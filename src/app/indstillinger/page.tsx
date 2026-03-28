@@ -13,6 +13,17 @@ interface UserSettings {
   privacyLevel: 'public' | 'private'
 }
 
+function readSettingsFromStorage(): Partial<UserSettings> {
+  try {
+    const raw = localStorage.getItem('user_settings')
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<UserSettings>) : {}
+  } catch {
+    return {}
+  }
+}
+
 export default function SettingsPage() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -29,10 +40,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       // Load user settings from localStorage or database
-      const savedSettings = localStorage.getItem('user_settings')
-      if (savedSettings) {
-        setSettings({ ...settings, ...JSON.parse(savedSettings) })
-      }
+      const savedSettings = readSettingsFromStorage()
+      setSettings((prev) => ({ ...prev, ...savedSettings }))
     }
   }, [user])
 

@@ -12,6 +12,17 @@ interface RecipeActionsProps {
   recipeDescription?: string
 }
 
+function getFavoriteRecipesFromStorage(): any[] {
+  try {
+    const raw = localStorage.getItem('favorite_recipes')
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 export default function RecipeActions({ 
   recipeId, 
   recipeTitle, 
@@ -26,7 +37,7 @@ export default function RecipeActions({
   // Load saved state from localStorage
   useEffect(() => {
     if (user) {
-      const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+      const savedRecipes = getFavoriteRecipesFromStorage()
       setIsSaved(savedRecipes.some((recipe: any) => recipe.id === recipeId))
     }
   }, [user, recipeId])
@@ -38,7 +49,7 @@ export default function RecipeActions({
       return
     }
 
-    const savedRecipes = JSON.parse(localStorage.getItem('favorite_recipes') || '[]')
+    const savedRecipes = getFavoriteRecipesFromStorage()
     
     if (isSaved) {
       // Remove from favorites

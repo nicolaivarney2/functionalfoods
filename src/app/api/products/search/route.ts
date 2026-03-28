@@ -61,11 +61,17 @@ export async function POST() {
     }
 
     // Get unique categories
-    const uniqueCategories = Array.from(new Set(categories.map(item => item.category)))
+    const uniqueCategories = Array.from(
+      new Set(
+        categories
+          .map((item) => item.category)
+          .filter((c): c is string => typeof c === 'string' && c.length > 0)
+      )
+    )
       .sort()
-      .map(category => ({
+      .map((category) => ({
         name: category,
-        slug: category.toLowerCase().replace(/\s+/g, '-')
+        slug: category.toLowerCase().replace(/\s+/g, '-'),
       }))
 
     return NextResponse.json({ categories: uniqueCategories })

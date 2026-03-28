@@ -6,6 +6,8 @@ import { databaseService } from '@/lib/database-service'
 import RecipeCard from '@/components/RecipeCard'
 import Script from 'next/script'
 
+export const revalidate = 3600
+
 interface PageProps {
   params: Promise<{ category: string }>
 }
@@ -54,8 +56,9 @@ export default async function CategoryPage({ params }: PageProps) {
     if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
       return false
     }
-    return recipe.dietaryCategories.some(cat => 
-      cat.toLowerCase() === category.name.toLowerCase()
+    return recipe.dietaryCategories.some(
+      (cat) =>
+        typeof cat === 'string' && cat.toLowerCase() === category.name.toLowerCase()
     )
   })
 

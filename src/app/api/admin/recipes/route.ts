@@ -1,28 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
+import { databaseService } from '@/lib/database-service'
+import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+const MAX_ADMIN_PAGE_SIZE = 1000
+
+function parseBoundedInt(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number
+): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Admin recipes route: Starting...')
-    
     // Get pagination parameters
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '0')
-    const limit = parseInt(searchParams.get('limit') || '1000')
+    const page = parseBoundedInt(searchParams.get('page'), 0, 0, 100_000)
+    const limit = parseBoundedInt(searchParams.get('limit'), MAX_ADMIN_PAGE_SIZE, 1, MAX_ADMIN_PAGE_SIZE)
     const offset = page * limit
     
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
-    console.log('🔍 Environment check:', {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceRoleKey: !!serviceRoleKey,
-      serviceRoleKeyLength: serviceRoleKey?.length || 0
-    })
     
     if (!supabaseUrl || !serviceRoleKey) {
       console.error('❌ Missing Supabase environment variables')
@@ -43,12 +51,6 @@ export async function GET(request: NextRequest) {
       },
     })
     
-    console.log('🔍 Service role client created successfully')
-    
-    // For now, skip complex authentication and just fetch recipes
-    // TODO: Implement proper admin authentication later
-    console.log('🍽️ GET /api/admin/recipes called (all recipes including drafts)')
-    
     // Use service role client to fetch recipes with pagination
     const { data: recipes, error } = await supabase
       .from('recipes')
@@ -61,7 +63,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch recipes' }, { status: 500 })
     }
     
-    console.log(`✅ Returning ${recipes?.length || 0} recipes (page ${page}, limit ${limit})`)
     return NextResponse.json({
       recipes: recipes || [],
       page,
@@ -79,8 +80,6 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    console.log('🔍 Admin recipes PUT route: Starting...')
-    
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -106,7 +105,16 @@ export async function PUT(request: NextRequest) {
     
     // Parse request body
     const body = await request.json()
-    const { recipeId, description, dietaryCategories, mainCategory, subCategories, ingredients, instructions } = body
+    const {
+      recipeId,
+      description,
+      dietaryCategories,
+      mainCategory,
+      subCategories,
+      ingredients,
+      instructions,
+      servings,
+    } = body
     
     if (!recipeId) {
       return NextResponse.json({ error: 'Recipe ID is required' }, { status: 400 })
@@ -134,6 +142,12 @@ export async function PUT(request: NextRequest) {
     if (instructions !== undefined) {
       updateData.instructions = Array.isArray(instructions) ? instructions : []
     }
+    if (servings !== undefined) {
+      const parsedServings = Number(servings)
+      if (Number.isFinite(parsedServings) && parsedServings > 0) {
+        updateData.servings = Math.max(1, Math.round(parsedServings))
+      }
+    }
     
     updateData.updatedAt = new Date().toISOString()
     
@@ -147,7 +161,10 @@ export async function PUT(request: NextRequest) {
         .eq('id', recipeId)
         .single()
       
-      const currentArray = Array.isArray(currentRecipe?.dietaryCategories) ? currentRecipe.dietaryCategories : []
+      const currentDietary = currentRecipe && typeof currentRecipe === 'object'
+        ? (currentRecipe as { dietaryCategories?: unknown }).dietaryCategories
+        : undefined
+      const currentArray = Array.isArray(currentDietary) ? currentDietary : []
       if (dietaryArray.length < currentArray.length) {
         // Array er kortere - sæt til null først for at tvinge opdatering
         await supabase
@@ -176,9 +193,16 @@ export async function PUT(request: NextRequest) {
     // Verify the update
     const { data: verifyData } = await supabase
       .from('recipes')
-      .select('id, title, dietaryCategories, mainCategory, subCategories')
+      .select('id, slug, title, dietaryCategories, mainCategory, subCategories')
       .eq('id', recipeId)
       .single()
+
+    // Invalidate public cache for this recipe and listing pages
+    databaseService.clearRecipeCaches()
+    if (verifyData?.slug) {
+      revalidatePath(`/opskrift/${verifyData.slug}`)
+    }
+    revalidateRecipeCollectionPaths(verifyData || {})
     
     return NextResponse.json({ 
       success: true, 

@@ -3,6 +3,20 @@ import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
 
 export const dynamic = 'force-dynamic'
 
+function parseIntInRange(value: unknown, min: number, max: number): number | null {
+  const parsed = Number.parseInt(String(value), 10)
+  if (!Number.isFinite(parsed)) return null
+  if (parsed < min || parsed > max) return null
+  return parsed
+}
+
+function parseFloatInRange(value: unknown, min: number, max: number): number | null {
+  const parsed = Number.parseFloat(String(value))
+  if (!Number.isFinite(parsed)) return null
+  if (parsed < min || parsed > max) return null
+  return parsed
+}
+
 /** Opdater eller opret voksenprofil fra vægt-tracker (inkl. kaldenavn og mål). */
 export async function PATCH(request: NextRequest) {
   try {
@@ -42,10 +56,22 @@ export async function PATCH(request: NextRequest) {
       if (body[key] !== undefined && body[key] !== null && body[key] !== '') row[snake] = body[key]
     }
     mapOpt('gender', 'gender')
-    if (body.age != null) row.age = parseInt(String(body.age), 10)
-    if (body.height != null) row.height = parseInt(String(body.height), 10)
-    if (body.weight != null) row.weight = parseFloat(String(body.weight))
-    if (body.activityLevel != null) row.activity_level = parseFloat(String(body.activityLevel))
+    if (body.age != null) {
+      const age = parseIntInRange(body.age, 10, 120)
+      if (age != null) row.age = age
+    }
+    if (body.height != null) {
+      const height = parseIntInRange(body.height, 80, 250)
+      if (height != null) row.height = height
+    }
+    if (body.weight != null) {
+      const weight = parseFloatInRange(body.weight, 20, 400)
+      if (weight != null) row.weight = weight
+    }
+    if (body.activityLevel != null) {
+      const activityLevel = parseFloatInRange(body.activityLevel, 1, 2.5)
+      if (activityLevel != null) row.activity_level = activityLevel
+    }
     if (typeof body.dietaryApproach === 'string') row.dietary_approach = body.dietaryApproach
     if (Array.isArray(body.mealsPerDay)) row.meals_per_day = body.mealsPerDay
     if (typeof body.weightGoal === 'string') row.weight_goal = body.weightGoal

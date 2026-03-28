@@ -4,6 +4,10 @@ import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
 export class DatabaseService {
+  private readonly RECIPES_CACHE_TTL_MS = 60_000
+  private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
+  private allRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
+
   private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
     'frugt & grønt': 'Frugt og grønt',
     'frugt og grønt': 'Frugt og grønt',
@@ -42,6 +46,11 @@ export class DatabaseService {
    * Get published recipes from database (for frontend use)
    */
   async getRecipes(): Promise<Recipe[]> {
+    const now = Date.now()
+    if (this.publishedRecipesCache && this.publishedRecipesCache.expiresAt > now) {
+      return this.publishedRecipesCache.data
+    }
+
     const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
@@ -53,28 +62,24 @@ export class DatabaseService {
       console.error('Error fetching published recipes:', error)
       return []
     }
-    
-    console.log(`🔍 Raw database data: ${data?.length || 0} published recipes found`)
-    if (data && data.length > 0) {
-      console.log('📋 First published recipe from DB:', {
-        id: data[0].id,
-        title: data[0].title,
-        imageUrl: data[0].imageUrl,
-        totalTime: data[0].totalTime,
-        preparationTime: data[0].preparationTime,
-        cookingTime: data[0].cookingTime
-      })
+
+    const recipes = data || []
+    this.publishedRecipesCache = {
+      data: recipes,
+      expiresAt: now + this.RECIPES_CACHE_TTL_MS,
     }
-    
-    // Database already uses camelCase, no transformation needed
-    console.log(`✅ Returning ${data?.length || 0} published recipes to frontend`)
-    return data || []
+    return recipes
   }
 
   /**
    * Get all recipes from database (including drafts) - for admin use only
    */
   async getAllRecipes(): Promise<Recipe[]> {
+    const now = Date.now()
+    if (this.allRecipesCache && this.allRecipesCache.expiresAt > now) {
+      return this.allRecipesCache.data
+    }
+
     const supabase = createSupabaseClient()
     const { data, error } = await supabase
       .from('recipes')
@@ -85,22 +90,55 @@ export class DatabaseService {
       console.error('Error fetching all recipes:', error)
       return []
     }
-    
-    console.log(`🔍 Raw database data: ${data?.length || 0} recipes found (all statuses)`)
-    if (data && data.length > 0) {
-      console.log('📋 First raw recipe from DB:', {
-        id: data[0].id,
-        title: data[0].title,
-        imageUrl: data[0].imageUrl,
-        totalTime: data[0].totalTime,
-        preparationTime: data[0].preparationTime,
-        cookingTime: data[0].cookingTime
-      })
+
+    const recipes = data || []
+    this.allRecipesCache = {
+      data: recipes,
+      expiresAt: now + this.RECIPES_CACHE_TTL_MS,
     }
-    
-    // Database already uses camelCase, no transformation needed
-    console.log(`✅ Returning ${data?.length || 0} recipes directly from database`)
+    return recipes
+  }
+
+  async getPublishedRecipeBySlug(slug: string): Promise<Recipe | null> {
+    const supabase = createSupabaseClient()
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('status', 'published')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching published recipe by slug:', error)
+      return null
+    }
+    return (data as Recipe | null) || null
+  }
+
+  async getRecentPublishedRecipes(limit: number = 80, excludeSlug?: string): Promise<Recipe[]> {
+    const supabase = createSupabaseClient()
+    let query = supabase
+      .from('recipes')
+      .select('*')
+      .eq('status', 'published')
+      .order('updatedAt', { ascending: false })
+      .limit(limit)
+
+    if (excludeSlug) {
+      query = query.neq('slug', excludeSlug)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('Error fetching recent published recipes:', error)
+      return []
+    }
     return data || []
+  }
+
+  clearRecipeCaches(): void {
+    this.publishedRecipesCache = null
+    this.allRecipesCache = null
   }
 
   /**

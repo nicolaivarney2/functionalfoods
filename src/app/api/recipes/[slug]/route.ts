@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
+import { databaseService } from '@/lib/database-service'
+import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -130,6 +133,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to update recipe' }, { status: 500 })
     }
     
+    // Invalidate public cache for this recipe and collection pages
+    databaseService.clearRecipeCaches()
+    revalidatePath(`/opskrift/${slug}`)
+    revalidateRecipeCollectionPaths(data?.[0] || {})
+
     return NextResponse.json({ 
       success: true, 
       recipe: data[0],

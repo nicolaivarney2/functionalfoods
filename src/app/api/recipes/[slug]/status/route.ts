@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { createSupabaseServerClient } from '@/lib/supabaseServer'
+import { databaseService } from '@/lib/database-service'
+import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +45,17 @@ export async function PUT(
         { status: 500 }
       )
     }
+
+    // Status changes affect recipe visibility/listing cache
+    const { data: updatedRecipe } = await supabase
+      .from('recipes')
+      .select('mainCategory, dietaryCategories')
+      .eq('slug', slug)
+      .maybeSingle()
+
+    databaseService.clearRecipeCaches()
+    revalidatePath(`/opskrift/${slug}`)
+    revalidateRecipeCollectionPaths(updatedRecipe || {})
 
     console.log('✅ Recipe status updated successfully')
     return NextResponse.json({ success: true })

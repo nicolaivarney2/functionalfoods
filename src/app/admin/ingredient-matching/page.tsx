@@ -36,6 +36,90 @@ interface IngredientMatch {
   selectedMatch: FridaIngredient | null
   isConfirmed: boolean
   isRejected: boolean
+  /** Sandt når matchet allerede findes i ingredient_matches (kan findes via søgning) */
+  hasStoredMatch: boolean
+}
+
+/**
+ * Frida (DTU) bruger ofte "Løg, rød" i stedet for ordet "rødløg" — ren substring-match finder derfor intet.
+ * Udvidelser: alle dele skal findes i navnet (typisk efter komma).
+ */
+const FRIDA_SEARCH_COMPOUNDS: Record<string, string[]> = {
+  rødløg: ['rød', 'løg'],
+  kyllingebryst: ['kylling', 'bryst'],
+  blomkålsris: ['blomkål'],
+  hakkedetomater: ['tomat'],
+  'hakkede tomater': ['tomat'],
+}
+
+function ingredientNameMatchesQuery(name: string, rawQuery: string): boolean {
+  const n = name.toLowerCase()
+  const q = rawQuery.trim().toLowerCase()
+  if (!q) return true
+  if (n.includes(q)) return true
+
+  const compound = FRIDA_SEARCH_COMPOUNDS[q.replace(/\s+/g, '')] ?? FRIDA_SEARCH_COMPOUNDS[q]
+  if (compound?.every((t) => n.includes(t.toLowerCase()))) return true
+
+  const tokens = q.split(/[\s,]+/).filter((t) => t.length >= 2)
+  if (tokens.length > 1 && tokens.every((t) => n.includes(t))) return true
+
+  return false
+}
+
+/**
+ * ingredients.category i DB følger IngredientCategory (fx groent, protein), ikke dropdown-værdier som "grøntsager".
+ */
+const INGREDIENT_MATCH_CATEGORY_FILTER: Record<string, string[]> = {
+  kød: ['protein'],
+  fisk: ['protein'],
+  grøntsager: ['groent', 'grøntsager'],
+  frugt: ['frugt'],
+  mejeri: ['mejeri'],
+  fedt: ['fedt'],
+  andre: [
+    'andre',
+    'korn',
+    'krydderi',
+    'urter',
+    'nodder',
+    'fro',
+    'balg',
+    'forarbejdet',
+    'soedstof',
+    'drikke',
+  ],
+}
+
+function recipeCategoryMatchesFilter(dbCategory: string | undefined, selected: string): boolean {
+  if (selected === 'all') return true
+  const allowed = INGREDIENT_MATCH_CATEGORY_FILTER[selected]
+  if (!allowed?.length) return true
+  const c = (dbCategory || '').toLowerCase().trim()
+  return allowed.includes(c)
+}
+
+function findFridaByStoredId(fridaData: FridaIngredient[], storedId: string | undefined): FridaIngredient | undefined {
+  if (!storedId) return undefined
+  const s = String(storedId).trim()
+  const numeric = s.replace(/^frida-/i, '')
+  return fridaData.find(
+    (f) => f.id === s || f.id === `frida-${numeric}` || f.id.replace(/^frida-/i, '') === numeric
+  )
+}
+
+function isIngredientMatchedRow(m: IngredientMatch): boolean {
+  return m.hasStoredMatch || (m.isConfirmed && !!m.selectedMatch)
+}
+
+/** Søg i opskrift-ingrediensnavn og i valgt/foreslået Frida-navn (fx "Løg, rød" når du søger rødløg) */
+function rowMatchesSearch(match: IngredientMatch, rawQuery: string): boolean {
+  const q = rawQuery.trim()
+  if (!q) return true
+  if (ingredientNameMatchesQuery(match.recipeIngredient.name, q)) return true
+  const fridaName = match.selectedMatch?.name || match.suggestedMatch?.fridaIngredient?.name
+  if (fridaName && ingredientNameMatchesQuery(fridaName, q)) return true
+  return false
 }
 
 export default function IngredientMatchingPage() {
@@ -44,6 +128,12 @@ export default function IngredientMatchingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  /**
+   * queue = kun uden match (standard — matchede «forsvinder» fra listen)
+   * all = inkl. i forvejen matchet
+   * matchedOnly = kun dem der allerede har match
+   */
+  const [matchFilter, setMatchFilter] = useState<'queue' | 'all' | 'matchedOnly'>('queue')
   const [stats, setStats] = useState({
     total: 0,
     confirmed: 0,
@@ -73,47 +163,36 @@ export default function IngredientMatchingPage() {
       const fridaResponse = await fetch('/api/frida-ingredients')
       const fridaData = await fridaResponse.json()
       setFridaIngredients(fridaData)
-      
-      // Debug logging for Frida data
-      console.log('📊 Loaded Frida ingredients:', fridaData.length)
-      console.log('🔍 API endpoint used: /api/frida-ingredients')
-      console.log('🔍 First few ingredients:', fridaData.slice(0, 5).map((ing: any) => ({ id: ing.id, name: ing.name, source: ing.source })))
-      
-      const smørIngredients = fridaData.filter((ing: any) => ing.name.toLowerCase().includes('smør'))
-      console.log('🔍 Found smør ingredients:', smørIngredients.map((ing: any) => ing.name))
-      console.log('🔍 Total smør ingredients found:', smørIngredients.length)
-      
+
       // Load existing matches from database
       const existingMatchesResponse = await fetch('/api/ingredient-matches')
       const existingMatches = await existingMatchesResponse.json()
       const existingMatchMap = new Map(
         existingMatches.map((match: any) => [match.recipe_ingredient_id, match.frida_ingredient_id])
       )
-      
+
       console.log(`📋 Found ${existingMatches.length} existing matches in database`)
-      
-      // Filter out ingredients that already have matches
-      // Ensure we compare normalized IDs (our import now uses stable slugs)
-      const unmatchedIngredients = recipeIngredients.filter((ingredient: RecipeIngredient) => {
-        return !existingMatchMap.has(ingredient.id)
-      })
-      
-      console.log(`🔍 Processing ${unmatchedIngredients.length} unmatched ingredients (${recipeIngredients.length - unmatchedIngredients.length} already matched)`)
-      
-      // Get auto-match suggestions for unmatched ingredients only
+
       const matchesWithSuggestions = await Promise.all(
-        unmatchedIngredients.map(async (ingredient: RecipeIngredient) => {
-          const suggestion = await getMatchSuggestion(ingredient.name, fridaData)
+        recipeIngredients.map(async (ingredient: RecipeIngredient) => {
+          const fridaId = existingMatchMap.get(ingredient.id) as string | undefined
+          const hasStoredMatch = !!(fridaId != null && String(fridaId).trim() !== '')
+          const selectedFromDb =
+            hasStoredMatch && fridaId != null ? findFridaByStoredId(fridaData, String(fridaId)) : undefined
+
+          const suggestion = hasStoredMatch ? null : await getMatchSuggestion(ingredient.name, fridaData)
+
           return {
             recipeIngredient: ingredient,
             suggestedMatch: suggestion,
-            selectedMatch: null,
-            isConfirmed: false,
-            isRejected: false
-          }
+            selectedMatch: selectedFromDb ?? null,
+            isConfirmed: hasStoredMatch,
+            isRejected: false,
+            hasStoredMatch,
+          } as IngredientMatch
         })
       )
-      
+
       setIngredientMatches(matchesWithSuggestions)
       
     } catch (error) {
@@ -161,58 +240,46 @@ export default function IngredientMatchingPage() {
   }
 
   const confirmMatch = async (recipeIngredientId: string) => {
-    const idx = ingredientMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
+    const idx = ingredientMatches.findIndex((m) => m.recipeIngredient.id === recipeIngredientId)
     if (idx === -1) return
-    const updated = [...ingredientMatches]
-    updated[idx].isConfirmed = true
-    updated[idx].isRejected = false
-    updated[idx].selectedMatch = updated[idx].suggestedMatch?.fridaIngredient || null
-    setIngredientMatches(updated)
-    
-    // Auto-save this match immediately
-    if (updated[idx].selectedMatch) {
-      try {
-        const matchToSave = {
-          recipeIngredientId: updated[idx].recipeIngredient.id,
-          fridaIngredientId: updated[idx].selectedMatch!.id,
-          confidence: updated[idx].suggestedMatch?.confidence || 100
-        }
-        
-        const response = await fetch('/api/ingredient-matches', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ matches: [matchToSave] })
-        })
-        
-        if (response.ok) {
-          // Remove saved match from UI
-          const filteredMatches = updated.filter(m => m.recipeIngredient.id !== matchToSave.recipeIngredientId)
-          setIngredientMatches(filteredMatches)
-          
-          // Update stats with filtered list
-          setTimeout(() => {
-            const total = filteredMatches.length
-            const confirmed = filteredMatches.filter(m => m.isConfirmed).length
-            const rejected = filteredMatches.filter(m => m.isRejected).length
-            const pending = total - confirmed - rejected
-            setStats({ total, confirmed, rejected, pending })
-          }, 0)
-          
-          return // Exit early since match is saved and removed
-        }
-      } catch (error) {
-        console.error('Auto-save failed:', error)
+    const selected = ingredientMatches[idx].suggestedMatch?.fridaIngredient
+    if (!selected) return
+
+    try {
+      const matchToSave = {
+        recipeIngredientId,
+        fridaIngredientId: selected.id,
+        confidence: ingredientMatches[idx].suggestedMatch?.confidence || 100,
       }
+
+      const response = await fetch('/api/ingredient-matches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matches: [matchToSave] }),
+      })
+
+      if (!response.ok) {
+        alert('Kunne ikke gemme match – prøv igen.')
+        return
+      }
+
+      setIngredientMatches((prev) => {
+        const next = [...prev]
+        const i = next.findIndex((m) => m.recipeIngredient.id === recipeIngredientId)
+        if (i === -1) return prev
+        next[i] = {
+          ...next[i],
+          isConfirmed: true,
+          isRejected: false,
+          hasStoredMatch: true,
+          selectedMatch: selected,
+        }
+        return next
+      })
+    } catch (error) {
+      console.error('Auto-save failed:', error)
+      alert('Kunne ikke gemme match.')
     }
-    
-    // Update stats if auto-save failed
-    setTimeout(() => {
-      const total = updated.length
-      const confirmed = updated.filter(m => m.isConfirmed).length
-      const rejected = updated.filter(m => m.isRejected).length
-      const pending = total - confirmed - rejected
-      setStats({ total, confirmed, rejected, pending })
-    }, 0)
   }
 
   const rejectMatch = (recipeIngredientId: string) => {
@@ -235,64 +302,49 @@ export default function IngredientMatchingPage() {
   }
 
   const selectManualMatch = async (recipeIngredientId: string, fridaIngredient: FridaIngredient) => {
-    const idx = ingredientMatches.findIndex(m => m.recipeIngredient.id === recipeIngredientId)
-    if (idx === -1) return
-    const updated = [...ingredientMatches]
-    updated[idx].selectedMatch = fridaIngredient
-    updated[idx].isConfirmed = true
-    updated[idx].isRejected = false
-    setIngredientMatches(updated)
-    
-    // Auto-save this manual match immediately
     try {
-        const matchToSave = {
-          recipeIngredientId: updated[idx].recipeIngredient.id,
-          fridaIngredientId: fridaIngredient.id,
-          confidence: 100 // Manual selection = 100% confidence
-        }
-      
+      const matchToSave = {
+        recipeIngredientId,
+        fridaIngredientId: fridaIngredient.id,
+        confidence: 100,
+      }
+
       const response = await fetch('/api/ingredient-matches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matches: [matchToSave] })
+        body: JSON.stringify({ matches: [matchToSave] }),
       })
-      
-      if (response.ok) {
-        // Remove saved match from UI
-          const filteredMatches = updated.filter(m => m.recipeIngredient.id !== matchToSave.recipeIngredientId)
-        setIngredientMatches(filteredMatches)
-        
-        // Update stats with filtered list
-        setTimeout(() => {
-          const total = filteredMatches.length
-          const confirmed = filteredMatches.filter(m => m.isConfirmed).length
-          const rejected = filteredMatches.filter(m => m.isRejected).length
-          const pending = total - confirmed - rejected
-          setStats({ total, confirmed, rejected, pending })
-        }, 0)
-        
-        return // Exit early since match is saved and removed
+
+      if (!response.ok) {
+        alert('Kunne ikke gemme match – prøv igen.')
+        return
       }
+
+      setIngredientMatches((prev) => {
+        const next = [...prev]
+        const i = next.findIndex((m) => m.recipeIngredient.id === recipeIngredientId)
+        if (i === -1) return prev
+        next[i] = {
+          ...next[i],
+          selectedMatch: fridaIngredient,
+          isConfirmed: true,
+          isRejected: false,
+          hasStoredMatch: true,
+        }
+        return next
+      })
     } catch (error) {
       console.error('Auto-save failed:', error)
+      alert('Kunne ikke gemme match.')
     }
-    
-    // Update stats if auto-save failed
-    setTimeout(() => {
-      const total = updated.length
-      const confirmed = updated.filter(m => m.isConfirmed).length
-      const rejected = updated.filter(m => m.isRejected).length
-      const pending = total - confirmed - rejected
-      setStats({ total, confirmed, rejected, pending })
-    }, 0)
   }
 
   const updateStats = () => {
     const total = ingredientMatches.length
-    const confirmed = ingredientMatches.filter(m => m.isConfirmed).length
-    const rejected = ingredientMatches.filter(m => m.isRejected).length
+    const confirmed = ingredientMatches.filter((m) => isIngredientMatchedRow(m)).length
+    const rejected = ingredientMatches.filter((m) => m.isRejected).length
     const pending = total - confirmed - rejected
-    
+
     setStats({ total, confirmed, rejected, pending })
   }
 
@@ -319,23 +371,15 @@ export default function IngredientMatchingPage() {
       
       if (response.ok) {
         alert(`Saved ${confirmedMatches.length} ingredient matches!`)
-        
-        // Remove saved matches from the UI
-        const savedIngredientIds = confirmedMatches.map(m => m.recipeIngredientId)
-        const updatedMatches = ingredientMatches.filter(m => 
-          !savedIngredientIds.includes(m.recipeIngredient.id)
+
+        const savedIds = new Set(confirmedMatches.map((m) => m.recipeIngredientId))
+        setIngredientMatches((prev) =>
+          prev.map((m) =>
+            savedIds.has(m.recipeIngredient.id)
+              ? { ...m, hasStoredMatch: true, isConfirmed: true }
+              : m
+          )
         )
-        setIngredientMatches(updatedMatches)
-        
-        // Update stats immediately
-        setTimeout(() => {
-          const total = updatedMatches.length
-          const confirmed = updatedMatches.filter(m => m.isConfirmed).length
-          const rejected = updatedMatches.filter(m => m.isRejected).length
-          const pending = total - confirmed - rejected
-          setStats({ total, confirmed, rejected, pending })
-        }, 0)
-        
       } else {
         alert(`Error saving matches: ${result.message || 'Unknown error'}`)
       }
@@ -345,10 +389,12 @@ export default function IngredientMatchingPage() {
     }
   }
 
-  const filteredMatches = ingredientMatches.filter(match => {
-    const matchesSearch = match.recipeIngredient.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || match.recipeIngredient.category === selectedCategory
-    return matchesSearch && matchesCategory
+  const filteredMatches = ingredientMatches.filter((match) => {
+    if (matchFilter === 'queue' && isIngredientMatchedRow(match)) return false
+    if (matchFilter === 'matchedOnly' && !isIngredientMatchedRow(match)) return false
+    if (!rowMatchesSearch(match, searchTerm)) return false
+    if (!recipeCategoryMatchesFilter(match.recipeIngredient.category, selectedCategory)) return false
+    return true
   })
 
   const getConfidenceColor = (confidence: number) => {
@@ -421,24 +467,67 @@ export default function IngredientMatchingPage() {
 
         {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
+            <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Ingredients
+                Søg (opskrift- eller Frida-navn)
               </label>
               <div className="relative">
                 <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-3 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by name..."
+                  placeholder="Fx rødløg eller Løg, rød…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
-            
-            <div>
+
+            <div className="lg:col-span-2">
+              <span className="block text-sm font-medium text-gray-700 mb-2">Visning</span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMatchFilter('queue')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium border transition ${
+                    matchFilter === 'queue'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Arbejdskø
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchFilter('all')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium border transition ${
+                    matchFilter === 'all'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title="Vis også ingredienser der allerede er matchet med Frida"
+                >
+                  Vis i forvejen matchet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMatchFilter('matchedOnly')}
+                  className={`px-3 py-2 rounded-md text-sm font-medium border transition ${
+                    matchFilter === 'matchedOnly'
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  Kun matchede
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Standard er <strong>Arbejdskø</strong>: gemte matches skjules, så du ser hurtigt, hvad der mangler.
+              </p>
+            </div>
+
+            <div className="lg:col-span-1">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Category
               </label>
@@ -458,7 +547,7 @@ export default function IngredientMatchingPage() {
               </select>
             </div>
 
-            <div className="flex items-end">
+            <div className="lg:col-span-1 flex items-end">
               <button
                 onClick={saveAllMatches}
                 disabled={stats.confirmed === 0}
@@ -475,6 +564,17 @@ export default function IngredientMatchingPage() {
           {filteredMatches.map((match) => (
             <div key={match.recipeIngredient.id} className="bg-white rounded-lg shadow">
               <div className="p-6">
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      isIngredientMatchedRow(match)
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-amber-100 text-amber-900'
+                    }`}
+                  >
+                    {isIngredientMatchedRow(match) ? 'Matchet med Frida' : 'Ikke matchet'}
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Recipe Ingredient */}
                   <div>
@@ -495,7 +595,9 @@ export default function IngredientMatchingPage() {
                   {/* Suggested Match */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      Suggested Frida Match
+                      {match.hasStoredMatch || (match.selectedMatch && !match.suggestedMatch)
+                        ? 'Frida-match'
+                        : 'Suggested Frida Match'}
                     </h3>
                     
                     {match.suggestedMatch ? (
@@ -546,6 +648,14 @@ export default function IngredientMatchingPage() {
                             {match.isRejected ? 'Rejected' : 'Reject'}
                           </button>
                         </div>
+                      </div>
+                    ) : match.selectedMatch ? (
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <div className="font-medium text-gray-900">{match.selectedMatch.name}</div>
+                        <div className="text-sm text-gray-600 mt-1">{match.selectedMatch.category}</div>
+                        <p className="text-sm text-green-800 mt-2">
+                          Gemt Frida-vare — kan ændres via manuel valg nedenfor.
+                        </p>
                       </div>
                     ) : (
                       <div className="bg-gray-50 p-4 rounded-lg">
@@ -599,26 +709,9 @@ function FridaIngredientSelector({
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredIngredients = fridaIngredients.filter(ingredient => {
-    const ingredientName = ingredient.name.toLowerCase()
-    const searchLower = searchTerm.toLowerCase()
-    const matches = ingredientName.includes(searchLower)
-    
-    // Debug logging for smør søgning
-    if (searchLower === 'smør' && ingredientName.includes('smør')) {
-      console.log('🔍 Found smør match:', ingredient.name, 'matches:', matches)
-    }
-    
-    return matches
-  }) // Removed slice limit to show all results
-  
-  // Debug logging for search results
-  if (searchTerm.toLowerCase() === 'smør') {
-    console.log('🔍 Search term: "smør"')
-    console.log('🔍 Total fridaIngredients:', fridaIngredients.length)
-    console.log('🔍 Filtered results count:', filteredIngredients.length)
-    console.log('🔍 All smør results:', filteredIngredients.filter(ing => ing.name.toLowerCase().includes('smør')).map(ing => ing.name))
-  }
+  const filteredIngredients = fridaIngredients.filter((ingredient) =>
+    ingredientNameMatchesQuery(ingredient.name, searchTerm)
+  )
 
   return (
     <div className="relative">

@@ -8,6 +8,10 @@ import RecipePageClient from '@/components/RecipePageClient'
 import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
 
+// Cache recipe pages for high-load production traffic.
+// Pages are invalidated explicitly from admin/recalculate endpoints on updates.
+export const revalidate = 3600
+
 interface PageProps {
   params: Promise<{ slug: string }>
 }
@@ -23,8 +27,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function RecipePage({ params }: PageProps) {
   const resolvedParams = await params
-  const allRecipes = await databaseService.getRecipes()
-  const recipe = allRecipes.find(r => r.slug === resolvedParams.slug)
+  const recipe = await databaseService.getPublishedRecipeBySlug(resolvedParams.slug)
+  const relatedRecipeCandidates = await databaseService.getRecentPublishedRecipes(80, resolvedParams.slug)
 
   if (!recipe) {
     return (
@@ -177,7 +181,7 @@ export default async function RecipePage({ params }: PageProps) {
         {/* Client-side interactive components */}
         <RecipePageClient 
           recipe={recipe} 
-          allRecipes={allRecipes} 
+          allRecipes={relatedRecipeCandidates} 
         />
       </main>
     </>

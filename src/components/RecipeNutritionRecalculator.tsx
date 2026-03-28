@@ -32,7 +32,21 @@ export default function RecipeNutritionRecalculator({ recipeId, recipeName: _rec
       const data = await response.json()
       
       if (data.success) {
-        const message = `✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g`
+        const unmatchedList = Array.isArray(data.unmatchedIngredients)
+          ? data.unmatchedIngredients
+              .map((u: { ingredient?: string; query?: string }) => {
+                const ingredient = (u.ingredient || '').trim()
+                const query = (u.query || '').trim()
+                if (!ingredient) return null
+                return query && query !== ingredient
+                  ? `- ${ingredient} (søgt som: ${query})`
+                  : `- ${ingredient}`
+              })
+              .filter(Boolean)
+              .join('\n')
+          : ''
+
+        const message = `✅ ${data.message}\n\nMatched: ${data.matchedIngredients}/${data.totalIngredients} ingredients\n\nCalories: ${Math.round(data.nutrition.calories)} kcal\nProtein: ${Math.round(data.nutrition.protein * 10) / 10}g\nCarbs: ${Math.round(data.nutrition.carbs * 10) / 10}g\nFat: ${Math.round(data.nutrition.fat * 10) / 10}g${unmatchedList ? `\n\nUnmatched ingredients:\n${unmatchedList}` : ''}`
         
         alert(message)
         

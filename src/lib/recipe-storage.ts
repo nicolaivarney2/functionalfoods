@@ -32,8 +32,10 @@ export async function getRecipesByCategory(category: string): Promise<Recipe[]> 
     if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
       return false
     }
-    return recipe.dietaryCategories.some(dietaryCategory =>
-      dietaryCategory.toLowerCase() === category.toLowerCase()
+    return recipe.dietaryCategories.some(
+      (dietaryCategory) =>
+        typeof dietaryCategory === 'string' &&
+        dietaryCategory.toLowerCase() === category.toLowerCase()
     )
   })
 }

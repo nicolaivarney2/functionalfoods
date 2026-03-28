@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
 import { databaseService } from '@/lib/database-service'
 
+const PRODUCT_DETAILS_CACHE_CONTROL = 'public, s-maxage=1800, stale-while-revalidate=86400'
+const PRODUCT_DETAILS_MEMORY_TTL_MS = 5 * 60 * 1000
+const PRODUCT_DETAILS_MEMORY_MAX_ITEMS = 500
+
+type ProductDetailsResponse = {
+  success: true
+  product: any
+  similarProducts: any[]
+  otherSizeProducts: any[]
+}
+
+const productDetailsCache = new Map<
+  string,
+  { expiresAt: number; payload: ProductDetailsResponse }
+>()
+
+function pruneProductDetailsCache() {
+  if (productDetailsCache.size <= PRODUCT_DETAILS_MEMORY_MAX_ITEMS) return
+  const now = Date.now()
+  for (const [key, entry] of productDetailsCache.entries()) {
+    if (entry.expiresAt <= now) {
+      productDetailsCache.delete(key)
+    }
+  }
+}
+
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -16,6 +42,16 @@ export async function GET(
         { success: false, message: 'Invalid product id' },
         { status: 400 }
       )
+    }
+
+    const cacheKey = String(offerId)
+    const cached = productDetailsCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      return NextResponse.json(cached.payload, {
+        headers: {
+          'Cache-Control': PRODUCT_DETAILS_CACHE_CONTROL,
+        },
+      })
     }
 
     // Hent primær offer + tilhørende produkt
@@ -247,11 +283,23 @@ export async function GET(
     const similarProducts = sameSizeOffers.map(mapOfferToProduct)
     const otherSizeProducts = otherSizeOffers.map(mapOfferToProduct)
 
-    return NextResponse.json({
+    const payload: ProductDetailsResponse = {
       success: true,
       product: mainProduct,
       similarProducts,
       otherSizeProducts,
+    }
+
+    pruneProductDetailsCache()
+    productDetailsCache.set(cacheKey, {
+      payload,
+      expiresAt: Date.now() + PRODUCT_DETAILS_MEMORY_TTL_MS,
+    })
+
+    return NextResponse.json(payload, {
+      headers: {
+        'Cache-Control': PRODUCT_DETAILS_CACHE_CONTROL,
+      },
     })
   } catch (error) {
     console.error('❌ Error in /api/supermarket/product/[id]:', error)

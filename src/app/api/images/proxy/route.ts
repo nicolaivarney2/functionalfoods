@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
+const IMAGE_PROXY_TIMEOUT_MS = 8000
+const MAX_IMAGE_URL_LENGTH = 2000
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+function isBlockedHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase().trim()
+  if (!h) return true
+  if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local')) return true
+
+  const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(h)
+  if (!isIpv4) return false
+  const parts = h.split('.').map((p) => Number.parseInt(p, 10))
+  if (parts.some((p) => !Number.isFinite(p) || p < 0 || p > 255)) return true
+
+  const [a, b] = parts
+  if (a === 10 || a === 127 || a === 0) return true
+  if (a === 169 && b === 254) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  return false
+}
 
 /**
  * Image proxy for external product images (Goma, etc.)
@@ -11,7 +32,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const imageUrl = searchParams.get('url')
 
-    if (!imageUrl) {
+    if (!imageUrl || imageUrl.length > MAX_IMAGE_URL_LENGTH) {
       return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 })
     }
 
@@ -21,6 +42,9 @@ export async function GET(request: NextRequest) {
       // Only allow http/https protocols
       if (!['http:', 'https:'].includes(url.protocol)) {
         return NextResponse.json({ error: 'Invalid protocol' }, { status: 400 })
+      }
+      if (isBlockedHostname(url.hostname)) {
+        return NextResponse.json({ error: 'Blocked host' }, { status: 400 })
       }
     } catch {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
@@ -66,12 +90,19 @@ export async function GET(request: NextRequest) {
       headers['Referer'] = 'https://www.meny.dk/'
     }
 
-    console.log(`🖼️ Fetching image from: ${imageUrl.substring(0, 100)}...`)
-    const response = await fetch(imageUrl, { 
-      headers,
-      // Don't follow redirects automatically - handle them manually if needed
-      redirect: 'follow',
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), IMAGE_PROXY_TIMEOUT_MS)
+    let response: Response
+    try {
+      response = await fetch(imageUrl, {
+        headers,
+        // Don't follow redirects automatically - handle them manually if needed
+        redirect: 'follow',
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!response.ok) {
       console.error(`❌ Failed to fetch image: ${response.status} ${response.statusText} from ${imageUrl.substring(0, 100)}`)
@@ -91,9 +122,17 @@ export async function GET(request: NextRequest) {
 
     // Get content type
     const contentType = response.headers.get('content-type') || 'image/jpeg'
+    const contentLengthHeader = response.headers.get('content-length')
+    const contentLength = contentLengthHeader ? Number.parseInt(contentLengthHeader, 10) : 0
+    if (Number.isFinite(contentLength) && contentLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ error: 'Image too large' }, { status: 413 })
+    }
     
     // Get image buffer
     const imageBuffer = await response.arrayBuffer()
+    if (imageBuffer.byteLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ error: 'Image too large' }, { status: 413 })
+    }
 
     // Return image with proper headers
     return new NextResponse(imageBuffer, {
@@ -105,6 +144,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return NextResponse.json({ error: 'Image upstream timeout' }, { status: 504 })
+    }
     console.error('❌ Image proxy error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

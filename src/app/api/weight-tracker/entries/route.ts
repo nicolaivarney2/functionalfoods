@@ -3,6 +3,14 @@ import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
 import { isMissingTableError, missingWeightTrackerTablesResponse } from '@/lib/supabase-postgrest-error'
 
 export const dynamic = 'force-dynamic'
+const MAX_ADULT_INDEX = 9
+
+function parseAdultIndex(value: string | null | undefined): number | null {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed)) return null
+  if (parsed < 0 || parsed > MAX_ADULT_INDEX) return null
+  return parsed
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,8 +24,8 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { searchParams } = new URL(request.url)
-    const adultIndex = parseInt(searchParams.get('adultIndex') ?? '0', 10)
-    if (Number.isNaN(adultIndex) || adultIndex < 0) {
+    const adultIndex = parseAdultIndex(searchParams.get('adultIndex'))
+    if (adultIndex == null) {
       return NextResponse.json({ error: 'Ugyldig adultIndex' }, { status: 400 })
     }
 
@@ -56,19 +64,19 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const adultIndex = parseInt(String(body.adultIndex ?? '0'), 10)
+    const adultIndex = parseAdultIndex(String(body.adultIndex ?? '0'))
     const weightKg = parseFloat(String(body.weightKg))
     const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : null
     let loggedAt = typeof body.loggedAt === 'string' ? body.loggedAt : null
 
-    if (Number.isNaN(adultIndex) || adultIndex < 0) {
+    if (adultIndex == null) {
       return NextResponse.json({ error: 'Ugyldig person' }, { status: 400 })
     }
     if (Number.isNaN(weightKg) || weightKg < 30 || weightKg > 300) {
       return NextResponse.json({ error: 'Vægt skal være mellem 30 og 300 kg' }, { status: 400 })
     }
 
-    if (!loggedAt) {
+    if (!loggedAt || Number.isNaN(Date.parse(loggedAt))) {
       loggedAt = new Date().toISOString()
     }
 
