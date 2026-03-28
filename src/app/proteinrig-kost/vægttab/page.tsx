@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Scale, Flame, Heart, Brain, Check, Zap, Target } from 'lucide-react'
+import { ArrowLeft, Scale, Flame, Heart, Brain, Check, Zap, Target, BookOpen } from 'lucide-react'
+import { Cite } from '@/components/Cite'
 
 export default function ProteinrigKostWeightLossTheoryPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -49,7 +51,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
 
               <p>
-                Almindelige kostanbefalinger for voksne siger, at cirka 10-15% af energien bør komme fra protein (svarende til omkring 0,8 g protein per kilo kropsvægt om dagen). En proteinrig kost ligger derimod højere – ofte 20-30% af kalorierne eller mere end ~1,2 g protein/kg kropsvægt.
+                Almindelige kostanbefalinger for voksne siger, at cirka 10-15% af energien bør komme fra protein (svarende til omkring 0,8 g protein per kilo kropsvægt om dagen).<Cite n={1} /><Cite n={12} /> En proteinrig kost ligger derimod højere – ofte 20-30% af kalorierne eller mere end ~1,2 g protein/kg kropsvægt.
               </p>
 
               <div className="bg-purple-50 rounded-xl p-6 border-l-4 border-purple-600">
@@ -66,12 +68,21 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
             </div>
 
-            {/* Illustration placeholder */}
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <p className="text-gray-500 text-sm mb-2">
-                <strong>Illustration:</strong> En tallerken illustreret i to versioner – én med almindelig fordeling (mindre protein, mere pasta/ris) og én med proteinrig fordeling (større stykke kylling/fisk eller bønner, mindre stivelse). Dette viser visuelt, hvordan en proteinrig kost adskiller sig fra en typisk tallerkenfordeling.
-              </p>
-            </div>
+            <figure className="mt-12 max-w-4xl mx-auto">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                <Image
+                  src="/billeder/nicher/proteinrig/more-protein-for-weightloss-3-1.png"
+                  alt="To tallerkenversioner: almindelig fordeling med mindre protein og mere pasta eller ris, og proteinrig fordeling med større andel kylling, fisk eller bønner og mindre stivelse."
+                  width={1200}
+                  height={675}
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 896px) 100vw, 896px"
+                />
+              </div>
+              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
+                <span className="font-medium text-gray-800">Illustration:</span> En tallerken illustreret i to versioner – én med almindelig fordeling (mindre protein, mere pasta/ris) og én med proteinrig fordeling (større stykke kylling/fisk eller bønner, mindre stivelse). Dette viser visuelt, hvordan en proteinrig kost adskiller sig fra en typisk tallerkenfordeling.
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -91,11 +102,11 @@ export default function ProteinrigKostWeightLossTheoryPage() {
             
             <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed space-y-6 mb-8">
               <p>
-                En af de vigtigste årsager til, at en proteinrig kost kan fremme vægttab, er dens effekt på mæthed. Protein mætter generelt mere per kalorie end både kulhydrat og fedt. Studier har vist, at personer føler sig betydeligt mere mætte efter et proteinrigt måltid sammenlignet med et kulhydratrigt eller fedtrigt måltid med samme kaloriemængde.
+                En af de vigtigste årsager til, at en proteinrig kost kan fremme vægttab, er dens effekt på mæthed. Protein mætter generelt mere per kalorie end både kulhydrat og fedt. Studier har vist, at personer føler sig betydeligt mere mætte efter et proteinrigt måltid sammenlignet med et kulhydratrigt eller fedtrigt måltid med samme kaloriemængde.<Cite n={2} /><Cite n={3} />
               </p>
 
               <p>
-                Faktisk anses protein for at være det mest mættende makronæringsstof, efterfulgt af kulhydrat, mens fedt mætter mindst. Når mæthedsfornemmelsen øges, vil du typisk spise færre kalorier resten af dagen – helt af sig selv. Denne spontant lavere appetit er afgørende for et succesfuldt vægttab, da det hjælper dig med at opnå et kalorieunderskud uden konstant sult.
+                Faktisk anses protein for at være det mest mættende makronæringsstof, efterfulgt af kulhydrat, mens fedt mætter mindst.<Cite n={3} /> Når mæthedsfornemmelsen øges, vil du typisk spise færre kalorier resten af dagen – helt af sig selv. Denne spontant lavere appetit er afgørende for et succesfuldt vægttab, da det hjælper dig med at opnå et kalorieunderskud uden konstant sult.
               </p>
             </div>
 
@@ -109,7 +120,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   Forklaringen ligger i både fordøjelsen og kroppens hormonelle respons. Proteiner kræver længere tid at fordøje og giver dermed en mere langvarig fyldefornemmelse i maven.
                 </p>
                 <p>
-                  Samtidig påvirker protein de appetitregulerende hormoner i kroppen: Et proteinrigt måltid stimulerer frigørelsen af mæthedshormoner fra tarmen – herunder <strong>GLP-1, PYY og CCK</strong>, som alle sender signal til hjernen om at du er ved at være mæt – og det dæmper samtidig niveauerne af sulthormonet <strong>ghrelin</strong>.
+                  Samtidig påvirker protein de appetitregulerende hormoner i kroppen: Et proteinrigt måltid stimulerer frigørelsen af mæthedshormoner fra tarmen – herunder <strong>GLP-1, PYY og CCK</strong>, som alle sender signal til hjernen om at du er ved at være mæt – og det dæmper samtidig niveauerne af sulthormonet <strong>ghrelin</strong>.<Cite n={4} />
                 </p>
                 <p>
                   Denne kombination (mere mæthedshormon og mindre ghrelin) betyder, at hjernen modtager et kraftigt "stop med at spise" signal. Protein ser også ud til at sænke hastigheden af mave-tømning, så maden bliver længere i maven, hvilket yderligere forlænger mæthedsfornemmelsen.
@@ -123,12 +134,21 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
             </div>
 
-            {/* Illustration placeholder */}
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <p className="text-gray-500 text-sm mb-2">
-                <strong>Illustration:</strong> En simpel graf over mæthedskurver for to måltider – ét rigt på protein og ét rigt på kulhydrat. Grafen viser fx at kurven for proteinmåltidet holder sig høj (man er mæt) i længere tid, mens kurven for kulhydratmåltidet falder hurtigere (man bliver hurtigere sulten igen). Alternativt en illustration af en person med fuld mave efter et proteinrigt måltid vs. en sulten person kort tid efter et højkulhydrat måltid.
-              </p>
-            </div>
+            <figure className="mt-12 max-w-4xl mx-auto">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                <Image
+                  src="/billeder/nicher/proteinrig/satiety-protein.webp"
+                  alt="Graf der sammenligner mæthed over tid: proteinmåltid holder mætheden længere, kulhydratmåltid falder hurtigere."
+                  width={940}
+                  height={528}
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 896px) 100vw, 896px"
+                />
+              </div>
+              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
+                <span className="font-medium text-gray-800">Illustration:</span> En simpel graf over mæthedskurver for to måltider – ét rigt på protein og ét rigt på kulhydrat. Grafen viser fx at kurven for proteinmåltidet holder sig høj (man er mæt) i længere tid, mens kurven for kulhydratmåltidet falder hurtigere (man bliver hurtigere sulten igen). Alternativt en illustration af en person med fuld mave efter et proteinrigt måltid vs. en sulten person kort tid efter et højkulhydrat måltid.
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -152,7 +172,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
 
               <p>
-                En udfordring ved traditionelle slankekure er, at kroppen ofte nedbryder noget muskelvæv, når den er i kalorieunderskud – især hvis proteinindtaget er lavt. Her udmærker en proteinrig kost sig ved at beskytte musklerne under vægttab. Tilstrækkeligt protein giver nemlig byggesten (aminosyrer) til muskelvedligeholdelse, selv når du er på skrump.
+                En udfordring ved traditionelle slankekure er, at kroppen ofte nedbryder noget muskelvæv, når den er i kalorieunderskud – især hvis proteinindtaget er lavt. Her udmærker en proteinrig kost sig ved at beskytte musklerne under vægttab. Tilstrækkeligt protein giver nemlig byggesten (aminosyrer) til muskelvedligeholdelse, selv når du er på skrump.<Cite n={13} />
               </p>
             </div>
 
@@ -163,13 +183,13 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </h3>
               <div className="space-y-4 text-gray-700">
                 <p>
-                  Evidensen for dette er solid: Sammenlignende forsøg har vist, at personer på høj-proteinkure bevarer mere af deres muskelmasse end personer på vægttabskure med lavere proteinindhold.
+                  Evidensen for dette er solid: Sammenlignende forsøg har vist, at personer på høj-proteinkure bevarer mere af deres muskelmasse end personer på vægttabskure med lavere proteinindhold.<Cite n={5} />
                 </p>
                 <p>
-                  For eksempel fandt en meta-analyse af 24 vægttabsstudier (over 1000 deltagere), at en høj-proteinkost (cirka 25-35% af kalorierne fra protein) gav et signifikant større vægttab og især et større fedttab sammenlignet med en mere proteinfattig kost – samtidig med at der blev skånet muskelvæv.
+                  For eksempel fandt en meta-analyse af 24 vægttabsstudier (over 1000 deltagere), at en høj-proteinkost (cirka 25-35% af kalorierne fra protein) gav et signifikant større vægttab og især et større fedttab sammenlignet med en mere proteinfattig kost – samtidig med at der blev skånet muskelvæv.<Cite n={5} />
                 </p>
                 <p className="bg-green-50 rounded-lg p-4 border border-green-200">
-                  <strong>I gennemsnit:</strong> Høj-protein-grupperne tabte sig ~0,8 kg mere, hvoraf det meste var fedt, og de holdt på ca. 0,4 kg ekstra muskelmasse i forhold til dem, der fik mindre protein. Med andre ord kom et større fald i vægten fra fedtdepoterne fremfor musklerne, når proteinandelen var høj.
+                  <strong>I gennemsnit:</strong> Høj-protein-grupperne tabte sig ~0,8 kg mere, hvoraf det meste var fedt, og de holdt på ca. 0,4 kg ekstra muskelmasse i forhold til dem, der fik mindre protein. Med andre ord kom et større fald i vægten fra fedtdepoterne fremfor musklerne, når proteinandelen var høj.<Cite n={5} />
                 </p>
                 <p>
                   Dette gør en stor forskel for kroppens sammensætning og efterlader dig med en stærkere, mere tonet krop efter vægttabet.
@@ -183,7 +203,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                 Normalt vil kroppens forbrænding sænkes under vægttab – et fænomen kendt som <strong>metabolisk adaptation</strong> eller <strong>adaptiv termogenese</strong>, hvor kroppen sparer på energien og gør det sværere at tabe sig yderligere.
               </p>
               <p className="text-gray-700 leading-relaxed">
-                Men en proteinrig kost ser ud til at modvirke det store fald i forbrænding, bl.a. fordi musklerne bevares bedre. Forskning indikerer, at et højere proteinindtag kan opretholde et højere hvilestofskifte efter vægttab end en kost med mindre protein. I en stor europæisk undersøgelse fandt man eksempelvis, at personer, som fulgte en høj-proteindiæt, faktisk havde en lidt højere hvileforbrænding og oplevede mindre "nedgearing" af stofskiftet efter vægttab sammenlignet med dem på en moderat-protein kost.
+                Men en proteinrig kost ser ud til at modvirke det store fald i forbrænding, bl.a. fordi musklerne bevares bedre. Forskning indikerer, at et højere proteinindtag kan opretholde et højere hvilestofskifte efter vægttab end en kost med mindre protein.<Cite n={2} /> I en stor europæisk undersøgelse fandt man eksempelvis, at personer, som fulgte en høj-proteindiæt, faktisk havde en lidt højere hvileforbrænding og oplevede mindre &quot;nedgearing&quot; af stofskiftet efter vægttab sammenlignet med dem på en moderat-protein kost.<Cite n={6} />
               </p>
             </div>
 
@@ -191,12 +211,21 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               Kombinationen af bedre muskelbevarelse og en mindre nedgang i stofskiftet gør høj-protein strategien særdeles effektiv til at fremme fedttab frem for muskeltab og potentielt lettere holde vægten nede bagefter.
             </p>
 
-            {/* Illustration placeholder */}
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <p className="text-gray-500 text-sm mb-2">
-                <strong>Illustration:</strong> En illustration med to forløb af vægttab – ét for en person på almindelig kost og ét for en person på høj-proteinkost. Begge viser vægttab, men ved den proteinrige kost bevares musklerne (illustreret ved fx en figur hvor muskelmassen er intakt) mens fedtprocenten går ned; i den anden ser man både muskler og fedt svinde ind. Alternativt to silhuetter efter vægttab: den ene lidt "ranglet" (muskeltab) og den anden mere "fit" (muskler bevaret).
-              </p>
-            </div>
+            <figure className="mt-12 max-w-3xl mx-auto">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                <Image
+                  src="/billeder/nicher/proteinrig/protein-retain-on-weightloss.webp"
+                  alt="Sammenligning af vægttab: høj-proteinkost bevarer muskelmasse mens fedt tabes; almindelig kost kan give både muskel- og fedttab."
+                  width={1025}
+                  height={1025}
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 768px) 100vw, 768px"
+                />
+              </div>
+              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
+                <span className="font-medium text-gray-800">Illustration:</span> En illustration med to forløb af vægttab – ét for en person på almindelig kost og ét for en person på høj-proteinkost. Begge viser vægttab, men ved den proteinrige kost bevares musklerne (illustreret ved fx en figur hvor muskelmassen er intakt) mens fedtprocenten går ned; i den anden ser man både muskler og fedt svinde ind. Alternativt to silhuetter efter vægttab: den ene lidt “ranglet” (muskeltab) og den anden mere “fit” (muskler bevaret).
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -231,7 +260,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </h3>
               <div className="space-y-4 text-gray-700">
                 <p>
-                  Omkring <strong>20-30% af kalorierne i protein</strong> går faktisk til selve fordøjelsesprocessen og omdannelse i kroppen. Til sammenligning forbruger kulhydrater kun omkring <strong>5-10%</strong> af deres kalorier under omsætning, og fedt endnu lavere (<strong>~0-3%</strong>).
+                  Omkring <strong>20-30% af kalorierne i protein</strong> går faktisk til selve fordøjelsesprocessen og omdannelse i kroppen. Til sammenligning forbruger kulhydrater kun omkring <strong>5-10%</strong> af deres kalorier under omsætning, og fedt endnu lavere (<strong>~0-3%</strong>).<Cite n={7} /><Cite n={8} />
                 </p>
                 <p>
                   Det vil sige, at hvis du spiser f.eks. 100 kcal rent protein, så "forsvinder" 20-30 kcal som varme og arbejde for kroppen, mens kun 70-80 kcal netto gemmes eller bruges. Spiser du derimod 100 kcal sukker, vil kroppen beholde 90-95 kcal af dem, fordi det er meget lettere at omsætte.
@@ -245,12 +274,12 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
 
               <p>
-                I praksis er effekten moderat men målbar: Studier med indirekte kalorimetri (hvor man måler folks energiforbrug) viser, at personer, der spiser en kost med fx 30-35% protein, forbrænder flere kalorier i døgnet end folk på en kost med lavere proteinandel.
+                I praksis er effekten moderat men målbar: Studier med indirekte kalorimetri (hvor man måler folks energiforbrug) viser, at personer, der spiser en kost med fx 30-35% protein, forbrænder flere kalorier i døgnet end folk på en kost med lavere proteinandel.<Cite n={7} />
               </p>
 
               <div className="bg-orange-50 rounded-xl p-6 border-l-4 border-orange-600">
                 <p className="text-gray-800 leading-relaxed">
-                  <strong>Eksempel:</strong> Ét forsøg fandt, at en kost med 36% af energien fra protein medførte ca. 70 kcal ekstra forbrænding per dag sammenlignet med en kost på 15% protein – alene på grund af den højere termiske effekt. 70 kcal lyder måske ikke af meget, men over tid kan det gøre en forskel i vægtregnskabet.
+                  <strong>Eksempel:</strong> Ét forsøg fandt, at en kost med 36% af energien fra protein medførte ca. 70 kcal ekstra forbrænding per dag sammenlignet med en kost på 15% protein – alene på grund af den højere termiske effekt.<Cite n={9} /> 70 kcal lyder måske ikke af meget, men over tid kan det gøre en forskel i vægtregnskabet.
                 </p>
               </div>
 
@@ -263,12 +292,21 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
             </div>
 
-            {/* Illustration placeholder */}
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <p className="text-gray-500 text-sm mb-2">
-                <strong>Illustration:</strong> En infographic med tre kolonner eller ikoner for hhv. protein, kulhydrat og fedt, hvor der ved hver står tal for hvor mange procent af kalorierne der går tabt som varme. F.eks. ved protein en flamme eller termometer med "20-30%", ved kulhydrat "~10%" og ved fedt "~3%". Dette visualiserer forskellen i termisk effekt. Alternativt en tegning af en lille "ovn" eller "motor" i maven, der brænder kraftigere ved proteinindtag end ved kulhydrat/fedt (illustreret med større flammer ved proteiner).
-              </p>
-            </div>
+            <figure className="mt-12 max-w-4xl mx-auto">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                <Image
+                  src="/billeder/nicher/proteinrig/weight-protein-food.png"
+                  alt="Sammenligning af den termiske effekt: omtrentlig andel af måltidskalorier brugt på fordøjelse og omsætning for protein, kulhydrat og fedt."
+                  width={1904}
+                  height={640}
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 896px) 100vw, 896px"
+                />
+              </div>
+              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
+                <span className="font-medium text-gray-800">Illustration:</span> Den termiske effekt af føde (TEF) for protein, kulhydrat og fedt – typiske intervaller; de præcise tal varierer med fødevarevalg og målemetode.
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -303,16 +341,16 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </h3>
               <div className="space-y-4 text-gray-700">
                 <p>
-                  Der er også konkrete studier, der underbygger, at protein mindsker cravings. I et forsøg lod man voksne spise en proteinrig vs. proteinfattig morgenmad med samme kalorier, og herefter målte man deres blodsukker og sult senere på dagen.
+                  Der er også konkrete studier, der underbygger, at protein mindsker cravings. I et forsøg lod man voksne spise en proteinrig vs. proteinfattig morgenmad med samme kalorier, og herefter målte man deres blodsukker og sult senere på dagen.<Cite n={10} />
                 </p>
                 <p className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                  <strong>Resultatet var slående:</strong> De, der havde fået ekstra protein til morgen, havde lavere blodsukkerniveauer og mindre appetit senere på dagen sammenlignet med dem, der fik mindre protein. Effekten hang sammen med, at protein fordøjes langsommere end kulhydrat – så de proteinrige måltider gav en længere mæthed og mere gradvis energifrigivelse.
+                  <strong>Resultatet var slående:</strong> De, der havde fået ekstra protein til morgen, havde lavere blodsukkerniveauer og mindre appetit senere på dagen sammenlignet med dem, der fik mindre protein. Effekten hang sammen med, at protein fordøjes langsommere end kulhydrat – så de proteinrige måltider gav en længere mæthed og mere gradvis energifrigivelse.<Cite n={10} />
                 </p>
                 <p>
                   Dette er gavnligt for folk der kæmper med eftermiddagscravings: I stedet for at opleve et dyk kl. 15 og gribe ud efter chokoladebaren, vil du med et proteinholdigt frokostmåltid i maven ofte føle dig stabil og mindre fristet.
                 </p>
                 <p>
-                  Andre undersøgelser har ovenikøbet vist, at højere proteinindtag kan påvirke hjernen ved at dæmpe aktiviteten i de områder, der styrer belønningsfølelsen ved mad – proteinet kan altså gøre os mindre "optagede" af tanken om mad, især usunde snacks.
+                  Andre undersøgelser har ovenikøbet vist, at højere proteinindtag kan påvirke hjernen ved at dæmpe aktiviteten i de områder, der styrer belønningsfølelsen ved mad – proteinet kan altså gøre os mindre "optagede" af tanken om mad, især usunde snacks.<Cite n={11} />
                 </p>
               </div>
             </div>
@@ -323,12 +361,21 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               </p>
             </div>
 
-            {/* Illustration placeholder */}
-            <div className="mt-12 bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-300 text-center">
-              <p className="text-gray-500 text-sm mb-2">
-                <strong>Illustration:</strong> En kurve-graf der viser blodsukker over tid efter to måltider: ét med højt proteinindhold og ét med højt sukkerindhold. Grafik: Proteinkurven stiger moderat og forbliver relativt stabil, mens sukker-kurven skyder i vejret og dykker brat kort efter. Under grafen kan være tegnet henholdsvis en person der ser tilfreds ud (stabil energi) og en der kigger sultent på en kage (blodsukker-crash).
-              </p>
-            </div>
+            <figure className="mt-12 max-w-4xl mx-auto">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 shadow-sm">
+                <Image
+                  src="/billeder/nicher/proteinrig/blood-glucose-protein-over-time.jpg"
+                  alt="Blodsukker over tid: mere stabilt forløb efter proteinrigt måltid sammenlignet med højt sukkerindhold."
+                  width={1200}
+                  height={823}
+                  className="w-full h-auto object-contain"
+                  sizes="(max-width: 896px) 100vw, 896px"
+                />
+              </div>
+              <figcaption className="mt-4 text-sm text-gray-600 text-center leading-relaxed px-2">
+                <span className="font-medium text-gray-800">Illustration:</span> Blodsukker over tid efter to måltider – ét med højt proteinindhold og ét med højt sukkerindhold. Proteinkurven stiger typisk mere moderat og kan være mere stabil, mens et måltid rigt på hurtigt sukker ofte giver et højere top og et hurtigere fald (mulig “crash”-fornemmelse).
+              </figcaption>
+            </figure>
           </div>
         </div>
       </section>
@@ -370,17 +417,17 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                   Dette er vigtigt for kostens holdbarhed: Når alle fødevaregrupper er tilladt i rimelige mængder, bliver det langt lettere at følge kosten i længden uden at føle afsavn.
                 </p>
                 <p>
-                  Faktisk viser forskning, at moderate justeringer i kostsammensætningen – frem for ekstreme restriktioner – giver de bedste resultater på sigt. Et stort europæisk studie (Diogenes-projektet) undersøgte, hvordan forskellige diæter fungerede til vægtvedligeholdelse efter et vægttab.
+                  Faktisk viser forskning, at moderate justeringer i kostsammensætningen – frem for ekstreme restriktioner – giver de bedste resultater på sigt. Et stort europæisk studie (Diogenes-projektet) undersøgte, hvordan forskellige diæter fungerede til vægtvedligeholdelse efter et vægttab.<Cite n={6} />
                 </p>
                 <p className="bg-indigo-50 rounded-lg p-4 border border-indigo-200">
-                  <strong>Resultatet:</strong> Deltagerne på den høj-protein/lav-GI kost havde lettere ved at blive ved deres kost og tog mindre på igen sammenlignet med dem på en mere traditionel kost. Det tyder på, at netop balancen – hvor man undgår ekstreme regler – gør det mere gennemførligt i hverdagen.
+                  <strong>Resultatet:</strong> Deltagerne på den høj-protein/lav-GI kost havde lettere ved at blive ved deres kost og tog mindre på igen sammenlignet med dem på en mere traditionel kost. Det tyder på, at netop balancen – hvor man undgår ekstreme regler – gør det mere gennemførligt i hverdagen.<Cite n={6} />
                 </p>
               </div>
             </div>
 
             <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed space-y-6">
               <p>
-                En proteinrig kost kan netop indrettes, så den overholder de officielle anbefalinger for en sund kost: Du kan sigte efter fx 25-30% af kalorierne fra protein (hvilket typisk ligger inden for anbefalingerne), omkring 30% fra sunde fedtstoffer, og resten (40-45%) fra kulhydrater af god kvalitet.
+                En proteinrig kost kan netop indrettes, så den overholder de officielle anbefalinger for en sund kost: Du kan sigte efter fx 25-30% af kalorierne fra protein (hvilket typisk ligger inden for anbefalingerne), omkring 30% fra sunde fedtstoffer, og resten (40-45%) fra kulhydrater af god kvalitet.<Cite n={1} /><Cite n={12} />
               </p>
 
               <p>
@@ -419,11 +466,11 @@ export default function ProteinrigKostWeightLossTheoryPage() {
               
               <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed space-y-6">
                 <p>
-                  En proteinrig kost kan betragtes som et effektivt og videnskabeligt funderet redskab til vægttab for voksne, der ønsker sunde vaner. Ved at øge proteinandelen i kosten får du flere mæthedsfordele, bedre muskelbeskyttelse og en lille metabolisk fordel, som samlet set kan gøre vægttab lettere og mere bæredygtigt.
+                  En proteinrig kost kan betragtes som et effektivt og videnskabeligt funderet redskab til vægttab for voksne, der ønsker sunde vaner. Ved at øge proteinandelen i kosten får du flere mæthedsfordele, bedre muskelbeskyttelse og en lille metabolisk fordel, som samlet set kan gøre vægttab lettere og mere bæredygtigt.<Cite n={2} /><Cite n={5} />
                 </p>
 
                 <p>
-                  Samtidig stabiliserer den appetitten og mindsker cravings, så du ikke konstant kæmper med sult. Både mænd og kvinder kan drage nytte af disse effekter (om end mænd i nogle tilfælde ser en lidt større effekt på vægten).
+                  Samtidig stabiliserer den appetitten og mindsker cravings, så du ikke konstant kæmper med sult. Både mænd og kvinder kan drage nytte af disse effekter (om end mænd i nogle tilfælde ser en lidt større effekt på vægten).<Cite n={5} />
                 </p>
 
                 <p>
@@ -432,7 +479,7 @@ export default function ProteinrigKostWeightLossTheoryPage() {
 
                 <div className="bg-white rounded-xl p-6 border-l-4 border-green-600 mt-6">
                   <p className="text-gray-800 leading-relaxed">
-                    <strong>Evidensen peger på:</strong> Kost med omkring 25-30% af kalorierne fra protein kan give betydelige forbedringer i vægtkontrol og kropssammensætning, netop fordi du spontant spiser mindre og taber primært fedt. Og det bedste er, at denne kost kan skræddersys med masser af grønt, fuldkorn og sunde fedtkilder, så du hverken går sulten i seng eller går glip af vigtige næringsstoffer.
+                    <strong>Evidensen peger på:</strong> Kost med omkring 25-30% af kalorierne fra protein kan give betydelige forbedringer i vægtkontrol og kropssammensætning, netop fordi du spontant spiser mindre og taber primært fedt.<Cite n={2} /><Cite n={5} /> Og det bedste er, at denne kost kan skræddersys med masser af grønt, fuldkorn og sunde fedtkilder, så du hverken går sulten i seng eller går glip af vigtige næringsstoffer.
                   </p>
                 </div>
 
@@ -445,6 +492,160 @@ export default function ProteinrigKostWeightLossTheoryPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Kilder */}
+      <section id="kilder" className="py-16 bg-gradient-to-b from-gray-50 to-white border-t border-gray-200 scroll-mt-20">
+        <div className="container">
+          <div className={`max-w-4xl mx-auto transition-all duration-1000 delay-1500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5 text-purple-800" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                Kilder og referencer
+              </h2>
+            </div>
+            <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+              Denne side er til <strong>information og inspiration</strong> og erstatter ikke individuel rådgivning fra læge, diætist eller anden godkendt sundhedsfaglig. Tallene i teksten matcher typiske intervaller i litteraturen; enkelte forsøg og metaanalyser afviger – se de primære kilder. Klik på de små tal i teksten for at hoppe til den tilsvarende reference.
+            </p>
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 md:p-8 shadow-sm">
+              <ol className="list-none space-y-5 text-sm text-gray-700 leading-relaxed">
+                <li id="kilde-1" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">1.</span>
+                  <span>
+                    <span className="font-medium text-gray-900">Nordiske næringsstofanbefalinger (NNR 2023).</span> Nordisk Ministerråd. Proteinbehov, makrofordeling og principper for en balanceret kost i Norden.{' '}
+                    <a href="https://www.norden.org/en/publication/nordic-nutrition-recommendations-2023" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      norden.org – NNR 2023
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-2" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">2.</span>
+                  <span>
+                    Leidy HJ, Clifton PM, Astrup A, et al. The role of protein in weight loss and maintenance.{' '}
+                    <em>Am J Clin Nutr</em>. 2015;101(6):1320S-1329S. (Oversigt: mæthed, energiindtag, kropssammensætning, stofskifte efter vægttab.){' '}
+                    <a href="https://doi.org/10.3945/ajcn.114.084038" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.3945/ajcn.114.084038
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-3" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">3.</span>
+                  <span>
+                    Paddon-Jones D, Westman E, Mattes RD, et al. Protein, weight management, and satiety.{' '}
+                    <em>Am J Clin Nutr</em>. 2008;87(5):1558S-1561S. (Protein og mæthedsregulering.){' '}
+                    <a href="https://doi.org/10.1093/ajcn/87.5.1558S" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1093/ajcn/87.5.1558S
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-4" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">4.</span>
+                  <span>
+                    Lejeune MP, Westerterp KR, Adam TC, et al. Ghrelin and glucagon-like peptide 1 concentrations, 24-h satiety, and energy and substrate metabolism during a high-protein diet and measured in a respiration chamber.{' '}
+                    <em>Br J Nutr</em>. 2006;95(2):405-411. (Akut hormonrespons ved protein vs. kulhydrat.){' '}
+                    <a href="https://doi.org/10.1079/BJN20051634" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1079/BJN20051634
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-5" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">5.</span>
+                  <span>
+                    Wycherley TP, Noakes M, Clifton PM, et al. Effects of energy-restricted high-protein, low-fat diets compared with standard-protein, low-fat diets: a meta-analysis of randomized controlled trials.{' '}
+                    <em>Am J Clin Nutr</em>. 2012;96(6):1281-1298. (Vægttab, fedt- vs. muskelmasse; kønsforskelle diskuteres i primærlitteraturen.){' '}
+                    <a href="https://doi.org/10.3945/ajcn.111.026294" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.3945/ajcn.111.026294
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-6" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">6.</span>
+                  <span>
+                    Larsen TM, et al. Diets with High or Low Protein Content and Glycemic Index for Weight-Loss Maintenance.{' '}
+                    <em>N Engl J Med</em>. 2010;363(22):2102-2111. (Diogenes: vægtvedligeholdelse, herunder høj protein / lav GI.){' '}
+                    <a href="https://doi.org/10.1056/NEJMoa0907137" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1056/NEJMoa0907137
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-7" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">7.</span>
+                  <span>
+                    Westerterp KR. Diet induced thermogenesis.{' '}
+                    <em>Nutr Metab (Lond)</em>. 2004;1(1):5. (Fødeinduceret termogenese og makronæringsstoffer.){' '}
+                    <a href="https://doi.org/10.1186/1743-7075-1-5" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1186/1743-7075-1-5
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-8" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">8.</span>
+                  <span>
+                    Reed GW, Hill JO. Measuring the thermic effect of food.{' '}
+                    <em>Am J Clin Nutr</em>. 1996;63(2):164-169. (Metode og typiske størrelsesordner for TEF.){' '}
+                    <a href="https://pubmed.ncbi.nlm.nih.gov/8561060/" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      PubMed
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-9" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">9.</span>
+                  <span>
+                    Johnston CS, Day CS, Swan PD. Postprandial thermogenesis is increased 100% on a high-protein, low-fat diet versus a high-carbohydrate, low-fat diet in healthy, young women.{' '}
+                    <em>J Am Coll Nutr</em>. 2002;21(1):55-61. (Ekstra energiforbrug ved høj vs. lav proteinandel – tal varierer med forsøgsdesign.){' '}
+                    <a href="https://doi.org/10.1080/07315724.2002.10719194" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1080/07315724.2002.10719194
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-10" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">10.</span>
+                  <span>
+                    Leidy HJ, Hoertel HA, Douglas SM, et al. Beneficial effects of a higher-protein breakfast on appetitive, hormonal, and neural signals controlling energy intake regulation in overweight/obese, &quot;breakfast-skipping&quot; adolescents.{' '}
+                    <em>Am J Clin Nutr</em>. 2013;98(2):305-314. (Proteinrig morgenmad, appetit og blodsukkerrespons.){' '}
+                    <a href="https://doi.org/10.3945/ajcn.112.053482" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.3945/ajcn.112.053482
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-11" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">11.</span>
+                  <span>
+                    Griffioen-Roose S, et al. Human protein status modulates brain reward responses to food cues.{' '}
+                    <em>Physiol Behav</em>. 2014;136:65-69. (Proteinstatus og belønningsrespons over for mad.){' '}
+                    <a href="https://doi.org/10.1016/j.physbeh.2014.05.026" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1016/j.physbeh.2014.05.026
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-12" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">12.</span>
+                  <span>
+                    <span className="font-medium text-gray-900">Officielle danske kostråd.</span> Fødevarestyrelsen / Alt om kost – anbefalinger til befolkningen.{' '}
+                    <a href="https://altomkost.dk/" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      altomkost.dk
+                    </a>
+                  </span>
+                </li>
+                <li id="kilde-13" className="scroll-mt-24 flex gap-3">
+                  <span className="font-semibold text-purple-800 shrink-0 w-6">13.</span>
+                  <span>
+                    Skov AR, Toubro S, Rønn B, Holm L, Astrup A. Randomized trial on protein vs carbohydrate in ad libitum fat reduced diet for the treatment of obesity.{' '}
+                    <em>Int J Obes Relat Metab Disord</em>. 1999;23(5):528-536. (Høj-protein vs. høj-kulhydrat ved vægttab; fedt- og magermasse.){' '}
+                    <a href="https://doi.org/10.1038/sj.ijo.0800863" className="text-purple-700 hover:underline break-words" target="_blank" rel="noopener noreferrer">
+                      doi.org/10.1038/sj.ijo.0800863
+                    </a>
+                  </span>
+                </li>
+              </ol>
+            </div>
+            <p className="mt-6 text-xs text-gray-500 leading-relaxed">
+              Eksemplet med ca. 70 kcal ekstra per døgn ved meget høj proteinandel er et konkret forsøgsresultat; størrelsesordner varierer mellem studier og populationer. Se kilde 9 og sammenlign med oversigter i kilde 2 og 7.
+            </p>
           </div>
         </div>
       </section>

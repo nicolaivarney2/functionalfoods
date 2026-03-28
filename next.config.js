@@ -4,7 +4,6 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
-
   // Undgå at Webpack splitter @supabase/* til en vendor-chunk der kan mangle (ENOENT) i dev/server.
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/serverExternalPackages
   serverExternalPackages: ['@supabase/supabase-js', '@supabase/ssr'],
@@ -22,6 +21,22 @@ const nextConfig = {
   // Reduce build complexity
   typescript: {
     ignoreBuildErrors: false,
+  },
+
+  // ASCII-venlige URL'er: /niche/vaegttab → samme side som /niche/vægttab (mapper med æ på disk).
+  // Rod-/vaegttab er et direkte route (src/app/vaegttab) og skal ikke rewrites.
+  async rewrites() {
+    return [
+      { source: '/5-2-diet/vaegttab', destination: '/5-2-diet/vægttab' },
+      { source: '/anti-inflammatory/vaegttab', destination: '/anti-inflammatory/vægttab' },
+      { source: '/familie/vaegttab', destination: '/familie/vægttab' },
+      { source: '/flexitarian/vaegttab', destination: '/flexitarian/vægttab' },
+      { source: '/keto/vaegttab', destination: '/keto/vægttab' },
+      { source: '/lchf-paleo/vaegttab', destination: '/lchf-paleo/vægttab' },
+      { source: '/proteinrig-kost/vaegttab', destination: '/proteinrig-kost/vægttab' },
+      { source: '/sense/vaegttab', destination: '/sense/vægttab' },
+      { source: '/GLP-1/vaegttab', destination: '/GLP-1/vægttab' },
+    ]
   },
 }
 

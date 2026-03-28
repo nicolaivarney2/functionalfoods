@@ -562,7 +562,7 @@ export default function RecipeOverviewPage() {
 
             {/* Card 2 */}
             <Link 
-              href="/vægttab"
+              href="/vaegttab"
               className="group bg-white rounded-2xl p-8 border-2 border-gray-100 hover:border-green-200 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="text-5xl mb-4 text-center">📚</div>

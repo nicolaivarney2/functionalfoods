@@ -380,7 +380,7 @@ export default function GLP1RecipesPage() {
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <Link 
-                href="/GLP-1/vægttab" 
+                href="/GLP-1/vaegttab" 
                 className="group bg-white text-blue-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:shadow-2xl hover:shadow-white/25 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om GLP-1 vægttab

@@ -62,7 +62,7 @@ export default function LchfPaleoPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/lchf-paleo/vægttab"
+              href="/lchf-paleo/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -219,7 +219,7 @@ export default function LchfPaleoPage() {
               </Link>
               
               <Link 
-                href="/lchf-paleo/vægttab" 
+                href="/lchf-paleo/vaegttab" 
                 className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om LCHF/Paleo vægttab

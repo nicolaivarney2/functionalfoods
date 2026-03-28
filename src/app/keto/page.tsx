@@ -62,7 +62,7 @@ export default function KetoPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/keto/vægttab"
+              href="/keto/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-purple-200 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -280,7 +280,7 @@ export default function KetoPage() {
               </Link>
               
               <Link 
-                href="/keto/vægttab" 
+                href="/keto/vaegttab" 
                 className="group bg-white border-2 border-purple-200 text-purple-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-purple-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
               >
                 Lær om Keto
@@ -328,7 +328,7 @@ export default function KetoPage() {
               </Link>
               
               <Link 
-                href="/keto/vægttab" 
+                href="/keto/vaegttab" 
                 className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om keto vægttab

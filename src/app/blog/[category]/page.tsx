@@ -615,7 +615,7 @@ export default function BlogCategoryHubPage() {
               <div className="text-3xl mb-2">📚</div>
               <div className="font-semibold text-gray-900">{categoryName} Guides & Blogs</div>
             </Link>
-            <Link href="/vægttab" className="text-center p-6 bg-white rounded-lg hover:shadow-md transition-shadow border border-gray-100">
+            <Link href="/vaegttab" className="text-center p-6 bg-white rounded-lg hover:shadow-md transition-shadow border border-gray-100">
               <div className="text-3xl mb-2">⚖️</div>
               <div className="font-semibold text-gray-900">Vægttabsguide</div>
             </Link>

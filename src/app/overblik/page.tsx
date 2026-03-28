@@ -273,7 +273,7 @@ function OverblikContent() {
               </p>
             </div>
             <Link
-              href="/vægttab"
+              href="/vaegttab"
               className="inline-flex justify-center items-center gap-2 rounded-xl bg-slate-900 text-white px-5 py-2.5 text-sm font-medium hover:bg-slate-800 shrink-0"
             >
               Til vægttab

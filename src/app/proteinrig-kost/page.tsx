@@ -62,7 +62,7 @@ export default function ProteinrigKostPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/proteinrig-kost/vægttab"
+              href="/proteinrig-kost/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -329,7 +329,7 @@ export default function ProteinrigKostPage() {
               </Link>
               
               <Link 
-                href="/proteinrig-kost/vægttab" 
+                href="/proteinrig-kost/vaegttab" 
                 className="group bg-white border-2 border-blue-200 text-blue-600 px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-blue-50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2 w-full sm:w-auto justify-center"
               >
                 Hvad går Proteinrig kost ud på?

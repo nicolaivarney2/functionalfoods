@@ -65,7 +65,7 @@ export default function SensePage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/sense/vægttab"
+              href="/sense/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -337,7 +337,7 @@ export default function SensePage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/sense/vægttab"
+              href="/sense/vaegttab"
               className="group bg-white rounded-3xl p-8 shadow-lg border-2 border-gray-100 hover:border-green-300 hover:shadow-xl transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">

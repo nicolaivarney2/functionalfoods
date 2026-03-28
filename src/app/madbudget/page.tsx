@@ -9,6 +9,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -2314,16 +2315,40 @@ export default function MadbudgetPage() {
 
                   const targetFiber = 25
 
+                  const mergedVitamins = mergeVitaminsAgainstRda(avg.vitamins)
+                  const lowVitamins = mergedVitamins.filter((v) => v.pct < 50)
+
                   const weekHighlights: string[] = []
+                  const nutritionWarnings: string[] = []
+
                   if (targetCal > 0) {
                     const pctCal = Math.round((avg.calories / targetCal) * 100)
                     if (pctCal >= 90 && pctCal <= 110) weekHighlights.push(`Kalorier passer godt til vægttabsmål (${avg.calories} af ${targetCal} kcal)`)
-                    else if (pctCal < 70) weekHighlights.push(`Lavt kalorieindtag – overvej at tilføje flere måltider`)
-                    else if (pctCal > 130) weekHighlights.push(`Højere kalorieindtag end mål – kan bremse vægttab`)
+                    else if (pctCal < 70) nutritionWarnings.push(`Lavt kalorieindtag ift. mål — overvej at tilføje flere måltider i planen.`)
+                    else if (pctCal > 130) nutritionWarnings.push(`Højere kalorieindtag end mål — kan bremse vægttab ift. dit mål.`)
                   }
-                  if (targetP > 0 && avg.protein >= targetP * 0.9) weekHighlights.push(`God proteinindtag (${Math.round(avg.protein)}g) – understøtter muskler og mæthed`)
-                  if (avg.fiber >= 20) weekHighlights.push(`God kostfibre-indtag (${Math.round(avg.fiber)}g) – god fordøjelse`)
-                  else if (avg.fiber > 0 && avg.fiber < 15) weekHighlights.push(`Overvej flere kostfibre – anbefaling er ca. 25g om dagen`)
+                  if (targetP > 0 && avg.protein >= targetP * 0.9) {
+                    weekHighlights.push(`Godt proteinindtag (${Math.round(avg.protein)} g) — understøtter muskler og mæthed.`)
+                  } else if (targetP > 0 && avg.protein < targetP * 0.85) {
+                    const da = primaryAdult?.dietaryApproach || ''
+                    const lowCarb = ['keto', 'lchf-paleo', 'glp-1'].includes(da)
+                    nutritionWarnings.push(
+                      lowCarb
+                        ? `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej en ekstra proteinrig kilde med lavt kulhydrat — fx magert kød, fisk, æg, skyr eller en proteinshake uden tilsat sukker.`
+                        : `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej magert kød, fisk, æg, bælgfrugter eller skyr ved et måltid.`
+                    )
+                  }
+                  if (avg.fiber >= 20) {
+                    weekHighlights.push(`Godt kostfiberindtag (${Math.round(avg.fiber * 10) / 10} g).`)
+                  } else if (avg.fiber > 0 && avg.fiber < 15) {
+                    nutritionWarnings.push(`Kostfibre er lave (${Math.round(avg.fiber * 10) / 10} g mod vejledende ca. ${targetFiber} g). Tilføj grøntsager, bær eller fuldkorn ved et måltid.`)
+                  }
+
+                  if (lowVitamins.length > 0) {
+                    nutritionWarnings.push(
+                      `Disse vitaminer ligger tydeligt under den vejledende daglige reference (voksne): ${lowVitamins.map((v) => `${v.display} (~${v.pct}%)`).join(', ')}. Ved kun aftensmad i planen er det ofte — supplér med frugt og grønt i øvrige måltider.`
+                    )
+                  }
 
                   return (
                     <div className="mt-6 pt-6 border-t border-gray-200">
@@ -2407,8 +2432,21 @@ export default function MadbudgetPage() {
                             </button>
                             {showNutritionDetails && (
                               <div className="mt-3 space-y-4">
+                                {nutritionWarnings.length > 0 && (
+                                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <h4 className="text-xs font-medium text-amber-900 mb-2">Anbefalinger og opmærksomhedspunkter</h4>
+                                    <ul className="space-y-2">
+                                      {nutritionWarnings.map((h, i) => (
+                                        <li key={i} className="text-xs text-amber-900 flex items-start leading-relaxed">
+                                          <span className="text-amber-600 mr-1.5 shrink-0">•</span>
+                                          <span>{h}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                                 {weekHighlights.length > 0 && (
-                                  <div className="bg-green-50 rounded p-3">
+                                  <div className="bg-green-50 rounded-lg p-3 border border-green-100">
                                     <h4 className="text-xs font-medium text-green-800 mb-2">Næringshøjdepunkter for ugen</h4>
                                     <ul className="space-y-1">
                                       {weekHighlights.map((h, i) => (
@@ -2420,9 +2458,43 @@ export default function MadbudgetPage() {
                                     </ul>
                                   </div>
                                 )}
-                                {Object.keys(avg.vitamins).length > 0 && (
+                                {mergedVitamins.length > 0 && (
                                   <div>
-                                    <h4 className="text-xs font-medium text-gray-900 mb-2">Vitaminer (gennemsnit pr. dag)</h4>
+                                    <h4 className="text-xs font-medium text-gray-900 mb-1">Vitaminer (gennemsnit pr. dag)</h4>
+                                    <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
+                                      Sammenlignet med vejledende daglige referenceværdier for voksne (nordiske/nationale udgangspunkter). Tallene er vejledende — ikke individuelle medicinske mål. Kun ét måltid i planen giver ofte lavere dækning end 100%.
+                                    </p>
+                                    <div className="space-y-2">
+                                      {mergedVitamins.map((row) => {
+                                        const barPct = Math.min(100, row.pct)
+                                        const low = row.pct < 50
+                                        return (
+                                          <div key={row.display}>
+                                            <div className="flex justify-between text-[11px] mb-0.5">
+                                              <span className="text-gray-600">Vitamin {row.display}</span>
+                                              <span className={`font-medium tabular-nums ${low ? 'text-amber-800' : 'text-gray-900'}`}>
+                                                {row.value} {row.unit} / {row.rda} {row.unit}
+                                                <span className="font-normal text-gray-500 ml-1">({row.pct}%)</span>
+                                              </span>
+                                            </div>
+                                            <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                              <div
+                                                className={`h-full rounded-full transition-all ${low ? 'bg-amber-400' : 'bg-emerald-500'}`}
+                                                style={{ width: `${barPct}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                                {mergedVitamins.length === 0 && Object.keys(avg.vitamins || {}).length > 0 && (
+                                  <div>
+                                    <h4 className="text-xs font-medium text-gray-900 mb-2">Vitaminer (rå nøgler)</h4>
+                                    <p className="text-[11px] text-gray-500 mb-2">
+                                      Nogle vitaminnavne kunne ikke matches til standard reference — viser rå værdier.
+                                    </p>
                                     <div className="flex flex-wrap gap-2">
                                       {Object.entries(avg.vitamins).map(([k, v]) => (
                                         <span key={k} className="text-xs bg-white px-2 py-1 rounded border border-gray-100">

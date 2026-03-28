@@ -12,7 +12,7 @@ const mainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
   { name: 'MADBUDGET', href: '/madbudget' },
-  { name: 'VÆGTTAB', href: '/vægttab' },
+  { name: 'VÆGTTAB', href: '/vaegttab' },
   { name: 'MENTALT', href: '/blog/mentalt' },
   { name: 'OM OS', href: '/bag-om-ff' },
 ]

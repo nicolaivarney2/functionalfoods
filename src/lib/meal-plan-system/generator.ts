@@ -181,25 +181,35 @@ export class MealPlanGenerator {
             categories: [this.mapCategory(recipe.mainCategory || 'Aftensmad')],
             dietaryApproaches,
             mainCategory: recipe.mainCategory || 'Aftensmad', // Preserve for meal type filtering
-            nutritionalInfo: {
-              caloriesPer100g: recipe.calories || 0,
-              proteinPer100g: recipe.protein || 0,
-              carbsPer100g: recipe.carbs || 0,
-              fatPer100g: recipe.fat || 0,
-              fiberPer100g: recipe.fiber || 0,
-              // If full Frida per-portion JSON exists, map it as per-portion fields
-              ...(
-                recipe.nutritionalInfo ? {
-                  caloriesPerPortion: recipe.nutritionalInfo.calories,
-                  proteinPerPortion: recipe.nutritionalInfo.protein,
-                  carbsPerPortion: recipe.nutritionalInfo.carbs,
-                  fatPerPortion: recipe.nutritionalInfo.fat,
-                  fiberPerPortion: recipe.nutritionalInfo.fiber,
-                  vitaminMap: recipe.nutritionalInfo.vitamins || {},
-                  mineralMap: recipe.nutritionalInfo.minerals || {}
-                } : {}
-              )
-            },
+            /**
+             * Supabase recipes: calories/protein/... på topniveau er kcal og gram pr. portion (som på opskriftsiden).
+             * De må IKKE mappes til caloriesPer100g — det gav ~7 kcal og næsten 0 makro i madbudget.
+             * Per-portion først; nested nutritionalInfo bruges kun som fallback.
+             */
+            nutritionalInfo: (() => {
+              const ni = recipe.nutritionalInfo
+              const cal = recipe.calories ?? ni?.calories
+              const prot = recipe.protein ?? ni?.protein
+              const carb = recipe.carbs ?? ni?.carbs
+              const fatVal = recipe.fat ?? ni?.fat
+              const fib = recipe.fiber ?? ni?.fiber
+              const vit = { ...(ni?.vitamins && typeof ni.vitamins === 'object' ? ni.vitamins : {}), ...(recipe.vitamins || {}) }
+              const min = { ...(ni?.minerals && typeof ni.minerals === 'object' ? ni.minerals : {}), ...(recipe.minerals || {}) }
+              return {
+                caloriesPer100g: 0,
+                proteinPer100g: 0,
+                carbsPer100g: 0,
+                fatPer100g: 0,
+                fiberPer100g: 0,
+                caloriesPerPortion: typeof cal === 'number' ? cal : undefined,
+                proteinPerPortion: typeof prot === 'number' ? prot : undefined,
+                carbsPerPortion: typeof carb === 'number' ? carb : undefined,
+                fatPerPortion: typeof fatVal === 'number' ? fatVal : undefined,
+                fiberPerPortion: typeof fib === 'number' ? fib : undefined,
+                vitaminMap: Object.keys(vit).length ? vit : undefined,
+                mineralMap: Object.keys(min).length ? min : undefined,
+              }
+            })(),
             images: [recipe.imageUrl || ''],
             slug: recipe.slug || '',
             isActive: true,
@@ -769,12 +779,18 @@ export class MealPlanGenerator {
         return false;
       }
 
-      // Additional keto-specific filtering
+      // Additional keto-specific filtering (pr. 100g hvis kendt; ellers grov grænse pr. portion)
       if (config.dietaryApproach.id.toLowerCase() === 'keto') {
-        const carbsPer100g = recipe.nutritionalInfo.carbsPer100g || 0;
-        if (carbsPer100g > 10) { // Keto: max 10g carbs per 100g
+        const ni = recipe.nutritionalInfo
+        const c100 = ni.carbsPer100g || 0
+        const cPort = ni.carbsPerPortion || 0
+        if (c100 > 10) {
           excludedByCarbs++
-          return false;
+          return false
+        }
+        if (c100 === 0 && cPort > 40) {
+          excludedByCarbs++
+          return false
         }
       }
 
@@ -884,23 +900,29 @@ export class MealPlanGenerator {
    * Calculate macro alignment score
    */
   private calculateMacroAlignment(recipe: Recipe, mealDistribution: any): number {
-    const recipeCalories = recipe.nutritionalInfo.caloriesPer100g;
-    const recipeProtein = recipe.nutritionalInfo.proteinPer100g;
-    const recipeCarbs = recipe.nutritionalInfo.carbsPer100g;
-    const recipeFat = recipe.nutritionalInfo.fatPer100g;
+    const ni = recipe.nutritionalInfo
+    const usePortion =
+      typeof ni.caloriesPerPortion === 'number' && ni.caloriesPerPortion > 0
 
-    const targetCalories = mealDistribution.targetCalories;
-    const targetProtein = mealDistribution.targetProtein;
-    const targetCarbs = mealDistribution.targetCarbs;
-    const targetFat = mealDistribution.targetFat;
+    const recipeCalories = usePortion ? (ni.caloriesPerPortion ?? 0) : (ni.caloriesPer100g ?? 0)
+    const recipeProtein = usePortion ? (ni.proteinPerPortion ?? 0) : (ni.proteinPer100g ?? 0)
+    const recipeCarbs = usePortion ? (ni.carbsPerPortion ?? 0) : (ni.carbsPer100g ?? 0)
+    const recipeFat = usePortion ? (ni.fatPerPortion ?? 0) : (ni.fatPer100g ?? 0)
 
-    // Calculate alignment scores
-    const calorieAlignment = Math.max(0, 100 - Math.abs(recipeCalories - targetCalories) / targetCalories * 100);
-    const proteinAlignment = Math.max(0, 100 - Math.abs(recipeProtein - targetProtein) / targetProtein * 100);
-    const carbAlignment = Math.max(0, 100 - Math.abs(recipeCarbs - targetCarbs) / targetCarbs * 100);
-    const fatAlignment = Math.max(0, 100 - Math.abs(recipeFat - targetFat) / targetFat * 100);
+    const targetCalories = mealDistribution.targetCalories || 1
+    const targetProtein = mealDistribution.targetProtein || 1
+    const targetCarbs = mealDistribution.targetCarbs || 1
+    const targetFat = mealDistribution.targetFat || 1
 
-    return (calorieAlignment + proteinAlignment + carbAlignment + fatAlignment) / 4;
+    const align = (r: number, t: number) =>
+      t > 0 ? Math.max(0, 100 - (Math.abs(r - t) / t) * 100) : 50
+
+    const calorieAlignment = align(recipeCalories, targetCalories)
+    const proteinAlignment = align(recipeProtein, targetProtein)
+    const carbAlignment = align(recipeCarbs, targetCarbs)
+    const fatAlignment = align(recipeFat, targetFat)
+
+    return (calorieAlignment + proteinAlignment + carbAlignment + fatAlignment) / 4
   }
 
   /**

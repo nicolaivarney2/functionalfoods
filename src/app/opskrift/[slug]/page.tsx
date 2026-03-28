@@ -170,6 +170,8 @@ export default async function RecipePage({ params }: PageProps) {
                     servings={recipe.servings || 4}
                     vitamins={recipe.vitamins || {}}
                     minerals={recipe.minerals || {}}
+                    dietaryCategories={recipe.dietaryCategories}
+                    mainCategory={recipe.mainCategory}
                   />
                 </div>
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Leaf, Apple } from 'lucide-react'
 
 export default function FlexitarianPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -62,7 +62,7 @@ export default function FlexitarianPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/flexitarian/vægttab"
+              href="/flexitarian/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-teal-200 hover:shadow-xl hover:shadow-teal-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -118,20 +118,35 @@ export default function FlexitarianPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
               <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
-                Hvad er 
+                Hvad er{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-green-600">
                   fleksitarisk kost?
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Fleksitarisk kost fokuserer på planter med mulighed for lidt kød – den perfekte balance mellem sundhed og fleksibilitet.
+              <p className="text-xl text-gray-600 mb-6 leading-relaxed">
+                Fleksitarisk kost lægger grøntsager, bælgfrugter, fuldkorn og frugt i centrum og bruger kød og fisk som
+                tilvalg – ikke som daglig hovedret. Det er ikke et regelsæt med point eller forbud, men en retning der gør det
+                lettere at spise mere fiber, færre tomme kalorier og stadig være social omkring mad.
+              </p>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Mange bruger fleksitarisme som bro til mere plantebaseret kost uden at melde sig ud af fællesspisning eller
+                traditioner med kød. På FunctionalFoods kan du følge nicherne fleksitarisk og familiemad på tværs og samle det i{' '}
+                <Link href="/madbudget" className="text-teal-700 font-semibold hover:underline">
+                  Madbudget
+                </Link>
+                , så ugen bliver både realistisk og næringsdækkende.
               </p>
               
               <div className="space-y-6">
                 <div className="bg-teal-100 border border-teal-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-teal-800 mb-2">Plantebaseret fokus</h4>
-                  <p className="text-teal-700">80% planter og 20% kød for optimal sundhed og bæredygtighed.</p>
+                  <h4 className="font-semibold text-teal-800 mb-2 flex items-center gap-2">
+                    <Leaf className="w-4 h-4" /> Plantebaseret fokus
+                  </h4>
+                  <p className="text-teal-700">
+                    Tænk &quot;halvdelen tallerken grønt&quot;, bælgfrugter flere gange om ugen og fuldkorn frem for
+                    raffineret – kød som smagsgiver nogle gange, ikke ved hvert måltid.
+                  </p>
                 </div>
                 
                 <div className="bg-green-100 border border-green-200 rounded-2xl p-6">
@@ -140,8 +155,13 @@ export default function FlexitarianPage() {
                 </div>
                 
                 <div className="bg-emerald-100 border border-emerald-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-emerald-800 mb-2">Bæredygtighed</h4>
-                  <p className="text-emerald-700">Mindre kødforbrug er bedre for miljøet og din sundhed.</p>
+                  <h4 className="font-semibold text-emerald-800 mb-2 flex items-center gap-2">
+                    <Apple className="w-4 h-4" /> Bæredygtighed
+                  </h4>
+                  <p className="text-emerald-700">
+                    Mindre kød pr. tallerken betyder typisk lavere klimaaftryk – en ekstra gevinst, når du allerede jager
+                    vægttab og bedre helbred.
+                  </p>
                 </div>
               </div>
             </div>
@@ -219,7 +239,7 @@ export default function FlexitarianPage() {
               </Link>
               
               <Link 
-                href="/flexitarian/vægttab" 
+                href="/flexitarian/vaegttab" 
                 className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om fleksitarisk vægttab

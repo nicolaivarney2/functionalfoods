@@ -62,7 +62,7 @@ export default function FamiliePage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/familie/vægttab"
+              href="/familie/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -118,14 +118,28 @@ export default function FamiliePage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
               <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
-                Hvad er 
+                Hvad er{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600">
                   familiemad?
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                Familiemad er sunde, balancerede opskrifter der passer til hele familien - både børn og voksne.
+              <p className="text-xl text-gray-600 mb-6 leading-relaxed">
+                Familiemad hos os betyder opskrifter, der er tænkt til fælles bord: smag som børn kan lide, næring som
+                voksne har brug for, og tal du kan stole på – kalorier, protein, fiber og mikronæring udregnet fra
+                ingredienserne.
+              </p>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Når du vil tabe dig, behøver du ikke lave dobbelt menu. Du kan spise <em>samme ret</em> som familien og
+                justere portion og tilbehør, mens du følger et kalorieunderskud i{' '}
+                <Link href="/madbudget" className="text-blue-700 font-semibold hover:underline">
+                  Madbudget
+                </Link>
+                . Læs strategien på{' '}
+                <Link href="/familie/vaegttab" className="text-blue-700 font-semibold hover:underline">
+                  familiemad og vægttab
+                </Link>
+                .
               </p>
               
               <div className="space-y-6">
@@ -219,7 +233,7 @@ export default function FamiliePage() {
               </Link>
               
               <Link 
-                href="/familie/vægttab" 
+                href="/familie/vaegttab" 
                 className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om familiemad vægttab

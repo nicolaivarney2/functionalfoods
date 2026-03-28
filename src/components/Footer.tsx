@@ -19,9 +19,9 @@ const columns = [
     links: [
       { label: 'Vægttabsoverblik', href: '/vaegttab' },
       { label: 'Mentalt (adfærd & vaner)', href: '/blog/mentalt' },
-      { label: 'Keto vægttab', href: '/keto/vægttab' },
-      { label: 'Sense vægttab', href: '/sense/vægttab' },
-      { label: 'Proteinrig vægttab', href: '/proteinrig-kost/vægttab' },
+      { label: 'Keto vægttab', href: '/keto/vaegttab' },
+      { label: 'Sense vægttab', href: '/sense/vaegttab' },
+      { label: 'Proteinrig vægttab', href: '/proteinrig-kost/vaegttab' },
       { label: 'GLP-1 vægttab', href: '/GLP-1/vaegttab' },
     ],
   },

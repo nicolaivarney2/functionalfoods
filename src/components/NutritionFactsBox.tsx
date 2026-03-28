@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { PieChart, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { PieChart, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { resolveNicheWeightLossLink } from '@/lib/dietary-niche-weight-loss'
 
 interface NutritionFactsBoxProps {
   calories: number
@@ -12,6 +14,10 @@ interface NutritionFactsBoxProps {
   servings: number
   vitamins?: { [key: string]: number }
   minerals?: { [key: string]: number }
+  /** Bruges til dynamisk "Forstå [niche]"-link til den rigtige vægttab-side */
+  dietaryCategories?: string[]
+  /** Prøves først hvis den matcher en kendt niche (typisk er dette måltidstype og ignoreres) */
+  mainCategory?: string | null
 }
 
 export default function NutritionFactsBox({
@@ -22,9 +28,25 @@ export default function NutritionFactsBox({
   fiber,
   servings,
   vitamins = {},
-  minerals = {}
+  minerals = {},
+  dietaryCategories,
+  mainCategory,
 }: NutritionFactsBoxProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [fridaModalOpen, setFridaModalOpen] = useState(false)
+  const nicheLink = resolveNicheWeightLossLink(dietaryCategories, mainCategory)
+
+  const dietaryList = (dietaryCategories || []).filter((c) => c?.trim())
+  const hasMultipleDietaryCategories = dietaryList.length > 1
+
+  useEffect(() => {
+    if (!fridaModalOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFridaModalOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fridaModalOpen])
 
   // Daglige anbefalinger (voksne)
   const dailyValues = {
@@ -247,11 +269,95 @@ export default function NutritionFactsBox({
         )}
       </div>
 
-      {/* Keto Education */}
+      {/* Flere kostkategorier → FRIDA-modal. Én kategori → niche vægttab-link */}
       <div className="pt-3 border-t border-gray-200">
-        <p className="text-xs text-gray-600">
-          <strong>Forstå Keto:</strong> Læs om anbefalet næringsindhold på Keto til vægttab
-        </p>
+        {hasMultipleDietaryCategories ? (
+          <>
+            <p className="text-xs text-gray-600 leading-relaxed">
+              <strong>Forstå ernæringsudregningens grundlag:</strong>{' '}
+              <button
+                type="button"
+                onClick={() => setFridaModalOpen(true)}
+                className="text-emerald-700 underline underline-offset-2 hover:text-emerald-900 text-left font-normal"
+              >
+                Sådan beregner vi næringsindhold (FRIDA)
+              </button>
+            </p>
+            {fridaModalOpen && (
+              <div
+                className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="frida-modal-title"
+              >
+                <div
+                  className="absolute inset-0 bg-black/45"
+                  aria-hidden
+                  onClick={() => setFridaModalOpen(false)}
+                />
+                <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl border border-gray-200">
+                  <div className="flex justify-between items-start gap-4 mb-4">
+                    <h3 id="frida-modal-title" className="text-lg font-semibold text-gray-900 pr-8">
+                      Sådan udregner vi næringsindholdet
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setFridaModalOpen(false)}
+                      className="shrink-0 rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                      aria-label="Luk"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-4 text-sm text-gray-700 leading-relaxed">
+                    <p>
+                      Vores ingredienser er koblet direkte til den{' '}
+                      <strong>officielle danske fødevaredatabase (FRIDA)</strong>. Tallene bygger derfor på samme
+                      udgangspunkt som ved standardiserede danske fødevarer — så du får så præcist et billede som muligt,
+                      når vi lægger en hel ret sammen.
+                    </p>
+                    <p>
+                      Hver ingrediens har kendt sammensætning <strong>pr. 100 g eller 100 ml</strong>. Vi summerer dem med
+                      de mængder, opskriften bruger, så vi får det <strong>samlede næringsindhold for hele retten</strong>.
+                    </p>
+                    <p>
+                      Det samlede tal <strong>fordeler vi med antal portioner</strong>, som opskriften er skrevet til — det
+                      er derfor, du ser næringsindhold <strong>pr. portion</strong>.
+                    </p>
+                    <p className="text-gray-600">
+                      Spiser du mere eller mindre end én portion, følger dit faktiske indtag med. Tallene er altså et{' '}
+                      <strong>vejledende gennemsnit</strong> — ikke en fast dosis.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-gray-600 leading-relaxed">
+            {nicheLink.generic ? (
+              <>
+                <strong>Forstå vægttab:</strong>{' '}
+                <Link
+                  href={nicheLink.href}
+                  className="text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+                >
+                  Læs om anbefalet næringsindhold til vægttab
+                </Link>
+              </>
+            ) : (
+              <>
+                <strong>Forstå {nicheLink.label}:</strong>{' '}
+                <Link
+                  href={nicheLink.href}
+                  className="text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+                >
+                  Læs om anbefalet næringsindhold på {nicheLink.label} til vægttab
+                </Link>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </div>
   )

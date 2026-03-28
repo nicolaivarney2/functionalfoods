@@ -440,7 +440,7 @@ export default function BlogPostPage() {
               </div>
               <h4 className="font-semibold text-gray-900 mb-2">Vægttab med Keto</h4>
               <p className="text-sm text-gray-600 mb-3">Evidensbaseret guide til vægttab med ketogen diæt</p>
-              <a href="/keto/vægttab" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+              <a href="/keto/vaegttab" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
                 Læs mere →
               </a>
             </div>

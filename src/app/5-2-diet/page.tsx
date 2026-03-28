@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Clock } from 'lucide-react'
 
 export default function FiveTwoDietPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -62,7 +62,7 @@ export default function FiveTwoDietPage() {
 
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             <Link
-              href="/5-2-diet/vægttab"
+              href="/5-2-diet/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-amber-200 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -118,20 +118,39 @@ export default function FiveTwoDietPage() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className={`transition-all duration-1000 delay-500 ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
               <h2 className="text-4xl md:text-5xl font-bold mb-8 text-gray-900 leading-tight">
-                Hvad er 
+                Hvad er{' '}
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600">
                   5:2 diæt?
                 </span>
               </h2>
               
-              <p className="text-xl text-gray-600 mb-8 leading-relaxed">
-                5:2 diæt er en form for intermittent fasting hvor du spiser normalt 5 dage og begrænser kalorier 2 dage.
+              <p className="text-xl text-gray-600 mb-6 leading-relaxed">
+                5:2-diæten er en struktureret form for <strong>periodisk kaloriebegrænsning</strong>: fem dage hvor du spiser
+                efter normale sunde vaner, og to ikke-sammenhængende dage med stærkt reduceret energi (typisk omkring
+                500–600 kcal), så du i gennemsnit får et ugentligt kalorieunderskud uden at tælle hver eneste dag.
+              </p>
+              <p className="text-lg text-gray-600 mb-8 leading-relaxed">
+                Den passer mange, der synes det er lettere at holde fokus på få &quot;light&quot;-dage end at leve i konstant
+                restriktion. Kombinér gerne med{' '}
+                <Link href="/madbudget" className="text-amber-700 font-semibold hover:underline">
+                  Madbudget
+                </Link>
+                , så du planlægger både normale og lette dage med rigtig mad – læs mere under{' '}
+                <Link href="/5-2-diet/vaegttab" className="text-amber-700 font-semibold hover:underline">
+                  5:2 og vægttab
+                </Link>
+                .
               </p>
               
               <div className="space-y-6">
                 <div className="bg-amber-100 border border-amber-200 rounded-2xl p-6">
-                  <h4 className="font-semibold text-amber-800 mb-2">5 normale dage</h4>
-                  <p className="text-amber-700">Spis normalt 5 dage om ugen uden begrænsninger på kalorier eller madtyper.</p>
+                  <h4 className="font-semibold text-amber-800 mb-2 flex items-center gap-2">
+                    <Clock className="w-4 h-4" /> 5 normale dage
+                  </h4>
+                  <p className="text-amber-700">
+                    Her bygger du vaner med varieret kost, nok protein og grønt – ikke fri leg med ultraforarbejdet mad, men
+                    heller ikke mikrostyring af hver snack.
+                  </p>
                 </div>
                 
                 <div className="bg-orange-100 border border-orange-200 rounded-2xl p-6">
@@ -229,7 +248,7 @@ export default function FiveTwoDietPage() {
               </Link>
               
               <Link 
-                href="/5-2-diet/vægttab" 
+                href="/5-2-diet/vaegttab" 
                 className="group bg-white/20 text-white px-8 py-4 rounded-2xl font-semibold text-lg hover:bg-white/30 transition-all duration-300 transform hover:-translate-y-1 flex items-center gap-2"
               >
                 Lær om 5:2 diæt vægttab
