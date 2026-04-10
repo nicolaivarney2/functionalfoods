@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Sparkles, Target, Zap, Brain, TrendingDown, Leaf, FileText, Calculator, Calendar, Building2, ChevronDown, Search, ChevronRight } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
+import HeroVideo from '@/components/home/HeroVideo'
 
 // Updated hero section with recipe focus and new design
 
@@ -138,108 +139,140 @@ export default function Home() {
     { name: 'Proteinrig kost', icon: '💪', href: '/proteinrig-kost/opskrifter', short: 'Optimal næring' }
   ]
 
+  /** Diskret “blød” sektion før FAQ: otte vægttabsområder + link til funktioner */
+  const vaegttabOmrader = [
+    { label: 'Keto', href: '/keto/vaegttab' },
+    { label: 'Sense', href: '/sense/vaegttab' },
+    { label: 'GLP-1 kost', href: '/GLP-1/vaegttab' },
+    { label: 'Proteinrig kost', href: '/proteinrig-kost/vaegttab' },
+    { label: 'Anti-inflammatorisk', href: '/anti-inflammatory/vaegttab' },
+    { label: 'Fleksitarisk', href: '/flexitarian/vaegttab' },
+    { label: '5:2 diæt', href: '/5-2-diet/vaegttab' },
+    { label: 'Familiemad', href: '/familie/vaegttab' },
+  ]
+
   return (
     <main className="min-h-screen bg-white">
-      {/* New Hero Section with Image */}
-      <section className="relative bg-white">
-        <div className="relative h-[400px] md:h-[500px] lg:h-[600px]">
-          {/* Background Image */}
-          <div className="absolute inset-0">
-            <Image
-              src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/jordbaer-header.webp"
-              alt="Sunde opskrifter til sundhed og vægttab"
-              fill
-              className="object-cover object-top"
-              priority
-            />
-            <div className="absolute inset-0 bg-black/40"></div>
-          </div>
-          
-          {/* Content Overlay */}
-          <div className="container relative h-full flex items-center">
-            <div className={`max-w-4xl mx-auto text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 text-white leading-tight drop-shadow-lg">
-                Sunde opskrifter til vægttab og velvære.
+      {/* Hero: video venstre, tekst højre, søgning i bunden */}
+      <section className="relative z-30 overflow-x-clip bg-gradient-to-b from-emerald-950 via-emerald-900 to-emerald-800 text-white">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+        <div className={`container relative px-4 py-12 lg:py-16 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-12">
+            <div className="min-w-0">
+              <HeroVideo />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl md:text-5xl">
+                Vægttab tilpasset dit liv – ikke omvendt.
               </h1>
-              
-              <p className="text-lg sm:text-xl md:text-2xl text-white/95 mb-8 max-w-2xl mx-auto drop-shadow-md">
-                <b>Tilpas maden til DIT liv. Ikke omvendt.</b>
-              </p>
-              
-              {/* Search Bar with Dropdown */}
-              <div className="max-w-2xl mx-auto">
-                <form onSubmit={handleSearch} className="relative">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onFocus={() => searchQuery.trim().length > 0 && setShowSearchDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
-                      placeholder="Søg efter opskrift eller vælg madfokus herunder"
-                      className="w-full px-6 py-4 pl-14 pr-14 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 shadow-xl"
-                    />
-                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  </div>
-                  
-                  {/* Search Dropdown */}
-                  {showSearchDropdown && searchResults.length > 0 && (
-                    <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-96 overflow-y-auto">
-                      {searchResults.map((recipe) => (
-                <Link 
-                          key={recipe.id}
-                          href={`/opskrift/${recipe.slug}`}
-                          className="block px-6 py-4 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                          onClick={() => {
-                            setShowSearchDropdown(false)
-                            setSearchQuery('')
-                          }}
-                        >
-                          <div className="flex items-center gap-4">
-                            {recipe.imageUrl && (
-                              <div className="relative w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden">
-                                <Image
-                                  src={recipe.imageUrl}
-                                  alt={recipe.title}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-gray-900 truncate">{recipe.title}</h3>
-                              {recipe.totalTime && (
-                                <p className="text-sm text-gray-500">{recipe.totalTime} min</p>
-                              )}
-                            </div>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <span className="inline-flex items-center justify-center rounded-full bg-white/10 px-4 py-2.5 text-sm font-semibold ring-1 ring-white/20 sm:justify-start">
+                  {isLoadingRecipes ? '…' : `${allRecipes.length.toLocaleString('da-DK')} gratis opskrifter`}
+                </span>
+                <Link
+                  href="/kom-i-gang"
+                  className="inline-flex items-center justify-center rounded-full bg-emerald-400/20 px-4 py-2.5 text-sm font-semibold ring-1 ring-emerald-300/50 transition hover:bg-emerald-400/30 sm:justify-start"
+                >
+                  Gratis vægttabssparring
+                </Link>
+              </div>
+              <h2 className="mt-8 text-base font-bold uppercase tracking-wide text-emerald-200/95 sm:text-sm">
+                Vægttabsmadplaner ud fra:
+              </h2>
+              <ul className="mt-4 space-y-2.5 text-[15px] leading-relaxed text-emerald-50/95 sm:text-base">
+                {[
+                  'Lavet ud fra tilbud',
+                  'Tilpasset din krop og dit liv',
+                  'Personlig ud fra madønsker og madstil',
+                  'Vægttabsoptimeret',
+                  'Kun ingredienser du kan lide',
+                  'Fuld ernæringsberegnet',
+                  'Fuld madplan og indkøbsliste',
+                ].map((line) => (
+                  <li key={line} className="flex gap-3">
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" aria-hidden />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/funktioner"
+                className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-white transition hover:text-emerald-200"
+              >
+                Se alle funktioner
+                <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="relative z-40 mx-auto mt-12 max-w-2xl border-t border-white/10 pt-10 pb-2">
+            <p className="mb-3 text-center text-sm text-emerald-100/90">Søg efter opskrift</p>
+            <form onSubmit={handleSearch} className="relative isolate z-40">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchQuery.trim().length > 0 && setShowSearchDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+                  placeholder="Søg efter opskrift eller vælg madfokus herunder"
+                  className="w-full rounded-xl px-6 py-4 pl-14 pr-14 text-gray-900 shadow-xl placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <Search className="absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              </div>
+              {showSearchDropdown && searchResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-[100] mt-2 max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-[0_20px_50px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
+                  {searchResults.map((recipe) => (
+                    <Link
+                      key={recipe.id}
+                      href={`/opskrift/${recipe.slug}`}
+                      className="block border-b border-gray-100 px-6 py-4 transition-colors last:border-b-0 hover:bg-gray-50"
+                      onClick={() => {
+                        setShowSearchDropdown(false)
+                        setSearchQuery('')
+                      }}
+                    >
+                      <div className="flex items-center gap-4">
+                        {recipe.imageUrl && (
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg">
+                            <Image src={recipe.imageUrl} alt={recipe.title} fill className="object-cover" />
                           </div>
-                </Link>
-                      ))}
-                      {searchQuery.trim().length > 0 && (
-                        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50">
-                <Link 
-                            href={`/opskriftsoversigt?search=${encodeURIComponent(searchQuery.trim())}`}
-                            className="text-green-600 font-semibold hover:text-green-700 flex items-center gap-2"
-                            onClick={() => {
-                              setShowSearchDropdown(false)
-                            }}
-                          >
-                            Se alle resultater for "{searchQuery}"
-                            <ArrowRight className="w-4 h-4" />
-                </Link>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate font-semibold text-gray-900">{recipe.title}</h3>
+                          {recipe.totalTime && <p className="text-sm text-gray-500">{recipe.totalTime} min</p>}
                         </div>
-                      )}
+                      </div>
+                    </Link>
+                  ))}
+                  {searchQuery.trim().length > 0 && (
+                    <div className="border-t border-gray-200 bg-gray-50 px-6 py-3">
+                      <Link
+                        href={`/opskriftsoversigt?search=${encodeURIComponent(searchQuery.trim())}`}
+                        className="flex items-center gap-2 font-semibold text-green-600 hover:text-green-700"
+                        onClick={() => {
+                          setShowSearchDropdown(false)
+                        }}
+                      >
+                        Se alle resultater for &quot;{searchQuery}&quot;
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
                     </div>
                   )}
-                </form>
-              </div>
-            </div>
+                </div>
+              )}
+            </form>
           </div>
         </div>
       </section>
 
       {/* Niche Selection Section */}
-      <section className="py-12 bg-white">
+      <section className="relative z-10 py-12 bg-white">
         <div className="container">
           <div className={`max-w-6xl mx-auto transition-all duration-1000 delay-200 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Desktop: Grid Layout */}
@@ -889,6 +922,40 @@ export default function Home() {
                 Mere om vægttab
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Blød videre-læsning før FAQ (diskret) */}
+      <section className="border-t border-gray-100 bg-gray-50/60 py-10 lg:py-12">
+        <div className="container px-4">
+          <div
+            className={`mx-auto max-w-2xl text-center transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Ikke helt klar endnu?</p>
+            <p className="mt-2 text-sm text-gray-600 leading-relaxed">
+              Læs videre om vægttab inden for otte områder — eller udforsk, hvad siden kan.
+            </p>
+            <ul className="mx-auto mt-5 max-w-xs space-y-1.5 text-left text-sm sm:max-w-sm">
+              {vaegttabOmrader.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="text-gray-600 underline decoration-gray-300/80 underline-offset-2 transition hover:text-emerald-700 hover:decoration-emerald-400/80"
+                  >
+                    Vægttab — {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-sm text-gray-500 leading-relaxed">
+              Eller{' '}
+              <Link href="/funktioner" className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-2 hover:text-emerald-700">
+                læs mere om Functional Foods&apos; funktioner
+              </Link>
+              {' '}
+              — madplaner, tilbud, opskrifter og værktøjer.
+            </p>
           </div>
         </div>
       </section>
