@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { buildNewsletterWidgetHtml } from '@/lib/newsletter-widget-html'
 
 export async function POST(req: NextRequest) {
   try {
@@ -320,16 +321,7 @@ export async function POST(req: NextRequest) {
         `
       }
     } else if (type === 'newsletter_signup') {
-      html = `
-        <div class="widget-newsletter p-4 rounded-md border border-blue-200 bg-blue-50">
-          <h4 class="text-lg font-semibold mb-1">${cfg.title || 'Tilmeld nyhedsbrev'}</h4>
-          <p class="text-sm text-blue-900 mb-3">${cfg.subtitle || 'Få nye artikler direkte i din inbox.'}</p>
-          <form action="${cfg.action || '#'}" method="post" class="flex gap-2">
-            <input type="email" name="email" required placeholder="Din email" class="flex-1 px-3 py-2 rounded border border-blue-300" />
-            <button type="submit" class="px-3 py-2 rounded bg-blue-600 text-white">${cfg.button || 'Tilmeld'}</button>
-          </form>
-        </div>
-      `
+      html = buildNewsletterWidgetHtml(context, cfg)
     } else if (type === 'cta_button') {
       html = `
         <div class="widget-cta text-center">

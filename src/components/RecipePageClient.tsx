@@ -14,6 +14,7 @@ import AboutFunctionalFoods from './AboutFunctionalFoods'
 import FloatingRecipeNavigation from './FloatingRecipeNavigation'
 import RatingModal from './RatingModal'
 import SupermarketProducts from './SupermarketProducts'
+import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 
 
 interface RecipePageClientProps {
@@ -26,11 +27,10 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
   const [currentRating, setCurrentRating] = useState(recipe.rating || 0)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false)
   const [activeSection, setActiveSection] = useState<'ingredients' | 'instructions'>('ingredients')
-  const [commentCount, setCommentCount] = useState(0)
-  
-  // Update comment count when comments change
+  const engagement = useRecipeEngagementOptional()
+  const commentCount = engagement?.commentCount ?? 0
   const handleCommentUpdate = (newCount: number) => {
-    setCommentCount(newCount)
+    engagement?.setCommentCount(newCount)
   }
 
   useEffect(() => {

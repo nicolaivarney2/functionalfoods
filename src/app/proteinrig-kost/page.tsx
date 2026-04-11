@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Zap, Sparkles, ChevronRight, Heart } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Zap, Sparkles, ChevronRight, Heart, BookOpen } from 'lucide-react'
 
 export default function ProteinrigKostPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -56,11 +56,11 @@ export default function ProteinrigKostPage() {
               Hvad går Proteinrig kost ud på?
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Lær om muskelbevarende vægttab med proteinrig kost og find opskrifter med højt proteinindhold.
+              Lær om muskelbevarende vægttab, find opskrifter – eller læs artikler om protein og kost på bloggen.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
             <Link
               href="/proteinrig-kost/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2"
@@ -105,6 +105,30 @@ export default function ProteinrigKostPage() {
               </p>
               <div className="flex items-center text-indigo-600 group-hover:text-indigo-700 font-medium">
                 Se alle proteinrige opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/proteinrig-kost"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-fuchsia-200 hover:shadow-xl hover:shadow-fuchsia-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-fuchsia-500 to-indigo-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-fuchsia-600 transition-colors">
+                    Proteinrig kost på bloggen
+                  </h3>
+                  <p className="text-gray-500">Artikler og guides</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Protein, mæthed og vægttab – dybdegående artikler og nyheder.
+              </p>
+              <div className="flex items-center text-fuchsia-600 group-hover:text-fuchsia-700 font-medium">
+                Gå til blog-sektionen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

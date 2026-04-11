@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Mail } from 'lucide-react'
 
@@ -53,8 +52,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Brugeradministration</h1>
           <p className="mt-2 text-gray-600">
@@ -107,7 +105,6 @@ export default function AdminUsersPage() {
             </ul>
           </div>
         )}
-      </div>
-    </AdminLayout>
+    </div>
   )
 }

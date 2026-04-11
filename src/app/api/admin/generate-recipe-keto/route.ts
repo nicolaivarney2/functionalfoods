@@ -3,12 +3,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
+import { buildRecipeVariationPrompt } from '@/lib/recipe-generation-diversity'
 
 interface ExistingRecipe {
   id: string
   title: string
   description: string
   dietaryCategories?: string[]
+  ingredients?: Array<{ name?: string | null } | string>
 }
 
 interface KetoParameters {
@@ -18,7 +21,7 @@ interface KetoParameters {
   hovedingrediens?: string // 'rodt-kod', 'fjaerkrae', 'fisk', 'vegetarisk', 'non-dairy'
   recipeType?: string // Predefined recipe type (burger, pizza, etc.)
   inspiration?: string // Free text inspiration
-  maxTid: 15 | 30 | 45 // minutes
+  maxTid?: 15 | 30 | 45 | null // minutes
   kompleksitet: number // 0-3
   maaltid: string // 'morgenmad', 'frokost', 'aftensmad', 'dessert', 'snacks'
 }
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
       proteinFokus: 1,
       fedtIndhold: 2,
       kulhydratStrikthed: 1,
-      maxTid: 30,
+      maxTid: null,
       kompleksitet: 1,
       maaltid: 'aftensmad'
     }
@@ -75,6 +78,14 @@ export async function POST(request: NextRequest) {
     
     // Build parameter instructions
     const parameterInstructions = buildParameterInstructions(params)
+    const variationPrompt = buildRecipeVariationPrompt({
+      niche: 'keto',
+      existingRecipes,
+      mealType: params.maaltid,
+      requestedRecipeType: params.recipeType,
+      preferredProtein: params.hovedingrediens,
+      inspiration: params.inspiration,
+    })
     
     // Generate recipe using standard OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -94,7 +105,8 @@ export async function POST(request: NextRequest) {
             role: "user",
             content: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til keto kost.
 
-${parameterInstructions}`
+${parameterInstructions}
+${variationPrompt}`
           }
         ],
         temperature: 1.2,
@@ -129,7 +141,7 @@ ${parameterInstructions}`
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: recipe.title,
+          title: normalizeDanishRecipeTitle(recipe.title),
           description: recipe.description,
           difficulty: recipe.difficulty,
           totalTime: recipe.prepTime + recipe.cookTime,
@@ -263,6 +275,8 @@ function buildParameterInstructions(params: KetoParameters): string {
     instructions.push('TID: Maksimalt 30 minutter total tid. Balanceret mellem hastighed og kompleksitet.')
   } else if (params.maxTid === 45) {
     instructions.push('TID: Maksimalt 45 minutter total tid. Mere komplekse retter er tilladt.')
+  } else {
+    instructions.push('TID: Ingen fast maksimal tid. Opskriften må gerne tage længere tid, hvis retten kræver det.')
   }
   
   // Kompleksitet instructions
@@ -350,7 +364,7 @@ INGREDIENS REGLER:
 - Fisk: "400 g laks", "300 g makrel"
 - Ingen notes felt på ingredienser
 - Portioner: altid 2
-- Titel: første bogstav stort, resten små bogstaver
+- Titel: dansk sætningscase — kun første bogstav stort (fx "Kylling med broccoli"), ikke Title Case På Hvert Ord
 
 KETO INGREDIENSER AT FOKUSERE PÅ:
 - Fedt kød: oksekød, svinekød, lam, kylling med skind
@@ -366,7 +380,12 @@ UNDGÅ:
 - Bælgfrugter: bønner, linser, kikærter
 - Frugt: æbler, bananer, druer (undtagen bær)
 - Sukker: alle former for sukker
-- Kartofler og stivelsesrige grøntsager`
+- Kartofler og stivelsesrige grøntsager
+
+VARIATION:
+- Undgå at falde tilbage til den samme sikre kombination af kylling/fisk + broccoli + peberfrugt + spinat.
+- Variér retformat, grøntsagsvalg, smagsprofil og proteinvalg fra opskrift til opskrift.
+- Hvis brugeren beder om morgenmad, frokost eller snacks, skal opskriften ligne det måltid tydeligt og ikke bare være en standard aftensmad i mindre format.`
 }
 
 function parseGeneratedRecipe(content: string): any {
@@ -389,7 +408,7 @@ function parseGeneratedRecipe(content: string): any {
     
     // Ensure all required fields exist
     return {
-      title: recipe.title,
+      title: normalizeDanishRecipeTitle(recipe.title),
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],

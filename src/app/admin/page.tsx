@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { 
@@ -227,8 +226,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
@@ -493,7 +491,6 @@ export default function AdminDashboard() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         )}
-      </div>
-    </AdminLayout>
+    </div>
   )
 } 

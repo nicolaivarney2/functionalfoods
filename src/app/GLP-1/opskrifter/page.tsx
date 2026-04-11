@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Brain, ChevronLeft, Search, Filter } from 'lucide-react'
 import RecipeCard from '@/components/RecipeCard'
+import RecipeSignupMidGridCta, { buildRecipeSlotsWithMidCta } from '@/components/RecipeSignupMidGridCta'
 
 interface Recipe {
   id: string
@@ -326,15 +327,19 @@ export default function GLP1RecipesPage() {
         <div className="container">
           {filteredRecipes.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {filteredRecipes.map((recipe, index) => (
-                <div
-                  key={recipe.id}
-                  className="transition-all duration-500 h-full"
-                  style={{ transitionDelay: `${index * 100}ms` }}
-                >
-                  <RecipeCard recipe={recipe} />
-                </div>
-              ))}
+              {buildRecipeSlotsWithMidCta(filteredRecipes, 30).map((slot) =>
+                slot.type === 'cta' ? (
+                  <RecipeSignupMidGridCta key="glp1-recipe-grid-signup-cta" />
+                ) : (
+                  <div
+                    key={slot.recipe.id}
+                    className="transition-all duration-500 h-full"
+                    style={{ transitionDelay: `${Math.min(slot.listIndex, 20) * 50}ms` }}
+                  >
+                    <RecipeCard recipe={slot.recipe} priority={slot.listIndex < 8} />
+                  </div>
+                )
+              )}
             </div>
           ) : (
             <div className="text-center py-16">

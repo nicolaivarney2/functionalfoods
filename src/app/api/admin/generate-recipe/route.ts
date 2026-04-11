@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -235,7 +236,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     
     // Ensure all required fields exist
     return {
-      title: recipe.title,
+      title: normalizeDanishRecipeTitle(recipe.title),
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import AdminLayout from '@/components/AdminLayout'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { Download, RefreshCw, FileImage, ExternalLink } from 'lucide-react'
 
@@ -112,8 +111,7 @@ export default function AdminImagesPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="p-6">
+    <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-900">Image Management</h1>
           <button
@@ -237,7 +235,6 @@ export default function AdminImagesPage() {
             <p className="mt-1 text-sm text-gray-500">Start by importing some recipes with images.</p>
           </div>
         )}
-      </div>
-    </AdminLayout>
+    </div>
   )
 }

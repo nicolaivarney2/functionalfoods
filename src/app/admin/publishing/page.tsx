@@ -1,6 +1,5 @@
 'use client'
 
-import AdminLayout from '@/components/AdminLayout'
 import { useState, useEffect, ChangeEvent } from 'react'
 import { Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
@@ -774,20 +773,17 @@ export default function AdminPublishingPage() {
 
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Indlæser opskrifter...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Indlæser opskrifter...</p>
         </div>
-      </AdminLayout>
+      </div>
     )
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
@@ -1509,7 +1505,6 @@ export default function AdminPublishingPage() {
             </p>
           </div>
         </div>
-      </div>
       
       {/* Auto-Publisher komponent */}
       <AutoPublisher />
@@ -1764,6 +1759,6 @@ export default function AdminPublishingPage() {
             </div>
           </div>
         )}
-    </AdminLayout>
+    </div>
   )
 }

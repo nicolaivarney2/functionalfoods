@@ -19,7 +19,7 @@ const WIDGET_TYPES = [
   { value: 'reddit_community', label: 'Reddit Community', description: 'Vis Reddit community widget' },
   { value: 'cta_button', label: 'CTA Button', description: 'Call-to-action knap' },
   { value: 'related_posts', label: 'Related Posts', description: 'Relaterede blog indlæg' },
-  { value: 'newsletter_signup', label: 'Newsletter Signup', description: 'Nyhedsbrev tilmelding' },
+  { value: 'newsletter_signup', label: 'Newsletter Signup', description: 'Nyhedsbrev (tekst + farve følger blog-kategori; form-URL via .env)' },
   { value: 'product_recommendation', label: 'Product Recommendation', description: 'Produkt anbefaling' }
 ]
 
@@ -303,7 +303,7 @@ function WidgetModal({ widget, onSave, onClose, saving }: WidgetModalProps) {
       case 'related_posts':
         return '{"limit": 3, "category": "keto"}'
       case 'newsletter_signup':
-        return '{"placeholder": "Din email", "button_text": "Tilmeld"}'
+        return '{"placeholder": "din@email.dk", "button": "Ja tak — tilmeld mig"}'
       case 'cta_button':
         return 'Klik her for at læse mere'
       case 'product_recommendation':

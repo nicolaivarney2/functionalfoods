@@ -2,6 +2,8 @@
 
 import { Star, MessageCircle, Clock, Eye } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
+import { getDisplayedRecipeViews } from '@/lib/recipe-view-display'
+import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 
 interface RecipeHeaderActionsProps {
   recipe: Recipe
@@ -27,7 +29,9 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
     return baseNumber
   }
 
-  const viewCount = generateViewCount()
+  const viewCount = getDisplayedRecipeViews(generateViewCount())
+  const engagement = useRecipeEngagementOptional()
+  const commentCount = engagement?.commentCount ?? 0
 
   const handleRatingClick = () => {
     // Trigger click on floating rating stars to open rating modal
@@ -44,8 +48,7 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
     document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  // Get rating from recipe data, default to 0 if no rating
-  const currentRating = recipe.rating || 0
+  const currentRating = Number(recipe.rating) || 0
   const reviewCount = recipe.reviewCount || 0
 
   return (
@@ -68,9 +71,11 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
             className={i < currentRating ? 'text-yellow-400 fill-current' : 'text-gray-300'}
           />
         ))}
-        {reviewCount > 0 && (
+        {reviewCount > 0 ? (
           <span className="text-gray-600 ml-1">({reviewCount})</span>
-        )}
+        ) : currentRating <= 0 ? (
+          <span className="text-gray-400 ml-1 text-xs font-normal">Bedøm</span>
+        ) : null}
       </button>
       
       <button 
@@ -79,7 +84,7 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
         id="top-comments"
       >
         <MessageCircle size={14} />
-        <span>Kommentarer</span>
+        <span>Kommentarer ({commentCount})</span>
       </button>
 
       {/* Simpel page counter */}

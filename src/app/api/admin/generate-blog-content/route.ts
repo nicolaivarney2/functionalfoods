@@ -49,12 +49,15 @@ Generer et nyt afsnit med:
 2. Velstruktureret indhold der supplerer det eksisterende
 3. Praktiske tips og råd
 4. Evidensbaseret information hvor relevant
+5. En lidt mere menneskelig, varm og mindre stiv tone
+6. Gerne en lille genkendelig hverdagssituation eller mikro-anekdote, hvis det passer naturligt
+7. Primært flydende brødtekst i stedet for punktlisteundervisning
 
 Svar i følgende format:
 OVERSKRIFT: [din overskrift]
 INHOLD: [dit indhold]
 
-Hold det dansk og fokuser på praktisk anvendelse.`
+Hold det dansk og fokuser på praktisk anvendelse. Emojis er tilladt meget sparsomt, højst 1 lille og kun hvis den føles naturlig. Undgå labels som "Praktiske tips:" og "Evidensbaseret fordel:". Brug kun bullets hvis de er klart bedre end almindelige afsnit.`
     
     // Generate content with OpenAI using existing config
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -119,7 +122,9 @@ Hold det dansk og fokuser på praktisk anvendelse.`
 function createBlogSystemPrompt(category: string): string {
   const basePrompt = `Du er en ekspert inden for sundhed, ernæring og vægttab. Du skriver på dansk og fokuserer på evidensbaseret information og praktiske råd.
 
-Din rolle er at skrive informative, engagerende og hjælpsomme blogafsnit der hjælper danske brugere med deres sundheds- og vægttabsmål.`
+Din rolle er at skrive informative, engagerende og hjælpsomme blogafsnit der hjælper danske brugere med deres sundheds- og vægttabsmål.
+
+Teksten må gerne have lidt personlighed og varme. Den skal føles skrevet af et menneske, ikke af en skabelon. Brug gerne små hverdagsnære observationer, men hold tonen professionel og troværdig.`
 
   const categorySpecificPrompts: { [key: string]: string } = {
     'Keto': `Du er særligt ekspert i ketogen diæt og lav-kulhydrat ernæring. Fokuser på:
@@ -191,7 +196,11 @@ Vigtige retningslinjer:
 - Vær engagerende og let at forstå
 - Inkluder konkrete tips og råd
 - Undgå at gentage information fra eksisterende indhold
-- Skriv i en venlig, professionel tone`
+- Skriv i en venlig, professionel tone
+- Undgå stive, formelle standardsætninger og AI-agtige formuleringer
+- Emojis er tilladt meget sparsomt: højst 1 lille, relevant emoji hvis det passer naturligt
+- Standard er sammenhængende prosa, ikke punktvis undervisning
+- Undgå skoleagtige labels og kunstig opsummeringstonе`
 }
 
 function parseGeneratedContent(content: string): { heading: string, content: string } {

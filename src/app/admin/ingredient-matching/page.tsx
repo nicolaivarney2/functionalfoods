@@ -9,6 +9,7 @@ interface RecipeIngredient {
   name: string
   category: string
   description: string
+  createdAt?: string | Date
 }
 
 interface FridaIngredient {
@@ -128,6 +129,7 @@ export default function IngredientMatchingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [hideLowPriorityCategories, setHideLowPriorityCategories] = useState(true)
   /**
    * queue = kun uden match (standard — matchede «forsvinder» fra listen)
    * all = inkl. i forvejen matchet
@@ -140,6 +142,10 @@ export default function IngredientMatchingPage() {
     rejected: 0,
     pending: 0
   })
+  const [manualIngredientName, setManualIngredientName] = useState('')
+  const [manualIngredientCategory, setManualIngredientCategory] = useState('andre')
+  const [manualIngredientDescription, setManualIngredientDescription] = useState('')
+  const [isAddingIngredient, setIsAddingIngredient] = useState(false)
 
   // Load data on component mount
   useEffect(() => {
@@ -154,10 +160,33 @@ export default function IngredientMatchingPage() {
   const loadData = async () => {
     try {
       setIsLoading(true)
-      
-      // Load current recipe ingredients
-      const recipeIngredientsResponse = await fetch('/api/ingredients')
-      const recipeIngredients = await recipeIngredientsResponse.json()
+
+      const loadRecipeIngredients = async (): Promise<RecipeIngredient[]> => {
+        // Primary source
+        const recipeIngredientsResponse = await fetch('/api/ingredients')
+        if (recipeIngredientsResponse.ok) {
+          const recipeIngredients = await recipeIngredientsResponse.json()
+          if (Array.isArray(recipeIngredients)) return recipeIngredients
+        }
+
+        // Fallback source so the page still works if /api/ingredients fails in dev
+        const fallbackResponse = await fetch('/api/admin/ingredients-for-matching?limit=1000')
+        if (!fallbackResponse.ok) {
+          throw new Error('Kunne ikke hente ingredienser fra hverken primær- eller fallback-endpoint')
+        }
+
+        const fallbackData = await fallbackResponse.json()
+        const fallbackIngredients = Array.isArray(fallbackData?.ingredients) ? fallbackData.ingredients : []
+        return fallbackIngredients.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          category: item.category || 'andre',
+          description: '',
+          createdAt: item.created_at || null,
+        }))
+      }
+
+      const recipeIngredients = await loadRecipeIngredients()
       
       // Load Frida ingredients (this will be the full database once uploaded)
       const fridaResponse = await fetch('/api/frida-ingredients')
@@ -167,11 +196,12 @@ export default function IngredientMatchingPage() {
       // Load existing matches from database
       const existingMatchesResponse = await fetch('/api/ingredient-matches')
       const existingMatches = await existingMatchesResponse.json()
+      const existingMatchesArray = Array.isArray(existingMatches) ? existingMatches : []
       const existingMatchMap = new Map(
-        existingMatches.map((match: any) => [match.recipe_ingredient_id, match.frida_ingredient_id])
+        existingMatchesArray.map((match: any) => [match.recipe_ingredient_id, match.frida_ingredient_id])
       )
 
-      console.log(`📋 Found ${existingMatches.length} existing matches in database`)
+      console.log(`📋 Found ${existingMatchesArray.length} existing matches in database`)
 
       const matchesWithSuggestions = await Promise.all(
         recipeIngredients.map(async (ingredient: RecipeIngredient) => {
@@ -199,6 +229,48 @@ export default function IngredientMatchingPage() {
       console.error('Error loading data:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const addManualIngredient = async () => {
+    const name = manualIngredientName.trim()
+    if (!name) {
+      alert('Skriv et ingrediensnavn først')
+      return
+    }
+
+    try {
+      setIsAddingIngredient(true)
+      const response = await fetch('/api/admin/ingredients-for-matching', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          category: manualIngredientCategory,
+          description: manualIngredientDescription.trim(),
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Kunne ikke tilføje ingrediens')
+      }
+
+      const alreadyExisted = Boolean(data?.data?.alreadyExisted)
+      alert(
+        alreadyExisted
+          ? `Ingrediensen "${name}" findes allerede.`
+          : `Ingrediensen "${name}" er tilføjet og klar til matching.`
+      )
+
+      setManualIngredientName('')
+      setManualIngredientDescription('')
+      await loadData()
+    } catch (error) {
+      console.error('Error adding manual ingredient:', error)
+      alert(error instanceof Error ? error.message : 'Kunne ikke tilføje ingrediens')
+    } finally {
+      setIsAddingIngredient(false)
     }
   }
 
@@ -259,7 +331,9 @@ export default function IngredientMatchingPage() {
       })
 
       if (!response.ok) {
-        alert('Kunne ikke gemme match – prøv igen.')
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.details || errorData?.error || 'Kunne ikke gemme match – prøv igen.'
+        alert(errorMessage)
         return
       }
 
@@ -316,7 +390,9 @@ export default function IngredientMatchingPage() {
       })
 
       if (!response.ok) {
-        alert('Kunne ikke gemme match – prøv igen.')
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.details || errorData?.error || 'Kunne ikke gemme match – prøv igen.'
+        alert(errorMessage)
         return
       }
 
@@ -389,13 +465,39 @@ export default function IngredientMatchingPage() {
     }
   }
 
-  const filteredMatches = ingredientMatches.filter((match) => {
-    if (matchFilter === 'queue' && isIngredientMatchedRow(match)) return false
-    if (matchFilter === 'matchedOnly' && !isIngredientMatchedRow(match)) return false
-    if (!rowMatchesSearch(match, searchTerm)) return false
-    if (!recipeCategoryMatchesFilter(match.recipeIngredient.category, selectedCategory)) return false
-    return true
-  })
+  const filteredMatches = ingredientMatches
+    .filter((match) => {
+      if (matchFilter === 'queue' && isIngredientMatchedRow(match)) return false
+      if (matchFilter === 'matchedOnly' && !isIngredientMatchedRow(match)) return false
+      if (!rowMatchesSearch(match, searchTerm)) return false
+      if (!recipeCategoryMatchesFilter(match.recipeIngredient.category, selectedCategory)) return false
+
+      if (hideLowPriorityCategories) {
+        const lowPriorityCategories = new Set(['krydderi', 'urter'])
+        const ingredientCategory = (match.recipeIngredient.category || '').toLowerCase().trim()
+        if (lowPriorityCategories.has(ingredientCategory)) return false
+      }
+
+      return true
+    })
+    .sort((a, b) => {
+      const aMatched = isIngredientMatchedRow(a)
+      const bMatched = isIngredientMatchedRow(b)
+
+      // Unmatched first (work queue first)
+      if (aMatched !== bMatched) return aMatched ? 1 : -1
+
+      // Newest first
+      const aTime = a.recipeIngredient.createdAt
+        ? new Date(a.recipeIngredient.createdAt).getTime()
+        : 0
+      const bTime = b.recipeIngredient.createdAt
+        ? new Date(b.recipeIngredient.createdAt).getTime()
+        : 0
+      if (aTime !== bTime) return bTime - aTime
+
+      return a.recipeIngredient.name.localeCompare(b.recipeIngredient.name)
+    })
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 90) return 'text-green-600 bg-green-100'
@@ -465,6 +567,68 @@ export default function IngredientMatchingPage() {
           </div>
         </div>
 
+        {/* Manual ingredient add */}
+        <div className="bg-white p-6 rounded-lg shadow mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Tilføj manglende ingrediens manuelt</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Hvis en ny ingrediens ikke er kommet med i køen endnu (fx "røde linser"), kan du oprette den her,
+            så den dukker op i ingredient matching-listen.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-3">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Navn</label>
+              <input
+                type="text"
+                value={manualIngredientName}
+                onChange={(e) => setManualIngredientName(e.target.value)}
+                placeholder="fx. røde linser"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+              <select
+                value={manualIngredientCategory}
+                onChange={(e) => setManualIngredientCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="protein">Protein</option>
+                <option value="groent">Grønt</option>
+                <option value="balg">Bælgfrugter</option>
+                <option value="korn">Korn</option>
+                <option value="forarbejdet">Konserves</option>
+                <option value="mejeri">Mejeri</option>
+                <option value="fedt">Fedt</option>
+                <option value="krydderi">Krydderi</option>
+                <option value="urter">Urter</option>
+                <option value="nodder">Nødder/Frø</option>
+                <option value="frugt">Frugt</option>
+                <option value="andre">Andre</option>
+              </select>
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivelse (valgfri)</label>
+              <input
+                type="text"
+                value={manualIngredientDescription}
+                onChange={(e) => setManualIngredientDescription(e.target.value)}
+                placeholder="Kort note til teamet"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="lg:col-span-1 flex items-end">
+              <button
+                type="button"
+                onClick={addManualIngredient}
+                disabled={isAddingIngredient}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {isAddingIngredient ? 'Tilføjer...' : 'Tilføj'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
@@ -525,6 +689,15 @@ export default function IngredientMatchingPage() {
               <p className="text-xs text-gray-500 mt-2">
                 Standard er <strong>Arbejdskø</strong>: gemte matches skjules, så du ser hurtigt, hvad der mangler.
               </p>
+              <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hideLowPriorityCategories}
+                  onChange={(e) => setHideLowPriorityCategories(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                Skjul krydderier og urter (fokus på nye, relevante ingredienser)
+              </label>
             </div>
 
             <div className="lg:col-span-1">

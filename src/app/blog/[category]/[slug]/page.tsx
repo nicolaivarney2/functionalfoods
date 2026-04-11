@@ -49,6 +49,9 @@ export default function BlogPostPage() {
   const [showDisclaimerModal, setShowDisclaimerModal] = useState(false)
   const [showEvidenceModal, setShowEvidenceModal] = useState(false)
   const [processedContent, setProcessedContent] = useState<string | null>(null)
+  const [relatedPosts, setRelatedPosts] = useState<
+    { id: number; title: string; slug: string; excerpt: string | null; header_image_url: string | null }[]
+  >([])
 
   const supabase = createSupabaseClient()
 
@@ -59,6 +62,7 @@ export default function BlogPostPage() {
   }, [slug])
 
   const loadBlogPost = async () => {
+    setRelatedPosts([])
     try {
       const { data, error } = await supabase
         .from('blog_posts')
@@ -79,6 +83,18 @@ export default function BlogPostPage() {
 
       if (data) {
         setPost(data)
+
+        const { data: related } = await supabase
+          .from('blog_posts')
+          .select('id, title, slug, excerpt, header_image_url')
+          .eq('category_id', data.category_id)
+          .eq('status', 'published')
+          .neq('id', data.id)
+          .order('published_at', { ascending: false })
+          .limit(6)
+
+        setRelatedPosts(related ?? [])
+
         // Increment view count
         await supabase
           .from('blog_posts')
@@ -268,7 +284,52 @@ export default function BlogPostPage() {
     } catch (e) {
       setProcessedContent(post.content)
     }
-  }, [post?.content])
+  }, [post?.content, post?.id, post?.category?.slug])
+
+  useEffect(() => {
+    const root = document.querySelector('.blog-content')
+    if (!root) return
+    const onSubmit = async (e: Event) => {
+      const el = e.target as HTMLElement | null
+      const form = el?.closest?.('form') as HTMLFormElement | undefined
+      if (!form || !form.hasAttribute('data-newsletter-internal')) return
+      e.preventDefault()
+      const emailInput = form.querySelector('input[type="email"]') as HTMLInputElement | null
+      const email = emailInput?.value?.trim()
+      if (!email) return
+      const audience = form.getAttribute('data-audience') || ''
+      const msg = form.parentElement?.querySelector('[data-newsletter-msg]') as HTMLElement | null
+      try {
+        const res = await fetch('/api/newsletter/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, newsletter_category: audience }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data && (data as { ok?: boolean }).ok) {
+          if (msg) {
+            msg.textContent = 'Tak — du er tilmeldt!'
+            msg.style.display = 'block'
+            msg.style.color = '#059669'
+          }
+          form.reset()
+        } else if (msg) {
+          msg.textContent = 'Kunne ikke tilmelde. Prøv igen.'
+          msg.style.display = 'block'
+          msg.style.color = '#b91c1c'
+        }
+      } catch {
+        if (msg) {
+          msg.textContent = 'Tjek din forbindelse og prøv igen.'
+          msg.style.display = 'block'
+          msg.style.color = '#b91c1c'
+        }
+      }
+    }
+    root.addEventListener('submit', onSubmit)
+    return () => root.removeEventListener('submit', onSubmit)
+  }, [processedContent])
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('da-DK', {
       year: 'numeric',
@@ -350,7 +411,16 @@ export default function BlogPostPage() {
 
               {/* Meta info */}
               <div className="text-sm text-gray-600 mb-4">
-                <p>Skrevet af nicolaivarney den {formatDate(post.published_at)}</p>
+                <p>
+                  Skrevet af{' '}
+                  <Link
+                    href="/bag-om-ff/nicolaivarney"
+                    className="text-emerald-700 hover:text-emerald-900 underline underline-offset-2 font-medium"
+                  >
+                    Nicolai Varney
+                  </Link>{' '}
+                  den {formatDate(post.published_at)}
+                </p>
                 {post.view_count > 0 && (
                   <p className="mt-1">{post.view_count} visninger</p>
                 )}
@@ -417,46 +487,71 @@ export default function BlogPostPage() {
           </div>
         )}
 
-        {/* Related content */}
-        <div className="mt-12 bg-white rounded-lg shadow-sm p-8">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Relateret indhold</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Keto Recipes */}
-            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
-              <div className="w-full h-32 bg-green-100 rounded-lg mb-4 flex items-center justify-center">
-                <span className="text-green-600 font-semibold">Keto Opskrifter</span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-2">Keto Opskrifter</h4>
-              <p className="text-sm text-gray-600 mb-3">Lækre og nemme keto-venlige opskrifter til hverdag og fest</p>
-              <a href="/keto/opskrifter" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                Se alle opskrifter →
-              </a>
-            </div>
+        {/* Relaterede artikler (samme kategori som dette indlæg) */}
+        <div className="mt-12 bg-white rounded-lg shadow-sm p-6 sm:p-8">
+          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 text-center sm:text-left">
+            Relaterede artikler
+          </h3>
+          <p className="text-sm text-gray-500 mb-6 text-center sm:text-left">
+            Andre artikler i {post.category?.name ?? 'samme kategori'}
+          </p>
 
-            {/* Weight Loss */}
-            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
-              <div className="w-full h-32 bg-blue-100 rounded-lg mb-4 flex items-center justify-center">
-                <span className="text-blue-600 font-semibold">Vægttab</span>
+          {relatedPosts.length > 0 ? (
+            <>
+              <ul className="space-y-4 divide-y divide-gray-100">
+                {relatedPosts.map((p) => (
+                  <li key={p.id} className="pt-4 first:pt-0">
+                    <Link
+                      href={`/blog/${categorySlug}/${p.slug}`}
+                      className="group flex gap-4 rounded-lg -m-2 p-2 hover:bg-gray-50 transition-colors"
+                    >
+                      {p.header_image_url ? (
+                        <div className="shrink-0 w-24 h-20 sm:w-28 sm:h-[4.5rem] rounded-md overflow-hidden bg-gray-100">
+                          <img
+                            src={p.header_image_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="shrink-0 w-24 h-20 sm:w-28 sm:h-[4.5rem] rounded-md bg-gradient-to-br from-gray-100 to-gray-200" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <span className="text-blue-600 group-hover:text-blue-800 font-medium leading-snug block">
+                          {p.title}
+                        </span>
+                        {p.excerpt ? (
+                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">{p.excerpt}</p>
+                        ) : null}
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8 text-center sm:text-left">
+                <Link
+                  href={`/blog/${post.category?.slug ?? categorySlug}`}
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center gap-1"
+                >
+                  Se alle artikler i {post.category?.name ?? 'kategorien'}
+                  <span aria-hidden>→</span>
+                </Link>
               </div>
-              <h4 className="font-semibold text-gray-900 mb-2">Vægttab med Keto</h4>
-              <p className="text-sm text-gray-600 mb-3">Evidensbaseret guide til vægttab med ketogen diæt</p>
-              <a href="/keto/vaegttab" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                Læs mere →
-              </a>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-gray-600 text-sm">
+                Der er ikke andre artikler i denne kategori endnu.
+              </p>
+              <Link
+                href={`/blog/${post.category?.slug ?? categorySlug}`}
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium inline-flex items-center gap-1"
+              >
+                Gå til blogoversigt for {post.category?.name ?? 'kategorien'}
+                <span aria-hidden>→</span>
+              </Link>
             </div>
-
-            {/* More Articles */}
-            <div className="bg-gray-50 rounded-lg p-6 hover:shadow-md transition-shadow">
-              <div className="w-full h-32 bg-purple-100 rounded-lg mb-4 flex items-center justify-center">
-                <span className="text-purple-600 font-semibold">Flere Artikler</span>
-              </div>
-              <h4 className="font-semibold text-gray-900 mb-2">Flere Keto Artikler</h4>
-              <p className="text-sm text-gray-600 mb-3">Udforsk vores komplette samling af keto-relaterede artikler</p>
-              <a href="/keto" className="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                Se alle artikler →
-              </a>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -503,7 +598,10 @@ export default function BlogPostPage() {
         @media (min-width: 640px) { .blog-content .blog-section { padding: 1.5rem !important; margin-bottom: 2rem !important; } }
         .blog-content .section-heading { font-family: 'Playfair Display', serif !important; font-size: 1.5rem !important; font-weight: 600 !important; color: #1f2937 !important; margin-bottom: 0.75rem !important; display: block !important; }
         .blog-content .section-content { font-family: 'Raleway', sans-serif !important; font-weight: 400 !important; line-height: 1.7 !important; color: #374151 !important; display: block !important; }
-        .blog-content .section-content p { margin-bottom: 1rem !important; }
+        .blog-content .section-content p { margin-bottom: 0.5rem !important; }
+        .blog-content .section-content p:last-child { margin-bottom: 0 !important; }
+        .blog-content .section-content strong { font-weight: 700 !important; }
+        .blog-content .section-content em { font-style: italic !important; }
         .blog-content .section-content ul { margin: 1rem 0 !important; padding-left: 1.5rem !important; }
         .blog-content .section-content li { margin-bottom: 0.5rem !important; list-style-type: disc !important; }
         .blog-content .section-content img.section-image { width: 100% !important; height: auto !important; margin-top: 1rem !important; border-radius: 0.5rem !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; }

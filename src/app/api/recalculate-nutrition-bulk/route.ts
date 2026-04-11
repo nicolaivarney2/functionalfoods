@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
 import { createSupabaseClient } from '@/lib/supabase'
+import { convertToGrams } from '@/lib/recipe-frida-nutrition-recalc'
 
 export async function POST() {
   try {
@@ -190,25 +191,4 @@ export async function POST() {
       { status: 500 }
     )
   }
-}
-
-function convertToGrams(amount: number, unit: string): number {
-  const u = (unit || '').toLowerCase()
-  const conversions: Record<string, number> = {
-    g: 1,
-    gram: 1,
-    kg: 1000,
-    kilo: 1000,
-    stk: 80,
-    st: 80,
-    stykke: 80,
-    spsk: 13,  // 1 spsk = 13g (mere præcis dansk mål)
-    tesk: 4,   // 1 tsk = 4g (mere præcis dansk mål)
-    tsk: 4,    // 1 tsk = 4g (mere præcis dansk mål)
-    dl: 100,
-    l: 1000,
-    ml: 1,
-  }
-  const gramsPerUnit = conversions[u] ?? 100
-  return amount * gramsPerUnit
 }

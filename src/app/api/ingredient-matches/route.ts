@@ -66,16 +66,16 @@ export async function POST(request: Request) {
       match_type: match.matchType || 'auto'
     }))
     
-    // Insert matches into database
+    // Upsert on recipe_ingredient_id so rematching an existing ingredient updates instead of failing
     const { data, error } = await supabase
       .from('ingredient_matches')
-      .insert(convertedMatches)
+      .upsert(convertedMatches, { onConflict: 'recipe_ingredient_id' })
       .select()
     
     if (error) {
       console.error('Error saving ingredient matches:', error)
       return NextResponse.json(
-        { error: 'Failed to save ingredient matches' },
+        { error: 'Failed to save ingredient matches', details: error.message },
         { status: 500 }
       )
     }

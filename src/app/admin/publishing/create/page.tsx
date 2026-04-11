@@ -2,6 +2,10 @@
 
 import { useState } from 'react'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import {
+  normalizeAiRecipeIngredients,
+  normalizeAiRecipeInstructions,
+} from '@/lib/ai-recipe-ingredient-normalize'
 
 interface RecipeCategory {
   id: string
@@ -38,11 +42,11 @@ const RECIPE_CATEGORIES: RecipeCategory[] = [
     difficulty: 'Easy'
   },
   {
-    id: 'paleo',
-    name: 'Paleo/LCHF',
-    description: 'Præhistorisk kost med lav kulhydrat, høj fedt',
-    icon: '🦕',
-    color: 'bg-orange-500',
+    id: 'glp1',
+    name: 'GLP-1 kost',
+    description: 'Mættende retter med protein, fibre og sunde fedtstoffer',
+    icon: '🧠',
+    color: 'bg-cyan-500',
     difficulty: 'Medium'
   },
   {
@@ -64,7 +68,7 @@ const RECIPE_CATEGORIES: RecipeCategory[] = [
   {
     id: '5-2',
     name: '5:2 Faste',
-    description: 'Retter til 5:2 faste dage (500-600 kalorier)',
+    description: 'Vælg fastedag (2\'er, ~500 kcal) eller spisedag (5\'er)',
     icon: '⏰',
     color: 'bg-indigo-500',
     difficulty: 'Hard'
@@ -114,7 +118,7 @@ interface FamiliemadParameters {
   stivelsesKlassiker: number // 0-3
   mereGront: number // 0-3
   bornefavorit: number // 0-3
-  maxTid: 15 | 30 | 45 // minutes
+  maxTid: 15 | 30 | 45 | null // minutes
   recipeType?: string // Predefined recipe type (burger, pizza, etc.)
   inspiration?: string // Free text inspiration (e.g., "børneversion af burger")
 }
@@ -126,9 +130,30 @@ interface KetoParameters {
   hovedingrediens?: string // 'rodt-kod', 'fjaerkrae', 'fisk', 'vegetarisk', 'non-dairy'
   recipeType?: string // Predefined recipe type (burger, pizza, etc.)
   inspiration?: string // Free text inspiration
-  maxTid: 15 | 30 | 45 // minutes
+  maxTid?: 15 | 30 | 45 | null // minutes
   kompleksitet: number // 0-3
   maaltid: string // 'morgenmad', 'frokost', 'aftensmad', 'dessert', 'snacks'
+}
+
+interface ProteinrigParameters {
+  maaltid: 'morgenmad' | 'frokost' | 'aftensmad' | 'snacks'
+  proteinKilde: 'frit-valg' | 'kylling' | 'fisk' | 'æg' | 'oksekød' | 'vegetarisk'
+  recipeType?: string
+  inspiration?: string
+}
+
+interface Glp1Parameters {
+  maaltid: 'morgenmad' | 'frokost' | 'aftensmad' | 'snacks'
+  proteinKilde: 'frit-valg' | 'kylling' | 'fisk' | 'æg' | 'vegetarisk'
+  fiberFokus: 0 | 1 | 2 | 3
+  maethedsProfil: 0 | 1 | 2 | 3
+  recipeType?: string
+  inspiration?: string
+}
+
+/** 5:2 diæt — 2'er = fastedage (~500 kcal), 5'er = spisedage (normal/varieret kost) */
+interface FiveTwoParameters {
+  dayType: '5' | '2'
 }
 
 export default function CreateRecipePage() {
@@ -142,7 +167,10 @@ export default function CreateRecipePage() {
   const [editableRecipe, setEditableRecipe] = useState<GeneratedRecipe | null>(null)
   const [recipeStatus, setRecipeStatus] = useState<'ai-preview' | 'ready-to-save' | 'saved'>('ai-preview')
   const [midjourneyPrompt, setMidjourneyPrompt] = useState<string>('')
+  const [midjourneyPromptSource, setMidjourneyPromptSource] = useState<string>('')
+  const [midjourneyPromptError, setMidjourneyPromptError] = useState<string>('')
   const [aiTips, setAiTips] = useState<string>('')
+  const [ingredientAmountDrafts, setIngredientAmountDrafts] = useState<Record<number, string>>({})
   const [isDragging, setIsDragging] = useState(false)
   
   // Familiemad parameter state
@@ -152,7 +180,7 @@ export default function CreateRecipePage() {
     stivelsesKlassiker: 2,
     mereGront: 1,
     bornefavorit: 2,
-    maxTid: 30,
+    maxTid: null,
     recipeType: '',
     inspiration: ''
   })
@@ -166,9 +194,28 @@ export default function CreateRecipePage() {
     hovedingrediens: '',
     recipeType: '',
     inspiration: '',
-    maxTid: 30,
+    maxTid: null,
     kompleksitet: 1,
     maaltid: 'aftensmad'
+  })
+
+  const [show52Modal, setShow52Modal] = useState(false)
+  const [showProteinrigModal, setShowProteinrigModal] = useState(false)
+  const [showGlp1Modal, setShowGlp1Modal] = useState(false)
+  const [fiveTwoParams, setFiveTwoParams] = useState<FiveTwoParameters>({ dayType: '2' })
+  const [proteinrigParams, setProteinrigParams] = useState<ProteinrigParameters>({
+    maaltid: 'aftensmad',
+    proteinKilde: 'frit-valg',
+    recipeType: '',
+    inspiration: '',
+  })
+  const [glp1Params, setGlp1Params] = useState<Glp1Parameters>({
+    maaltid: 'aftensmad',
+    proteinKilde: 'frit-valg',
+    fiberFokus: 2,
+    maethedsProfil: 2,
+    recipeType: '',
+    inspiration: '',
   })
 
   // Redirect if not admin
@@ -208,6 +255,18 @@ export default function CreateRecipePage() {
     if (categoryId === 'keto') {
       setShowKetoModal(true)
     }
+
+    if (categoryId === '5-2') {
+      setShow52Modal(true)
+    }
+
+    if (categoryId === 'proteinrig-kost') {
+      setShowProteinrigModal(true)
+    }
+
+    if (categoryId === 'glp1') {
+      setShowGlp1Modal(true)
+    }
   }
   
   const handleFamiliemadGenerate = () => {
@@ -220,6 +279,21 @@ export default function CreateRecipePage() {
     handleGenerateRecipe()
   }
 
+  const handle52Generate = () => {
+    setShow52Modal(false)
+    handleGenerateRecipe()
+  }
+
+  const handleProteinrigGenerate = () => {
+    setShowProteinrigModal(false)
+    handleGenerateRecipe()
+  }
+
+  const handleGlp1Generate = () => {
+    setShowGlp1Modal(false)
+    handleGenerateRecipe()
+  }
+
   const handleGenerateRecipe = async () => {
     if (!selectedCategory) return
 
@@ -227,6 +301,8 @@ export default function CreateRecipePage() {
     setError(null)
     setProgress('Initialiserer...')
     setMidjourneyPrompt('') // Clear previous prompt
+    setMidjourneyPromptSource('')
+    setMidjourneyPromptError('')
 
     try {
       const category = RECIPE_CATEGORIES.find(c => c.id === selectedCategory)
@@ -254,6 +330,18 @@ export default function CreateRecipePage() {
       if (selectedCategory === 'keto') {
         requestBody.parameters = ketoParams
       }
+
+      if (selectedCategory === '5-2') {
+        requestBody.parameters = fiveTwoParams
+      }
+
+      if (selectedCategory === 'proteinrig-kost') {
+        requestBody.parameters = proteinrigParams
+      }
+
+      if (selectedCategory === 'glp1') {
+        requestBody.parameters = glp1Params
+      }
       
       // Generate new recipe using category-specific ChatGPT assistant
       const generateResponse = await fetch(`/api/admin/generate-recipe-${selectedCategory}`, {
@@ -275,6 +363,8 @@ export default function CreateRecipePage() {
       if (recipeData.midjourneyPrompt) {
         setMidjourneyPrompt(recipeData.midjourneyPrompt)
       }
+      setMidjourneyPromptSource(recipeData.midjourneyPromptSource || '')
+      setMidjourneyPromptError(recipeData.midjourneyPromptError || '')
       
       // Store AI tips if available
       if (recipeData.aiTips) {
@@ -283,6 +373,12 @@ export default function CreateRecipePage() {
       
       setProgress('Validerer opskrift...')
       
+      const normalizedRecipe = {
+        ...recipeData.recipe,
+        ingredients: normalizeAiRecipeIngredients(recipeData.recipe?.ingredients || []),
+        instructions: normalizeAiRecipeInstructions(recipeData.recipe?.instructions || [])
+      }
+
       // Validate recipe
       const validateResponse = await fetch('/api/admin/validate-recipe', {
         method: 'POST',
@@ -290,7 +386,7 @@ export default function CreateRecipePage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          recipe: recipeData.recipe
+          recipe: normalizedRecipe
         })
       })
 
@@ -308,13 +404,14 @@ export default function CreateRecipePage() {
       setProgress('Opskrift genereret!')
       
       const finalRecipe = {
-        ...recipeData.recipe,
+        ...normalizedRecipe,
         imageUrl: '/images/recipe-placeholder.jpg' // Placeholder - upload billede manuelt
       }
 
       // Set as AI-kladde for editing
       setGeneratedRecipe(finalRecipe)
       setEditableRecipe({ ...finalRecipe })
+      setIngredientAmountDrafts({})
       setIsEditing(true)
 
       setProgress('Færdig! AI-kladde klar til redigering')
@@ -399,6 +496,7 @@ export default function CreateRecipePage() {
   const handleCancelEdit = () => {
     setIsEditing(false)
     setEditableRecipe(generatedRecipe)
+    setIngredientAmountDrafts({})
   }
 
   const handleUpdateEditableRecipe = (field: string, value: any) => {
@@ -718,6 +816,16 @@ export default function CreateRecipePage() {
                     Maksimal tid
                   </label>
                   <div className="flex space-x-3">
+                    <button
+                      onClick={() => setFamiliemadParams(prev => ({ ...prev, maxTid: null }))}
+                      className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+                        familiemadParams.maxTid == null
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Ingen maks
+                    </button>
                     {[15, 30, 45].map((time) => (
                       <button
                         key={time}
@@ -1006,12 +1114,22 @@ export default function CreateRecipePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Maksimal tid
                   </label>
-                  <div className="flex space-x-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <button
+                      onClick={() => setKetoParams(prev => ({ ...prev, maxTid: null }))}
+                      className={`py-2 px-4 rounded-lg transition-colors ${
+                        ketoParams.maxTid == null
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Ingen maks
+                    </button>
                     {[15, 30, 45].map((time) => (
                       <button
                         key={time}
                         onClick={() => setKetoParams(prev => ({ ...prev, maxTid: time as 15 | 30 | 45 }))}
-                        className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
+                        className={`py-2 px-4 rounded-lg transition-colors ${
                           ketoParams.maxTid === time
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -1021,6 +1139,9 @@ export default function CreateRecipePage() {
                       </button>
                     ))}
                   </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Vælg kun tid hvis opskriften skal holdes inden for en bestemt ramme. Ellers kan AI gerne foreslå retter, der tager længere tid.
+                  </p>
                 </div>
 
                 {/* Kompleksitet */}
@@ -1098,6 +1219,353 @@ export default function CreateRecipePage() {
           </div>
         </div>
       )}
+
+      {/* Proteinrig Parameter Modal */}
+      {showProteinrigModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">💪 Tilpas Proteinrig kost</h2>
+                <button
+                  onClick={() => {
+                    setShowProteinrigModal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Vælg retning for den proteinrige opskrift, fx måltidstype, primær proteinkilde og ret-type.
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Måltid</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {['morgenmad', 'frokost', 'aftensmad', 'snacks'].map((maaltid) => (
+                      <button
+                        key={maaltid}
+                        onClick={() => setProteinrigParams((prev) => ({ ...prev, maaltid: maaltid as ProteinrigParameters['maaltid'] }))}
+                        className={`py-2 px-3 rounded-lg transition-colors text-sm ${
+                          proteinrigParams.maaltid === maaltid
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {maaltid.charAt(0).toUpperCase() + maaltid.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Primær proteinkilde</label>
+                  <select
+                    value={proteinrigParams.proteinKilde}
+                    onChange={(e) => setProteinrigParams((prev) => ({ ...prev, proteinKilde: e.target.value as ProteinrigParameters['proteinKilde'] }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="frit-valg">Frit valg</option>
+                    <option value="kylling">Kylling/kalkun</option>
+                    <option value="fisk">Fisk/skaldyr</option>
+                    <option value="æg">Æg</option>
+                    <option value="oksekød">Oksekød</option>
+                    <option value="vegetarisk">Vegetarisk</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ret-type (valgfrit)</label>
+                  <select
+                    value={proteinrigParams.recipeType || ''}
+                    onChange={(e) => setProteinrigParams((prev) => ({ ...prev, recipeType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Frit valg</option>
+                    <option value="lasagne">Lasagne</option>
+                    <option value="gryderet">Gryderet</option>
+                    <option value="suppe">Suppe</option>
+                    <option value="bowl">Bowl</option>
+                    <option value="ovnret">Ovnret</option>
+                    <option value="salat">Salat</option>
+                    <option value="wraps">Wraps</option>
+                    <option value="frikadeller">Frikadeller</option>
+                    <option value="pastasalat">Pastasalat</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Inspiration (valgfrit)</label>
+                  <input
+                    type="text"
+                    value={proteinrigParams.inspiration || ''}
+                    onChange={(e) => setProteinrigParams((prev) => ({ ...prev, inspiration: e.target.value }))}
+                    placeholder="fx. 'proteinrig lasagne med grønt' eller 'hurtig frokost bowl'"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowProteinrigModal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={handleProteinrigGenerate}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? 'Genererer...' : '🤖 Generer Opskrift'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GLP-1 Parameter Modal */}
+      {showGlp1Modal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">🧠 Tilpas GLP-1 kost</h2>
+                <button
+                  onClick={() => {
+                    setShowGlp1Modal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Juster mæthedsprofilen: måltidstype, proteinvalg, fiberfokus og ret-type.
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Måltid</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {['morgenmad', 'frokost', 'aftensmad', 'snacks'].map((maaltid) => (
+                      <button
+                        key={maaltid}
+                        onClick={() => setGlp1Params((prev) => ({ ...prev, maaltid: maaltid as Glp1Parameters['maaltid'] }))}
+                        className={`py-2 px-3 rounded-lg transition-colors text-sm ${
+                          glp1Params.maaltid === maaltid
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {maaltid.charAt(0).toUpperCase() + maaltid.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Primær proteinkilde</label>
+                  <select
+                    value={glp1Params.proteinKilde}
+                    onChange={(e) => setGlp1Params((prev) => ({ ...prev, proteinKilde: e.target.value as Glp1Parameters['proteinKilde'] }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="frit-valg">Frit valg</option>
+                    <option value="kylling">Kylling/kalkun</option>
+                    <option value="fisk">Fisk/skaldyr</option>
+                    <option value="æg">Æg</option>
+                    <option value="vegetarisk">Vegetarisk</option>
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium text-gray-700">Fiber-fokus</label>
+                    <span className="text-sm text-gray-500">{glp1Params.fiberFokus}/3</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3"
+                    value={glp1Params.fiberFokus}
+                    onChange={(e) => setGlp1Params((prev) => ({ ...prev, fiberFokus: parseInt(e.target.value) as 0 | 1 | 2 | 3 }))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-medium text-gray-700">Mæthedsprofil</label>
+                    <span className="text-sm text-gray-500">{glp1Params.maethedsProfil}/3</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3"
+                    value={glp1Params.maethedsProfil}
+                    onChange={(e) => setGlp1Params((prev) => ({ ...prev, maethedsProfil: parseInt(e.target.value) as 0 | 1 | 2 | 3 }))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ret-type (valgfrit)</label>
+                  <select
+                    value={glp1Params.recipeType || ''}
+                    onChange={(e) => setGlp1Params((prev) => ({ ...prev, recipeType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Frit valg</option>
+                    <option value="lasagne">Lasagne</option>
+                    <option value="gryderet">Gryderet</option>
+                    <option value="suppe">Suppe</option>
+                    <option value="bowl">Bowl</option>
+                    <option value="ovnret">Ovnret</option>
+                    <option value="salat">Salat</option>
+                    <option value="wraps">Wraps</option>
+                    <option value="æggeret">Æggeret</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Inspiration (valgfrit)</label>
+                  <input
+                    type="text"
+                    value={glp1Params.inspiration || ''}
+                    onChange={(e) => setGlp1Params((prev) => ({ ...prev, inspiration: e.target.value }))}
+                    placeholder="fx. 'mættende frokost-bowl' eller 'GLP-1 venlig lasagne'"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowGlp1Modal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={handleGlp1Generate}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? 'Genererer...' : '🤖 Generer Opskrift'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5:2 — vælg fastedag (2'er) eller spisedag (5'er) */}
+      {show52Modal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">⏰ 5:2 — hvilken type opskrift?</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShow52Modal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <p className="text-gray-600 text-sm mb-6">
+                I 5:2 faster man typisk <strong>2 dage</strong> om ugen (lav energi) og spiser <strong>normalt de andre 5 dage</strong>.
+                Vælg hvilken situation opskriften skal passe til — så får AI de rigtige kalorie- og stilmæssige rammer.
+              </p>
+              <div className="space-y-3">
+                <label
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                    fiveTwoParams.dayType === '2'
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fiveTwoDayType"
+                    checked={fiveTwoParams.dayType === '2'}
+                    onChange={() => setFiveTwoParams({ dayType: '2' })}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-semibold text-gray-900">2&apos;er — fastedag</span>
+                    <span className="block text-sm text-gray-600 mt-1">
+                      Opskrift til de to ugentlige fastedage: <strong>ca. 500 kcal per portion</strong> (kvinder; mænd kan ligge omkring 600).
+                      Mættende, voluminøse grøntsager, magert protein — høj mæthed pr. kalorie.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-colors ${
+                    fiveTwoParams.dayType === '5'
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="fiveTwoDayType"
+                    checked={fiveTwoParams.dayType === '5'}
+                    onChange={() => setFiveTwoParams({ dayType: '5' })}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-semibold text-gray-900">5&apos;er — spisedag</span>
+                    <span className="block text-sm text-gray-600 mt-1">
+                      Opskrift til de <strong>fem dage</strong> hvor man spiser normalt: balanceret, næringsrig hverdagsmad uden den skarpe fastedags-grænse.
+                      Ikke &quot;kalorieslank&quot; som på 2&apos;eren — fokus på variation og tilfredsstillende måltider.
+                    </span>
+                  </span>
+                </label>
+              </div>
+              <div className="flex gap-3 mt-8 pt-4 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShow52Modal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={handle52Generate}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isGenerating ? 'Genererer...' : '🤖 Generer opskrift'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1169,6 +1637,12 @@ export default function CreateRecipePage() {
                         if (category.id === 'familiemad') {
                           handleCategorySelect(category.id)
                         } else if (category.id === 'keto') {
+                          handleCategorySelect(category.id)
+                        } else if (category.id === '5-2') {
+                          handleCategorySelect(category.id)
+                        } else if (category.id === 'proteinrig-kost') {
+                          handleCategorySelect(category.id)
+                        } else if (category.id === 'glp1') {
                           handleCategorySelect(category.id)
                         } else {
                           setSelectedCategory(category.id)
@@ -1330,6 +1804,20 @@ export default function CreateRecipePage() {
                         🎨 Midjourney Prompt
                         <span className="ml-2 text-gray-500 text-sm font-normal">(Kopier til Midjourney)</span>
                       </h4>
+                      {(midjourneyPromptSource || midjourneyPromptError) && (
+                        <div className="mb-2 text-xs text-gray-600">
+                          {midjourneyPromptSource && (
+                            <span>
+                              Kilde: {midjourneyPromptSource === 'openai' ? 'model' : 'fallback'}
+                            </span>
+                          )}
+                          {midjourneyPromptError && (
+                            <span className="ml-2 text-amber-700">
+                              ({midjourneyPromptError})
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <textarea
                           value={midjourneyPrompt}
@@ -1385,6 +1873,10 @@ export default function CreateRecipePage() {
                               type="text"
                               inputMode="decimal"
                               value={(() => {
+                                const draft = ingredientAmountDrafts[index]
+                                if (draft !== undefined) {
+                                  return draft
+                                }
                                 if (ingredient.amount === 0 || ingredient.amount === null || ingredient.amount === undefined) {
                                   return ''
                                 }
@@ -1414,10 +1906,18 @@ export default function CreateRecipePage() {
                                 
                                 // Opdater input-værdien direkte
                                 e.target.value = value
+                                setIngredientAmountDrafts((prev) => ({
+                                  ...prev,
+                                  [index]: value,
+                                }))
                                 
                                 // Hvis tom eller kun komma, sæt til 0
-                                if (value === '' || value === ',') {
-                                  handleUpdateIngredient(index, 'amount', 0)
+                                if (value === '' || value === ',' || value === '.') {
+                                  return
+                                }
+
+                                // Lad brugeren færdigskrive decimaler som "0," eller "1."
+                                if (value.endsWith(',') || value.endsWith('.')) {
                                   return
                                 }
                                 
@@ -1431,17 +1931,31 @@ export default function CreateRecipePage() {
                               }}
                               onBlur={(e) => {
                                 // Ved blur, sørg for at værdien er korrekt formateret
-                                let value = e.target.value.trim()
-                                if (value === '' || value === ',') {
+                                const value = e.target.value.trim()
+                                if (value === '' || value === ',' || value === '.') {
                                   handleUpdateIngredient(index, 'amount', 0)
+                                  setIngredientAmountDrafts((prev) => {
+                                    const next = { ...prev }
+                                    delete next[index]
+                                    return next
+                                  })
                                   return
                                 }
                                 const normalizedValue = value.replace(',', '.')
                                 const numValue = parseFloat(normalizedValue)
                                 if (!isNaN(numValue) && isFinite(numValue)) {
                                   handleUpdateIngredient(index, 'amount', numValue)
+                                  setIngredientAmountDrafts((prev) => ({
+                                    ...prev,
+                                    [index]: String(numValue).replace('.', ','),
+                                  }))
                                 } else {
                                   handleUpdateIngredient(index, 'amount', 0)
+                                  setIngredientAmountDrafts((prev) => {
+                                    const next = { ...prev }
+                                    delete next[index]
+                                    return next
+                                  })
                                 }
                               }}
                               className="w-full px-2 py-1 border border-gray-300 rounded text-sm"

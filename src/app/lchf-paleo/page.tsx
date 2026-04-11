@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, BookOpen } from 'lucide-react'
 
 export default function LchfPaleoPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -56,11 +56,11 @@ export default function LchfPaleoPage() {
               Udforsk LCHF/Paleo
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Lær om LCHF/Paleo vægttab og find opskrifter baseret på naturlige fødevarer.
+              Lær om LCHF/Paleo vægttab, find opskrifter – eller læs lavkulhydrat-artikler på keto-bloggen (tættest på LCHF).
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
             <Link
               href="/lchf-paleo/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/10 transition-all duration-500 transform hover:-translate-y-2"
@@ -105,6 +105,30 @@ export default function LchfPaleoPage() {
               </p>
               <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
                 Se alle LCHF/Paleo opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/keto"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-amber-200 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-amber-600 transition-colors">
+                    Lavkulhydrat på bloggen
+                  </h3>
+                  <p className="text-gray-500">Keto &amp; lignende</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Vi har ingen separat LCHF-blog – keto-sektionen dækker tilsvarende temaer (lavkulhydrat, fedt, praksis).
+              </p>
+              <div className="flex items-center text-amber-600 group-hover:text-amber-700 font-medium">
+                Gå til blog-sektionen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

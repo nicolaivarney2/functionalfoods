@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, ChevronRight, CheckCircle2, XCircle, UtensilsCrossed, Clock } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, ChevronRight, CheckCircle2, XCircle, UtensilsCrossed, Clock, BookOpen } from 'lucide-react'
 
 export default function GLP1Page() {
   const [isVisible, setIsVisible] = useState(false)
@@ -105,6 +105,30 @@ export default function GLP1Page() {
               </p>
               <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
                 Se alle GLP-1 opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/glp-1"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                    GLP-1 på bloggen
+                  </h3>
+                  <p className="text-gray-500">Artikler og guides</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Artikler om naturlig mæthed, GLP-1 og kost – opdateret løbende.
+              </p>
+              <div className="flex items-center text-indigo-600 group-hover:text-indigo-700 font-medium">
+                Gå til GLP-1-bloggen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

@@ -381,3 +381,14 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
 }
 
 export const FUNKTION_SLUGS = Object.keys(FUNKTIONER) as FunktionSlug[]
+
+/** Rækkefølge på oversigtssiden /funktioner */
+export const FUNKTION_OVERVIEW_ORDER: FunktionSlug[] = [
+  'madbudget-ai-madplaner',
+  'madplaner-ud-fra-tilbud',
+  'vaegttabsrejse',
+  'makro-mikro-opskrifter',
+  '5000-opskrifter-i-8-nicher',
+  'smart-indkob-liste-sms',
+  'vaegt-tracker',
+]

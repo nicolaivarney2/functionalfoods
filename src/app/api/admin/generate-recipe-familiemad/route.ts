@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 
 interface ExistingRecipe {
   id: string
@@ -15,7 +16,7 @@ interface FamiliemadParameters {
   stivelsesKlassiker: number // 0-3
   mereGront: number // 0-3
   bornefavorit: number // 0-3
-  maxTid: 15 | 30 | 45
+  maxTid: 15 | 30 | 45 | null
   recipeType?: string // Predefined recipe type (burger, pizza, etc.)
   inspiration?: string // Free text inspiration (e.g., "børneversion af burger")
 }
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
       stivelsesKlassiker: 2,
       mereGront: 1,
       bornefavorit: 2,
-      maxTid: 30
+      maxTid: null
     }
     
     if (!categoryName) {
@@ -99,19 +100,10 @@ export async function POST(request: NextRequest) {
     // Build parameter-specific instructions
     const parameterInstructions = buildParameterInstructions(params)
     
-    // Generate recipe using standard OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `Du er FunctionalFoods opskriftsassistent for Familiemad. Skriv altid på dansk.
+    const baseMessages = [
+      {
+        role: "system",
+        content: `Du er FunctionalFoods opskriftsassistent for Familiemad. Skriv altid på dansk.
 
 Formål: Generér familievenlige opskrifter, der passer til danske hjem. FOKUSÉR PÅ RETTER SOM BØRN VIL SPISE - ikke voksenmad.
 
@@ -210,10 +202,10 @@ Twist-typer kan være:
 - Ekstra sauce til voksne (fx stærkere variant i lille skål)
 VIKTIGT: Twists må IKKE være integreret i selve børnebasen - det skal kunne tilføjes individuelt ved servering.
 Format: "<p><strong>Voksen-twist (valgfrit):</strong></p><ul><li>Forslag 1</li><li>Forslag 2</li><li>Forslag 3</li></ul>"`
-          },
-          {
-            role: "user",
-            content: `Generer en NY og UNIK Familiemad opskrift der er FULDSTÆNDIG forskellig fra eksisterende opskrifter.
+      },
+      {
+        role: "user",
+        content: `Generer en NY og UNIK Familiemad opskrift der er FULDSTÆNDIG forskellig fra eksisterende opskrifter.
 
 KRITISK: Denne opskrift skal være UNIK - ikke bare en lille variation af en eksisterende opskrift.
 - Vælg en HELT ANDEN ret-type end eksisterende opskrifter
@@ -313,27 +305,63 @@ JSON-struktur (obligatorisk):
   ],
   "notes": "string (HTML formateret noter - SKAL inkludere 'Voksen-twist (valgfrit)' sektion)"
 }`
-          }
-        ],
-        temperature: 1.2, // Increased to 1.2 for maximum variation and creativity
-        max_tokens: 2500
+      }
+    ]
+
+    // Generate recipe with retries to reduce transient JSON-format failures
+    let recipe: any = null
+    let lastGenerationError: Error | null = null
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const retryHint =
+        attempt > 1
+          ? {
+              role: 'system',
+              content:
+                'FORRIGE SVAR KUNNE IKKE PARSES. Returnér KUN gyldig JSON i præcis den ønskede struktur. Ingen ekstra tekst.',
+            }
+          : null
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiConfig.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: retryHint ? [...baseMessages, retryHint] : baseMessages,
+          temperature: 1.2, // Increased to 1.2 for maximum variation and creativity
+          max_tokens: 2500
+        })
       })
-    })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      }
+
+      const completion = await response.json()
+      const recipeContent = completion.choices[0]?.message?.content
+
+      if (!recipeContent) {
+        lastGenerationError = new Error('No recipe content generated')
+        continue
+      }
+
+      try {
+        recipe = parseGeneratedRecipe(recipeContent)
+        lastGenerationError = null
+        break
+      } catch (parseError) {
+        lastGenerationError = parseError instanceof Error ? parseError : new Error('Failed to parse generated recipe')
+        console.warn(`⚠️ Familiemad parse failed on attempt ${attempt}, retrying...`)
+      }
     }
 
-    const completion = await response.json()
-    const recipeContent = completion.choices[0]?.message?.content
-    
-    if (!recipeContent) {
-      throw new Error('No recipe content generated')
+    if (!recipe) {
+      throw lastGenerationError || new Error('Failed to generate valid Familiemad recipe')
     }
-
-    // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent)
     
     // Validate that title doesn't already exist
     const normalizedNewTitle = recipe.title?.toLowerCase().trim()
@@ -365,7 +393,7 @@ JSON-struktur (obligatorisk):
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: recipe.title,
+          title: normalizeDanishRecipeTitle(recipe.title),
           description: recipe.description,
           difficulty: recipe.difficulty,
           totalTime: recipe.prepTime + recipe.cookTime,
@@ -455,6 +483,8 @@ function buildParameterInstructions(params: FamiliemadParameters): string {
     instructions.push('TID: Maksimalt 30 minutter total tid. Balanceret mellem hastighed og kompleksitet.')
   } else if (params.maxTid === 45) {
     instructions.push('TID: Maksimalt 45 minutter total tid. Mere komplekse retter er tilladt.')
+  } else {
+    instructions.push('TID: Ingen maksimal tidsgrænse. Klassiske retter med længere tilberedningstid er tilladt (fx lasagne, simreretter og ovnretter).')
   }
   
   // Recipe type instructions
@@ -596,7 +626,7 @@ function parseGeneratedRecipe(content: string): any {
     
     // Ensure all required fields exist
     return {
-      title: recipe.title,
+      title: normalizeDanishRecipeTitle(recipe.title),
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],

@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { Search, Filter, Sparkles } from 'lucide-react'
 import RecipeCard from '@/components/RecipeCard'
 import MobileRecipeFilterBar from '@/components/MobileRecipeFilterBar'
-import { useState, useEffect } from 'react'
+import RecipeSignupMidGridCta, { buildRecipeSlotsWithMidCta } from '@/components/RecipeSignupMidGridCta'
+import { useState, useEffect, useMemo } from 'react'
+import { recipeMatchesOverviewCategory } from '@/lib/recipe-diet-matcher'
 
 interface Recipe {
   id: string
@@ -58,7 +60,6 @@ const extendedDietaryCategories = [
     description: 'Almindelige familiemad opskrifter',
     color: 'bg-blue-500',
     icon: '👨‍👩‍👧‍👦',
-    recipeCount: 450,
     imageUrl: '/images/categories/familie.webp',
     imageAlt: 'Familievenlige retter til hverdagen'
   },
@@ -69,7 +70,6 @@ const extendedDietaryCategories = [
     description: 'Ketogene opskrifter til vægttab og sundhed',
     color: 'bg-purple-500',
     icon: '🥑',
-    recipeCount: 712,
     imageUrl: '/images/categories/keto.webp',
     imageAlt: 'Keto mad med bacon, æg og grønne grøntsager'
   },
@@ -80,7 +80,6 @@ const extendedDietaryCategories = [
     description: 'Sunde opskrifter baseret på danske kostråd',
     color: 'bg-green-500',
     icon: '✋',
-    recipeCount: 445,
     imageUrl: '/images/categories/sense.webp',
     imageAlt: 'Sunde danske retter med rugbrød og grønne grøntsager'
   },
@@ -91,7 +90,6 @@ const extendedDietaryCategories = [
     description: 'Naturligt vægttab med maksimal mæthed',
     color: 'bg-blue-500',
     icon: '🧠',
-    recipeCount: 0,
     imageUrl: '/images/categories/glp-1.webp',
     imageAlt: 'GLP-1 kost med protein, fibre og sunde fedtstoffer'
   },
@@ -102,7 +100,6 @@ const extendedDietaryCategories = [
     description: 'Proteinrige opskrifter til optimal næring',
     color: 'bg-blue-500',
     icon: '💪',
-    recipeCount: 234,
     imageUrl: '/images/categories/proteinrig-kost.webp',
     imageAlt: 'Proteinrige opskrifter til optimal næring'
   },
@@ -113,7 +110,6 @@ const extendedDietaryCategories = [
     description: 'Anti-inflammatoriske opskrifter til sundhed',
     color: 'bg-emerald-500',
     icon: '🌿',
-    recipeCount: 156,
     imageUrl: '/images/categories/anti-inflammatory.webp',
     imageAlt: 'Anti-inflammatoriske retter med grønne grøntsager og omega-3'
   },
@@ -124,7 +120,6 @@ const extendedDietaryCategories = [
     description: 'Fleksitariske opskrifter med fokus på planter',
     color: 'bg-teal-500',
     icon: '🥬',
-    recipeCount: 98,
     imageUrl: '/images/categories/flexitarian.webp',
     imageAlt: 'Fleksitariske retter med planter og lidt kød'
   },
@@ -135,7 +130,6 @@ const extendedDietaryCategories = [
     description: 'Opskrifter til 5:2 intermittent fasting',
     color: 'bg-amber-500',
     icon: '⏰',
-    recipeCount: 123,
     imageUrl: '/images/categories/5-2-diet.webp',
     imageAlt: 'Sunde måltider til 5:2 diæt og intermittent fasting'
   }
@@ -184,6 +178,14 @@ export default function RecipeOverviewPage() {
 
     loadRecipes()
   }, [])
+
+  const categoryRecipeCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const cat of extendedDietaryCategories) {
+      counts[cat.id] = allRecipes.filter((r) => recipeMatchesOverviewCategory(r, cat.id)).length
+    }
+    return counts
+  }, [allRecipes])
 
   // Apply filters when dependencies change
   useEffect(() => {
@@ -298,7 +300,9 @@ export default function RecipeOverviewPage() {
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Udforsk <strong>+2.509 gratis opskrifter</strong> beregnet på vitaminer og næring.<br />
+              Udforsk{' '}
+              <strong>{allRecipes.length.toLocaleString('da-DK')} gratis opskrifter</strong> beregnet på vitaminer og næring.
+              <br />
               Vælg din mad-ideologi eller udforsk alle opskrifter.
             </p>
             
@@ -332,21 +336,15 @@ export default function RecipeOverviewPage() {
                 className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
-                <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  {category.name === 'KETO' && '🥑'}
-                  {category.name === 'SENSE' && '✋'}
-                  {category.name === 'GLP-1 KOST' && '🧠'}
-                  {category.name === 'ANTI-INFLAMMATORISK' && '🌿'}
-                  {category.name === 'FLEKSITARISK' && '🥬'}
-                  {category.name === '5:2 DIÆT' && '⏰'}
-                  {category.name === 'FAMILIEMAD' && '👨‍👩‍👧‍👦'}
-                  {category.name === 'PROTEINRIG KOST' && '💪'}
-                  {category.name === 'MIDDELHAVSDIÆTEN' && '🐟'}
+                <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300" aria-hidden>
+                  {category.icon}
                 </div>
                 <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
                   {category.name}
                 </h3>
-                <p className="text-sm text-gray-500 mb-2">{category.recipeCount} opskrifter</p>
+                <p className="text-sm text-gray-500 mb-2">
+                  {(categoryRecipeCounts[category.id] ?? 0).toLocaleString('da-DK')} opskrifter
+                </p>
                 <div className="text-xs text-gray-400 group-hover:text-green-500 transition-colors">
                   Klik for at udforske →
                 </div>
@@ -382,7 +380,8 @@ export default function RecipeOverviewPage() {
                 }`}
               >
                 <Filter size={20} />
-                Filtre
+                <span className="md:hidden">Filtre</span>
+                <span className="hidden md:inline">Flere filtre</span>
                 {hasActiveFilters && (
                   <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
                     {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== '', selectedDietary !== 'all'].filter(Boolean).length}
@@ -399,31 +398,86 @@ export default function RecipeOverviewPage() {
               )}
             </div>
 
+            {/* Desktop/tablet: nicher som primære filtre (ikke skjult i dropdown) */}
+            <div className="hidden md:block rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm ring-1 ring-slate-100">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Vælg niche</p>
+                <span className="text-xs text-slate-400">Det vigtigste filter — resten under &quot;Flere filtre&quot;</span>
+              </div>
+              <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDietary('all')}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                    selectedDietary === 'all'
+                      ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/50'
+                  }`}
+                >
+                  Alle
+                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                    selectedDietary === 'all' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {allRecipes.length}
+                  </span>
+                </button>
+                {extendedDietaryCategories.map((cat) => {
+                  const n = categoryRecipeCounts[cat.id] ?? 0
+                  const active = selectedDietary === cat.id
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedDietary(cat.id)}
+                      className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                        active
+                          ? 'border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/50'
+                      }`}
+                    >
+                      <span aria-hidden>{cat.icon}</span>
+                      <span className="max-w-[10rem] truncate sm:max-w-none">{cat.name}</span>
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                          active ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {n}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Filters Panel */}
             {showFilters && (
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <p className="mb-4 hidden text-sm font-semibold text-slate-700 md:block">
+                  Flere filtre: tid og måltidstype
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Dietary Filter */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Mad ideologi
-                    </label>
-            <select
-              value={selectedDietary}
-              onChange={(e) => setSelectedDietary(e.target.value)}
+                  {/* Dietary: kun på mobil (desktop bruger chips ovenfor) */}
+                  <div className="md:hidden">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">Mad ideologi</label>
+                    <select
+                      value={selectedDietary}
+                      onChange={(e) => setSelectedDietary(e.target.value)}
                       className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200"
-            >
-              <option value="all">Alle mad ideologier</option>
-              {extendedDietaryCategories.map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
-          </div>
+                    >
+                      <option value="all">Alle mad ideologier</option>
+                      {extendedDietaryCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
                   {/* Prep Time Filter */}
                 <div>
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
-                      Forbredelsestid
+                      Forberedelsestid
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {[
@@ -495,15 +549,19 @@ export default function RecipeOverviewPage() {
         <div className="container">
           {filteredRecipes.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-              {filteredRecipes.map((recipe, index) => (
-                <div
-                    key={recipe.id} 
-                  className="transition-all duration-500 h-full"
-                  style={{ transitionDelay: `${index * 100}ms` }}
-                >
-                  <RecipeCard recipe={recipe} priority={index < 8} />
-                </div>
-              ))}
+              {buildRecipeSlotsWithMidCta(filteredRecipes, 30).map((slot) =>
+                slot.type === 'cta' ? (
+                  <RecipeSignupMidGridCta key="recipe-grid-signup-cta" />
+                ) : (
+                  <div
+                    key={slot.recipe.id}
+                    className="transition-all duration-500 h-full"
+                    style={{ transitionDelay: `${Math.min(slot.listIndex, 20) * 50}ms` }}
+                  >
+                    <RecipeCard recipe={slot.recipe} priority={slot.listIndex < 8} />
+                  </div>
+                )
+              )}
             </div>
           ) : (
             <div className="text-center py-16">
@@ -553,7 +611,7 @@ export default function RecipeOverviewPage() {
                 Alle opskrifter
               </h3>
               <p className="text-gray-600 text-center mb-4">
-                Udforsk +2.509 gratis opskrifter beregnet på vitaminer og næring
+                Udforsk {allRecipes.length.toLocaleString('da-DK')} gratis opskrifter beregnet på vitaminer og næring
               </p>
               <div className="text-center text-green-600 font-medium group-hover:underline">
                 Se alle →

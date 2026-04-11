@@ -6,6 +6,7 @@ import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '
 import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
 import RecipeHeaderActions from '@/components/RecipeHeaderActions'
+import { RecipeEngagementProvider } from '@/contexts/RecipeEngagementContext'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
 
 // Cache recipe pages for high-load production traffic.
@@ -63,6 +64,7 @@ export default async function RecipePage({ params }: PageProps) {
         }}
       />
       
+      <RecipeEngagementProvider>
       <main className="min-h-screen bg-white overflow-x-hidden">
         {/* Header with Search */}
         <section className="bg-white border-b border-gray-200">
@@ -186,6 +188,7 @@ export default async function RecipePage({ params }: PageProps) {
           allRecipes={relatedRecipeCandidates} 
         />
       </main>
+      </RecipeEngagementProvider>
     </>
   )
 } 

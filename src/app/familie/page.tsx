@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, BookOpen } from 'lucide-react'
 
 export default function FamiliePage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -56,11 +56,11 @@ export default function FamiliePage() {
               Udforsk Familiemad
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Lær om familiemad vægttab og find opskrifter der passer til hele familien.
+              Lær om familiemad og vægttab, find opskrifter – eller læs artikler på familiemad-bloggen.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-6xl mx-auto">
             <Link
               href="/familie/vaegttab"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-500 transform hover:-translate-y-2"
@@ -105,6 +105,30 @@ export default function FamiliePage() {
               </p>
               <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
                 Se alle familiemad opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/familie"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-sky-200 hover:shadow-xl hover:shadow-sky-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-sky-500 to-blue-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-sky-600 transition-colors">
+                    Familiemad på bloggen
+                  </h3>
+                  <p className="text-gray-500">Artikler og guides</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Hverdag, børn og sunde vaner – artikler om familiemad og balance.
+              </p>
+              <div className="flex items-center text-sky-600 group-hover:text-sky-700 font-medium">
+                Gå til familiemad-bloggen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

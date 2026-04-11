@@ -5,6 +5,7 @@ const columns = [
   {
     title: 'Funktioner',
     links: [
+      { label: 'Oversigt over funktioner', href: '/funktioner' },
       { label: 'Madbudget (AI madplaner)', href: '/funktioner/madbudget-ai-madplaner' },
       { label: 'Madplaner ud fra tilbud', href: '/funktioner/madplaner-ud-fra-tilbud' },
       { label: 'Vægttabsrejse (50+ parametre)', href: '/funktioner/vaegttabsrejse' },

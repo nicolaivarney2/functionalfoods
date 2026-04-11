@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Clock } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Clock, BookOpen } from 'lucide-react'
 
 export default function FiveTwoDietPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -105,6 +105,30 @@ export default function FiveTwoDietPage() {
               </p>
               <div className="flex items-center text-orange-600 group-hover:text-orange-700 font-medium">
                 Se alle 5:2 diæt opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/5-2-diet"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-rose-200 hover:shadow-xl hover:shadow-rose-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-rose-500 to-amber-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-rose-600 transition-colors">
+                    5:2 på bloggen
+                  </h3>
+                  <p className="text-gray-500">Artikler og guides</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Intermittent fasting, 5:2 og vægttab – artikler og praktiske guides.
+              </p>
+              <div className="flex items-center text-rose-600 group-hover:text-rose-700 font-medium">
+                Gå til 5:2-bloggen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

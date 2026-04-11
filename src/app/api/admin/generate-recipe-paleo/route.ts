@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 
 interface ExistingRecipe {
   id: string
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: recipe.title,
+          title: normalizeDanishRecipeTitle(recipe.title),
           description: recipe.description,
           difficulty: recipe.difficulty,
           totalTime: recipe.prepTime + recipe.cookTime,
@@ -242,7 +243,7 @@ function parseGeneratedRecipe(content: string): any {
     
     // Ensure all required fields exist
     return {
-      title: recipe.title,
+      title: normalizeDanishRecipeTitle(recipe.title),
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],

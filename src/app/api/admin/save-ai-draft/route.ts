@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
 import { generateSlug } from '@/lib/utils'
+import {
+  normalizeAiRecipeIngredients,
+  normalizeAiRecipeInstructions,
+} from '@/lib/ai-recipe-ingredient-normalize'
+import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
 
 interface GeneratedRecipe {
   title: string
@@ -51,8 +56,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`💾 Saving AI-kladde as real draft: ${recipe.title}`)
 
+    const ingredientsNormalized = normalizeAiRecipeIngredients(recipe.ingredients)
+    const instructionsNormalized = normalizeAiRecipeInstructions(recipe.instructions || [])
+
     const supabase = createSupabaseClient()
     const slug = generateSlug(recipe.title)
+
+    try {
+      await syncIngredientsToRegistry(supabase, ingredientsNormalized)
+      console.log(`🧂 Synced ${ingredientsNormalized.length} ingredients to ingredients registry`)
+    } catch (syncError) {
+      console.warn('⚠️ Ingredient registry sync failed:', syncError)
+    }
     
     // Check if recipe with same title or slug already exists
     const { data: existingRecipe } = await supabase
@@ -97,14 +112,14 @@ export async function POST(request: NextRequest) {
       mainCategory: getMainCategory(category),
       subCategories: null,
       dietaryCategories: recipe.dietaryCategories,
-      ingredients: recipe.ingredients.map((ingredient, i) => ({
+      ingredients: ingredientsNormalized.map((ingredient, i) => ({
         id: `${crypto.randomUUID()}-${i + 1}`,
         name: ingredient.name,
         amount: ingredient.amount,
         unit: ingredient.unit,
-        notes: ingredient.notes || null
+        notes: ingredient.notes
       })),
-      instructions: recipe.instructions.map((instruction, i) => ({
+      instructions: instructionsNormalized.map((instruction, i) => ({
         id: `${crypto.randomUUID()}-${i + 1}`,
         stepNumber: instruction.stepNumber,
         instruction: instruction.instruction,
@@ -141,6 +156,20 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ AI-kladde saved as real draft: ${recipe.title} (ID: ${recipeData.id})`)
+
+    try {
+      const { recalculateRecipeNutritionFromFrida } = await import('@/lib/recipe-frida-nutrition-recalc')
+      const frida = await recalculateRecipeNutritionFromFrida(recipeData.id)
+      if (frida.success) {
+        console.log(
+          `🥗 Frida-ernæring sat: ${frida.matchedIngredients}/${frida.totalIngredients} ingredienser`
+        )
+      } else {
+        console.warn('⚠️ Frida-ernæring efter gem fejlede:', frida.error)
+      }
+    } catch (recalcErr) {
+      console.warn('⚠️ Frida-ernæring efter gem (exception):', recalcErr)
+    }
 
     // Auto-assign slot to the new recipe
     try {

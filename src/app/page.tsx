@@ -139,16 +139,16 @@ export default function Home() {
     { name: 'Proteinrig kost', icon: '💪', href: '/proteinrig-kost/opskrifter', short: 'Optimal næring' }
   ]
 
-  /** Diskret “blød” sektion før FAQ: otte vægttabsområder + link til funktioner */
+  /** Diskret sektion før FAQ: otte vægttabsområder + link til funktioner */
   const vaegttabOmrader = [
-    { label: 'Keto', href: '/keto/vaegttab' },
-    { label: 'Sense', href: '/sense/vaegttab' },
-    { label: 'GLP-1 kost', href: '/GLP-1/vaegttab' },
-    { label: 'Proteinrig kost', href: '/proteinrig-kost/vaegttab' },
-    { label: 'Anti-inflammatorisk', href: '/anti-inflammatory/vaegttab' },
-    { label: 'Fleksitarisk', href: '/flexitarian/vaegttab' },
-    { label: '5:2 diæt', href: '/5-2-diet/vaegttab' },
-    { label: 'Familiemad', href: '/familie/vaegttab' },
+    { label: 'Keto', href: '/keto/vaegttab', icon: '🥑' },
+    { label: 'Sense', href: '/sense/vaegttab', icon: '✋' },
+    { label: 'GLP-1 kost', href: '/GLP-1/vaegttab', icon: '🧠' },
+    { label: 'Proteinrig kost', href: '/proteinrig-kost/vaegttab', icon: '💪' },
+    { label: 'Anti-inflammatorisk', href: '/anti-inflammatory/vaegttab', icon: '🌿' },
+    { label: 'Fleksitarisk', href: '/flexitarian/vaegttab', icon: '🥬' },
+    { label: '5:2 diæt', href: '/5-2-diet/vaegttab', icon: '⏰' },
+    { label: 'Familiemad', href: '/familie/vaegttab', icon: '👨‍👩‍👧‍👦' },
   ]
 
   return (
@@ -930,28 +930,32 @@ export default function Home() {
       <section className="border-t border-gray-100 bg-gray-50/60 py-10 lg:py-12">
         <div className="container px-4">
           <div
-            className={`mx-auto max-w-2xl text-center transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+            className={`mx-auto max-w-3xl text-center transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
           >
             <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Ikke helt klar endnu?</p>
             <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-              Læs videre om vægttab inden for otte områder — eller udforsk, hvad siden kan.
+              Læs mere om vægttab i det område, der passer dig — eller udforsk resten af siden.
             </p>
-            <ul className="mx-auto mt-5 max-w-xs space-y-1.5 text-left text-sm sm:max-w-sm">
+            <div className="mt-6 flex flex-wrap justify-center gap-2 sm:gap-2.5">
               {vaegttabOmrader.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="text-gray-600 underline decoration-gray-300/80 underline-offset-2 transition hover:text-emerald-700 hover:decoration-emerald-400/80"
-                  >
-                    Vægttab — {item.label}
-                  </Link>
-                </li>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="inline-flex items-center gap-2 rounded-full border border-gray-200/90 bg-white px-3.5 py-2 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/[0.03] transition hover:border-emerald-200 hover:bg-emerald-50/60 hover:text-emerald-900 hover:shadow-md hover:ring-emerald-100"
+                >
+                  <span className="text-base leading-none select-none" aria-hidden>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </Link>
               ))}
-            </ul>
-            <p className="mt-6 text-sm text-gray-500 leading-relaxed">
-              Eller{' '}
-              <Link href="/funktioner" className="font-medium text-gray-700 underline decoration-gray-300 underline-offset-2 hover:text-emerald-700">
-                læs mere om Functional Foods&apos; funktioner
+            </div>
+            <p className="mt-8 text-sm text-gray-500 leading-relaxed">
+              <Link
+                href="/funktioner"
+                className="font-medium text-gray-700 underline decoration-gray-300/90 underline-offset-[3px] transition hover:text-emerald-700 hover:decoration-emerald-400/70"
+              >
+                Se også, hvad Functional Foods kan
               </Link>
               {' '}
               — madplaner, tilbud, opskrifter og værktøjer.

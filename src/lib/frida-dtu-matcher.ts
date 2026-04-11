@@ -36,7 +36,12 @@ export class FridaDTUMatcher {
   /**
    * Get manually confirmed match from ingredient_matches table
    */
-  private async getManualMatch(ingredientName: string): Promise<{ name: string, category: string, nutritionalInfo: NutritionalInfo | null } | null> {
+  private async getManualMatch(ingredientName: string): Promise<{
+    name: string
+    category: string
+    nutritionalInfo: NutritionalInfo | null
+    fridaRowId: string
+  } | null> {
     try {
       console.log(`🔍 Looking for manual match for: ${ingredientName}`)
       
@@ -69,7 +74,8 @@ export class FridaDTUMatcher {
       return {
         name: data.name,
         category: data.category,
-        nutritionalInfo
+        nutritionalInfo,
+        fridaRowId: String(data.id || ''),
       }
     } catch (error) {
       console.error(`❌ Error getting manual match for ${ingredientName}:`, error)
@@ -307,13 +313,20 @@ export class FridaDTUMatcher {
   /**
    * Match ingredient and get nutritional info
    */
-  public async matchIngredient(ingredientName: string): Promise<{ nutrition: NutritionalInfo | null, match: string | null, score: number }> {
+  public async matchIngredient(ingredientName: string): Promise<{
+    nutrition: NutritionalInfo | null
+    match: string | null
+    score: number
+    /** Primær nøgle i `frida_ingredients` — kan gemmes i `ingredient_matches` efter auto-match */
+    fridaIngredientId: string | null
+  }> {
     // Check cache first
     if (this.ingredientCache.has(ingredientName)) {
       return {
         nutrition: this.ingredientCache.get(ingredientName)!,
         match: ingredientName,
-        score: 1.0
+        score: 1.0,
+        fridaIngredientId: null,
       }
     }
 
@@ -327,30 +340,34 @@ export class FridaDTUMatcher {
         return {
           nutrition: manualMatch.nutritionalInfo,
           match: manualMatch.name,
-          score: 1.0 // Manual matches get perfect score
+          score: 1.0, // Manual matches get perfect score
+          fridaIngredientId: manualMatch.fridaRowId || null,
         }
       }
     }
 
     // If no manual match, fall back to automatic matching
     const bestMatch = await this.findBestMatch(ingredientName)
-    
+
     if (!bestMatch) {
       console.log(`❌ No match found for: ${ingredientName}`)
-      return { nutrition: null, match: null, score: 0 }
+      return { nutrition: null, match: null, score: 0, fridaIngredientId: null }
     }
 
     const nutrition = await this.getNutritionalInfo(bestMatch.foodId)
-    
+
     if (nutrition) {
       this.ingredientCache.set(ingredientName, nutrition)
       console.log(`✅ Matched "${ingredientName}" to "${bestMatch.name}" (score: ${bestMatch.score.toFixed(2)})`)
     }
 
+    const fridaIngredientId = `frida-${bestMatch.foodId}`
+
     return {
       nutrition,
       match: bestMatch.name,
-      score: bestMatch.score
+      score: bestMatch.score,
+      fridaIngredientId,
     }
   }
 

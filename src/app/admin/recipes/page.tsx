@@ -1,6 +1,5 @@
 'use client'
 
-import AdminLayout from '@/components/AdminLayout'
 import { useState, useEffect } from 'react'
 import { Recipe } from '@/types/recipe'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
@@ -221,20 +220,17 @@ export default function AdminRecipesPage() {
 
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Indlæser opskrifter...</p>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Indlæser opskrifter...</p>
         </div>
-      </AdminLayout>
+      </div>
     )
   }
 
   return (
-    <AdminLayout>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="px-4 py-6 sm:px-0">
@@ -522,7 +518,6 @@ export default function AdminRecipesPage() {
             </div>
           </div>
         </div>
-      </div>
-    </AdminLayout>
+    </div>
   )
 }

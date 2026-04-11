@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 
 interface ExistingRecipe {
   id: string
@@ -254,7 +255,7 @@ function parseGeneratedRecipe(content: string, category: string): any {
     
     // Ensure all required fields exist
     return {
-      title: recipe.title,
+      title: normalizeDanishRecipeTitle(recipe.title),
       description: recipe.description || '',
       ingredients: recipe.ingredients || [],
       instructions: recipe.instructions || [],

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Target, Leaf, Brain, Zap, Check, X, AlertCircle, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
+import WeightLossBlogSection from '@/components/WeightLossBlogSection'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -292,16 +293,20 @@ export default function WeightLossPage() {
         </div>
       </section>
 
-      {/* Find din madniche */}
-      <section id="find-din-madstil" className="py-20 bg-gray-50">
+      {/* Find din madniche – efter grundprincipper (mæthed/kalorier), før dyb læsning på bloggen */}
+      <section id="find-din-madstil" className="py-20 bg-gray-50 scroll-mt-20">
         <div className="container">
           <div className={`max-w-5xl mx-auto transition-all duration-1000 delay-800 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="text-center mb-12">
+              <p className="text-sm font-semibold uppercase tracking-wide text-green-700 mb-3">
+                Næste skridt
+              </p>
               <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900">
                 Find den madstil, der passer til dit liv
               </h2>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Alle kostretninger kan virke – men kun, hvis du kan leve med dem
+                Når du har styr på mæthed, kalorier og bæredygtighed, kan du vælge den retning, du vil udforske først.
+                Alle kostretninger kan virke – men kun, hvis du kan leve med dem.
               </p>
                     </div>
 
@@ -353,7 +358,7 @@ export default function WeightLossPage() {
                   name: "Proteinrig kost",
                   icon: "💪",
                   short: "Optimal næring",
-                  href: "/proteinrig-kost/opskrifter"
+                  href: "/proteinrig-kost"
                 }
               ].map((niche, idx) => (
                 <Link
@@ -370,6 +375,9 @@ export default function WeightLossPage() {
           </div>
         </div>
       </section>
+
+      {/* Blog – dyb læsning efter niche-valg, så siden ikke føles overfyldt i toppen */}
+      <WeightLossBlogSection />
 
       {/* FunctionalFoods positioning */}
       <section className="py-20 bg-gray-50">
@@ -524,7 +532,10 @@ export default function WeightLossPage() {
               </div>
 
               {/* Sense */}
-              <div className="bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/sense"
+                className="group block bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">🧠</div>
                   <div className="flex-1">
@@ -535,19 +546,19 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       Sense har sine egne spilleregler, du skal sætte dig ind i, for at kunne leve på Sense i en periode. Her er et godt community vigtigt (se vores reddit eller find Suzy's på Facebook). Er Sense noget for dig, så har vi en hel Sense sektion, du er velkommen til at bladre i.
                     </p>
-                    <Link
-                      href="/sense"
-                      className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:text-blue-700 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-blue-600 font-semibold group-hover:text-blue-700">
                       Er du interesseret i mere, så læs om Sense
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* GLP-1 Kost */}
-              <div className="bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/GLP-1"
+                className="group block bg-gradient-to-br from-blue-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">🧠</div>
                   <div className="flex-1">
@@ -558,19 +569,19 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       Den nye GLP-1 kost er designet til at efterligne og forstærke kroppens GLP-1 respons – helt uden medicin. Ved at spise protein, fibre og sunde fedtstoffer i hvert måltid, får du øget mæthed, lavere appetit og effektivt vægttab.
                     </p>
-                    <Link
-                      href="/GLP-1"
-                      className="inline-flex items-center gap-2 text-blue-600 font-semibold hover:text-blue-700 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-blue-600 font-semibold group-hover:text-blue-700">
                       Er du interesseret i mere, så læs om GLP-1 kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Anti-inflammatorisk */}
-              <div className="bg-gradient-to-br from-emerald-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/anti-inflammatory"
+                className="group block bg-gradient-to-br from-emerald-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-emerald-200 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">🌿</div>
                   <div className="flex-1">
@@ -581,19 +592,19 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       At leve anti-inflammatorisk er et opgør med nogle af nutidens mad-vaner, der er blevet formet af globale fødevaregiganter. En anti-inflammatorisk kost giver som regel vægttab som et afkast, fordi man undgår madvarer der påvirker kroppen negativt. Det giver mere overskud og langt mere velvære, som gør vægttab nemmere.
                     </p>
-                    <Link
-                      href="/anti-inflammatory"
-                      className="inline-flex items-center gap-2 text-emerald-600 font-semibold hover:text-emerald-700 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-emerald-600 font-semibold group-hover:text-emerald-700">
                       Er du interesseret i mere, så læs om anti-inflammatorisk kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Fleksitarisk */}
-              <div className="bg-gradient-to-br from-green-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/flexitarian"
+                className="group block bg-gradient-to-br from-green-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-green-200 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">🥬</div>
                   <div className="flex-1">
@@ -604,19 +615,19 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       Fleksitarisk mad kan derfor både være med kød og uden kød. Vi har opskrifter med begge, men da vi (hos functionalfoods) ser kød som en naturligvis del af en sund kost, har vi fokus på periodisk kød i kosten. Der er plads til alle holdninger hos os, og med vores fleksitariske opskrifter har du mulighed for at leve sundt, billigt og grønt.
                     </p>
-                    <Link
-                      href="/flexitarian"
-                      className="inline-flex items-center gap-2 text-green-600 font-semibold hover:text-green-700 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-green-600 font-semibold group-hover:text-green-700">
                       Er du interesseret i mere, så læs om fleksitarisk kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* 5:2 Diæt */}
-              <div className="bg-gradient-to-br from-purple-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/5-2-diet"
+                className="group block bg-gradient-to-br from-purple-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-purple-200 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">⏰</div>
                   <div className="flex-1">
@@ -627,19 +638,19 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       5:2 som koncept er en kur, men er også en metode til bedre vægttab og fasteperioder der styrker sundhed og vægttab generelt. Vi er stor fan af 5:2 som redskab, og for mange, er det også en konkret og simpel måde at smide et par overflødige kilo. Vores madbudget funktion tilbyder madplaner (med indkøbsliste) der er målrettet 5:2.
                     </p>
-                    <Link
-                      href="/5-2-diet"
-                      className="inline-flex items-center gap-2 text-purple-600 font-semibold hover:text-purple-700 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-purple-600 font-semibold group-hover:text-purple-700">
                       Er du interesseret i mere, så læs om 5:2 Diæt
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
 
               {/* Proteinrig kost */}
-              <div className="bg-gradient-to-br from-gray-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl transition-shadow">
+              <Link
+                href="/proteinrig-kost"
+                className="group block bg-gradient-to-br from-gray-50/50 to-white rounded-2xl p-8 md:p-10 border-2 border-gray-100 hover:shadow-xl hover:border-gray-300 transition-all"
+              >
                 <div className="flex items-start gap-4 mb-6">
                   <div className="text-5xl flex-shrink-0">💪</div>
                   <div className="flex-1">
@@ -650,16 +661,13 @@ export default function WeightLossPage() {
                     <p className="text-gray-700 leading-relaxed mb-6">
                       Gennem vores proteinrige opskrifter får du balancerede måltider med højt proteinindhold, der understøtter både vægttab og muskelopbygning. Perfekt til alle der vil optimere deres næring.
                     </p>
-                    <Link
-                      href="/proteinrig-kost/opskrifter"
-                      className="inline-flex items-center gap-2 text-gray-700 font-semibold hover:text-gray-900 transition-colors group"
-                    >
+                    <span className="inline-flex items-center gap-2 text-gray-700 font-semibold group-hover:text-gray-900">
                       Er du interesseret i mere, så læs om Proteinrig kost
                       <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </span>
                   </div>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
         </div>

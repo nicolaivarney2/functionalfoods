@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   ArrowLeft, 
@@ -9,7 +9,8 @@ import {
   MoveUp, 
   MoveDown,
   CheckCircle,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
@@ -63,6 +64,82 @@ interface BlogPost {
   sections: ContentSection[]
 }
 
+interface TopicSuggestion {
+  title: string
+  primaryKeyword: string
+  searchIntent: string
+  whyNow: string
+  gapReason: string
+  suggestedAngle: string
+  suggestedExcerpt: string
+  suggestedMetaTitle: string
+  suggestedMetaDescription: string
+  suggestedTags: string[]
+  suggestedOutline: string[]
+  priority: 'high' | 'medium' | 'low'
+}
+
+interface BlogSeoBrief {
+  recommendedTitle: string
+  recommendedSlug: string
+  searchIntent: string
+  primaryKeyword: string
+  secondaryKeywords: string[]
+  readerPromise: string
+  angle: string
+  metaTitle: string
+  metaDescription: string
+  recommendedTags: string[]
+  sectionPlan: string[]
+  internalLinks: Array<{ title: string; slug: string; reason: string }>
+  notes: string[]
+}
+
+/**
+ * Udleder redigerbar tekst fra .section-content HTML. `element.textContent` klistrer
+ * sammen uden mellemrum mellem </p><p> → "...ord.Næste" — derfor går vi blok for blok.
+ */
+function sectionHtmlToPlainText(contentEl: Element | null): string {
+  if (!contentEl) return ''
+  const chunks: string[] = []
+  const pushLine = (s: string) => {
+    const t = s.replace(/\s+/g, ' ').trim()
+    if (t) chunks.push(t)
+  }
+
+  for (const child of Array.from(contentEl.children)) {
+    const tag = child.tagName.toLowerCase()
+    if (tag === 'img' || child.classList.contains('takeaway-box')) continue
+    if (tag === 'p') {
+      pushLine(child.textContent || '')
+    } else if (tag === 'ul' || tag === 'ol') {
+      child.querySelectorAll(':scope > li').forEach((li) => {
+        pushLine(`- ${li.textContent || ''}`)
+      })
+    } else if (/^h[1-6]$/.test(tag)) {
+      const level = Math.min(6, parseInt(tag[1], 10))
+      const inner = (child.textContent || '').replace(/\s+/g, ' ').trim()
+      if (inner) chunks.push(`${'#'.repeat(level)} ${inner}`)
+    } else {
+      pushLine(child.textContent || '')
+    }
+  }
+
+  if (chunks.length > 0) return chunks.join('\n\n')
+  const clone = contentEl.cloneNode(true) as HTMLElement
+  clone.querySelectorAll('img, .takeaway-box').forEach((n) => n.remove())
+  return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+/** Fuld HTML-streng → plain (fx fallback uden .blog-section) */
+function htmlBlobToPlainText(html: string): string {
+  const div = document.createElement('div')
+  div.innerHTML = html
+  const fromBlocks = sectionHtmlToPlainText(div)
+  if (fromBlocks.length > 0) return fromBlocks
+  return (div.innerText || div.textContent || '').replace(/\r\n/g, '\n').trim()
+}
+
 export default function EnhancedBlogEditor() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -73,9 +150,21 @@ export default function EnhancedBlogEditor() {
   const [generatingContent, setGeneratingContent] = useState<number | null>(null)
   const [generatingResume, setGeneratingResume] = useState(false)
   const [generatingSeo, setGeneratingSeo] = useState(false)
+  const [suggestingTopics, setSuggestingTopics] = useState(false)
+  const [generatingBrief, setGeneratingBrief] = useState<number | null>(null)
+  const [generatingStructuredPost, setGeneratingStructuredPost] = useState<number | null>(null)
+  const [regeneratingSection, setRegeneratingSection] = useState<number | null>(null)
   const [generatingTakeaway, setGeneratingTakeaway] = useState<number | null>(null)
+  const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>([])
+  const [topicSuggestionError, setTopicSuggestionError] = useState<string>('')
+  const [selectedTopicBrief, setSelectedTopicBrief] = useState<BlogSeoBrief | null>(null)
+  const [selectedTopicBriefTitle, setSelectedTopicBriefTitle] = useState<string>('')
   const [tagInput, setTagInput] = useState('')
-  
+  /** 'header' | sektionens index | null */
+  const [uploadingBlogImage, setUploadingBlogImage] = useState<'header' | number | null>(null)
+  const pendingBlogImageRef = useRef<{ kind: 'header' } | { kind: 'section'; index: number } | null>(null)
+  const blogImageFileInputRef = useRef<HTMLInputElement>(null)
+
   const [blogPost, setBlogPost] = useState<BlogPost>({
     title: '',
     slug: '',
@@ -101,15 +190,40 @@ export default function EnhancedBlogEditor() {
   })
 
   const supabase = createSupabaseClient()
-  // Normalize raw plain text from legacy posts into editor-friendly paragraphs
+
+  // Ved indlæsning: linjeskift + typisk tabt mellemrum efter . ! ? før stort bogstav (HTML/copy-paste)
   const normalizeForEditor = (text: string): string => {
     if (!text) return ''
     let t = text.replace(/\r\n/g, '\n').trim()
-    // Insert double newlines after sentence end followed by uppercase letter (including Danish letters)
-    t = t.replace(/([\.\!\?])\s+([A-ZÆØÅ])/g, '$1\n\n$2')
-    // Insert breaks after certain emojis then uppercase (avoid Unicode 'u' flag for TS target)
-    t = t.replace(/(🥓|🍔|🥗)\s*([A-ZÆØÅ])/g, '$1\n\n$2')
+    // Ikke punktum i ... (tre punktummer): (?<!\.) sikrer at vi ikke splitter ellipsis
+    t = t.replace(/(?<!\.)[\.\!\?]([A-ZÆØÅ])/g, (match, letter: string) => `${match[0]} ${letter}`)
     return t
+  }
+
+  const sectionTextareaRefs = useRef<(HTMLTextAreaElement | null)[]>([])
+
+  const insertMarkdownAroundSelection = (
+    sectionIndex: number,
+    before: string,
+    after: string,
+    setContent: (value: string) => void,
+    currentValue: string
+  ) => {
+    const textarea = sectionTextareaRefs.current[sectionIndex]
+    const start = textarea?.selectionStart ?? currentValue.length
+    const end = textarea?.selectionEnd ?? currentValue.length
+    const value = currentValue
+    const selected = value.slice(start, end)
+    const newValue = value.slice(0, start) + before + selected + after + value.slice(end)
+    setContent(newValue)
+    const selStart = start + before.length
+    const selEnd = selStart + selected.length
+    setTimeout(() => {
+      const el = sectionTextareaRefs.current[sectionIndex]
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(selStart, selEnd)
+    }, 0)
   }
 
   useEffect(() => {
@@ -163,7 +277,9 @@ export default function EnhancedBlogEditor() {
             defaultSections = sections.map(section => ({
               ...section,
               content: normalizeForEditor(section.content || ''),
-              section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion'
+              section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion',
+              // Eksplicit så billed-URL ikke tabes (spread alene kan være fint, men vi sikrer feltet)
+              image_url: section.image_url ?? '',
             }))
           } else if (data.content) {
             // Parse existing content by looking for .blog-section divs
@@ -176,6 +292,11 @@ export default function EnhancedBlogEditor() {
                 const heading = section.querySelector('.section-heading')
                 const content = section.querySelector('.section-content')
                 const sectionClass = section.className
+                const imgEl = section.querySelector('img.section-image') as HTMLImageElement | null
+                const imageUrlFromHtml = imgEl?.getAttribute('src')?.trim() || ''
+                const widgetEl = section.querySelector('.blog-widget[data-widget-id]')
+                const widgetIdAttr = widgetEl?.getAttribute('data-widget-id')
+                const widgetIdParsed = widgetIdAttr ? parseInt(widgetIdAttr, 10) : NaN
                 
                 let sectionType: 'introduction' | 'content' | 'widget' | 'conclusion' = 'content'
                 if (sectionClass.includes('introduction-section')) {
@@ -184,18 +305,32 @@ export default function EnhancedBlogEditor() {
                   sectionType = 'conclusion'
                 } else if (sectionClass.includes('resume-section')) {
                   sectionType = 'content' // Resume is treated as content
+                } else if (sectionClass.includes('widget-section')) {
+                  sectionType = 'widget'
                 }
                 
+                const rawFromHtml = content
+                  ? (() => {
+                      const structured = sectionHtmlToPlainText(content)
+                      const fallback = (content.textContent || '').trim()
+                      return structured.length > 0 ? structured : fallback
+                    })()
+                  : (section.textContent || '').trim()
+
                 return {
                   section_type: sectionType,
                   section_order: index + 1,
-                  content: normalizeForEditor(content ? content.textContent || '' : section.textContent || ''),
-                  title: heading ? heading.textContent || undefined : undefined
+                  content: normalizeForEditor(rawFromHtml),
+                  title: heading ? heading.textContent || undefined : undefined,
+                  image_url: imageUrlFromHtml,
+                  ...(sectionType === 'widget' && !Number.isNaN(widgetIdParsed)
+                    ? { widget_id: widgetIdParsed }
+                    : {}),
                 }
               })
             } else {
-              // Fallback: create introduction section with all content
-              const contentText = data.content.replace(/<[^>]*>/g, '').trim()
+              // Fallback: hele body som HTML — strip ikke med regex (ødelægger mellemrum mellem tags)
+              const contentText = htmlBlobToPlainText(data.content)
               defaultSections = [{
                 section_type: 'introduction' as const,
                 section_order: 1,
@@ -220,6 +355,7 @@ export default function EnhancedBlogEditor() {
             meta_title: data.meta_title || '',
             meta_description: data.meta_description || '',
             tags: data.tags || [],
+            header_image_url: data.header_image_url || '',
             sections: defaultSections
           })
         }
@@ -289,6 +425,45 @@ export default function EnhancedBlogEditor() {
       .trim()
   }
 
+  const getCurrentCategory = () => categories.find(c => c.id === blogPost.category_id)
+
+  const scaffoldSectionsFromSuggestion = (suggestion: TopicSuggestion): ContentSection[] => {
+    const outline = Array.isArray(suggestion.suggestedOutline)
+      ? suggestion.suggestedOutline.filter(Boolean).slice(0, 6)
+      : []
+
+    const introContent = suggestion.suggestedAngle
+      ? `Vinkel: ${suggestion.suggestedAngle}\n\n${suggestion.whyNow || ''}`.trim()
+      : suggestion.whyNow || ''
+
+    const sections: ContentSection[] = [
+      {
+        section_type: 'introduction',
+        section_order: 1,
+        content: introContent,
+      }
+    ]
+
+    outline.forEach((heading, index) => {
+      sections.push({
+        section_type: 'content',
+        section_order: index + 2,
+        title: heading,
+        heading,
+        content: '',
+      })
+    })
+
+    sections.push({
+      section_type: 'conclusion',
+      section_order: sections.length + 1,
+      content: '',
+      takeaway: suggestion.primaryKeyword,
+    })
+
+    return sections
+  }
+
   const generateBreadcrumb = (categoryId: number, postType: string) => {
     const category = categories.find(c => c.id === categoryId)
     if (!category) return ['Keto', 'Blogs']
@@ -315,6 +490,10 @@ export default function EnhancedBlogEditor() {
       category_id: categoryId,
       breadcrumb_path: generateBreadcrumb(categoryId, prev.post_type)
     }))
+    setTopicSuggestions([])
+    setTopicSuggestionError('')
+    setSelectedTopicBrief(null)
+    setSelectedTopicBriefTitle('')
   }
 
   const handlePostTypeChange = (postType: 'core' | 'blog') => {
@@ -374,15 +553,12 @@ export default function EnhancedBlogEditor() {
   }
 
   const updateSection = (index: number, updates: Partial<ContentSection>) => {
-    // If content is being updated, normalize it so single-line pastes render well
-    const normalizedUpdates = {
-      ...updates,
-      ...(typeof updates.content === 'string' ? { content: normalizeForEditor(updates.content) } : {})
-    }
+    // Ingen transformation af content her – trim eller linjeskift-normalisering ved hvert tastetryk kan forvirre markøren.
+    // normalizeForEditor() bruges kun ved indlæsning fra DB.
     setBlogPost(prev => ({
       ...prev,
-      sections: prev.sections.map((section, i) => 
-        i === index ? { ...section, ...normalizedUpdates } : section
+      sections: prev.sections.map((section, i) =>
+        i === index ? { ...section, ...updates } : section
       )
     }))
   }
@@ -402,6 +578,48 @@ export default function EnhancedBlogEditor() {
       ...prev,
       tags: (prev.tags || []).filter(t => t !== value)
     }))
+  }
+
+  const openHeaderImagePicker = () => {
+    pendingBlogImageRef.current = { kind: 'header' }
+    blogImageFileInputRef.current?.click()
+  }
+
+  const openSectionImagePicker = (sectionIndex: number) => {
+    pendingBlogImageRef.current = { kind: 'section', index: sectionIndex }
+    blogImageFileInputRef.current?.click()
+  }
+
+  const handleBlogImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const pending = pendingBlogImageRef.current
+    e.target.value = ''
+    if (!file || !pending) return
+
+    const loadingKey = pending.kind === 'header' ? 'header' : pending.index
+    setUploadingBlogImage(loadingKey)
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('purpose', pending.kind === 'header' ? 'header' : 'section')
+      const resp = await fetch('/api/admin/upload-blog-section-image', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Upload fejlede')
+      const url = data.imageUrl as string
+      if (pending.kind === 'header') {
+        setBlogPost(prev => ({ ...prev, header_image_url: url }))
+      } else {
+        updateSection(pending.index, { image_url: url })
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Upload fejlede')
+    } finally {
+      setUploadingBlogImage(null)
+      pendingBlogImageRef.current = null
+    }
   }
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -434,6 +652,206 @@ export default function EnhancedBlogEditor() {
       alert('Kunne ikke generere SEO beskrivelse')
     } finally {
       setGeneratingSeo(false)
+    }
+  }
+
+  const suggestBlogTopics = async () => {
+    const category = getCurrentCategory()
+    if (!category) return
+
+    try {
+      setSuggestingTopics(true)
+      setTopicSuggestionError('')
+
+      const resp = await fetch('/api/admin/blogs/suggest-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: blogPost.category_id,
+          postType: blogPost.post_type,
+          limit: 8,
+        })
+      })
+
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Kunne ikke foreslå emner')
+      }
+
+      setTopicSuggestions(Array.isArray(data.suggestions) ? data.suggestions : [])
+      setSelectedTopicBrief(null)
+      setSelectedTopicBriefTitle('')
+    } catch (e) {
+      setTopicSuggestionError(e instanceof Error ? e.message : 'Kunne ikke hente emneforslag')
+    } finally {
+      setSuggestingTopics(false)
+    }
+  }
+
+  const applyTopicSuggestion = (suggestion: TopicSuggestion) => {
+    const hasMeaningfulContent =
+      Boolean(blogPost.title.trim()) ||
+      blogPost.sections.some(section => (section.content || '').trim().length > 0 || (section.title || '').trim().length > 0)
+
+    if (hasMeaningfulContent) {
+      const confirmed = window.confirm('Dette vil overskrive titel, excerpt, SEO-felter, tags og sektionstruktur. Fortsæt?')
+      if (!confirmed) return
+    }
+
+    setBlogPost(prev => ({
+      ...prev,
+      title: suggestion.title,
+      slug: generateSlug(suggestion.title),
+      excerpt: suggestion.suggestedExcerpt || prev.excerpt,
+      meta_title: suggestion.suggestedMetaTitle || suggestion.title,
+      meta_description: suggestion.suggestedMetaDescription || prev.meta_description,
+      tags: Array.isArray(suggestion.suggestedTags) ? suggestion.suggestedTags : prev.tags,
+      sections: scaffoldSectionsFromSuggestion(suggestion),
+    }))
+  }
+
+  const generateBlogFromSuggestion = async (suggestion: TopicSuggestion, suggestionIndex: number) => {
+    const hasMeaningfulContent =
+      Boolean(blogPost.title.trim()) ||
+      blogPost.sections.some(
+        (section) =>
+          (section.content || '').trim().length > 0 || (section.title || '').trim().length > 0
+      )
+
+    if (hasMeaningfulContent) {
+      const confirmed = window.confirm(
+        'Dette vil overskrive nuværende titel, SEO-felter, tags og sektioner med en AI-genereret blog. Fortsæt?'
+      )
+      if (!confirmed) return
+    }
+
+    try {
+      setGeneratingStructuredPost(suggestionIndex)
+      const resp = await fetch('/api/admin/blogs/generate-structured-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: blogPost.category_id,
+          postType: blogPost.post_type,
+          suggestion,
+          brief: selectedTopicBriefTitle === suggestion.title ? selectedTopicBrief : null,
+        }),
+      })
+
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Kunne ikke generere blog')
+      }
+
+      const post = data.post || {}
+      const matchingBrief = selectedTopicBriefTitle === suggestion.title ? selectedTopicBrief : null
+      setBlogPost((prev) => ({
+        ...prev,
+        title: post.title || suggestion.title,
+        slug: matchingBrief?.recommendedSlug || generateSlug(post.title || suggestion.title),
+        excerpt: post.excerpt || suggestion.suggestedExcerpt || '',
+        meta_title: post.metaTitle || suggestion.suggestedMetaTitle || suggestion.title,
+        meta_description:
+          post.metaDescription || suggestion.suggestedMetaDescription || '',
+        tags: Array.isArray(post.tags) ? post.tags : suggestion.suggestedTags || [],
+        sections:
+          Array.isArray(post.sections) && post.sections.length > 0
+            ? post.sections
+            : scaffoldSectionsFromSuggestion(suggestion),
+      }))
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Kunne ikke generere blog')
+    } finally {
+      setGeneratingStructuredPost(null)
+    }
+  }
+
+  const generateBriefFromSuggestion = async (suggestion: TopicSuggestion, suggestionIndex: number) => {
+    try {
+      setGeneratingBrief(suggestionIndex)
+      const resp = await fetch('/api/admin/blogs/generate-brief', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: blogPost.category_id,
+          postType: blogPost.post_type,
+          suggestion,
+        }),
+      })
+
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Kunne ikke generere brief')
+      }
+
+      setSelectedTopicBrief(data.brief || null)
+      setSelectedTopicBriefTitle(suggestion.title)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Kunne ikke generere brief')
+    } finally {
+      setGeneratingBrief(null)
+    }
+  }
+
+  const regenerateSectionFromBrief = async (sectionIndex: number) => {
+    if (!selectedTopicBrief) {
+      alert('Lav et brief først, før du regenererer en sektion.')
+      return
+    }
+
+    if (!blogPost.title || !blogPost.category_id) {
+      alert('Titel og kategori skal være udfyldt først')
+      return
+    }
+
+    try {
+      setRegeneratingSection(sectionIndex)
+
+      const resp = await fetch('/api/admin/blogs/regenerate-section', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryId: blogPost.category_id,
+          postType: blogPost.post_type,
+          blogTitle: blogPost.title,
+          suggestion: topicSuggestions.find((item) => item.title === selectedTopicBriefTitle) || null,
+          brief: selectedTopicBrief,
+          targetSection: {
+            section_type: blogPost.sections[sectionIndex].section_type,
+            title: blogPost.sections[sectionIndex].title,
+            content: blogPost.sections[sectionIndex].content,
+            takeaway: blogPost.sections[sectionIndex].takeaway,
+            section_order: blogPost.sections[sectionIndex].section_order,
+          },
+          allSections: blogPost.sections
+            .filter((section) => section.section_type !== 'widget')
+            .map((section) => ({
+              section_type: section.section_type,
+              title: section.title,
+              content: section.content,
+              takeaway: section.takeaway,
+              section_order: section.section_order,
+            })),
+        }),
+      })
+
+      const data = await resp.json()
+      if (!resp.ok || !data.success || !data.section) {
+        throw new Error(data.error || 'Kunne ikke regenerere sektionen')
+      }
+
+      updateSection(sectionIndex, {
+        title:
+          blogPost.sections[sectionIndex].section_type === 'content'
+            ? data.section.title || blogPost.sections[sectionIndex].title
+            : blogPost.sections[sectionIndex].title,
+        content: data.section.content || '',
+        takeaway: data.section.takeaway || '',
+      })
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Kunne ikke regenerere sektionen')
+    } finally {
+      setRegeneratingSection(null)
     }
   }
 
@@ -473,16 +891,63 @@ export default function EnhancedBlogEditor() {
     }))
   }
 
+  const renderFormattingToolbar = (sectionIndex: number, content: string, extras?: ReactNode) => (
+    <div className="flex flex-wrap items-center gap-2 mb-2">
+      <span className="text-xs text-gray-500 shrink-0">Formatering:</span>
+      <button
+        type="button"
+        title="Fed (**tekst**)"
+        onClick={() =>
+          insertMarkdownAroundSelection(sectionIndex, '**', '**', (v) => updateSection(sectionIndex, { content: v }), content)
+        }
+        className="px-2.5 py-1 text-xs font-bold bg-gray-100 text-gray-900 rounded border border-gray-200 hover:bg-gray-200"
+      >
+        Fed
+      </button>
+      <button
+        type="button"
+        title="Kursiv (*tekst*)"
+        onClick={() =>
+          insertMarkdownAroundSelection(sectionIndex, '*', '*', (v) => updateSection(sectionIndex, { content: v }), content)
+        }
+        className="px-2.5 py-1 text-xs italic bg-gray-100 text-gray-900 rounded border border-gray-200 hover:bg-gray-200"
+      >
+        Kursiv
+      </button>
+      {extras ? (
+        <>
+          <span className="text-gray-300 select-none" aria-hidden>
+            |
+          </span>
+          {extras}
+        </>
+      ) : null}
+    </div>
+  )
+
+  const escapeHtml = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+
+  /** **fed** og *kursiv* (markdown-lignende); kører efter escape */
+  const parseInlineMarkdown = (line: string) => {
+    let t = escapeHtml(line)
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    t = t.replace(
+      /\[([^\]]+)\]\((\/[^)\s]+)\)/g,
+      '<a href="$2" class="text-blue-700 underline hover:text-blue-900">$1</a>'
+    )
+    return t
+  }
+
   const formatContent = (text: string) => {
     if (!text) return ''
 
-    // Normalize and heuristically insert paragraph breaks at sentence boundaries
-    let normalized = text.replace(/\r\n/g, '\n')
-    // Add paragraph breaks after period + space before uppercase (Danish included)
-    normalized = normalized.replace(/\.\s+([A-ZÆØÅ])/g, '.\n\n$1')
-    // Add breaks after common emoji separators before uppercase
-    normalized = normalized.replace(/([🥓🍔🥗])\s*([A-ZÆØÅ])/g, '$1\n\n$2')
-
+    const normalized = text.replace(/\r\n/g, '\n')
     const lines = normalized.split('\n')
     const htmlParts: string[] = []
     let inList = false
@@ -491,7 +956,7 @@ export default function EnhancedBlogEditor() {
 
     const flushParagraph = () => {
       if (paragraphLines.length > 0) {
-        const content = paragraphLines.join('<br/>')
+        const content = paragraphLines.map((ln) => parseInlineMarkdown(ln)).join('<br/>')
         htmlParts.push(`<p>${content}</p>`)
         paragraphLines = []
       }
@@ -521,7 +986,7 @@ export default function EnhancedBlogEditor() {
         flushList()
         flushParagraph()
         const level = Math.min(headingMatch[1].length, 6)
-        const textContent = headingMatch[2].trim()
+        const textContent = parseInlineMarkdown(headingMatch[2].trim())
         htmlParts.push(`<h${level}>${textContent}</h${level}>`)
         continue
       }
@@ -531,7 +996,7 @@ export default function EnhancedBlogEditor() {
       if (bulletMatch) {
         flushParagraph()
         inList = true
-        listItems.push(bulletMatch[1].trim())
+        listItems.push(parseInlineMarkdown(bulletMatch[1].trim()))
         continue
       }
 
@@ -822,7 +1287,7 @@ export default function EnhancedBlogEditor() {
         .eq('blog_post_id', blogPostId)
 
       // Insert new sections
-      const sectionsToInsert = blogPost.sections.map(section => ({
+      const sectionsToInsert = blogPost.sections.map(({ id: _omitId, ...section }) => ({
         blog_post_id: blogPostId,
         ...section
       }))
@@ -839,6 +1304,14 @@ export default function EnhancedBlogEditor() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <input
+        ref={blogImageFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        aria-hidden
+        onChange={handleBlogImageFileChange}
+      />
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -964,21 +1437,43 @@ export default function EnhancedBlogEditor() {
               {/* Header Image */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Header Billede URL
+                  Header-billede
                 </label>
-                <input
-                  type="url"
-                  value={blogPost.header_image_url || ''}
-                  onChange={(e) => setBlogPost(prev => ({
-                    ...prev,
-                    header_image_url: e.target.value
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com/image.jpg"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Billede der vises i blog header (valgfrit)
+                <p className="text-xs text-gray-500 mb-2">
+                  Upload eller indsæt URL. Vises øverst på artiklen (valgfrit).
                 </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="url"
+                    value={blogPost.header_image_url || ''}
+                    onChange={(e) =>
+                      setBlogPost(prev => ({
+                        ...prev,
+                        header_image_url: e.target.value,
+                      }))
+                    }
+                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://… (valgfrit hvis du uploader)"
+                  />
+                  <button
+                    type="button"
+                    onClick={openHeaderImagePicker}
+                    disabled={uploadingBlogImage === 'header'}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 shrink-0"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {uploadingBlogImage === 'header' ? 'Uploader…' : 'Upload billede'}
+                  </button>
+                </div>
+                {blogPost.header_image_url ? (
+                  <div className="mt-3">
+                    <img
+                      src={blogPost.header_image_url}
+                      alt=""
+                      className="max-h-40 w-full max-w-xl rounded-md border border-gray-200 object-cover bg-gray-50"
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1024,15 +1519,35 @@ export default function EnhancedBlogEditor() {
                 {/* Section Content */}
                 {section.section_type === 'introduction' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Indledningstekst
-                    </label>
+                    <div className="flex items-center justify-between mb-2 gap-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Indledningstekst
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => regenerateSectionFromBrief(index)}
+                        disabled={!selectedTopicBrief || regeneratingSection === index}
+                        className="inline-flex items-center px-3 py-1 bg-violet-600 text-white text-sm rounded-md hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        {!selectedTopicBrief
+                          ? 'Lav brief først'
+                          : regeneratingSection === index
+                            ? 'Regenererer...'
+                            : '🤖 Regenerér fra brief'}
+                      </button>
+                    </div>
+                    {renderFormattingToolbar(index, section.content)}
                     <textarea
+                      ref={(el) => {
+                        sectionTextareaRefs.current[index] = el
+                      }}
                       value={section.content}
                       onChange={(e) => updateSection(index, { content: e.target.value })}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Skriv en indledning til artiklen..."
+                      rows={10}
+                      spellCheck
+                      className="w-full min-h-[200px] px-3 py-2.5 border border-gray-300 rounded-md leading-normal focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
+                      placeholder="Skriv en indledning… Brug **fed** og *kursiv*. Tom linje = nyt afsnit."
                     />
                     
                     {/* Auto-generated Table of Contents */}
@@ -1081,14 +1596,29 @@ export default function EnhancedBlogEditor() {
                         <label className="block text-sm font-medium text-gray-700">
                           Overskrift
                         </label>
-                        <button
-                          onClick={() => generateContentWithAI(index)}
-                          disabled={generatingContent === index}
-                          className="inline-flex items-center px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Sparkles className="w-4 h-4 mr-1" />
-                          {generatingContent === index ? 'Genererer...' : '🤖 AI Generer'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => regenerateSectionFromBrief(index)}
+                            disabled={!selectedTopicBrief || regeneratingSection === index}
+                            className="inline-flex items-center px-3 py-1 bg-violet-600 text-white text-sm rounded-md hover:bg-violet-700 disabled:opacity-50"
+                          >
+                            <Sparkles className="w-4 h-4 mr-1" />
+                            {!selectedTopicBrief
+                              ? 'Lav brief først'
+                              : regeneratingSection === index
+                                ? 'Regenererer...'
+                                : '🤖 Fra brief'}
+                          </button>
+                          <button
+                            onClick={() => generateContentWithAI(index)}
+                            disabled={generatingContent === index}
+                            className="inline-flex items-center px-3 py-1 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Sparkles className="w-4 h-4 mr-1" />
+                            {generatingContent === index ? 'Genererer...' : '🤖 AI Generer'}
+                          </button>
+                        </div>
                       </div>
                       <input
                         type="text"
@@ -1100,37 +1630,46 @@ export default function EnhancedBlogEditor() {
                     </div>
                     
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Indhold
-                        </label>
-                        <div className="flex gap-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Indhold
+                      </label>
+                      {renderFormattingToolbar(
+                        index,
+                        section.content,
+                        <>
                           <button
+                            type="button"
                             onClick={() => insertHeading(index, 1)}
                             className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             H1
                           </button>
                           <button
+                            type="button"
                             onClick={() => insertHeading(index, 2)}
                             className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             H2
                           </button>
                           <button
+                            type="button"
                             onClick={() => insertHeading(index, 3)}
                             className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
                           >
                             H3
                           </button>
-                        </div>
-                      </div>
+                        </>
+                      )}
                       <textarea
+                        ref={(el) => {
+                          sectionTextareaRefs.current[index] = el
+                        }}
                         value={section.content}
                         onChange={(e) => updateSection(index, { content: e.target.value })}
-                        rows={6}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Skriv indholdet her... Brug # for overskrifter, • for lister"
+                        rows={8}
+                        spellCheck
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
+                        placeholder="Skriv indhold… Tom linje = nyt afsnit. # Overskrift, • punkt. **fed**, *kursiv*."
                       />
                     </div>
                     
@@ -1154,15 +1693,38 @@ export default function EnhancedBlogEditor() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Billede URL
+                        Billede
                       </label>
-                      <input
-                        type="url"
-                        value={section.image_url || ''}
-                        onChange={(e) => updateSection(index, { image_url: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="https://example.com/image.jpg"
-                      />
+                      <p className="text-xs text-gray-500 mb-2">
+                        Upload fra computer eller indsæt et direkte link til et billede.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="url"
+                          value={section.image_url || ''}
+                          onChange={(e) => updateSection(index, { image_url: e.target.value })}
+                          className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="https://… (valgfrit hvis du uploader)"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => openSectionImagePicker(index)}
+                          disabled={uploadingBlogImage === index}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 shrink-0"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {uploadingBlogImage === index ? 'Uploader…' : 'Upload billede'}
+                        </button>
+                      </div>
+                      {section.image_url ? (
+                        <div className="mt-3">
+                          <img
+                            src={section.image_url}
+                            alt=""
+                            className="max-h-48 max-w-full rounded-md border border-gray-200 object-contain bg-gray-50"
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -1189,15 +1751,35 @@ export default function EnhancedBlogEditor() {
 
                 {section.section_type === 'conclusion' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Afslutningstekst
-                    </label>
+                    <div className="flex items-center justify-between mb-2 gap-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Afslutningstekst
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => regenerateSectionFromBrief(index)}
+                        disabled={!selectedTopicBrief || regeneratingSection === index}
+                        className="inline-flex items-center px-3 py-1 bg-violet-600 text-white text-sm rounded-md hover:bg-violet-700 disabled:opacity-50"
+                      >
+                        <Sparkles className="w-4 h-4 mr-1" />
+                        {!selectedTopicBrief
+                          ? 'Lav brief først'
+                          : regeneratingSection === index
+                            ? 'Regenererer...'
+                            : '🤖 Regenerér fra brief'}
+                      </button>
+                    </div>
+                    {renderFormattingToolbar(index, section.content)}
                     <textarea
+                      ref={(el) => {
+                        sectionTextareaRefs.current[index] = el
+                      }}
                       value={section.content}
                       onChange={(e) => updateSection(index, { content: e.target.value })}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Skriv en afslutning til artiklen..."
+                      rows={6}
+                      spellCheck
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
+                      placeholder="Afslutning… **fed**, *kursiv*. Tom linje = nyt afsnit."
                     />
 
                     {/* One Takeaway */}
@@ -1342,6 +1924,222 @@ export default function EnhancedBlogEditor() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* SEO Topic Suggestions */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">SEO Emneforslag</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    AI finder content gaps ud fra eksisterende blogtitler i kategorien.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={suggestBlogTopics}
+                  disabled={suggestingTopics}
+                  className="inline-flex items-center px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+                >
+                  {suggestingTopics ? 'Finder…' : '✨ Foreslå emner'}
+                </button>
+              </div>
+
+              <div className="text-xs text-gray-500 mb-4">
+                Kategori: <span className="font-medium text-gray-700">{getCurrentCategory()?.name || 'Ikke valgt'}</span>
+                {' '}• Post type: <span className="font-medium text-gray-700">{blogPost.post_type === 'core' ? 'Kerneartikel' : 'Blog'}</span>
+              </div>
+
+              {topicSuggestionError && (
+                <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {topicSuggestionError}
+                </div>
+              )}
+
+              {selectedTopicBrief && (
+                <div className="mb-4 rounded-lg border border-violet-200 bg-violet-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">SEO Brief</p>
+                      <h4 className="mt-1 text-base font-semibold text-gray-900">{selectedTopicBrief.recommendedTitle || selectedTopicBriefTitle}</h4>
+                      <p className="mt-1 text-sm text-gray-600">{selectedTopicBrief.readerPromise}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTopicBrief(null)
+                        setSelectedTopicBriefTitle('')
+                      }}
+                      className="text-sm text-violet-700 hover:text-violet-900"
+                    >
+                      Luk
+                    </button>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2 text-sm">
+                    <div className="rounded-md bg-white/70 p-3">
+                      <p className="font-medium text-gray-900">Søgeintention</p>
+                      <p className="mt-1 text-gray-700">{selectedTopicBrief.searchIntent}</p>
+                    </div>
+                    <div className="rounded-md bg-white/70 p-3">
+                      <p className="font-medium text-gray-900">Primært keyword</p>
+                      <p className="mt-1 text-gray-700">{selectedTopicBrief.primaryKeyword}</p>
+                    </div>
+                    <div className="rounded-md bg-white/70 p-3 md:col-span-2">
+                      <p className="font-medium text-gray-900">Vinkel</p>
+                      <p className="mt-1 text-gray-700">{selectedTopicBrief.angle}</p>
+                    </div>
+                    <div className="rounded-md bg-white/70 p-3">
+                      <p className="font-medium text-gray-900">Meta title</p>
+                      <p className="mt-1 text-gray-700">{selectedTopicBrief.metaTitle}</p>
+                    </div>
+                    <div className="rounded-md bg-white/70 p-3">
+                      <p className="font-medium text-gray-900">Meta description</p>
+                      <p className="mt-1 text-gray-700">{selectedTopicBrief.metaDescription}</p>
+                    </div>
+                  </div>
+
+                  {selectedTopicBrief.secondaryKeywords?.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-900 mb-2">Sekundære keywords</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedTopicBrief.secondaryKeywords.map((keyword, keywordIndex) => (
+                          <span
+                            key={`${keyword}-${keywordIndex}`}
+                            className="rounded-full bg-white px-2.5 py-1 text-xs text-violet-700 border border-violet-200"
+                          >
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTopicBrief.sectionPlan?.length > 0 && (
+                    <div className="mt-3 rounded-md bg-white/70 p-3">
+                      <p className="text-sm font-medium text-gray-900 mb-2">Sektionplan</p>
+                      <div className="space-y-1 text-sm text-gray-700">
+                        {selectedTopicBrief.sectionPlan.map((item, sectionIndex) => (
+                          <p key={`${item}-${sectionIndex}`}>{sectionIndex + 1}. {item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTopicBrief.internalLinks?.length > 0 && (
+                    <div className="mt-3 rounded-md bg-white/70 p-3">
+                      <p className="text-sm font-medium text-gray-900 mb-2">Foreslåede interne links</p>
+                      <div className="space-y-2">
+                        {selectedTopicBrief.internalLinks.map((link, linkIndex) => (
+                          <div key={`${link.slug}-${linkIndex}`} className="rounded border border-violet-100 bg-white px-3 py-2">
+                            <p className="text-sm font-medium text-gray-900">{link.title}</p>
+                            <p className="text-xs text-violet-700">/{link.slug}</p>
+                            <p className="mt-1 text-sm text-gray-600">{link.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTopicBrief.notes?.length > 0 && (
+                    <div className="mt-3 rounded-md bg-white/70 p-3">
+                      <p className="text-sm font-medium text-gray-900 mb-2">Redaktionelle noter</p>
+                      <div className="space-y-1 text-sm text-gray-700">
+                        {selectedTopicBrief.notes.map((note, noteIndex) => (
+                          <p key={`${note}-${noteIndex}`}>- {note}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {topicSuggestions.length > 0 ? (
+                <div className="space-y-3">
+                  {topicSuggestions.map((suggestion, index) => (
+                    <div
+                      key={`${suggestion.title}-${index}`}
+                      className={`rounded-lg p-4 border ${
+                        selectedTopicBriefTitle === suggestion.title && selectedTopicBrief
+                          ? 'border-violet-300 bg-violet-50/40'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{suggestion.title}</h4>
+                          <div className="mt-1 flex flex-wrap gap-2 text-xs">
+                            <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                              {suggestion.primaryKeyword}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                              {suggestion.searchIntent}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded ${
+                              suggestion.priority === 'high'
+                                ? 'bg-green-50 text-green-700'
+                                : suggestion.priority === 'medium'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {suggestion.priority}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => generateBriefFromSuggestion(suggestion, index)}
+                            disabled={generatingBrief === index}
+                            className="px-3 py-1.5 bg-violet-600 text-white text-sm rounded-md hover:bg-violet-700 disabled:opacity-50"
+                          >
+                            {generatingBrief === index ? 'Laver brief…' : 'Lav brief'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => applyTopicSuggestion(suggestion)}
+                            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700"
+                          >
+                            Brug emne
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => generateBlogFromSuggestion(suggestion, index)}
+                            disabled={generatingStructuredPost === index}
+                            className="px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700 disabled:opacity-50"
+                          >
+                            {generatingStructuredPost === index
+                              ? 'Genererer…'
+                              : selectedTopicBriefTitle === suggestion.title && selectedTopicBrief
+                                ? 'Generér fra brief'
+                                : 'Generér blog'}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2 text-sm text-gray-600">
+                        <p><span className="font-medium text-gray-800">Hvorfor nu:</span> {suggestion.whyNow}</p>
+                        <p><span className="font-medium text-gray-800">Gap:</span> {suggestion.gapReason}</p>
+                        <p><span className="font-medium text-gray-800">Vinkel:</span> {suggestion.suggestedAngle}</p>
+                        {Array.isArray(suggestion.suggestedOutline) && suggestion.suggestedOutline.length > 0 && (
+                          <div>
+                            <p className="font-medium text-gray-800 mb-1">Foreslået struktur:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                              {suggestion.suggestedOutline.slice(0, 5).map((item, outlineIndex) => (
+                                <li key={`${suggestion.title}-outline-${outlineIndex}`}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg p-4">
+                  Klik på <span className="font-medium">Foreslå emner</span> for at få AI-idéer til næste blog i denne kategori.
+                </div>
+              )}
             </div>
 
             {/* SEO Settings */}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Leaf, Apple } from 'lucide-react'
+import { ArrowRight, Target, TrendingDown, Brain, Sparkles, ChevronRight, Leaf, Apple, BookOpen } from 'lucide-react'
 
 export default function FlexitarianPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -105,6 +105,30 @@ export default function FlexitarianPage() {
               </p>
               <div className="flex items-center text-green-600 group-hover:text-green-700 font-medium">
                 Se alle fleksitariske opskrifter
+                <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </Link>
+
+            <Link
+              href="/blog/flexitarian"
+              className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-cyan-200 hover:shadow-xl hover:shadow-cyan-500/10 transition-all duration-500 transform hover:-translate-y-2"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900 group-hover:text-cyan-600 transition-colors">
+                    Fleksitarisk på bloggen
+                  </h3>
+                  <p className="text-gray-500">Artikler og guides</p>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Plantebaseret kost, klima og vægttab – artikler og inspiration.
+              </p>
+              <div className="flex items-center text-cyan-600 group-hover:text-cyan-700 font-medium">
+                Gå til blog-sektionen
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

@@ -20,6 +20,71 @@ function isPersistentIngredientId(id: string | undefined): id is string {
   return !v.toLowerCase().startsWith('temp-')
 }
 
+type SupabaseLike = ReturnType<typeof createSupabaseServiceClient>
+
+/**
+ * Henter product_ingredient_matches + supermarket_products i to trin.
+ * Undgår PostgREST-embed (`supermarket_products!inner`), som kan fejle hvis relationen
+ * ikke er synlig for API'et — så hele Dagligvarer-boksen fejlede med 500.
+ */
+async function loadProductMatchesWithProducts(
+  supabase: SupabaseLike,
+  ingredientIds: string[]
+): Promise<
+  Array<{
+    ingredient_id: string
+    confidence: number
+    match_type: string
+    supermarket_products: Record<string, unknown>
+  }>
+> {
+  if (ingredientIds.length === 0) return []
+
+  const { data: rows, error: mErr } = await supabase
+    .from('product_ingredient_matches')
+    .select('ingredient_id, product_external_id, confidence, match_type')
+    .in('ingredient_id', ingredientIds)
+
+  if (mErr) {
+    throw new Error(`product_ingredient_matches: ${mErr.message}`)
+  }
+  if (!rows?.length) return []
+
+  const externalIds = [...new Set(rows.map((r) => r.product_external_id).filter(Boolean) as string[])]
+  if (externalIds.length === 0) return []
+
+  const { data: products, error: pErr } = await supabase
+    .from('supermarket_products')
+    .select('external_id, name, category, store, price, original_price, is_on_sale, image_url')
+    .in('external_id', externalIds)
+
+  if (pErr) {
+    throw new Error(`supermarket_products: ${pErr.message}`)
+  }
+
+  const productByExt = new Map((products || []).map((p) => [p.external_id, p]))
+
+  const out: Array<{
+    ingredient_id: string
+    confidence: number
+    match_type: string
+    supermarket_products: Record<string, unknown>
+  }> = []
+
+  for (const r of rows) {
+    const product = productByExt.get(r.product_external_id)
+    if (!product) continue
+    out.push({
+      ingredient_id: String(r.ingredient_id),
+      confidence: Number(r.confidence),
+      match_type: String(r.match_type ?? ''),
+      supermarket_products: product as Record<string, unknown>,
+    })
+  }
+
+  return out
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -84,47 +149,31 @@ export async function GET(
      * Primær sti: opskriftslinjer har `id` = ingredients.id → vi henter produktmatch direkte på ingredient_id.
      * (Tidligere bug: opslag med fuld tekst "10 stk oksepølser" mod nøgle "oksepølser" → næsten alt fejlede.)
      */
-    const ingredientIdsFromRecipe = [
-      ...new Set(
-        recipeIngredients
-          .map((ing: { id?: string }) => ing.id)
-          .filter((id: string | undefined): id is string => isPersistentIngredientId(id))
-      ),
-    ]
+    const idsFromRows = (recipeIngredients as { id?: string }[])
+      .map((ing) => ing.id)
+      .filter((id): id is string => isPersistentIngredientId(id))
+    const ingredientIdsFromRecipe = [...new Set(idsFromRows)]
 
-    const selectProductMatch = `
-        ingredient_id,
-        product_external_id,
-        confidence,
-        match_type,
-        supermarket_products!inner(
-          external_id,
-          name,
-          category,
-          store,
-          price,
-          original_price,
-          is_on_sale,
-          image_url
-        )
-      `
-
-    let matches: any[] = []
+    let matches: Array<{
+      ingredient_id: string
+      confidence: number
+      match_type: string
+      supermarket_products: Record<string, unknown>
+    }> = []
 
     if (ingredientIdsFromRecipe.length > 0) {
-      const { data: byIdMatches, error: matchesError } = await supabase
-        .from('product_ingredient_matches')
-        .select(selectProductMatch)
-        .in('ingredient_id', ingredientIdsFromRecipe)
-
-      if (matchesError) {
-        console.error('Error fetching matches:', matchesError)
-        return NextResponse.json({
-          success: false,
-          message: 'Failed to fetch ingredient matches',
-        }, { status: 500 })
+      try {
+        matches = await loadProductMatchesWithProducts(supabase, ingredientIdsFromRecipe)
+      } catch (e) {
+        console.error('Error fetching product ingredient matches:', e)
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Failed to fetch ingredient matches: ${e instanceof Error ? e.message : 'Unknown error'}`,
+          },
+          { status: 500 }
+        )
       }
-      matches = byIdMatches || []
     }
 
     const matchesByIngredientId = new Map<
@@ -175,21 +224,30 @@ export async function GET(
 
       const fallbackIds = [...new Set(resolvedIds.map((r) => r.ingredientId).filter(Boolean) as string[])]
       if (fallbackIds.length > 0) {
-        const { data: fbMatches } = await supabase
-          .from('product_ingredient_matches')
-          .select(selectProductMatch)
-          .in('ingredient_id', fallbackIds)
+        let fbRows: Awaited<ReturnType<typeof loadProductMatchesWithProducts>> = []
+        try {
+          fbRows = await loadProductMatchesWithProducts(supabase, fallbackIds)
+        } catch (e) {
+          console.error('Error fetching fallback product matches:', e)
+          return NextResponse.json(
+            {
+              success: false,
+              message: `Failed to fetch ingredient matches: ${e instanceof Error ? e.message : 'Unknown error'}`,
+            },
+            { status: 500 }
+          )
+        }
 
-        const byIngId = new Map<string, any[]>()
-        for (const m of fbMatches || []) {
-          const iid = String((m as { ingredient_id: string }).ingredient_id)
+        const byIngId = new Map<string, typeof fbRows>()
+        for (const m of fbRows) {
+          const iid = String(m.ingredient_id)
           if (!byIngId.has(iid)) byIngId.set(iid, [])
           byIngId.get(iid)!.push(m)
         }
 
         for (const { cleaned, ingredientId } of resolvedIds) {
           if (!ingredientId) continue
-          const arr = (byIngId.get(String(ingredientId)) || []).map((x: any) => ({
+          const arr = (byIngId.get(String(ingredientId)) || []).map((x) => ({
             product: x.supermarket_products,
             confidence: x.confidence,
             matchType: x.match_type,

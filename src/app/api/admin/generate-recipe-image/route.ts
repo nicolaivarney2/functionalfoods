@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 
 interface GenerateImageRequest {
   recipe: {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         recipe: {
-          title: recipe.title,
+          title: normalizeDanishRecipeTitle(recipe.title),
           description: recipe.description,
           category: category,
           dietaryCategories: recipe.dietaryCategories
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 
 function createImagePrompt(recipe: any, category: string): string {
   // Base prompt for food photography
-  let prompt = `Professional food photography, ${recipe.title}, `
+  let prompt = `Professional food photography, ${normalizeDanishRecipeTitle(recipe.title)}, `
   
   // Add category-specific styling
   switch (category) {

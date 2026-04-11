@@ -11,6 +11,7 @@ interface Ingredient {
   description?: string
   is_basis?: boolean
   grams_per_unit?: number | null
+  created_at?: string | null
 }
 
 interface GroceryProduct {
@@ -62,6 +63,7 @@ export default function ProductIngredientMatchingPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
   const [selectedStore, setSelectedStore] = useState('all')
+  const [hideLowPriorityCategories, setHideLowPriorityCategories] = useState(true)
   const [pendingMatchIds, setPendingMatchIds] = useState<Set<string>>(new Set())
   const [isSyncingMatches, setIsSyncingMatches] = useState(false)
   const [copySourceByIngredient, setCopySourceByIngredient] = useState<Record<string, string>>({})
@@ -139,7 +141,7 @@ export default function ProductIngredientMatchingPage() {
 
     while (hasMore) {
       try {
-        const response = await fetch(`/api/admin/ingredients-for-matching?page=${page}&limit=100`)
+        const response = await fetch(`/api/admin/ingredients-for-matching?page=${page}&limit=100&sort=newest`)
         const data = await response.json()
         
         if (data.success && data.data.ingredients) {
@@ -149,7 +151,8 @@ export default function ProductIngredientMatchingPage() {
             category: ing.category || 'Andre',
             description: `${ing.name} - importeret fra opskrifter`,
             is_basis: ing.is_basis || false,
-            grams_per_unit: ing.grams_per_unit ?? null
+            grams_per_unit: ing.grams_per_unit ?? null,
+            created_at: ing.created_at ?? null
           })))
           
           hasMore = data.data.pagination.hasMore
@@ -416,13 +419,31 @@ export default function ProductIngredientMatchingPage() {
   // Filter ingredients based on search and category
   const filteredIngredients = useMemo(() => {
     const searchLower = searchTerm.toLowerCase()
-    return ingredients.filter(ingredient => {
-      const matchesSearch = ingredient.name &&
-        ingredient.name.toLowerCase().includes(searchLower)
-      const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
-      return matchesSearch && matchesCategory
-    })
-  }, [ingredients, searchTerm, selectedCategory])
+    const lowPriorityCategories = new Set(['krydderi', 'urter'])
+
+    return ingredients
+      .filter((ingredient) => {
+        const matchesSearch = ingredient.name && ingredient.name.toLowerCase().includes(searchLower)
+        const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
+        const ingredientCategory = (ingredient.category || '').toLowerCase().trim()
+        const keepByPriority = !hideLowPriorityCategories || !lowPriorityCategories.has(ingredientCategory)
+        return matchesSearch && matchesCategory && keepByPriority
+      })
+      .sort((a, b) => {
+        const aHasMatch = (matchesByIngredient.get(String(a.id).trim()) || []).length > 0
+        const bHasMatch = (matchesByIngredient.get(String(b.id).trim()) || []).length > 0
+
+        // Unmatched first (the active work queue)
+        if (aHasMatch !== bHasMatch) return aHasMatch ? 1 : -1
+
+        // Newest first
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
+        if (aTime !== bTime) return bTime - aTime
+
+        return a.name.localeCompare(b.name)
+      })
+  }, [ingredients, searchTerm, selectedCategory, hideLowPriorityCategories, matchesByIngredient])
 
   // Pagination
   const totalPages = useMemo(
@@ -567,6 +588,17 @@ export default function ProductIngredientMatchingPage() {
                 <option value="ABC Lavpris">ABC Lavpris</option>
               </select>
             </div>
+          </div>
+          <div className="mt-4 flex items-center">
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hideLowPriorityCategories}
+                onChange={(e) => setHideLowPriorityCategories(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Skjul krydderier og urter (viser de mest relevante nye først)
+            </label>
           </div>
         </div>
 

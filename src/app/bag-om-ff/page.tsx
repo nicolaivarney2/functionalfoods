@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   ArrowRight,
   BookOpen,
@@ -151,11 +152,27 @@ export default function BagOmFFPage() {
         <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 shadow-sm overflow-hidden">
           <div className="grid lg:grid-cols-5 gap-0">
             <div className="lg:col-span-2 bg-gradient-to-br from-emerald-700 to-emerald-900 p-10 lg:p-12 text-white flex flex-col justify-center min-h-[280px]">
+              <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-white/25 shadow-lg mb-6">
+                <Image
+                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/blog-sections/nicolai-om-os-founder-1775638836185.png"
+                  alt="Nicolai Varney"
+                  fill
+                  sizes="80px"
+                  className="object-cover object-center"
+                />
+              </div>
               <p className="text-emerald-200 text-sm font-medium uppercase tracking-wide">Stifter</p>
               <h2 className="mt-2 text-3xl sm:text-4xl font-bold">Nicolai Varney</h2>
               <p className="mt-4 text-emerald-100/95 leading-relaxed">
                 Autoriseret paramediciner · iværksætter · madentusiast · forfatter
               </p>
+              <Link
+                href="/bag-om-ff/nicolaivarney"
+                className="mt-6 inline-flex items-center gap-1.5 text-sm font-medium text-white hover:text-emerald-100 underline underline-offset-2 decoration-white/40 hover:decoration-emerald-100"
+              >
+                Læs mere om Nicolai Varney
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
             <div className="lg:col-span-3 p-8 sm:p-10 lg:p-12 space-y-5 text-slate-600 leading-relaxed">
               <p className="text-slate-900 font-semibold text-lg">

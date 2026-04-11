@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { convertToGrams } from '@/lib/recipe-frida-nutrition-recalc'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -10,11 +11,14 @@ function isPersistentIngredientId(id: string | undefined): id is string {
   return !v.toLowerCase().startsWith('temp-')
 }
 
-function foodIdFromFridaRef(ref: string | null | undefined): number | null {
-  if (ref == null || ref === '') return null
-  const s = String(ref).trim()
-  const num = parseInt(s.replace(/^frida-/i, ''), 10)
-  return Number.isFinite(num) ? num : null
+/** Samme som recalculate-nutrition — til opløsning mod ingredients.id */
+function cleanRecipeIngredientName(raw: string): string {
+  let s = String(raw || '').toLowerCase().trim()
+  s = s
+    .replace(/^\d+[.,]?\d*\s*(stk|st|styk|stykker|dl|ml|l|g|gram|kg|mg|tsk|tesk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/i, '')
+    .replace(/^\d+[.,]?\d*\s*/, '')
+    .trim()
+  return s
 }
 
 export async function GET(
@@ -64,14 +68,37 @@ export async function GET(
       seen.add(String(i.id))
       return true
     })
-    const ids = recipeIngredients.map((i) => i.id).filter((id): id is string => isPersistentIngredientId(id))
+    const idsFromLines = recipeIngredients.map((i) => i.id).filter((id): id is string => isPersistentIngredientId(id))
+
+    const uniqueCleaned = [
+      ...new Set(
+        recipeIngredients
+          .map((ing) => cleanRecipeIngredientName(String(ing.name || '')))
+          .filter((n) => n.length > 0)
+      ),
+    ]
+    const cleanedToCatalogId = new Map<string, string>()
+    for (const cleaned of uniqueCleaned) {
+      const { data: ingRow } = await supabase
+        .from('ingredients')
+        .select('id')
+        .ilike('name', cleaned)
+        .limit(1)
+        .maybeSingle()
+      if (ingRow?.id) cleanedToCatalogId.set(cleaned, String(ingRow.id))
+    }
+
+    const allIdsForMatches = new Set<string>([...idsFromLines])
+    for (const cid of cleanedToCatalogId.values()) {
+      allIdsForMatches.add(cid)
+    }
 
     let matchRows: Array<{ recipe_ingredient_id: string; frida_ingredient_id: string }> = []
-    if (ids.length > 0) {
+    if (allIdsForMatches.size > 0) {
       const { data, error: matchErr } = await supabase
         .from('ingredient_matches')
         .select('recipe_ingredient_id, frida_ingredient_id')
-        .in('recipe_ingredient_id', ids)
+        .in('recipe_ingredient_id', [...allIdsForMatches])
 
       if (matchErr) {
         console.error('frida-match-status ingredient_matches:', matchErr)
@@ -87,70 +114,87 @@ export async function GET(
       }
     }
 
-    // Fallback for rows uden persistente IDs (fx temp-1): resolve via ingredients.name
-    const cleanedToResolvedIngredientId = new Map<string, string>()
-    const rowsWithoutPersistentId = recipeIngredients.filter((ing) => !isPersistentIngredientId(ing.id))
-    const cleanedNames = [
-      ...new Set(
-        rowsWithoutPersistentId
-          .map((ing) => String(ing.name || '').toLowerCase().trim())
-          .filter((n) => n.length > 0)
-      ),
-    ]
-
-    if (cleanedNames.length > 0) {
-      const resolved = await Promise.all(
-        cleanedNames.map(async (name) => {
-          const { data: ingRow } = await supabase
-            .from('ingredients')
-            .select('id')
-            .ilike('name', name)
-            .limit(1)
-            .maybeSingle()
-          return { name, ingredientId: ingRow?.id as string | undefined }
-        })
-      )
-
-      const fallbackIds = [...new Set(resolved.map((r) => r.ingredientId).filter(Boolean) as string[])]
-      for (const r of resolved) {
-        if (r.ingredientId) cleanedToResolvedIngredientId.set(r.name, r.ingredientId)
+    const allIdsForGrams = new Set<string>([...idsFromLines, ...cleanedToCatalogId.values()])
+    const gramsPerUnitByCatalogId = new Map<string, number>()
+    if (allIdsForGrams.size > 0) {
+      const { data: gramRows } = await supabase
+        .from('ingredients')
+        .select('id, grams_per_unit')
+        .in('id', [...allIdsForGrams])
+      for (const row of gramRows || []) {
+        const id = String((row as { id?: string }).id || '')
+        const g = (row as { grams_per_unit?: number | null }).grams_per_unit
+        if (id && g != null && Number(g) > 0) {
+          gramsPerUnitByCatalogId.set(id, Number(g))
+        }
       }
+    }
 
-      if (fallbackIds.length > 0) {
-        const { data: fbRows } = await supabase
-          .from('ingredient_matches')
-          .select('recipe_ingredient_id, frida_ingredient_id')
-          .in('recipe_ingredient_id', fallbackIds)
+    // Visningsnavn skal komme fra samme tabel som matching-UI (`frida_ingredients.name` på id-strengen).
+    // Tidligere slog vi numerisk del op i `frida_foods.food_id`, hvilket ofte ramte forkert vare (andet food_id).
+    const fridaRefs = [...new Set([...byRecipeIngId.values()].filter(Boolean))]
+    const fridaNameByRef = new Map<string, string>()
+    const fridaMacrosPer100ByRef = new Map<
+      string,
+      { calories: number; protein: number; carbs: number; fat: number }
+    >()
+    if (fridaRefs.length > 0) {
+      const { data: fiRows, error: fiErr } = await supabase
+        .from('frida_ingredients')
+        .select('id, name, calories, protein, carbs, fat')
+        .in('id', fridaRefs)
 
-        for (const r of fbRows || []) {
-          if (r.recipe_ingredient_id && r.frida_ingredient_id) {
-            byRecipeIngId.set(String(r.recipe_ingredient_id), String(r.frida_ingredient_id))
+      if (fiErr) {
+        console.error('frida-match-status frida_ingredients:', fiErr)
+      } else {
+        for (const row of fiRows || []) {
+          if (row.id) {
+            const id = String(row.id)
+            fridaNameByRef.set(id, String((row as { name?: string }).name || ''))
+            fridaMacrosPer100ByRef.set(id, {
+              calories: Number((row as { calories?: number }).calories) || 0,
+              protein: Number((row as { protein?: number }).protein) || 0,
+              carbs: Number((row as { carbs?: number }).carbs) || 0,
+              fat: Number((row as { fat?: number }).fat) || 0,
+            })
           }
         }
       }
     }
 
-    const foodIds = [...new Set([...byRecipeIngId.values()].map(foodIdFromFridaRef).filter((n): n is number => n != null))]
-
-    let foodNames = new Map<number, string>()
-    if (foodIds.length > 0) {
-      const { data: foods } = await supabase
-        .from('frida_foods')
-        .select('food_id, food_name_da')
-        .in('food_id', foodIds)
-
-      for (const f of foods || []) {
-        foodNames.set(f.food_id, f.food_name_da || '')
-      }
-    }
-
     const rows = recipeIngredients.map((ing) => {
-      const rid = isPersistentIngredientId(ing.id)
-        ? String(ing.id)
-        : cleanedToResolvedIngredientId.get(String(ing.name || '').toLowerCase().trim()) || ''
-      const fridaRef = rid ? byRecipeIngId.get(rid) : undefined
-      const fid = fridaRef ? foodIdFromFridaRef(fridaRef) : null
-      const fridaName = fid != null ? foodNames.get(fid) || null : null
+      const cleaned = cleanRecipeIngredientName(String(ing.name || ''))
+      const catalogId = cleanedToCatalogId.get(cleaned)
+      const linePersisted = isPersistentIngredientId(ing.id) ? String(ing.id) : ''
+      const rid = linePersisted || catalogId || ''
+      const fridaRef = catalogId
+        ? byRecipeIngId.get(catalogId) || undefined
+        : (linePersisted && byRecipeIngId.get(linePersisted)) || undefined
+      const fridaName = fridaRef ? fridaNameByRef.get(fridaRef) || null : null
+
+      let contribution: {
+        kcal: number
+        protein: number
+        carbs: number
+        fat: number
+        grams: number
+      } | null = null
+      if (fridaRef && fridaMacrosPer100ByRef.has(fridaRef)) {
+        const per100 = fridaMacrosPer100ByRef.get(fridaRef)!
+        const catalogForGrams = catalogId || linePersisted || ''
+        const gramsPerPiece = catalogForGrams ? gramsPerUnitByCatalogId.get(catalogForGrams) : undefined
+        const grams = convertToGrams(Number(ing.amount) || 0, String(ing.unit || ''), {
+          gramsPerPiece,
+        })
+        const sf = grams / 100
+        contribution = {
+          grams: Math.round(grams * 10) / 10,
+          kcal: Math.round(per100.calories * sf),
+          protein: Math.round(per100.protein * sf * 10) / 10,
+          carbs: Math.round(per100.carbs * sf * 10) / 10,
+          fat: Math.round(per100.fat * sf * 10) / 10,
+        }
+      }
 
       return {
         ingredientId: ing.id || null,
@@ -161,6 +205,7 @@ export async function GET(
         hasFridaMatch: !!fridaRef,
         fridaIngredientId: fridaRef || null,
         fridaNameDa: fridaName,
+        contribution,
       }
     })
 
