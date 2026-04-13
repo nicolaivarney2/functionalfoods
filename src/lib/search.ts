@@ -1,4 +1,5 @@
 import { Recipe } from '@/types/recipe'
+import { recipeTagsMatchDietQuery } from '@/lib/diet-tag-matching'
 
 export interface SearchFilters {
   query?: string
@@ -39,10 +40,7 @@ export function searchRecipes(recipes: Recipe[], filters: SearchFilters): Recipe
         return false
       }
       const hasMatchingDietary = filters.dietary.some((dietary) =>
-        recipe.dietaryCategories.some(
-          (cat) =>
-            typeof cat === 'string' && cat.toLowerCase() === dietary.toLowerCase()
-        )
+        recipeTagsMatchDietQuery(recipe.dietaryCategories, dietary)
       )
       if (!hasMatchingDietary) return false
     }

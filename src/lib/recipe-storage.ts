@@ -1,5 +1,6 @@
 import { Recipe } from '@/types/recipe'
 import { databaseService } from './database-service'
+import { recipeTagsMatchDietQuery } from './diet-tag-matching'
 
 // Get all recipes from database
 export async function getAllRecipes(): Promise<Recipe[]> {
@@ -32,11 +33,7 @@ export async function getRecipesByCategory(category: string): Promise<Recipe[]> 
     if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
       return false
     }
-    return recipe.dietaryCategories.some(
-      (dietaryCategory) =>
-        typeof dietaryCategory === 'string' &&
-        dietaryCategory.toLowerCase() === category.toLowerCase()
-    )
+    return recipeTagsMatchDietQuery(recipe.dietaryCategories, category)
   })
 }
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ExternalLink, Loader2, MessageCircle, UserRound, X } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { FF_OPEN_MESSENGER_GUIDANCE } from '@/lib/messenger-guidance-events'
 import { createSupabaseClient } from '@/lib/supabase'
 
 const PAGE_ID = process.env.NEXT_PUBLIC_MESSENGER_PAGE_ID
@@ -60,6 +61,12 @@ export default function MessengerHumanGuidanceWidget() {
       cancelled = true
     }
   }, [user?.id])
+
+  useEffect(() => {
+    const openPanel = () => setOpen(true)
+    window.addEventListener(FF_OPEN_MESSENGER_GUIDANCE, openPanel)
+    return () => window.removeEventListener(FF_OPEN_MESSENGER_GUIDANCE, openPanel)
+  }, [])
 
   if (!PAGE_ID?.trim() || loading || !user) {
     return null

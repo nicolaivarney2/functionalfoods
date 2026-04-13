@@ -8,6 +8,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '@heroicons/react/2
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
 import { mealPlanGenerator } from '@/lib/meal-plan-system';
 import MealPlanPreview from './MealPlanPreview';
+import VaegttabsbogPromoModal from './VaegttabsbogPromoModal';
 
 interface WizardStep {
   id: string;
@@ -46,7 +47,6 @@ const WizardFlow: React.FC = () => {
 
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [mealPlan, setMealPlan] = useState<any>(null);
-
   // Define wizard steps
   const steps: WizardStep[] = [
     {
@@ -130,8 +130,9 @@ const WizardFlow: React.FC = () => {
   const CurrentStepComponent = currentStep.component;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#FEFDF8] via-white to-[#87A96B]/10">
-      {/* Header */}
+    <div className="relative min-h-screen bg-gradient-to-br from-[#FEFDF8] via-white to-[#87A96B]/10">
+      <div className="pointer-events-none select-none" aria-hidden="true">
+        {/* Header */}
       <div className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -293,6 +294,10 @@ const WizardFlow: React.FC = () => {
       </motion.div>
 
       {/* Preview Modal */}
+      </div>
+
+      <VaegttabsbogPromoModal />
+
       {showPreviewModal && (
         <motion.div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"

@@ -16,6 +16,7 @@ const LIST_ENV_BY_CATEGORY: Record<string, string> = {
   'anti-inflammatory': 'LOOPS_MAILING_LIST_ANTI_INFLAMMATORY',
   '5-2-diet': 'LOOPS_MAILING_LIST_5_2_DIET',
   'proteinrig-kost': 'LOOPS_MAILING_LIST_PROTEINRIG_KOST',
+  vaegttabsbog: 'LOOPS_MAILING_LIST_VAEGTTABSBOG',
   functionalfoods: 'LOOPS_MAILING_LIST_DEFAULT',
 }
 
@@ -38,12 +39,18 @@ export function resolveLoopsMailingListId(newsletterCategory: string): string | 
 
 export type LoopsSubscribeResult = { ok: true } | { ok: false; error: string }
 
+export type SubscribeToLoopsOptions = {
+  /** Vises som kilde på kontakten i Loops (standard: blog-widget). */
+  source?: string
+}
+
 /**
  * Opret eller opdatér kontakt i Loops og tilføj til relevant mailing list (automation).
  */
 export async function subscribeEmailToLoops(
   email: string,
-  newsletterCategory: string
+  newsletterCategory: string,
+  options?: SubscribeToLoopsOptions
 ): Promise<LoopsSubscribeResult> {
   const apiKey = process.env.LOOPS_API_KEY?.trim()
   if (!apiKey) {
@@ -53,7 +60,7 @@ export async function subscribeEmailToLoops(
   const listId = resolveLoopsMailingListId(newsletterCategory)
   const body: Record<string, unknown> = {
     email,
-    source: 'FunctionalFoods blog',
+    source: options?.source?.trim() || 'FunctionalFoods blog',
   }
 
   if (listId) {

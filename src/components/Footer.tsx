@@ -1,5 +1,6 @@
 
 import Link from 'next/link'
+import Image from 'next/image'
 
 const columns = [
   {
@@ -51,10 +52,25 @@ const columns = [
   },
 ]
 
+const BRAND_LOGO_URL = '/billeder/favicon/ff-logo favicon white logo.jpg.png'
+
 export default function Footer() {
   return (
     <footer className="bg-black text-white">
       <div className="container px-4 py-12 sm:py-14">
+        <div className="mb-8">
+          <Link href="/" className="inline-flex items-center gap-3">
+            <Image
+              src={BRAND_LOGO_URL}
+              alt="Functional Foods logo"
+              width={34}
+              height={34}
+              className="h-8 w-8 object-contain"
+            />
+            <span className="text-sm font-semibold tracking-wide text-white/90">Functional Foods</span>
+          </Link>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {columns.map((col) => (
             <div key={col.title}>

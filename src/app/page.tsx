@@ -311,47 +311,74 @@ export default function Home() {
       </section>
 
       {/* Sådan virker FunctionalFoods */}
-      <section className="py-16 lg:py-20 bg-white">
+      <section className="relative overflow-hidden border-y border-emerald-100/80 bg-gradient-to-b from-emerald-50/40 via-white to-white py-16 lg:py-20">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/60 to-transparent"
+          aria-hidden
+        />
         <div className="container">
-          <div className={`text-center mb-12 transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
+          <div
+            className={`mx-auto mb-12 max-w-2xl text-center transition-all duration-1000 delay-300 ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700/90">
+              Sådan hjælper vi dig
+            </p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">
               Sådan virker FunctionalFoods
             </h2>
+            <p className="mt-4 text-base leading-relaxed text-gray-600 md:text-lg">
+              Opskrifter, plan og opfølgning i ét samlet flow – bygget til dansk hverdag og rigtige butikstilbud.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3 md:gap-8">
             {[
               {
                 icon: FileText,
-                title: 'Gratis opskrifter til vægttab inden for alle mad kategorier',
-                description: 'Keto, Sense, GLP-1 kost, Anti-inflammatorisk og mange flere. Alle opskrifter er gratis og gennemtestet. Ernæringsudregnet fra den danske fødevaredatabase ned til mindste detalje.',
-                color: 'from-green-500 to-green-600'
+                title: 'Gratis opskrifter til vægttab',
+                tagline: 'Alle madkategorier – fra keto til familiemad',
+                description:
+                  'Keto, Sense, GLP-1 kost, anti-inflammatorisk og mange flere. Alle opskrifter er gratis og gennemtestet. Ernæringsudregnet fra den danske fødevaredatabase ned til mindste detalje.',
+                iconGradient: 'from-emerald-500 to-teal-600',
+                iconShadow: 'shadow-emerald-500/30',
+                cardBorder: 'hover:border-emerald-200',
               },
               {
                 icon: Calculator,
-                title: 'Revolutionerende vægttabsplan',
-                description: 'Du får en vægttabsplan planlagt ud fra dagligvarebutikkernes tilbud, dit vægttabsønske, madpræferencer, aktivitetsniveau, familieliv og meget mere.',
-                color: 'from-blue-500 to-blue-600'
+                title: 'Vægttabsplan der følger dit liv',
+                tagline: 'Tilbud, mål og præferencer i ét system',
+                description:
+                  'Du får en plan lagt ud fra dagligvarebutikkernes tilbud, dit vægttabsønske, madpræferencer, aktivitetsniveau, familieliv og meget mere.',
+                iconGradient: 'from-sky-500 to-blue-600',
+                iconShadow: 'shadow-blue-500/25',
+                cardBorder: 'hover:border-blue-200',
               },
               {
                 icon: Calendar,
-                title: 'Vi støtter dig til du når dit mål',
-                description: 'Ikke nok med, at vores system giver dig personlige madplaner hver uge - tilpasset dit liv - så er vi her for at støtte dig hver dag fuldt ud personligt (på sms).',
-                color: 'from-purple-500 to-purple-600'
-              }
+                title: 'Vi støtter dig hele vejen',
+                tagline: 'Ugeplaner og personlig opfølgning på messenger',
+                description:
+                  'Vores system giver dig personlige madplaner hver uge – tilpasset dit liv – og vi er her for at støtte dig dagligt, hvis det er dét du har brug for.',
+                iconGradient: 'from-violet-500 to-indigo-600',
+                iconShadow: 'shadow-violet-500/25',
+                cardBorder: 'hover:border-violet-200',
+              },
             ].map((feature, index) => (
               <div
-                key={index}
-                className={`bg-white border border-gray-100 rounded-2xl p-8 hover:shadow-xl hover:border-gray-200 transition-all duration-500 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+                key={feature.title}
+                className={`group relative flex flex-col rounded-2xl border-2 border-gray-100 bg-white p-7 shadow-sm ring-1 ring-black/5 transition-all duration-300 md:p-8 ${feature.cardBorder} hover:-translate-y-0.5 hover:shadow-lg ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}
                 style={{ transitionDelay: `${(index + 1) * 100}ms` }}
               >
-                <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-xl flex items-center justify-center mb-6`}>
-                  <feature.icon className="w-8 h-8 text-white" />
+                <div
+                  className={`mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.iconGradient} text-white shadow-lg ${feature.iconShadow} ring-2 ring-white/30 transition-transform duration-300 group-hover:scale-[1.03]`}
+                >
+                  <feature.icon className="h-7 w-7" strokeWidth={2} aria-hidden />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
+                <h3 className="text-lg font-bold leading-snug tracking-tight text-gray-900 md:text-xl">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600 leading-relaxed">
+                <p className="mt-2 text-sm font-medium leading-snug text-gray-500">{feature.tagline}</p>
+                <p className="mt-4 flex-1 text-sm leading-relaxed text-gray-600 md:text-[15px]">
                   {feature.description}
                 </p>
               </div>

@@ -3,30 +3,42 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
   Heart,
   LayoutGrid,
+  MessageCircle,
   Scale,
   Settings,
   ShoppingBasket,
-  Sparkles,
   User,
   UtensilsCrossed,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { FF_OPEN_MESSENGER_GUIDANCE } from '@/lib/messenger-guidance-events'
 
-type Tool = {
-  href: string
-  title: string
-  description: string
-  icon: typeof CalendarDays
-  accent: string
-  badge?: string
-}
+type Tool =
+  | {
+      href: string
+      title: string
+      description: string
+      icon: LucideIcon
+      accent: string
+      badge?: string
+    }
+  | {
+      messenger: true
+      title: string
+      description: string
+      icon: LucideIcon
+      accent: string
+      badge?: string
+    }
 
 const TOOLS: Tool[] = [
   {
@@ -61,9 +73,10 @@ const TOOLS: Tool[] = [
   },
   {
     href: '/wizard',
-    title: 'Madplan-guiden',
-    description: 'Trin-for-trin: kostvalg, præferencer og mål – bygger op til din madplan.',
-    icon: Sparkles,
+    title: 'Personlig trykt bog',
+    description:
+      'Kør vores trin-for-trin guide om kostvalg, præferencer og mål – og så bygger vi og trykker en personlig bog med opskrifter, indkøbsliste hver uge, og 40–50 siders vægttabshjælp.',
+    icon: BookOpen,
     accent: 'from-rose-600 to-pink-600',
   },
   {
@@ -86,6 +99,15 @@ const TOOLS: Tool[] = [
     description: 'Notifikationer og personlige præferencer for siden.',
     icon: Settings,
     accent: 'from-gray-600 to-gray-700',
+  },
+  {
+    messenger: true,
+    title: 'Personlig vejledning',
+    description:
+      'Skriv med os i Messenger om din madplan, ugens tilbud, opskrifter eller det, der driller i hverdagen. Nicolai eller en anden fra teamet svarer, og vi kan koble samtalen til din konto, så hjælpen bliver konkret.',
+    icon: MessageCircle,
+    accent: 'from-[#0084FF] to-blue-700',
+    badge: 'Messenger',
   },
 ]
 
@@ -227,12 +249,10 @@ function OverblikContent() {
           <div className="grid sm:grid-cols-2 gap-4">
             {TOOLS.map((tool) => {
               const Icon = tool.icon
-              return (
-                <Link
-                  key={tool.href}
-                  href={tool.href}
-                  className="group flex gap-4 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all"
-                >
+              const cardClassName =
+                'group flex gap-4 rounded-2xl bg-white border border-slate-200 p-5 shadow-sm hover:border-emerald-300 hover:shadow-md transition-all text-left w-full'
+              const inner = (
+                <>
                   <div
                     className={`shrink-0 w-14 h-14 rounded-xl bg-gradient-to-br ${tool.accent} flex items-center justify-center text-white shadow-inner`}
                   >
@@ -244,18 +264,43 @@ function OverblikContent() {
                         {tool.title}
                       </h3>
                       {tool.badge && (
-                        <span className="text-[10px] uppercase font-bold tracking-wide bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                        <span
+                          className={`text-[10px] uppercase font-bold tracking-wide px-2 py-0.5 rounded-full ${
+                            'messenger' in tool && tool.messenger
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
                           {tool.badge}
                         </span>
                       )}
                     </div>
                     <p className="text-sm text-slate-600 mt-1 leading-relaxed">{tool.description}</p>
                     <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-emerald-600 group-hover:gap-2 transition-all">
-                      Åbn
+                      {'messenger' in tool && tool.messenger ? 'Åbn personlig vejledning' : 'Åbn'}
                       <ArrowRight className="w-4 h-4" />
                     </span>
                   </div>
-                </Link>
+                </>
+              )
+
+              if ('href' in tool) {
+                return (
+                  <Link key={tool.href} href={tool.href} className={cardClassName}>
+                    {inner}
+                  </Link>
+                )
+              }
+
+              return (
+                <button
+                  key="personlig-vejledning"
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event(FF_OPEN_MESSENGER_GUIDANCE))}
+                  className={`${cardClassName} cursor-pointer`}
+                >
+                  {inner}
+                </button>
               )
             })}
           </div>

@@ -46,6 +46,8 @@ import {
   calculateSupplementAmount
 } from './kombi-supplements';
 
+import { buildAcceptableDietKeys, recipeDietTagMatches } from '../diet-tag-matching';
+
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
   private usedRecipes: Set<string> = new Set();
@@ -760,6 +762,8 @@ export class MealPlanGenerator {
     let excludedByDietaryApproach = 0
     let excludedByCarbs = 0
     
+    const acceptableDietKeys = buildAcceptableDietKeys(config.dietaryApproach.id)
+
     const filteredRecipes = this.recipes.filter(recipe => {
       // Filter by meal type if provided
       if (mealType) {
@@ -770,13 +774,10 @@ export class MealPlanGenerator {
           return false
         }
       }
-      // Check dietary approach compatibility
-      const hasDietaryApproach = recipe.dietaryApproaches.some(approach => {
-        // Handle both "Keto" and "[Keto]" formats by removing brackets
-        const cleanApproach = approach.toLowerCase().replace(/[\[\]]/g, '');
-        const targetApproach = config.dietaryApproach.id.toLowerCase();
-        return cleanApproach === targetApproach;
-      });
+      // Check dietary approach compatibility (slug vs DB label, hyphen vs space, aliases)
+      const hasDietaryApproach = recipe.dietaryApproaches.some(approach =>
+        recipeDietTagMatches(approach, acceptableDietKeys)
+      );
       
       if (!hasDietaryApproach) {
         excludedByDietaryApproach++

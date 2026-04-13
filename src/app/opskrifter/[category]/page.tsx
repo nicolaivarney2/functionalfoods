@@ -3,6 +3,7 @@ import { Search, Filter } from 'lucide-react'
 import { Metadata } from 'next'
 import { dietaryCategories } from '@/lib/sample-data'
 import { databaseService } from '@/lib/database-service'
+import { recipeTagsMatchDietQuery } from '@/lib/diet-tag-matching'
 import RecipeCard from '@/components/RecipeCard'
 import Script from 'next/script'
 
@@ -56,10 +57,7 @@ export default async function CategoryPage({ params }: PageProps) {
     if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
       return false
     }
-    return recipe.dietaryCategories.some(
-      (cat) =>
-        typeof cat === 'string' && cat.toLowerCase() === category.name.toLowerCase()
-    )
+    return recipeTagsMatchDietQuery(recipe.dietaryCategories, category.name)
   })
 
   // Generate structured data for SEO

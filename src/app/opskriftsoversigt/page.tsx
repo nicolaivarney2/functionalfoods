@@ -212,19 +212,9 @@ export default function RecipeOverviewPage() {
       })
     }
 
-    // Apply dietary filter
+    // Apply dietary filter (same rules as category counts — Familiemad, aliases, slugs)
     if (selectedDietary !== 'all') {
-      filtered = filtered.filter(recipe => {
-        if (!recipe.dietaryCategories || !Array.isArray(recipe.dietaryCategories)) {
-          return false
-        }
-        return recipe.dietaryCategories.some(cat => {
-          if (!cat) return false
-          const normalizedCat = cat.replace(/[\[\]]/g, '').trim()
-          const normalizedSelected = selectedDietary.replace(/[\[\]]/g, '').trim()
-          return normalizedCat.toLowerCase() === normalizedSelected.toLowerCase()
-        })
-      })
+      filtered = filtered.filter((recipe) => recipeMatchesOverviewCategory(recipe, selectedDietary))
     }
 
     // Prep time filter

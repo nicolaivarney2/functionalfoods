@@ -1,7 +1,9 @@
 /**
  * Shared diet/tag matching for /api/recipes?diet= and opskriftsoversigt counts.
- * Keep in sync with niche /…/opskrifter pages (same filter strings).
+ * Core rules live in `diet-tag-matching.ts`.
  */
+
+import { recipeTagsMatchDietQuery } from './diet-tag-matching'
 
 export function normalizeDiet(value: string): string {
   return value.trim().toLowerCase()
@@ -9,39 +11,8 @@ export function normalizeDiet(value: string): string {
 
 export function recipeMatchesDiet(recipe: { dietaryCategories?: unknown }, dietFilter: string): boolean {
   if (!Array.isArray(recipe.dietaryCategories)) return false
-  const normalizedFilter = normalizeDiet(dietFilter)
-  return recipe.dietaryCategories.some((cat) => {
-    if (typeof cat !== 'string') return false
-    const normalizedCategory = normalizeDiet(cat)
-    if (normalizedFilter === 'glp-1') {
-      return normalizedCategory.includes('glp-1') || normalizedCategory.includes('glp1')
-    }
-    if (normalizedFilter === 'flexitarian') {
-      return normalizedCategory.includes('fleksitarisk') || normalizedCategory.includes('flexitarian')
-    }
-    if (normalizedFilter === 'anti-inflammatory' || normalizedFilter === 'antiinflammatory') {
-      return (
-        normalizedCategory.includes('antiinflammatorisk') ||
-        normalizedCategory.includes('anti-inflammatorisk') ||
-        normalizedCategory.includes('anti inflammatorisk')
-      )
-    }
-    if (
-      normalizedFilter === '5-2' ||
-      normalizedFilter === '5-2-diet' ||
-      normalizedFilter === '52' ||
-      normalizedFilter === '5:2' ||
-      normalizedFilter === '5:2 diæt'
-    ) {
-      return (
-        normalizedCategory.includes('5:2') ||
-        normalizedCategory.includes('5-2') ||
-        normalizedCategory.includes('5:2 diæt') ||
-        normalizedCategory.includes('5:2 faste')
-      )
-    }
-    return normalizedCategory.includes(normalizedFilter)
-  })
+  const cats = recipe.dietaryCategories.filter((c): c is string => typeof c === 'string')
+  return recipeTagsMatchDietQuery(cats, dietFilter)
 }
 
 /** Same idea as /familie/opskrifter — broader than exact tag "Familiemad". */
