@@ -13,6 +13,9 @@ export class DietaryApproachFactory {
   private initializeDiets(): void {
     this.registerDiet(this.createKetoDiet());
     this.registerDiet(this.createSenseDiet());
+    this.registerDiet(this.createProteinRichDiet());
+    this.registerDiet(this.createGLP1Diet());
+    this.registerDiet(this.createFamilyDiet());
     this.registerDiet(this.createLCHFPaleoDiet());
     this.registerDiet(this.createAntiInflammatoryDiet());
     this.registerDiet(this.createMediterraneanDiet());
@@ -202,6 +205,47 @@ export class DietaryApproachFactory {
         'Focus on food quality over quantity',
         'Include variety for nutritional completeness'
       ]
+    };
+  }
+
+  /**
+   * Create Protein-rich dietary approach
+   */
+  private createProteinRichDiet(): DietaryApproach {
+    return {
+      ...this.createSenseDiet(),
+      id: 'proteinrig-kost',
+      name: 'Proteinrig kost',
+      description: 'Proteinfokuseret tilgang med mættende måltider og stabil energi.',
+      macroRatios: {
+        carbohydrates: { min: 30, target: 35, max: 40 },
+        protein: { min: 30, target: 35, max: 40 },
+        fat: { min: 25, target: 30, max: 35 }
+      }
+    };
+  }
+
+  /**
+   * Create GLP-1 dietary approach
+   */
+  private createGLP1Diet(): DietaryApproach {
+    return {
+      ...this.createSenseDiet(),
+      id: 'glp-1',
+      name: 'GLP-1 kost',
+      description: 'Skånsom og mættende struktur med fokus på mindre portioner og protein.'
+    };
+  }
+
+  /**
+   * Create family-food dietary approach
+   */
+  private createFamilyDiet(): DietaryApproach {
+    return {
+      ...this.createSenseDiet(),
+      id: 'familiemad',
+      name: 'Sund familiemad',
+      description: 'Balanceret, børnevenlig hverdagsmad til hele familien.'
     };
   }
 

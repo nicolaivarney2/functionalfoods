@@ -673,45 +673,42 @@ export default function MadbudgetPage() {
 
   // Save family profile to database when it changes (debounced)
   useEffect(() => {
-    const saveFamilyProfile = async () => {
+    const timeoutId = setTimeout(async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
 
-        // Debounce saves
-        const timeoutId = setTimeout(async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            await fetch('/api/madbudget/family-profile', {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              body: JSON.stringify({
-                familyProfile: {
-                  adults: familyProfile.adults,
-                  children: familyProfile.children,
-                  childrenAges: familyProfile.childrenAges,
-                  prioritizeOrganic: familyProfile.prioritizeOrganic,
-                  prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
-                  excludedIngredients: familyProfile.excludedIngredients,
-                  selectedStores: familyProfile.selectedStores,
-                  variationLevel,
-                  weeklyBudgetKr: familyProfile.weeklyBudgetKr
-                },
-                adultProfiles: familyProfile.adultsProfiles
-              })
-            })
-          }
-        }, 1000) // Wait 1 second after last change
+        const response = await fetch('/api/madbudget/family-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({
+            familyProfile: {
+              adults: familyProfile.adults,
+              children: familyProfile.children,
+              childrenAges: familyProfile.childrenAges,
+              prioritizeOrganic: familyProfile.prioritizeOrganic,
+              prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+              excludedIngredients: familyProfile.excludedIngredients,
+              selectedStores: familyProfile.selectedStores,
+              variationLevel,
+              weeklyBudgetKr: familyProfile.weeklyBudgetKr
+            },
+            adultProfiles: familyProfile.adultsProfiles
+          })
+        })
 
-        return () => clearTimeout(timeoutId)
+        if (!response.ok) {
+          console.error('Autosave family profile failed:', await response.text())
+        }
       } catch (error) {
         console.error('Error saving family profile:', error)
       }
-    }
-    saveFamilyProfile()
+    }, 1000)
+
+    return () => clearTimeout(timeoutId)
   }, [familyProfile, variationLevel])
 
   // Load basisvarer on component mount
