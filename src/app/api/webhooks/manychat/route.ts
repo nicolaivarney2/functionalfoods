@@ -107,11 +107,6 @@ export async function POST(request: NextRequest) {
 
   const linkToken = extractLinkToken(body)
   let linked = false
-  let profileFound = false
-  let syncAttempted = false
-  let fieldsAttempted = 0
-  let mcOk: boolean | null = null
-  let mcError: string | undefined
 
   if (linkToken) {
     const { data: row } = await supabase
@@ -132,7 +127,6 @@ export async function POST(request: NextRequest) {
     .select('id, manychat_context_synced_at')
     .eq('manychat_subscriber_id', subscriberId)
     .maybeSingle()
-  profileFound = Boolean(profile?.id)
 
   if (profile?.id && shouldSyncManychatContext(profile.manychat_context_synced_at as string | null)) {
     const summary = await buildAgentContextSummary(supabase, profile.id)
@@ -146,11 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (fields.length > 0) {
-      syncAttempted = true
-      fieldsAttempted = fields.length
       const mc = await manychatSetCustomFields(subscriberId, fields)
-      mcOk = mc.ok
-      mcError = mc.error
       if (mc.ok) {
         await supabase
           .from('user_profiles')
@@ -162,15 +152,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    linked,
-    debug: {
-      profile_found: profileFound,
-      sync_attempted: syncAttempted,
-      fields_attempted: fieldsAttempted,
-      mc_ok: mcOk,
-      mc_error: mcError,
-    },
-  })
+  return NextResponse.json({ ok: true, linked })
 }
