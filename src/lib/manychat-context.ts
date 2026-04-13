@@ -1,5 +1,60 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function getMealTitle(value: unknown): string | null {
+  if (!isRecord(value)) return null
+  const title = value.title
+  if (typeof title !== 'string') return null
+  const trimmed = title.trim()
+  return trimmed || null
+}
+
+function formatLatestMealPlanSummary(mealPlanData: unknown): string | null {
+  if (!isRecord(mealPlanData)) return null
+
+  const dayOrder = [
+    { key: 'monday', label: 'Man' },
+    { key: 'tuesday', label: 'Tir' },
+    { key: 'wednesday', label: 'Ons' },
+    { key: 'thursday', label: 'Tor' },
+    { key: 'friday', label: 'Fre' },
+    { key: 'saturday', label: 'Lør' },
+    { key: 'sunday', label: 'Søn' },
+  ] as const
+
+  const mealOrder = [
+    { key: 'breakfast', label: 'morgen' },
+    { key: 'lunch', label: 'frokost' },
+    { key: 'dinner', label: 'aftensmad' },
+    { key: 'snack', label: 'snack' },
+  ] as const
+
+  const lines: string[] = []
+
+  for (const day of dayOrder) {
+    const dayData = mealPlanData[day.key]
+    if (!isRecord(dayData)) continue
+
+    const mealParts: string[] = []
+    for (const meal of mealOrder) {
+      const title = getMealTitle(dayData[meal.key])
+      if (title) {
+        mealParts.push(`${meal.label}: ${title.slice(0, 70)}`)
+      }
+    }
+
+    if (mealParts.length > 0) {
+      lines.push(`${day.label}: ${mealParts.join(', ')}`)
+    }
+  }
+
+  if (lines.length === 0) return null
+  return lines.join(' | ')
+}
+
 /**
  * Kort agent-kontekst til ManyChat (max ~1900 tegn). Minimeret — ingen fuld JSON eller journal.
  * Fejl på enkelttabeller ignoreres (manglende tabeller i mindre miljøer).
@@ -50,7 +105,7 @@ export async function buildAgentContextSummary(
 
   const { data: lastPlan } = await supabase
     .from('user_meal_plans')
-    .select('week_start_date, week_number, updated_at')
+    .select('week_start_date, week_number, updated_at, meal_plan_data')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
     .limit(1)
@@ -64,6 +119,11 @@ export async function buildAgentContextSummary(
           ? `uge ${lastPlan.week_number}`
           : 'gemt'
     chunks.push(`Seneste madplan: ${label}`)
+
+    const detailedMealPlan = formatLatestMealPlanSummary(lastPlan.meal_plan_data)
+    if (detailedMealPlan) {
+      chunks.push(`Seneste madplan (retter): ${detailedMealPlan}`)
+    }
   }
 
   return chunks.join(' · ').slice(0, 1900)
