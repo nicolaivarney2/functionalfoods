@@ -14,6 +14,16 @@ export const metadata: Metadata = {
   title: 'Functional Foods - Sunde opskrifter til vægttab og en sund livsstil',
   description: 'Opskrifter til vægttab og en sund livsstil. Keto, LCHF og sunde opskrifter til hverdagen.',
   keywords: 'keto opskrifter, vægttab, sunde opskrifter, LCHF, danske opskrifter, funktionelle fødevarer',
+  icons: {
+    icon: [
+      {
+        url: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
+        type: 'image/png',
+      },
+    ],
+    shortcut: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
+    apple: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
+  },
   openGraph: {
     title: 'Functional Foods - Sunde opskrifter til vægttab',
     description: 'Opskrifter til vægttab og en sund livsstil. Keto, LCHF og sunde opskrifter til hverdagen.',
