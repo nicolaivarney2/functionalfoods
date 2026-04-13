@@ -707,7 +707,11 @@ export class MealPlanGenerator {
     date: Date
   ): Promise<MealAssignment> {
     // Filter recipes based on dietary approach, meal type, and exclusions
-    const availableRecipes = this.filterRecipes(config, mealDistribution.mealType);
+    let availableRecipes = this.filterRecipes(config, mealDistribution.mealType);
+    // Fallback: hvis vi mangler match i den eksakte måltidskategori, brug samme kostretning uden måltidsfilter.
+    if (availableRecipes.length === 0) {
+      availableRecipes = this.filterRecipes(config);
+    }
     
     // Score and rank recipes (async for offer matching)
     const scoredRecipes = await this.scoreRecipes(availableRecipes, mealDistribution, config);

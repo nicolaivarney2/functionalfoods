@@ -17,12 +17,12 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
+        url: '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png',
         type: 'image/png',
       },
     ],
-    shortcut: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
-    apple: '/billeder/favicon/ff-logo favicon white logo.jpg.png',
+    shortcut: '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png',
+    apple: '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png',
   },
   openGraph: {
     title: 'Functional Foods - Sunde opskrifter til vægttab',

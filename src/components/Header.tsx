@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
 import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -28,6 +29,8 @@ const dietaryCategories = [
   { name: '5:2 DIÆT', href: '/5-2-diet' },
   { name: 'FAMILIEMAD', href: '/familie' },
 ]
+
+const BRAND_LOGO_URL = '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png'
 
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -66,7 +69,13 @@ export default function Header() {
             <div className="flex items-center justify-between h-16 gap-3">
               {/* Logo */}
               <Link href="/" className="flex items-center space-x-2.5 shrink-0">
-                <div className="text-2xl font-bold">FF</div>
+                <Image
+                  src={BRAND_LOGO_URL}
+                  alt="Functional Foods logo"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 rounded-sm object-contain"
+                />
                 <span className="text-base lg:text-lg font-medium">Functional Foods</span>
               </Link>
 
