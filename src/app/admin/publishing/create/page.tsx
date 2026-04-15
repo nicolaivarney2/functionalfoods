@@ -20,8 +20,8 @@ interface RecipeCategory {
 const RECIPE_CATEGORIES: RecipeCategory[] = [
   {
     id: 'familiemad',
-    name: 'Familiemad',
-    description: 'Klassiske, næringsrige retter der passer til hele familien',
+    name: 'Kalorietælling',
+    description: 'Almindelig familiemad med planlagte kalorier — hele familien',
     icon: '👨‍👩‍👧‍👦',
     color: 'bg-blue-500',
     difficulty: 'Easy'
@@ -821,7 +821,7 @@ export default function CreateRecipePage() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  👨‍👩‍👧‍👦 Tilpas Familiemad Opskrift
+                  👨‍👩‍👧‍👦 Tilpas kalorietælling-opskrift
                 </h2>
                 <button
                   onClick={() => {
@@ -835,7 +835,7 @@ export default function CreateRecipePage() {
               </div>
               
               <p className="text-gray-600 mb-6">
-                Juster parametrene for at styre hvilken type familiemad opskrift der genereres. 
+                Juster parametrene for at styre hvilken type familiemad/kalorietælling-opskrift der genereres (samme motor som før). 
                 Du kan også ignorere dette og bruge standardværdier.
               </p>
               

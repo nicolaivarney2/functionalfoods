@@ -24,8 +24,8 @@ const RULES: Rule[] = [
   { match: (n) => n === 'sense', label: 'Sense', href: '/sense/vaegttab' },
   {
     match: (n) => n === 'familiemad' || n === 'familie',
-    label: 'Familiemad',
-    href: '/familie/vaegttab',
+    label: 'Kalorietælling',
+    href: '/kalorietaelling/vaegttab',
   },
   {
     match: (n) => n === 'proteinrig kost' || n === 'proteinrig',

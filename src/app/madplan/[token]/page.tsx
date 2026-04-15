@@ -1,9 +1,90 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Share2, Utensils, ShoppingCart, ChevronRight, Users, Store, Calendar } from 'lucide-react'
+import { Share2, Utensils, ShoppingCart, ChevronRight, Users, Store, Calendar, PieChart, FlaskConical } from 'lucide-react'
+
+type SharedMealSlot = {
+  title?: string
+  slug?: string
+  id?: string
+  image?: string
+  imageUrl?: string
+  calories?: number
+  protein?: number
+  carbs?: number
+  fat?: number
+  fiber?: number
+  vitamins?: Record<string, number>
+}
+
+type DayNutRow = {
+  dayKey: string
+  label: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+  vitamins: Record<string, number>
+  hasMacros: boolean
+}
+
+function sumMealNutrients(m: SharedMealSlot | null | undefined) {
+  const vitamins: Record<string, number> = {}
+  if (m?.vitamins && typeof m.vitamins === 'object') {
+    for (const [k, v] of Object.entries(m.vitamins)) {
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        vitamins[k] = (vitamins[k] ?? 0) + v
+      }
+    }
+  }
+  const calories = typeof m?.calories === 'number' && Number.isFinite(m.calories) ? m.calories : 0
+  const protein = typeof m?.protein === 'number' && Number.isFinite(m.protein) ? m.protein : 0
+  const carbs = typeof m?.carbs === 'number' && Number.isFinite(m.carbs) ? m.carbs : 0
+  const fat = typeof m?.fat === 'number' && Number.isFinite(m.fat) ? m.fat : 0
+  const fiber = typeof m?.fiber === 'number' && Number.isFinite(m.fiber) ? m.fiber : 0
+  const hasMacros =
+    calories > 0 || protein > 0 || carbs > 0 || fat > 0 || fiber > 0 || Object.keys(vitamins).length > 0
+  return { calories, protein, carbs, fat, fiber, vitamins, hasMacros }
+}
+
+function addVitMaps(a: Record<string, number>, b: Record<string, number>): Record<string, number> {
+  const out = { ...a }
+  for (const [k, v] of Object.entries(b)) {
+    out[k] = (out[k] ?? 0) + v
+  }
+  return out
+}
+
+function aggregateDayNutrients(
+  day: Record<string, SharedMealSlot> | undefined,
+  dayKey: string,
+  label: string
+): DayNutRow {
+  const slots = ['breakfast', 'lunch', 'dinner'] as const
+  let calories = 0,
+    protein = 0,
+    carbs = 0,
+    fat = 0,
+    fiber = 0
+  let vitamins: Record<string, number> = {}
+  let hasMacros = false
+  if (day) {
+    for (const sk of slots) {
+      const part = sumMealNutrients(day[sk])
+      calories += part.calories
+      protein += part.protein
+      carbs += part.carbs
+      fat += part.fat
+      fiber += part.fiber
+      vitamins = addVitMaps(vitamins, part.vitamins)
+      if (part.hasMacros) hasMacros = true
+    }
+  }
+  return { dayKey, label, calories, protein, carbs, fat, fiber, vitamins, hasMacros }
+}
 
 function formatFetchedDate(iso: string | undefined): string {
   if (!iso) return ''
@@ -52,7 +133,7 @@ const DIETARY_LABELS: Record<string, string> = {
   keto: 'Keto',
   sense: 'Sense',
   'glp-1': 'GLP-1',
-  familiemad: 'Familiemad',
+  familiemad: 'Kalorietælling',
   'lchf-paleo': 'LCHF/Paleo'
 }
 
@@ -72,6 +153,105 @@ const MEAL_LABELS: Record<string, string> = {
   dinner: 'Aftensmad'
 }
 
+const PLAN_DAY_KEYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday'
+] as const
+
+const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'] as const
+type MealSlotKey = (typeof MEAL_SLOTS)[number]
+
+function slotHasPlannedMeal(m: SharedMealSlot | null | undefined): boolean {
+  if (m == null || typeof m !== 'object') return false
+  if (typeof m.title === 'string' && m.title.trim().length > 0) return true
+  if (m.slug != null && String(m.slug).trim() !== '') return true
+  if (m.id != null && String(m.id).trim() !== '') return true
+  return false
+}
+
+function countPlannedMealsPerSlot(
+  mealPlan: Record<string, Record<string, SharedMealSlot>>
+): Record<MealSlotKey, number> {
+  const slotCounts: Record<MealSlotKey, number> = { breakfast: 0, lunch: 0, dinner: 0 }
+  for (const dayKey of PLAN_DAY_KEYS) {
+    const day = mealPlan[dayKey]
+    if (!day) continue
+    for (const sk of MEAL_SLOTS) {
+      if (slotHasPlannedMeal(day[sk])) slotCounts[sk]++
+    }
+  }
+  return slotCounts
+}
+
+function formatDaList(items: string[]): string {
+  if (items.length === 0) return ''
+  if (items.length === 1) return items[0]!
+  if (items.length === 2) return `${items[0]} og ${items[1]}`
+  return `${items.slice(0, -1).join(', ')} og ${items.at(-1)!}`
+}
+
+function mealSlotsSummaryFromCounts(slotCounts: Record<MealSlotKey, number>): {
+  pills: { key: MealSlotKey; count: number; label: string }[]
+  sentence: string
+} {
+  const pills = MEAL_SLOTS.map((key) => ({
+    key,
+    count: slotCounts[key],
+    label: MEAL_LABELS[key] ?? key,
+  }))
+  const plannedMealsInWeek = pills.reduce((s, p) => s + p.count, 0)
+  const never = pills.filter((p) => p.count === 0)
+  const full = pills.filter((p) => p.count === 7)
+  const partial = pills.filter((p) => p.count > 0 && p.count < 7)
+  const active = pills.filter((p) => p.count > 0)
+
+  let sentence = ''
+  if (full.length === 3 && never.length === 0 && partial.length === 0) {
+    sentence =
+      'Alle tre måltider er sat alle ugens dage. Næringstallene er summen af morgenmad, frokost og aftensmad (3 måltider pr. dag).'
+  } else if (partial.length === 0 && active.length > 0) {
+    const inc = formatDaList(active.map((p) => p.label.toLowerCase()))
+    const mpd = active.length
+    if (never.length > 0) {
+      const exc = formatDaList(never.map((p) => p.label.toLowerCase()))
+      sentence = `Næringstallene indeholder kun ${inc} (${mpd} måltider pr. dag, ${plannedMealsInWeek} i ugen i alt). ${exc.charAt(0).toUpperCase() + exc.slice(1)} er ikke med i denne madplan.`
+    } else {
+      sentence = `Næringstallene summerer ${inc}.`
+    }
+  } else {
+    const bits: string[] = []
+    for (const p of partial) {
+      bits.push(`${p.label} på ${p.count} af 7 dage`)
+    }
+    if (never.length > 0) {
+      bits.push(`${formatDaList(never.map((n) => n.label))} er ikke planlagt`)
+    }
+    sentence = `Kun planlagte måltider tælles med: ${bits.join('; ')}. Kcal pr. dag er derfor ikke nødvendigvis et helt døgn, hvis der mangler måltider på nogle dage.`
+  }
+
+  return { pills, sentence }
+}
+
+function mealPlanGridFromPlan(plan: any): Record<string, Record<string, SharedMealSlot>> {
+  const rawMealPlan = plan?.meal_plan_data || {}
+  if (
+    rawMealPlan &&
+    typeof rawMealPlan === 'object' &&
+    'grid' in rawMealPlan &&
+    rawMealPlan.grid &&
+    typeof rawMealPlan.grid === 'object' &&
+    'monday' in (rawMealPlan.grid as object)
+  ) {
+    return rawMealPlan.grid as Record<string, Record<string, SharedMealSlot>>
+  }
+  return rawMealPlan as Record<string, Record<string, SharedMealSlot>>
+}
+
 export default function SharedMealPlanPage() {
   const params = useParams()
   const token = params?.token as string
@@ -79,6 +259,7 @@ export default function SharedMealPlanPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
+  const [nutritionTab, setNutritionTab] = useState<'makro' | 'mikro'>('makro')
 
   useEffect(() => {
     if (!token) {
@@ -113,6 +294,47 @@ export default function SharedMealPlanPage() {
   const storePrices = Object.fromEntries(
     Object.entries(rawPrices).filter(([k]) => !k.startsWith('_'))
   ) as Record<string, Record<string, any>>
+
+  const mealPlan = useMemo(() => mealPlanGridFromPlan(plan), [plan])
+
+  const nutritionReport = useMemo(() => {
+    const rows: DayNutRow[] = []
+    for (const dayKey of PLAN_DAY_KEYS) {
+      rows.push(aggregateDayNutrients(mealPlan[dayKey], dayKey, DAY_LABELS[dayKey] || dayKey))
+    }
+    const week = rows.reduce(
+      (acc, r) => ({
+        calories: acc.calories + r.calories,
+        protein: acc.protein + r.protein,
+        carbs: acc.carbs + r.carbs,
+        fat: acc.fat + r.fat,
+        fiber: acc.fiber + r.fiber,
+        vitamins: addVitMaps(acc.vitamins, r.vitamins),
+      }),
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, vitamins: {} as Record<string, number> }
+    )
+    const daysWithMacros = rows.filter((r) => r.hasMacros).length
+    const denom = daysWithMacros > 0 ? daysWithMacros : 1
+    const weekAvg = {
+      calories: Math.round(week.calories / denom),
+      protein: Math.round((week.protein / denom) * 10) / 10,
+      carbs: Math.round((week.carbs / denom) * 10) / 10,
+      fat: Math.round((week.fat / denom) * 10) / 10,
+      fiber: Math.round((week.fiber / denom) * 10) / 10,
+    }
+    const vitaminAvg: Record<string, number> = {}
+    for (const [k, v] of Object.entries(week.vitamins)) {
+      vitaminAvg[k] = v / 7
+    }
+    const vitaminRows = Object.entries(vitaminAvg)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 48)
+    const hasAny = rows.some((r) => r.hasMacros)
+    const slotCounts = countPlannedMealsPerSlot(mealPlan)
+    const mealSlotsSummary = mealSlotsSummaryFromCounts(slotCounts)
+    return { rows, week, weekAvg, vitaminRows, hasAny, daysWithMacros, mealSlotsSummary }
+  }, [mealPlan])
 
   if (loading) {
     return (
@@ -149,19 +371,7 @@ export default function SharedMealPlanPage() {
   const sharedByName = plan.shared_by_name || null
   const planTitle = sharedByName ? `${sharedByName}s madplan` : 'Delt madplan'
 
-  const rawMealPlan = plan.meal_plan_data || {}
-  const mealPlan = (
-    rawMealPlan &&
-    typeof rawMealPlan === 'object' &&
-    'grid' in rawMealPlan &&
-    rawMealPlan.grid &&
-    typeof rawMealPlan.grid === 'object' &&
-    'monday' in (rawMealPlan.grid as object)
-      ? rawMealPlan.grid
-      : rawMealPlan
-  ) as Record<string, Record<string, { title?: string; slug?: string; id?: string; image?: string; imageUrl?: string }>>
-  const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-  const mealKeys = ['breakfast', 'lunch', 'dinner']
+  const mealKeys = ['breakfast', 'lunch', 'dinner'] as const
   const shoppingList = plan.shopping_list || {}
   const categories = shoppingList.categories || []
   const mainCategories = categories.filter((c: any) => c.name !== 'Varer du måske allerede har')
@@ -226,7 +436,7 @@ export default function SharedMealPlanPage() {
           Madplanen
         </h2>
         <div className="space-y-4">
-          {days.map((dayKey) => {
+          {PLAN_DAY_KEYS.map((dayKey) => {
             const day = mealPlan[dayKey]
             if (!day) return null
             return (
@@ -257,6 +467,9 @@ export default function SharedMealPlanPage() {
                             </div>
                             <div className="p-3">
                               <span className="font-medium text-gray-900 group-hover:text-green-600 transition-colors">{m.title}</span>
+                              {typeof m.calories === 'number' && m.calories > 0 && (
+                                <p className="mt-1 text-xs text-gray-500 tabular-nums">ca. {Math.round(m.calories)} kcal</p>
+                              )}
                             </div>
                           </Link>
                         ) : (
@@ -275,6 +488,9 @@ export default function SharedMealPlanPage() {
                             </div>
                             <div className="p-3">
                               <span className="font-medium text-gray-900">{m.title}</span>
+                              {typeof m.calories === 'number' && m.calories > 0 && (
+                                <p className="mt-1 text-xs text-gray-500 tabular-nums">ca. {Math.round(m.calories)} kcal</p>
+                              )}
                             </div>
                           </div>
                         )}
@@ -286,6 +502,174 @@ export default function SharedMealPlanPage() {
             )
           })}
         </div>
+
+        {nutritionReport.hasAny && (
+          <div className="mt-10 bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <PieChart size={20} className="text-emerald-600" />
+                Ernæring i planen
+              </h2>
+              <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50 self-start">
+                <button
+                  type="button"
+                  onClick={() => setNutritionTab('makro')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    nutritionTab === 'makro' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Makro (dag / uge)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNutritionTab('mikro')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors inline-flex items-center gap-1 ${
+                    nutritionTab === 'mikro' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <FlaskConical size={14} />
+                  Mikro
+                </button>
+              </div>
+            </div>
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {nutritionReport.mealSlotsSummary.pills.map((p) => (
+                  <span
+                    key={p.key}
+                    className={`inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium ${
+                      p.count === 0
+                        ? 'border-dashed border-gray-200 bg-white text-gray-500'
+                        : p.count === 7
+                          ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                          : 'border-amber-200 bg-amber-50 text-amber-900'
+                    }`}
+                    title={
+                      p.count === 0
+                        ? 'Ikke med i næringstallene denne uge'
+                        : p.count === 7
+                          ? 'Med alle ugens dage'
+                          : `Med ${p.count} af ugens dage`
+                    }
+                  >
+                    {p.label}
+                    <span className="ml-1 tabular-nums opacity-80 font-normal">
+                      {p.count === 0 ? 'ikke i plan' : p.count === 7 ? '7/7' : `${p.count}/7`}
+                    </span>
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-gray-700 leading-relaxed">{nutritionReport.mealSlotsSummary.sentence}</p>
+            </div>
+            <div className="p-4 text-sm text-gray-600">
+              {nutritionTab === 'makro' ? (
+                <>
+                  <p className="mb-3 text-xs text-gray-500">
+                    Pr. dag summeres kun de måltider, der står i planen ovenfor. Gennemsnit er over de dage, der har
+                    næringsdata ({nutritionReport.daysWithMacros} af 7). Nederst: hele ugen summeret.
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left border-collapse min-w-[480px]">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-gray-500 text-xs uppercase tracking-wide">
+                          <th className="py-2 pr-3 font-medium">Dag</th>
+                          <th className="py-2 pr-3 font-medium text-right">kcal</th>
+                          <th className="py-2 pr-3 font-medium text-right">P (g)</th>
+                          <th className="py-2 pr-3 font-medium text-right">K (g)</th>
+                          <th className="py-2 pr-3 font-medium text-right">F (g)</th>
+                          <th className="py-2 font-medium text-right">Fiber</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {nutritionReport.rows.map((r) =>
+                          r.hasMacros ? (
+                            <tr key={r.dayKey} className="border-b border-gray-100">
+                              <td className="py-2 pr-3 font-medium text-gray-900">{r.label}</td>
+                              <td className="py-2 pr-3 text-right tabular-nums">{Math.round(r.calories)}</td>
+                              <td className="py-2 pr-3 text-right tabular-nums">{Math.round(r.protein * 10) / 10}</td>
+                              <td className="py-2 pr-3 text-right tabular-nums">{Math.round(r.carbs * 10) / 10}</td>
+                              <td className="py-2 pr-3 text-right tabular-nums">{Math.round(r.fat * 10) / 10}</td>
+                              <td className="py-2 text-right tabular-nums">{Math.round(r.fiber * 10) / 10}</td>
+                            </tr>
+                          ) : null
+                        )}
+                        <tr className="bg-gray-50 font-semibold text-gray-900">
+                          <td className="py-2 pr-3">Gennemsnit / dag</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{nutritionReport.weekAvg.calories}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{nutritionReport.weekAvg.protein}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{nutritionReport.weekAvg.carbs}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{nutritionReport.weekAvg.fat}</td>
+                          <td className="py-2 text-right tabular-nums">{nutritionReport.weekAvg.fiber}</td>
+                        </tr>
+                        <tr className="text-gray-700 border-t border-gray-200">
+                          <td className="py-2 pr-3">Total (7 dage)</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{Math.round(nutritionReport.week.calories)}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{Math.round(nutritionReport.week.protein * 10) / 10}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{Math.round(nutritionReport.week.carbs * 10) / 10}</td>
+                          <td className="py-2 pr-3 text-right tabular-nums">{Math.round(nutritionReport.week.fat * 10) / 10}</td>
+                          <td className="py-2 text-right tabular-nums">{Math.round(nutritionReport.week.fiber * 10) / 10}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-gray-500">
+                    Samme måltider som i båndet ovenfor. Vitaminer og mineraler pr. dag; snit/dag = hele ugen / 7. Navne
+                    kommer fra opskrifternes næringsdata.
+                  </p>
+                  {nutritionReport.vitaminRows.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Ingen mikronæringsstoffer gemt på retterne i denne deling.</p>
+                  ) : (
+                    <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-lg border border-gray-100">
+                      <table className="w-full text-sm text-left">
+                        <thead className="sticky top-0 bg-white border-b border-gray-200 text-xs text-gray-500">
+                          <tr>
+                            <th className="py-2 px-2 font-medium">Næringsstof</th>
+                            {nutritionReport.rows.map((r) => (
+                              <th key={r.dayKey} className="py-2 px-1 font-medium text-right whitespace-nowrap">
+                                {r.label.slice(0, 3)}
+                              </th>
+                            ))}
+                            <th className="py-2 px-2 font-medium text-right">Snit/dag</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {nutritionReport.vitaminRows.map(([key, avg]) => (
+                            <tr key={key} className="border-b border-gray-50 hover:bg-gray-50/80">
+                              <td className="py-1.5 px-2 text-gray-800 font-medium break-all max-w-[140px]">{key}</td>
+                              {nutritionReport.rows.map((r) => {
+                                const v = r.vitamins[key]
+                                const show = typeof v === 'number' && v > 0
+                                return (
+                                  <td key={r.dayKey} className="py-1.5 px-1 text-right tabular-nums text-gray-600 text-xs">
+                                    {show ? Math.round(v * 10) / 10 : '-'}
+                                  </td>
+                                )
+                              })}
+                              <td className="py-1.5 px-2 text-right tabular-nums text-gray-900 font-medium text-xs">
+                                {Math.round(avg * 10) / 10}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!nutritionReport.hasAny && (
+          <p className="mt-8 text-sm text-gray-500 max-w-2xl">
+            Makro- og mikrooversigt vises, når retterne i planen har næringsdata (som i Madbudget). Denne deling har ingen
+            gemt næring på retterne endnu - typisk fordi skålene er tomme, eller fordi planen er delt fra en ældre version.
+            Gem og del igen fra Madbudget for at få tabellerne med.
+          </p>
+        )}
 
         {/* Indkøbsliste – madbudget-lignende med tilbud og priser */}
         {categories.length > 0 && (

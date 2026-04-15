@@ -27,7 +27,7 @@ const dietaryCategories = [
   { name: 'ANTI-INFLAMMATORISK', href: '/anti-inflammatory' },
   { name: 'FLEKSITARISK', href: '/flexitarian' },
   { name: '5:2 DIÆT', href: '/5-2-diet' },
-  { name: 'FAMILIEMAD', href: '/familie' },
+  { name: 'KALORIETÆLLING', href: '/kalorietaelling' },
 ]
 
 const BRAND_LOGO_URL = '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png'

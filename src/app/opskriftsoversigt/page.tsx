@@ -55,9 +55,9 @@ interface Recipe {
 const extendedDietaryCategories = [
   {
     id: 'Familiemad',
-    name: 'Familiemad',
+    name: 'Kalorietælling',
     slug: 'familie',
-    description: 'Almindelige familiemad opskrifter',
+    description: 'Normal familiemad med planlagte kalorier og fuld næring',
     color: 'bg-blue-500',
     icon: '👨‍👩‍👧‍👦',
     imageUrl: '/images/categories/familie.webp',

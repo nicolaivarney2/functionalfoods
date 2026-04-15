@@ -24,7 +24,7 @@ const TOPIC_FILTERS: { slug: string | null; label: string; shortLabel?: string }
   { slug: 'anti-inflammatory', label: 'Anti-inflammatorisk', shortLabel: 'Anti-infl.' },
   { slug: 'flexitarian', label: 'Fleksitarisk' },
   { slug: '5-2-diet', label: '5:2', shortLabel: '5:2' },
-  { slug: 'familie', label: 'Familiemad', shortLabel: 'Familie' },
+  { slug: 'familie', label: 'Kalorietælling', shortLabel: 'Familie' },
   { slug: 'proteinrig-kost', label: 'Proteinrig kost', shortLabel: 'Protein' },
 ]
 

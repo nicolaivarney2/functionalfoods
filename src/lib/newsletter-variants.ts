@@ -103,12 +103,12 @@ const VARIANTS: Record<string, NewsletterVariant> = {
     borderColor: '#86efac',
   },
   familie: {
-    headline: 'Sundere familiekost uden bøvl hver aften',
+    headline: 'Kalorietælling uden regneark hver aften',
     subline:
-      'Tips til måltider der fungerer når tiden er knap — og børn er ved bordet.',
+      'Planlagte kalorier og familiemad der fungerer, når tiden er knap — og børn er ved bordet.',
     perks: [
-      'Realistiske løsninger til travle uger',
-      'Idéer både børn og voksne kan spise',
+      'Klare tal — mindre gætteri',
+      'Samme ret til børn og voksne',
       'Ingen krav om perfektion',
     ],
     audienceTag: 'familie',

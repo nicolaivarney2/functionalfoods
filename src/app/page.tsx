@@ -79,7 +79,7 @@ export default function Home() {
         'anti-inflammatory': 'Anti-inflammatorisk',
         'flexitarian': 'Fleksitarisk',
         '5-2-diet': '5:2 Diæt',
-        'family': 'Familiemad',
+        'family': 'Kalorietælling',
         'proteinrig-kost': 'Proteinrig kost',
         'meal-prep': 'Proteinrig kost' // Legacy mapping
       }
@@ -111,20 +111,34 @@ export default function Home() {
 
   const faqs = [
     {
-      question: 'Skal jeg tælle kalorier?',
-      answer: 'Nej, men det hjælper at forstå dem. FunctionalFoods viser dig ikke kun kalorier, men også alle næringsstoffer, så du kan se det fulde billede af det, du spiser.'
+      question: 'Hvad er FunctionalFoods?',
+      answer:
+        'En dansk platform til sund mad og vægttab i hverdagen: opskrifter til flere kostretninger, detaljerede næringstal pr. ret, og værktøjer som personlige madplaner og indkøbslister ud fra tilbud, når du vil have ugen planlagt frem for at improvisere hver dag.'
     },
     {
-      question: 'Kan jeg tabe mig uden Keto?',
-      answer: 'Ja! Alle kostretninger kan fungere til vægttab. Det handler om at finde den tilgang, der passer til dit liv og som du kan holde ved lige. Vi har opskrifter fra Keto til Sense til Familiemad.'
+      question: 'Koster det noget at bruge?',
+      answer:
+        'Det meste indhold, herunder opskrifter og artikler, er gratis. Vil du gemme favoritter, bygge ugeplaner og få beregninger på kalorier og næring for dig eller familien, opretter du en gratis profil. Der ligger ikke et skjult abonnement bag opskrifterne. Vi har mange udgifter forbundet med at holde siden kørende, så vi har lavet en "Betal hvad du kan/vil"-funktion. Giv endelig et bidrag hvis du kan. Tak ❤️'
     },
     {
-      question: 'Hvad betyder ernæringsprofilen?',
-      answer: 'Vores ernæringsprofil viser ikke kun kalorier, protein, kulhydrater og fedt, men også vitaminer, mineraler og fedtsyrer. Alt beregnet ud fra Fødevareinstituttets FRIDA-database med danske data.'
+      question: 'Hvor kommer næringstallene fra – og kan jeg stole på dem?',
+      answer:
+        'Beregningerne bygger på danske råvarer og Fødevarestyrelsens FRIDA-database. Ud over kalorier og makro (protein, kulhydrat, fedt) viser vi også vitaminer, mineraler og fedtsyrer, når data findes, så du får et mere komplet billede end et enkelt tal for energi.'
     },
     {
-      question: 'Er FunctionalFoods gratis?',
-      answer: 'Ja, alle opskrifter og al viden på FunctionalFoods er 100% gratis. Ingen tilmelding, ingen skjulte gebyrer. Vi tror på gennemsigtighed og adgang til sundhedsviden for alle.'
+      question: 'Skal jeg følge keto eller en bestemt kur?',
+      answer:
+        'Nej. Vægttab handler i sidste ende om energibalance og en kost du kan holde i det lange løb. Vi har keto, sense, kalorietælling, GLP-1-venlig kost og flere spor, så du kan vælge den tilgang, der passer til dit liv – ikke omvendt.'
+    },
+    {
+      question: 'Hvad får jeg ud over opskrifter?',
+      answer:
+        'Opskrifterne er kernen, men du kan også bruge Madbudget til en konkret uge: retter der matcher dit kalorimål, indkøbsliste til udvalgte butikker med tilbudsvarer, og næring pr. dag og uge, så du slipper for at gætte dig frem hver aften.'
+    },
+    {
+      question: 'Hvordan hænger kalorietælling og vægttab sammen?',
+      answer:
+        'Du skal typisk ligge i et kontrolleret underskud over tid for at tabe dig. Hos os understøtter vi det med kalorietælling på forhånd: du sætter rammerne, får en plan der lægger sig til dit mål, og følger så planen i stedet for at skønne i bagklogskab. Under Kalorietælling finder du mere om teorien og praksis.'
     }
   ]
 
@@ -135,7 +149,7 @@ export default function Home() {
     { name: 'Anti-inflammatorisk', icon: '🌿', href: '/anti-inflammatory/opskrifter', short: 'Sundhedsfokus' },
     { name: 'Fleksitarisk', icon: '🥬', href: '/flexitarian/opskrifter', short: 'Fleksibel kost' },
     { name: '5:2 Diæt', icon: '⏰', href: '/5-2-diet/opskrifter', short: 'Fasteperioder' },
-    { name: 'Familiemad', icon: '👨‍👩‍👧‍👦', href: '/familie/opskrifter', short: 'Hele familien' },
+    { name: 'Kalorietælling', icon: '👨‍👩‍👧‍👦', href: '/familie/opskrifter', short: 'Planlagte kalorier' },
     { name: 'Proteinrig kost', icon: '💪', href: '/proteinrig-kost/opskrifter', short: 'Optimal næring' }
   ]
 
@@ -148,7 +162,7 @@ export default function Home() {
     { label: 'Anti-inflammatorisk', href: '/anti-inflammatory/vaegttab', icon: '🌿' },
     { label: 'Fleksitarisk', href: '/flexitarian/vaegttab', icon: '🥬' },
     { label: '5:2 diæt', href: '/5-2-diet/vaegttab', icon: '⏰' },
-    { label: 'Familiemad', href: '/familie/vaegttab', icon: '👨‍👩‍👧‍👦' },
+    { label: 'Kalorietælling', href: '/kalorietaelling/vaegttab', icon: '👨‍👩‍👧‍👦' },
   ]
 
   return (
@@ -336,7 +350,7 @@ export default function Home() {
               {
                 icon: FileText,
                 title: 'Gratis opskrifter til vægttab',
-                tagline: 'Alle madkategorier – fra keto til familiemad',
+                tagline: 'Alle madkategorier – fra keto til kalorietælling',
                 description:
                   'Keto, Sense, GLP-1 kost, anti-inflammatorisk og mange flere. Alle opskrifter er gratis og gennemtestet. Ernæringsudregnet fra den danske fødevaredatabase ned til mindste detalje.',
                 iconGradient: 'from-emerald-500 to-teal-600',
@@ -783,10 +797,10 @@ export default function Home() {
                 href: "/5-2-diet/opskrifter"
               },
               {
-                name: "FAMILIEMAD",
+                name: "KALORIETÆLLING",
                 icon: "👨‍👩‍👧‍👦",
-                description: "Sunde opskrifter til hele familien",
-                suitsYou: "Vil spise sundt sammen med familien",
+                description: "Normal mad med planlagte kalorier til hele familien",
+                suitsYou: "Vil spise med familien og stadig styre energien",
                 href: "/familie/opskrifter"
               }
             ].map((niche, index) => (

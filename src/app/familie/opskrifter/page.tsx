@@ -142,7 +142,7 @@ export default function FamilieRecipesPage() {
         <div className="container py-24">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Indlæser familiemad opskrifter...</p>
+            <p className="text-gray-600">Indlæser kalorietælling-opskrifter...</p>
           </div>
         </div>
       </main>
@@ -160,28 +160,28 @@ export default function FamilieRecipesPage() {
         <div className="container relative">
           <div className={`text-center transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <Link 
-              href="/familie"
+              href="/kalorietaelling"
               className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-6 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
-              Tilbage til Familiemad
+              Tilbage til kalorietælling
             </Link>
             
             <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-pulse">
               <Utensils className="w-4 h-4" />
-              Familiemad opskrifter
+              Kalorietælling · opskrifter
             </div>
             
             <h1 className="text-5xl md:text-7xl font-bold mb-8 text-gray-900 leading-tight">
-              Familiemad opskrifter –<br />
+              Kalorietælling opskrifter –<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-green-600">
                 {filteredRecipes.length} opskrifter
               </span>
             </h1>
             
             <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Find inspiration til dine familiemad måltider med vores store udvalg af gratis opskrifter,<br />
-              der er nemme at lave og fulde af smag.
+              Almindelig familiemad med udregnet energi og næring — stort udvalg af gratis opskrifter,<br />
+              der er nemme at lave og passer til fælles bord.
             </p>
           </div>
         </div>
@@ -197,7 +197,7 @@ export default function FamilieRecipesPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Søg i familiemad opskrifter..."
+                  placeholder="Søg i kalorietælling-opskrifter..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
@@ -326,12 +326,12 @@ export default function FamilieRecipesPage() {
             <div className="text-center py-16">
               <div className="text-6xl mb-4">👨‍👩‍👧‍👦</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                {hasActiveFilters ? 'Ingen opskrifter fundet' : 'Ingen familiemad opskrifter endnu'}
+                {hasActiveFilters ? 'Ingen opskrifter fundet' : 'Ingen opskrifter i denne kategori endnu'}
               </h3>
               <p className="text-gray-600 mb-8">
                 {hasActiveFilters
                   ? 'Prøv at justere dine filtre for at se flere opskrifter.'
-                  : 'Vi arbejder på at tilføje flere familiemad opskrifter. Kom snart tilbage!'
+                  : 'Vi arbejder på at tilføje flere opskrifter. Kom snart tilbage!'
                 }
               </p>
               {hasActiveFilters && (

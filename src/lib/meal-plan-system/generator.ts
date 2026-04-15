@@ -20,6 +20,8 @@ import {
   MealPlanStatus
 } from './types';
 
+import { getPeoplePerMealFromAdultsProfiles } from './people-per-meal';
+
 import { RecipeCategory } from '../ingredient-system';
 
 import { 
@@ -529,21 +531,10 @@ export class MealPlanGenerator {
     })
 
     // Antal personer der spiser hvert måltid – bruges til portionsstørrelse og indkøbsliste
-    const peoplePerMeal: Record<string, number> = { breakfast: 0, lunch: 0, dinner: 0 }
-    familyProfile.adultsProfiles.forEach(profile => {
-      if (profile.mealsPerDay) {
-        profile.mealsPerDay.forEach(meal => {
-          peoplePerMeal[meal] = (peoplePerMeal[meal] || 0) + 1
-        })
-      }
-    })
-    // Hvis ingen profiler har mealsPerDay, antag at alle voksne spiser alle måltider
-    const hasAnyMealsPerDay = Object.values(peoplePerMeal).some(n => n > 0)
-    if (!hasAnyMealsPerDay && familyProfile.adults > 0) {
-      peoplePerMeal.breakfast = familyProfile.adults
-      peoplePerMeal.lunch = familyProfile.adults
-      peoplePerMeal.dinner = familyProfile.adults
-    }
+    const peoplePerMeal = getPeoplePerMealFromAdultsProfiles(
+      familyProfile.adultsProfiles,
+      familyProfile.adults
+    )
     
     // Create meal structure that includes all selected meals
     const mealStructure = this.createMealStructure(dietaryApproach)

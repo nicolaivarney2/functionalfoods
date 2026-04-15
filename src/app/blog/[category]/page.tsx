@@ -97,12 +97,12 @@ const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     showRecipes: true,
   },
   familie: {
-    name: 'Familiemad',
+    name: 'Kalorietælling',
     emoji: '👨‍👩‍👧‍👦',
     bgColor: '#EFF6FF',
-    introTitle: 'Det bedste fra familiemad verdenen.',
+    introTitle: 'Kalorietælling og familiemad — uden regneark hver aften.',
     introLead:
-      'Guides, artikler og opskrifter der passer ind i en travl hverdag for hele familien.',
+      'Guides og artikler om planlagte kalorier, hverdagsretter og balance når børn og voksne spiser sammen.',
     showRecipes: true,
   },
   'proteinrig-kost': {

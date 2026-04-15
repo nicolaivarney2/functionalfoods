@@ -3,6 +3,21 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/familie',
+        destination: '/kalorietaelling',
+        permanent: true,
+      },
+      {
+        source: '/familie/vægttab',
+        destination: '/kalorietaelling/vaegttab',
+        permanent: true,
+      },
+      {
+        source: '/familie/vaegttab',
+        destination: '/kalorietaelling/vaegttab',
+        permanent: true,
+      },
+      {
         source: '/om-mig',
         destination: '/bag-om-ff/nicolaivarney',
         permanent: true,

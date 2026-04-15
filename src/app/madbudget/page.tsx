@@ -8,7 +8,7 @@ import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDow
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
-import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { mealPlanGenerator, getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 
 // Use the same Supabase client as the rest of the app
@@ -1194,6 +1194,12 @@ export default function MadbudgetPage() {
     )
   }, [familyProfile.adultsProfiles, selectedNutritionAdultIndex])
 
+  const peoplePerMealForNutrition = useMemo(
+    () =>
+      getPeoplePerMealFromAdultsProfiles(familyProfile.adultsProfiles, familyProfile.adults),
+    [familyProfile.adultsProfiles, familyProfile.adults]
+  )
+
   const recipeMatchesMealSlot = (recipe: PlannerRecipe, meal: MealType): boolean => {
     const blob = `${recipe.category || ''} ${recipe.title || ''} ${(recipe.dietaryTags || []).join(' ')}`.toLowerCase()
     if (recipe.mealType === meal) return true
@@ -1455,7 +1461,7 @@ export default function MadbudgetPage() {
     }
     
     if (!validateDietaryApproaches()) {
-      alert('Voksne skal have samme kostretning, eller mindst én skal være på familiemad hvis der er børn')
+      alert('Voksne skal have samme kostretning, eller mindst én skal være på kalorietælling (familiemad) hvis der er børn')
       return
     }
     
@@ -1676,21 +1682,26 @@ export default function MadbudgetPage() {
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   const dayLabels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
 
-  const getDayNutrition = (dayKey: DayKey, mealsFilter?: MealType[]) => {
+  /**
+   * @param perPersonSharedMeals Når true: hvert måltids tal i grid er for hele husstanden (samme ret);
+   *   divider med antal voksne der spiser det slot, så gennemsnit matcher personlige mål.
+   */
+  const getDayNutrition = (dayKey: DayKey, mealsFilter?: MealType[], perPersonSharedMeals = false) => {
     let calories = 0, protein = 0, carbs = 0, fat = 0, fiber = 0
     const vitamins: Record<string, number> = {}
     const mealKeys = (mealsFilter && mealsFilter.length > 0) ? mealsFilter : (['breakfast', 'lunch', 'dinner'] as MealType[])
     ;(mealKeys as MealType[]).forEach(mealKey => {
       const m = mealPlan[dayKey][mealKey]
       if (m) {
-        if (typeof m.calories === 'number') calories += m.calories
-        if (typeof m.protein === 'number') protein += m.protein
-        if (typeof m.carbs === 'number') carbs += m.carbs
-        if (typeof m.fat === 'number') fat += m.fat
-        if (typeof m.fiber === 'number') fiber += m.fiber
+        const div = perPersonSharedMeals ? Math.max(1, peoplePerMealForNutrition[mealKey]) : 1
+        if (typeof m.calories === 'number') calories += m.calories / div
+        if (typeof m.protein === 'number') protein += m.protein / div
+        if (typeof m.carbs === 'number') carbs += m.carbs / div
+        if (typeof m.fat === 'number') fat += m.fat / div
+        if (typeof m.fiber === 'number') fiber += m.fiber / div
         if (m.vitamins && typeof m.vitamins === 'object') {
           for (const [k, v] of Object.entries(m.vitamins)) {
-            vitamins[k] = (vitamins[k] || 0) + (typeof v === 'number' ? v : 0)
+            vitamins[k] = (vitamins[k] || 0) + (typeof v === 'number' ? v / div : 0)
           }
         }
       }
@@ -1698,12 +1709,12 @@ export default function MadbudgetPage() {
     return { calories, protein, carbs, fat, fiber, vitamins }
   }
 
-  const getWeekAverageNutrition = (mealsFilter?: MealType[]) => {
+  const getWeekAverageNutrition = (mealsFilter?: MealType[], perPersonSharedMeals = false) => {
     let totalCal = 0, totalP = 0, totalK = 0, totalF = 0, totalFiber = 0
     const totalVitamins: Record<string, number> = {}
     let daysWithData = 0
     ;(days as DayKey[]).forEach(dayKey => {
-      const nut = getDayNutrition(dayKey, mealsFilter)
+      const nut = getDayNutrition(dayKey, mealsFilter, perPersonSharedMeals)
       if (nut.calories > 0 || nut.protein > 0 || nut.carbs > 0 || nut.fat > 0) {
         daysWithData++
         totalCal += nut.calories
@@ -1747,7 +1758,7 @@ export default function MadbudgetPage() {
 
   const getMealPlanInsights = () => {
     const { adults, children, adultsProfiles } = familyProfile
-    const avg = getWeekAverageNutrition()
+    const avg = getWeekAverageNutrition(undefined, true)
     const mealsStatus = getMealsIncludedStatus()
     const hasData = avg.calories > 0 || avg.protein > 0
 
@@ -1779,7 +1790,7 @@ export default function MadbudgetPage() {
       if (children > 0) parts.push(`${children} børn`)
       intro = `I er ${parts.join(' og ')}, `
       if (hasWeightLoss) intro += 'så planen har fokus på vægttab'
-      if (hasFamiliemad && children > 0) intro += (intro.endsWith('vægttab') ? ' og ' : '') + 'familiemad'
+      if (hasFamiliemad && children > 0) intro += (intro.endsWith('vægttab') ? ' og ' : '') + 'kalorietælling'
       if (intro.endsWith(', ')) intro = intro.slice(0, -2)
       intro += '.'
     } else {
@@ -2035,7 +2046,7 @@ export default function MadbudgetPage() {
               <div className="hidden lg:grid lg:grid-cols-7 gap-4">
                 {days.map((day, index) => {
                   const dayKey = day as DayKey
-                  const dayNut = getDayNutrition(dayKey)
+                  const dayNut = getDayNutrition(dayKey, undefined, true)
                   const hasDayNut = dayNut.calories > 0 || dayNut.protein > 0 || dayNut.carbs > 0 || dayNut.fat > 0
                   return (
                   <div key={day} className="text-center">
@@ -2186,7 +2197,7 @@ export default function MadbudgetPage() {
                   {getVisibleDays().map((day, index) => {
                     const actualIndex = currentDayOffset + index
                     const dayKey = day as DayKey
-                    const dayNut = getDayNutrition(dayKey)
+                    const dayNut = getDayNutrition(dayKey, undefined, true)
                     const hasDayNut = dayNut.calories > 0 || dayNut.protein > 0 || dayNut.carbs > 0 || dayNut.fat > 0
                     return (
                       <div key={day} className="text-center">
@@ -2350,7 +2361,7 @@ export default function MadbudgetPage() {
                 {/* Dagens ernæring — præcis kasse (vægttab) */}
                 {(() => {
                   const dayKey = days[selectedDayIndex] as DayKey
-                  const nut = getDayNutrition(dayKey)
+                  const nut = getDayNutrition(dayKey, undefined, true)
                   const calFromP = nut.protein * 4
                   const calFromK = nut.carbs * 4
                   const calFromF = nut.fat * 9
@@ -2526,7 +2537,7 @@ export default function MadbudgetPage() {
                   const mealsFilter = selectedAdult?.mealsPerDay?.length
                     ? (selectedAdult.mealsPerDay as MealType[])
                     : undefined
-                  const avg = getWeekAverageNutrition(mealsFilter)
+                  const avg = getWeekAverageNutrition(mealsFilter, true)
                   const mealsStatus = getMealsIncludedStatus(mealsFilter)
                   const hasAnyData = avg.calories > 0 || avg.protein > 0 || avg.carbs > 0 || avg.fat > 0
 
@@ -4340,7 +4351,7 @@ export default function MadbudgetPage() {
                         { id: 'flexitarian', name: 'Fleksitarisk', desc: 'Primært plantebaseret med lejlighedsvis kød' },
                         { id: '5-2', name: '5:2 diæt', desc: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag' },
                         { id: 'proteinrig-kost', name: 'Proteinrig kost', desc: 'Proteinrige opskrifter til optimal næring' },
-                        { id: 'familiemad', name: 'Sund familiemad', desc: 'Klassiske, næringsrige retter der passer til hele familien' }
+                        { id: 'familiemad', name: 'Kalorietælling', desc: 'Almindelig familiemad med planlagte kalorier og fuld næring — hele familien kan spise med' }
                       ].map((approach) => (
                         <label
                           key={approach.id}

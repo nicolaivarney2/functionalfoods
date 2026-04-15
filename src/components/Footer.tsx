@@ -37,7 +37,7 @@ const columns = [
       { label: 'Anti-inflammatorisk', href: '/anti-inflammatory' },
       { label: 'Fleksitarisk', href: '/flexitarian' },
       { label: '5:2 diæt', href: '/5-2-diet' },
-      { label: 'Familiemad', href: '/familie' },
+      { label: 'Kalorietælling', href: '/kalorietaelling' },
     ],
   },
   {

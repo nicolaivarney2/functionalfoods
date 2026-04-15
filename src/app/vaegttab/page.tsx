@@ -349,10 +349,10 @@ export default function WeightLossPage() {
                   href: "/5-2-diet"
                 },
                 {
-                  name: "Familiemad",
+                  name: "Kalorietælling",
                   icon: "👨‍👩‍👧‍👦",
-                  short: "Hele familien",
-                  href: "/familie"
+                  short: "Planlagte kalorier",
+                  href: "/kalorietaelling"
                 },
                 {
                   name: "Proteinrig kost",

@@ -155,7 +155,7 @@ export default function FlexitarianPage() {
               </p>
               <p className="text-lg text-gray-600 mb-8 leading-relaxed">
                 Mange bruger fleksitarisme som bro til mere plantebaseret kost uden at melde sig ud af fællesspisning eller
-                traditioner med kød. På FunctionalFoods kan du følge nicherne fleksitarisk og familiemad på tværs og samle det i{' '}
+                traditioner med kød. På FunctionalFoods kan du følge nicherne fleksitarisk og kalorietælling på tværs og samle det i{' '}
                 <Link href="/madbudget" className="text-teal-700 font-semibold hover:underline">
                   Madbudget
                 </Link>

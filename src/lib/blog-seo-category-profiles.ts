@@ -79,9 +79,9 @@ const BLOG_SEO_CATEGORY_PROFILES: Record<string, BlogSeoCategoryProfile> = {
   },
   familiemad: {
     slug: 'familiemad',
-    displayName: 'Familiemad',
-    audience: 'Familier der vil have nemmere, sundere og mere realistisk hverdagsmad',
-    positioning: 'Travl hverdag, børn, budget og smag i balance',
+    displayName: 'Kalorietælling',
+    audience: 'Familier der vil have nemmere, sundere og mere realistisk hverdagsmad med styr på kalorierne',
+    positioning: 'Travl hverdag, børn, budget, kalorier og smag i balance',
     coreTopics: ['hverdagsmad', 'børn', 'budget', 'madpakke', 'nem aftensmad', 'planlægning'],
     searchIntents: ['nemme retter', 'børnevenlig mad', 'billig aftensmad', 'måltidsplan'],
     avoid: ['for akademisk tone', 'for snævre nichevinkler'],

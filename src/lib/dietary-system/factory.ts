@@ -58,11 +58,11 @@ export class DietaryApproachFactory {
     return {
       id: 'keto',
       name: 'Ketogenic Diet',
-      description: 'High-fat, adequate-protein, low-carbohydrate diet that forces the body to burn fats rather than carbohydrates.',
+      description: 'High-fat, moderate-protein, low-carbohydrate diet that forces the body to burn fats rather than carbohydrates.',
       macroRatios: {
         carbohydrates: { min: 5, target: 7, max: 10 },
-        protein: { min: 30, target: 32, max: 35 },
-        fat: { min: 55, target: 61, max: 65 }
+        protein: { min: 18, target: 25, max: 30 },
+        fat: { min: 62, target: 68, max: 75 }
       },
       mealStructure: {
         mealsPerDay: 3,
@@ -71,8 +71,8 @@ export class DietaryApproachFactory {
             mealType: MealType.Breakfast,
             macroDistribution: {
               carbohydrates: { min: 5, target: 7, max: 10 },
-              protein: { min: 30, target: 32, max: 35 },
-              fat: { min: 55, target: 61, max: 65 }
+              protein: { min: 18, target: 25, max: 30 },
+              fat: { min: 62, target: 68, max: 75 }
             },
             portionSize: { unit: 'calories', amount: 500 },
             isOptional: true
@@ -81,8 +81,8 @@ export class DietaryApproachFactory {
             mealType: MealType.Lunch,
             macroDistribution: {
               carbohydrates: { min: 5, target: 7, max: 10 },
-              protein: { min: 30, target: 32, max: 35 },
-              fat: { min: 55, target: 61, max: 65 }
+              protein: { min: 18, target: 25, max: 30 },
+              fat: { min: 62, target: 68, max: 75 }
             },
             portionSize: { unit: 'calories', amount: 600 }
           },
@@ -90,8 +90,8 @@ export class DietaryApproachFactory {
             mealType: MealType.Dinner,
             macroDistribution: {
               carbohydrates: { min: 5, target: 7, max: 10 },
-              protein: { min: 30, target: 32, max: 35 },
-              fat: { min: 55, target: 61, max: 65 }
+              protein: { min: 18, target: 25, max: 30 },
+              fat: { min: 62, target: 68, max: 75 }
             },
             portionSize: { unit: 'calories', amount: 700 }
           }
@@ -244,8 +244,9 @@ export class DietaryApproachFactory {
     return {
       ...this.createSenseDiet(),
       id: 'familiemad',
-      name: 'Sund familiemad',
-      description: 'Balanceret, børnevenlig hverdagsmad til hele familien.'
+      name: 'Kalorietælling',
+      description:
+        'Almindelig familiemad med planlagte kalorier og fuld næringsdeklaration — så hele familien kan spise med, mens du rammer dit energimål.'
     };
   }
 
