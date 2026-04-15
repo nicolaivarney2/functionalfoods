@@ -29,13 +29,29 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
       try {
         const res = await fetch(`/api/recipes/${encodeURIComponent(slug)}/view`, {
           method: 'POST',
+          cache: 'no-store',
         })
-        if (!res.ok || cancelled) return
-        const data = (await res.json()) as { pageViews?: number; error?: string }
-        if (typeof data.pageViews !== 'number' || cancelled) return
-        setDisplayedViews(
-          getDisplayedRecipeViews(getRecipeViewBaseline(recipe) + data.pageViews)
-        )
+        if (!res.ok || cancelled) {
+          if (process.env.NODE_ENV === 'development') {
+            const errBody = await res.clone().text().catch(() => '')
+            console.warn('[recipe view]', res.status, errBody.slice(0, 200))
+          }
+          return
+        }
+        const data = (await res.json()) as {
+          pageViews?: number | string
+          page_views?: number | string
+          error?: string
+        }
+        const rawPv = data.pageViews ?? data.page_views
+        const pv =
+          typeof rawPv === 'number' && Number.isFinite(rawPv)
+            ? Math.floor(rawPv)
+            : typeof rawPv === 'string' && rawPv.trim() !== ''
+              ? Math.floor(Number(rawPv))
+              : NaN
+        if (cancelled || !Number.isFinite(pv) || pv < 0) return
+        setDisplayedViews(getDisplayedRecipeViews(getRecipeViewBaseline(recipe) + pv))
       } catch {
         /* ignorer netværksfejl — visning forbliver SSR-værdi */
       }

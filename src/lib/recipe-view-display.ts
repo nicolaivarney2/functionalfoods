@@ -42,10 +42,20 @@ export function getDisplayedRecipeViews(rawViews: number): number {
   return Math.round(base * m)
 }
 
-function readPageViewsIncrement(recipe: Pick<Recipe, 'pageViews'> & { page_views?: number }): number {
-  const raw = recipe.pageViews ?? recipe.page_views
-  const n = typeof raw === 'number' ? raw : Number(raw)
-  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
+function coerceNonNegativeInt(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return Math.floor(value)
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value)
+    if (Number.isFinite(n) && n >= 0) return Math.floor(n)
+  }
+  return 0
+}
+
+function readPageViewsIncrement(
+  recipe: Pick<Recipe, 'pageViews'> & { page_views?: number; pageviews?: number }
+): number {
+  const raw = recipe.pageViews ?? recipe.page_views ?? recipe.pageviews
+  return coerceNonNegativeInt(raw)
 }
 
 /** Startværdi før FF-visninger: Ketoliv-tal hvis sat, ellers deterministisk slug-fallback. */
@@ -58,7 +68,7 @@ export function getRecipeViewBaseline(recipe: Pick<Recipe, 'slug' | 'ketolivView
 
 /** Rå visningstal til UI = baseline + registrerede FF-sidevisninger (`pageViews` i DB). */
 export function getRecipeViewRawTotal(
-  recipe: Pick<Recipe, 'slug' | 'ketolivViews' | 'pageViews'> & { page_views?: number }
+  recipe: Pick<Recipe, 'slug' | 'ketolivViews' | 'pageViews'> & { page_views?: number; pageviews?: number }
 ): number {
   return getRecipeViewBaseline(recipe) + readPageViewsIncrement(recipe)
 }

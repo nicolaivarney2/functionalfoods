@@ -9,9 +9,8 @@ import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import { RecipeEngagementProvider } from '@/contexts/RecipeEngagementContext'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
 
-// Cache recipe pages for high-load production traffic.
-// Pages are invalidated explicitly from admin/recalculate endpoints on updates.
-export const revalidate = 3600
+// Dynamisk: så pageViews (besøgstæller) og andre DB-felter er friske ved refresh — ellers kan ISR vise samme tal i timevis.
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ slug: string }>

@@ -89,18 +89,19 @@ export async function POST(
       )
     }
 
-    const u = updated as { pageViews?: number; pageviews?: number } | null
+    const u = updated as { pageViews?: number | string; pageviews?: number | string } | null
+    const rawOut = u?.pageViews ?? u?.pageviews
     const pageViews =
-      typeof u?.pageViews === 'number'
-        ? u.pageViews
-        : typeof u?.pageviews === 'number'
-          ? u.pageviews
+      typeof rawOut === 'number' && Number.isFinite(rawOut)
+        ? Math.floor(rawOut)
+        : typeof rawOut === 'string' && rawOut.trim() !== ''
+          ? Math.floor(Number(rawOut))
           : next
 
     databaseService.clearRecipeCaches()
-    revalidatePath(`/opskrift/${slug}`)
+    revalidatePath(`/opskrift/${slug}`, 'page')
 
-    return NextResponse.json({ pageViews })
+    return NextResponse.json({ pageViews: Number(pageViews) })
   } catch (e) {
     console.error('POST /api/recipes/[slug]/view:', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
