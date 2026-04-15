@@ -3144,17 +3144,15 @@ export default function MadbudgetPage() {
             <p className="text-sm text-gray-600 leading-relaxed">
               {mealInfoKind === 'breakfast' ? (
                 <>
-                  Har du afkrydset morgenmad, dannes morgenmad ud fra dine udregninger og ønsker. Dog er morgenmad og
-                  frokost meget individuelt, og du kan nemt klikke på et frit morgenmadsfelt og her vælge morgenmad
-                  manuelt.
+                  Når morgenmad er afkrydset, indgår morgenmad i dine beregninger og i den automatiske madplan - men
+                  morgenmad er ofte meget individuelt. Klik på et frit morgenmadsfelt for at vælge ret manuelt.
                   <span className="mt-3 block text-gray-700">
-                    <strong>Tip:</strong> Dine favorit-morgenmadsopskrifter kan du markere som favorit, så du nemmere
-                    finder dem i listen.
+                    <strong>Tip:</strong> Markér ofte brugte morgenmadsopskrifter som favoritter for hurtig adgang.
                   </span>
                 </>
               ) : (
                 <>
-                  Når frokost er afkrydset, indgår frokost i dine beregninger og i den automatiske madplan — men
+                  Når frokost er afkrydset, indgår frokost i dine beregninger og i den automatiske madplan - men
                   frokost er ofte meget individuelt. Klik på et frit frokostfelt for at vælge ret manuelt, præcis som ved
                   morgenmad.
                   <span className="mt-3 block text-gray-700">
