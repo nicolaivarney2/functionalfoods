@@ -156,7 +156,7 @@ FÆLLES FOR 5:2 DIÆTEN (kontekst):
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
-  "title": "kort beskrivende titel på dansk",
+  "title": "kort beskrivende titel (på dansk, sætningscase)",
   "description": "2-4 sætninger",
   "ingredients": [ { "name": "...", "amount": 100, "unit": "g" } ],
   "instructions": [ { "stepNumber": 1, "instruction": "...", "time": 10 } ],
@@ -168,8 +168,10 @@ OPPSKRIFT FORMAT (returner kun JSON):
   "nutritionalInfo": { "calories": 0, "protein": 0, "carbs": 0, "fat": 0, "fiber": 0 }
 }
 
-TITEL: dansk sætningscase — kun første bogstav stort, ikke Title Case På Hvert Ord.
+TITEL: sætningscase på dansk — kun første bogstav stort, ikke Title Case På Hvert Ord.
 INGREDIENSER: mængder i gram (g) hvor muligt.
+
+SMAG: Krydderier og køkkenstil må gerne være internationale, så længe 5:2-kravene til den aktuelle dagstype overholdes.
 `
 
   if (dayType === '2') {
@@ -207,7 +209,7 @@ OPGAVE: **5'ER / SPISEDAG** (de fem dage om ugen hvor man **ikke** faster)
 
 ESSENS:
 - På spisedage spiser man **normalt** — ikke med den skarpe 500-kcal grænse.
-- Opskriften skal føles som **almindelig, sund og tilfredsstillende** mad: varierede grøntsager, god proteinkilde, fuldkorn eller kartoffel/ris/pasta efter måltidstype, sunde fedt.
+- Opskriften skal føles som **sund og tilfredsstillende** mad: varierede grøntsager, god proteinkilde, fuldkorn eller kartoffel/ris/pasta efter måltidstype, sunde fedt.
 - **Ikke** designet som slanke- eller fastedagsret; kalorier må gerne ligge på et **normalt niveau** for et aftensmåltid (fx ofte ca. 450–900 kcal per portion afhængigt af ret — ikke kunstigt lavt).
 - Fokus: næring, smag, mæthed, familievenlige råvarer hvor det giver mening.
 

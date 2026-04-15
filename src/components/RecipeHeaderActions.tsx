@@ -1,8 +1,13 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Star, MessageCircle, Clock, Eye } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
-import { getDisplayedRecipeViews } from '@/lib/recipe-view-display'
+import {
+  getDisplayedRecipeViews,
+  getRecipeViewBaseline,
+  getRecipeViewRawTotal,
+} from '@/lib/recipe-view-display'
 import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 
 interface RecipeHeaderActionsProps {
@@ -10,6 +15,37 @@ interface RecipeHeaderActionsProps {
 }
 
 export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps) {
+  const [displayedViews, setDisplayedViews] = useState(() =>
+    getDisplayedRecipeViews(getRecipeViewRawTotal(recipe))
+  )
+
+  useEffect(() => {
+    setDisplayedViews(getDisplayedRecipeViews(getRecipeViewRawTotal(recipe)))
+    let cancelled = false
+    const slug = recipe.slug
+    if (!slug) return () => { cancelled = true }
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/recipes/${encodeURIComponent(slug)}/view`, {
+          method: 'POST',
+        })
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as { pageViews?: number; error?: string }
+        if (typeof data.pageViews !== 'number' || cancelled) return
+        setDisplayedViews(
+          getDisplayedRecipeViews(getRecipeViewBaseline(recipe) + data.pageViews)
+        )
+      } catch {
+        /* ignorer netværksfejl — visning forbliver SSR-værdi */
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [recipe.slug, recipe.pageViews, recipe.ketolivViews])
+
   const formatTime = (minutes: number) => {
     if (minutes < 60) return `${minutes} MIN`
     const hours = Math.floor(minutes / 60)
@@ -17,19 +53,7 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
     return mins > 0 ? `${hours}T ${mins} MIN` : `${hours}T`
   }
 
-  // Simpel page counter der skaber tillid
-  const generateViewCount = (): number => {
-    // Brug rigtige Ketoliv views hvis tilgængelige
-    if (recipe.ketolivViews && recipe.ketolivViews > 0) {
-      return recipe.ketolivViews
-    }
-    
-    // Fallback: Baseret på recipe slug for konsistens (ingen random)
-    const baseNumber = 1000 + (recipe.slug.length * 100) + (recipe.slug.charCodeAt(0) * 10)
-    return baseNumber
-  }
-
-  const viewCount = getDisplayedRecipeViews(generateViewCount())
+  const viewCount = displayedViews
   const engagement = useRecipeEngagementOptional()
   const commentCount = engagement?.commentCount ?? 0
 

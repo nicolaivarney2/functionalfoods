@@ -839,7 +839,7 @@ export default function Home() {
                     AI teknikken designer, vi vejleder dig.
                   </h3>
                   <p className="text-gray-700 leading-relaxed mb-6">
-                    Vores AI madplans-system lærer dig at kende, og er skræddersyet til dig og din familie, dine madpræferencer, vægttabsmål og livsstil - og det bedste: ugens tilbud i butikkerne!
+                    Ud fra din madprofil skræddersyr vores maskine med kunstig intelligens den bedste madplan til dit familieliv, dine mål, madpræferencer og livsstil – og det bedste: ud fra ugens tilbud i dagligvarebutikkerne!
                   </p>
                   <Link
                     href="/premium"
@@ -853,7 +853,10 @@ export default function Home() {
                   <div className="text-6xl text-center mb-4">📋</div>
                   <p className="text-center text-gray-600 font-medium">
                     AI-genererede madplaner<br />
-                    hver uge
+                    hver uge<br />
+                    <span className="text-gray-500 font-normal text-sm sm:text-base mt-2 inline-block">
+                      Ud fra opskrifter og vejledning fra mennesker
+                    </span>
                   </p>
                 </div>
               </div>

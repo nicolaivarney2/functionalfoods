@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny ${categoryName} opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner.`
+            content: `Generer en ny ${categoryName} opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter kategori og kostkrav. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
           }
         ],
         temperature: 0.8,
@@ -114,7 +114,9 @@ export async function POST(request: NextRequest) {
 }
 
 function createSystemPrompt(category: string, existingTitles: string[]): string {
-  const basePrompt = `Du er en ekspert i dansk madlavning og ernæring. Generer en detaljeret opskrift i JSON format.
+  const basePrompt = `Du er en ekspert i ernæring og praktisk madlavning. Skriv på dansk. Generer en detaljeret opskrift i JSON format.
+
+SMAG: Du må gerne bruge tydelige internationale smagsprofiler og retninger, så længe opskriften overholder den valgte kategori og kostkrav.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
@@ -161,8 +163,8 @@ OPPSKRIFT FORMAT (returner kun JSON):
 KATEGORI: FAMILIEMAD
 - Klassiske, næringsrige retter der passer til hele familien
 - Bør være nemme at lave og populære hos børn og voksne
-- Fokus på danske traditioner og smag
-- Brug almindelige ingredienser der er lette at få fat i`
+- Varier gerne smag og køkken globalt, så længe det er børnevenligt og realistisk i hverdagen
+- Brug ingredienser der er realistiske at handle til hjemme`
 
     case 'keto':
       return basePrompt + `
@@ -177,11 +179,12 @@ KATEGORI: KETO
     case 'sense':
       return basePrompt + `
 
-KATEGORI: SENSE
-- Sunde, balancerede retter med fokus på næring
-- Fokus på omega-3, antioksidanter, og fuldkorn
-- Brug: fisk, nødder, bær, grøntsager, fuldkorn
-- Undgå: processerede fødevarer, for meget sukker`
+KATEGORI: SENSE (Suzy Wengel-inspireret portionsforståelse)
+- Spisekasse pr. person (ca.): 1–2 håndfulde ikke-stivelsesholdigt grønt, 1 håndfuld protein, 0–1 håndfuld stivelse eller frugt (afhænger af måltid), 1–3 spsk fedt totalt (olie, smør, dressing, ost …).
+- Ingen kalorietælling i teksten; fokus på mæthed, hverdagsbalance og 2–3 måltider.
+- IKKE keto, IKKE "hjerne-kost" eller kognitiv gimmick-vinkel.
+- Varier protein (kød, fisk, æg, magert mejeri, tofu, bælgfrugt) og stivelse (kartoffel, ris, pasta, fuldkorn, brød) — undgå at hver ret er kylling + broccoli + ris.
+- Skriv ingrediensmængder i gram; portioner som udgangspunkt 2 personer.`
 
     case 'paleo':
       return basePrompt + `

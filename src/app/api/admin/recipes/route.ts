@@ -112,6 +112,7 @@ export async function PUT(request: NextRequest) {
       mainCategory,
       subCategories,
       ingredients,
+      ingredientGroups,
       instructions,
       servings,
     } = body
@@ -138,6 +139,9 @@ export async function PUT(request: NextRequest) {
     }
     if (ingredients !== undefined) {
       updateData.ingredients = Array.isArray(ingredients) ? ingredients : []
+    }
+    if (ingredientGroups !== undefined) {
+      updateData.ingredientGroups = Array.isArray(ingredientGroups) ? ingredientGroups : []
     }
     if (instructions !== undefined) {
       updateData.instructions = Array.isArray(instructions) ? instructions : []

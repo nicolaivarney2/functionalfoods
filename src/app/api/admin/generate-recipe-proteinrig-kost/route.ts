@@ -15,7 +15,7 @@ interface ExistingRecipe {
 
 interface ProteinrigParameters {
   maaltid?: 'morgenmad' | 'frokost' | 'aftensmad' | 'snacks'
-  proteinKilde?: 'kylling' | 'fisk' | 'æg' | 'oksekød' | 'vegetarisk' | 'frit-valg'
+  proteinKilde?: 'kylling' | 'kalkun' | 'fisk' | 'æg' | 'oksekød' | 'svinekød' | 'vegetarisk' | 'frit-valg'
   recipeType?: string
   inspiration?: string
 }
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: `Generer en ny proteinrig opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og tydelige proteinkilder (magert kød, fisk, æg, mejeriprodukter, bælgfrugter). Balancerede kulhydrater og fedt — ikke keto, ikke ekstrem lavkalorie.
+            content: `Generer en ny proteinrig opskrift der er unik og ikke ligner eksisterende opskrifter. Tydelige proteinkilder (magert kød, fisk, æg, mejeriprodukter, bælgfrugter). Balancerede kulhydrater og fedt — ikke keto, ikke ekstrem lavkalorie. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
 
 ${proteinrigCarbInstructionForUser(resolvedMaaltid)}
 
@@ -91,7 +91,7 @@ ${parameterInstructions}
 ${variationPrompt}`,
           },
         ],
-        temperature: 0.85,
+        temperature: 0.9,
         max_tokens: 2500,
       }),
     })
@@ -178,14 +178,18 @@ function createProteinrigSystemPrompt(existingTitles: string[], maaltid: string)
   const variationBlock = isAftensmad
     ? `VARIATION:
 - Undgå standardmønstret kød + peberfrugt + broccoli + olie + salt/peber.
-- Varier retformat tydeligt mellem fx lasagne, suppe, bowl, gryderet, ovnret, salat eller wraps.
+- Undgå at gentage samme grøntsags-DNA igen og igen (fx fennikel + kikærter + gulerødder som fast trio); søg bredt i køkkener, årstider, rodfrugt, kål, svampe og forskellige kulhydrater.
+- Varier retformat tydeligt mellem fx lasagne, suppe, bowl, gryderet, ovnret, salat, wraps, pastaret, wok, risotto/perlespelt, karry, taco-skål eller sheet-pan.
 - Hvis brugeren angiver ret-type, skal den respekteres tydeligt i både ingredienser og tilberedning.`
     : `VARIATION:
 - Undgå standardmønstret kød + peberfrugt + broccoli + olie + salt/peber.
+- Undgå ensformig gentagelse af samme grøntsager og bælgfrugt i hver opskrift — tænk også urter, andre kåltyper, svampe, agurk, radiser, tomat m.m.
 - Til morgenmad/frokost/snack: varier kun inden for enkle formater (æggeret, grød, sandwich, salat, skyr-/cottage tallerken) — ikke lasagne, tunge gryderetter eller ovnretter som morgenmad.
 - Hvis brugeren angiver ret-type, skal den respekteres når den passer til måltidet.`
 
-  return `Du er en ekspert i proteinrig kost, sportsernæring og dansk hverdagsmad. Generer en detaljeret opskrift i JSON format.
+  return `Du er en ekspert i proteinrig kost og sportsernæring. Skriv på dansk. Generer en detaljeret opskrift i JSON format.
+
+SMAG: Varier gerne internationalt (wok, karry, tagine, taco, ramen-inspireret …), så længe protein- og kulhydratprincipperne for proteinrig kost overholdes.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map((title) => `- ${title}`).join('\n')}
@@ -198,7 +202,7 @@ ${kulhydratPrincip}
 - Undgå "tomme" kalorier: begræns sukker og tilsat fedt uden protein.
 
 OPPSKRIFT FORMAT (returner kun JSON):
-- "title": dansk sætningscase — kun stort begyndelsesbogstav i første ord (fx "Grillet kylling med skyr-dip"), aldrig Title Case På Hvert Ord.
+- "title": sætningscase på dansk — kun stort begyndelsesbogstav i første ord (fx "Grillet kylling med skyr-dip"), aldrig Title Case På Hvert Ord.
 
 {
   "title": "Proteinrig opskrift titel",
@@ -240,7 +244,7 @@ INGREDIENS REGLER:
 - Kød/fisk: "200 g kyllingebryst", "400 g laks"
 - Mejeri: "150 g skyr", "100 g cottage cheese"
 - Æg: "200 g æg" (ca. 4 stk)
-- Bælgfrugter: "200 g kogte kikærter", "120 g røde linser tørre"
+- Bælgfrugter (varier): "200 g kogte kikærter", "120 g røde linser tørre", "200 g sorte bønner kogte", "150 g edamamebønner"
 - Grøntsager og tilbehør i gram
 - Portioner: altid 2
 - Ingen "notes" på ingredienser medmindre nødvendigt
@@ -249,7 +253,7 @@ PROTEINRIGE INGREDIENSER AT FOKUSERE PÅ:
 - Kylling, kalkun, magert svinekød, oksekød (magre udskæringer)
 - Fisk, tun, rejer, æg
 - Skyr, kvark, cottage cheese, ost (moderat)
-- Tofu, tempeh, linser, bønner, kikærter
+- Tofu, tempeh, linser, bønner, kikærter (skift mellem bælgtyper — ikke kikærter i hver eneste ret)
 ${kulhydratIngrediensBullet}
 - Valgfrit: proteinpulver kun hvis det giver mening i retten (fx en meget simpel shake), ellers helst hel mad; undgå proteinpulver som undskyldning for mærkelige smoothie-ingredienser
 
@@ -269,7 +273,21 @@ function buildProteinrigParameterInstructions(params: ProteinrigParameters): str
   }
 
   if (params.proteinKilde && params.proteinKilde !== 'frit-valg') {
-    instructions.push(`PROTEIN-KILDE: ${params.proteinKilde} skal være primær proteinkilde.`)
+    if (params.proteinKilde === 'kylling') {
+      instructions.push(
+        'PROTEIN-KILDE: Kylling (fjerkræ) skal være den tydelige hovedprotein — fx kyllingebryst eller lår uden ben. Brug ikke kalkun i denne opskrift.'
+      )
+    } else if (params.proteinKilde === 'kalkun') {
+      instructions.push(
+        'PROTEIN-KILDE: Kalkun skal være den tydelige hovedprotein — fx kalkunbryst eller kalkunfars. Kylling må ikke være hovedkilde.'
+      )
+    } else if (params.proteinKilde === 'svinekød') {
+      instructions.push(
+        'PROTEIN-KILDE: Svinekød skal være den tydelige hovedprotein — fx mager kotlet, filet, mørbrad eller hakket svinekød (ca. 8–12% fedt). Okse og fjerkræ må ikke være hovedkilde.'
+      )
+    } else {
+      instructions.push(`PROTEIN-KILDE: ${params.proteinKilde} skal være primær proteinkilde.`)
+    }
   }
 
   if (params.recipeType && params.recipeType.trim()) {

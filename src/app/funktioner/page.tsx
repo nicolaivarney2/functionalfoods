@@ -9,6 +9,7 @@ import {
   PiggyBank,
   Scale,
   Sparkles,
+  Users,
   Video,
   type LucideIcon,
 } from 'lucide-react'
@@ -27,6 +28,7 @@ const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
   LayoutGrid,
   MessageSquare,
   Scale,
+  Users,
 }
 
 export const metadata: Metadata = {

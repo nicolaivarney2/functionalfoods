@@ -228,6 +228,16 @@ export default function NutritionFactsBox({
                   </li>
                 ))}
               </ul>
+              <p className="mt-2 pt-2 border-t border-green-200/80 text-xs text-green-800/95 leading-relaxed">
+                I vores Madbudget kan du lave en fuld madplan for ugen og se fuld makro- og mikrosammensætning
+                (vitaminer og mineraler) for ugen, så du ved, om du lever sundt!{' '}
+                <Link
+                  href="/madbudget"
+                  className="font-semibold text-green-900 underline underline-offset-2 decoration-green-700/70 hover:text-green-950"
+                >
+                  Prøv det her
+                </Link>
+              </p>
             </div>
 
             {/* Vitamins */}

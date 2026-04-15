@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
 import { generateSlug } from '@/lib/utils'
+import type { Ingredient, IngredientGroup } from '@/types/recipe'
 import {
   normalizeAiRecipeIngredients,
   normalizeAiRecipeInstructions,
 } from '@/lib/ai-recipe-ingredient-normalize'
 import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
+import {
+  buildIngredientGroupsWithIds,
+  inferSenseIngredientGroupsFromFlat,
+  orderSenseGroupsFromAi,
+  senseGroupSizesMatchFlatLength,
+  type SenseGroupFromAi,
+} from '@/lib/sense-spisekasse'
 
 interface GeneratedRecipe {
   title: string
@@ -15,6 +23,11 @@ interface GeneratedRecipe {
     amount: number
     unit: string
     notes?: string
+  }>
+  /** Sense: gruppeinddeling — antal linjer pr. gruppe skal matche den flade ingrediensliste. */
+  ingredientGroups?: Array<{
+    name: string
+    ingredients: Array<{ name: string; amount: number; unit: string; notes?: string }>
   }>
   instructions: Array<{
     stepNumber: number
@@ -56,8 +69,59 @@ export async function POST(request: NextRequest) {
 
     console.log(`💾 Saving AI-kladde as real draft: ${recipe.title}`)
 
-    const ingredientsNormalized = normalizeAiRecipeIngredients(recipe.ingredients)
+    const ingredientsNormalized = normalizeAiRecipeIngredients(recipe.ingredients || [])
     const instructionsNormalized = normalizeAiRecipeInstructions(recipe.instructions || [])
+
+    let ingredientsForDb: Ingredient[] = ingredientsNormalized.map((ingredient) => ({
+      id: crypto.randomUUID(),
+      name: ingredient.name,
+      amount: ingredient.amount,
+      unit: ingredient.unit,
+      ...(ingredient.notes != null && ingredient.notes !== ''
+        ? { notes: ingredient.notes }
+        : {}),
+    }))
+    let ingredientGroupsForDb: IngredientGroup[] | null = null
+
+    if (category === 'sense') {
+      let senseGroupsResolved = false
+      if (Array.isArray(recipe.ingredientGroups) && recipe.ingredientGroups.length > 0) {
+        const ordered = orderSenseGroupsFromAi(recipe.ingredientGroups as SenseGroupFromAi[])
+        const sizes = ordered.map((g) => ({
+          name: g.name,
+          count: Array.isArray(g.ingredients) ? g.ingredients.length : 0,
+        }))
+        if (senseGroupSizesMatchFlatLength(ordered, ingredientsNormalized.length)) {
+          const withIds: Ingredient[] = ingredientsNormalized.map((ingredient) => ({
+            id: crypto.randomUUID(),
+            name: ingredient.name,
+            amount: ingredient.amount,
+            unit: ingredient.unit,
+            ...(ingredient.notes != null && ingredient.notes !== ''
+              ? { notes: ingredient.notes }
+              : {}),
+          }))
+          const built = buildIngredientGroupsWithIds(withIds, sizes)
+          if (built.length > 0) {
+            ingredientsForDb = built.flatMap((g) => g.ingredients)
+            ingredientGroupsForDb = built
+            senseGroupsResolved = true
+          }
+        } else {
+          console.warn(
+            '⚠️ Sense: ingredientGroups matcher ikke antal ingredienser — forsøger heuristisk fordeling'
+          )
+        }
+      }
+      if (!senseGroupsResolved && ingredientsNormalized.length > 0) {
+        const inferred = inferSenseIngredientGroupsFromFlat(ingredientsNormalized)
+        if (inferred && inferred.length > 0) {
+          ingredientsForDb = inferred.flatMap((g) => g.ingredients)
+          ingredientGroupsForDb = inferred
+          console.log('Sense: gemt med heuristisk spisekasse-fordeling (ingredientGroups)')
+        }
+      }
+    }
 
     const supabase = createSupabaseClient()
     const slug = generateSlug(recipe.title)
@@ -69,19 +133,24 @@ export async function POST(request: NextRequest) {
       console.warn('⚠️ Ingredient registry sync failed:', syncError)
     }
     
-    // Check if recipe with same title or slug already exists
-    const { data: existingRecipe } = await supabase
+    // Undgå dubletter: to separate opslag (stabilt ved 0/1 række) — .single() på .or() fejler let ved 0 eller 2+ rækker
+    const { data: existingByTitle } = await supabase
       .from('recipes')
-      .select('id, title, slug')
-      .or(`title.eq.${recipe.title},slug.eq.${slug}`)
-      .single()
+      .select('id')
+      .eq('title', recipe.title)
+      .maybeSingle()
+    const { data: existingBySlug } = await supabase
+      .from('recipes')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle()
 
-    if (existingRecipe) {
+    if (existingByTitle?.id || existingBySlug?.id) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Recipe already exists',
-          details: `A recipe with title "${recipe.title}" or slug "${slug}" already exists`
+        {
+          success: false,
+          error: 'Opskrift findes allerede',
+          details: `Der findes allerede en opskrift med samme titel eller slug («${slug}»).`,
         },
         { status: 409 }
       )
@@ -112,13 +181,10 @@ export async function POST(request: NextRequest) {
       mainCategory: getMainCategory(category),
       subCategories: null,
       dietaryCategories: recipe.dietaryCategories,
-      ingredients: ingredientsNormalized.map((ingredient, i) => ({
-        id: `${crypto.randomUUID()}-${i + 1}`,
-        name: ingredient.name,
-        amount: ingredient.amount,
-        unit: ingredient.unit,
-        notes: ingredient.notes
-      })),
+      ingredients: ingredientsForDb,
+      ...(ingredientGroupsForDb && ingredientGroupsForDb.length > 0
+        ? { ingredientGroups: ingredientGroupsForDb }
+        : {}),
       instructions: instructionsNormalized.map((instruction, i) => ({
         id: `${crypto.randomUUID()}-${i + 1}`,
         stepNumber: instruction.stepNumber,
@@ -145,11 +211,26 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error saving recipe:', error)
+      const msg = error.message || ''
+      const code = (error as { code?: string }).code
+      const isDup =
+        code === '23505' ||
+        /duplicate key|unique constraint|already exists/i.test(msg)
+      if (isDup) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Opskrift findes allerede (samtidig gemning?)',
+            details: msg,
+          },
+          { status: 409 }
+        )
+      }
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Failed to save recipe',
-          details: error.message
+        {
+          success: false,
+          error: 'Kunne ikke gemme opskriften',
+          details: msg,
         },
         { status: 500 }
       )

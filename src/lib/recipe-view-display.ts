@@ -1,3 +1,5 @@
+import type { Recipe } from '@/types/recipe'
+
 /**
  * Visnings-tal for opskrifter: i en indledende periode vises tallet × multiplier,
  * så det matcher øget synlighed i starten. Samme logik som "hver visning tæller som 3".
@@ -38,4 +40,25 @@ export function getDisplayedRecipeViews(rawViews: number): number {
   const base = Math.max(0, Math.round(rawViews))
   const m = getRecipeViewDisplayMultiplier()
   return Math.round(base * m)
+}
+
+function readPageViewsIncrement(recipe: Pick<Recipe, 'pageViews'> & { page_views?: number }): number {
+  const raw = recipe.pageViews ?? recipe.page_views
+  const n = typeof raw === 'number' ? raw : Number(raw)
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
+}
+
+/** Startværdi før FF-visninger: Ketoliv-tal hvis sat, ellers deterministisk slug-fallback. */
+export function getRecipeViewBaseline(recipe: Pick<Recipe, 'slug' | 'ketolivViews'>): number {
+  const k = Number(recipe.ketolivViews)
+  if (Number.isFinite(k) && k > 0) return k
+  const slug = String(recipe.slug || '')
+  return 1000 + slug.length * 100 + (slug.charCodeAt(0) || 0) * 10
+}
+
+/** Rå visningstal til UI = baseline + registrerede FF-sidevisninger (`pageViews` i DB). */
+export function getRecipeViewRawTotal(
+  recipe: Pick<Recipe, 'slug' | 'ketolivViews' | 'pageViews'> & { page_views?: number }
+): number {
+  return getRecipeViewBaseline(recipe) + readPageViewsIncrement(recipe)
 }

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Fleksitarisk opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på plantebaseret kost med mulighed for kød.`
+            content: `Generer en ny Fleksitarisk opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på plantebaseret kost med mulighed for kød. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
           }
         ],
         temperature: 0.8,
@@ -202,7 +202,7 @@ INGREDIENS REGLER:
 - Fisk: "400 g laks", "300 g makrel"
 - Ingen notes felt på ingredienser
 - Portioner: altid 2
-- Titel: dansk sætningscase — kun første bogstav stort, ikke Title Case På Hvert Ord
+- Titel: sætningscase på dansk — kun første bogstav stort, ikke Title Case På Hvert Ord
 
 FLEKSITARISKE INGREDIENSER:
 - Grøntsager: broccoli, spinat, kål, zucchini, squash
@@ -220,7 +220,10 @@ PLANTEBASERET FOKUS:
 - Tilføj nødder og frø for fedt
 - Vælg fuldkorn for kulhydrater
 - Brug kød som smagsgiver, ikke hovedingrediens
-- Tilføj frisk urt for smag`
+- Tilføj frisk urt for smag
+
+SMAG OG KØKKEN:
+- Krydderiprofiler og retter må gerne være tydeligt internationale (asiatisk, latinamerikansk, mellemøstlig, afrikansk, europæisk …), så længe fleksitariske principper overholdes.`
 }
 
 function parseGeneratedRecipe(content: string): any {

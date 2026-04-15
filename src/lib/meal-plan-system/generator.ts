@@ -46,7 +46,7 @@ import {
   calculateSupplementAmount
 } from './kombi-supplements';
 
-import { buildAcceptableDietKeys, recipeDietTagMatches } from '../diet-tag-matching';
+import { buildAcceptableDietKeys, recipeDietTagMatches, resolveFactoryDietId } from '../diet-tag-matching';
 
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
@@ -55,10 +55,11 @@ export class MealPlanGenerator {
   private recipeLastUsed: Map<string, Date> = new Map(); // Track last used date per recipe
   private currentOffers: Map<string, any[]> = new Map(); // Cache for current offers by ingredient
   private selectedIngredientIds: Set<string> = new Set(); // Track selected ingredients for overlap scoring
+  /** Afvent altid denne før generering — ellers er `this.recipes` tom ved første klik (race). */
+  private readonly recipesLoadPromise: Promise<void>
 
   constructor() {
-    // Initialize recipes asynchronously
-    this.initializeRealRecipes();
+    this.recipesLoadPromise = this.initializeRealRecipes()
   }
 
   /**
@@ -384,10 +385,13 @@ export class MealPlanGenerator {
   ): Promise<MealPlan> {
     const startTime = Date.now();
 
-    // Get dietary approach
-    const dietaryApproach = dietaryFactory.getDiet(dietaryApproachId);
+    await this.recipesLoadPromise
+
+    const resolvedId = resolveFactoryDietId(dietaryApproachId)
+    const dietaryApproach =
+      dietaryFactory.getDiet(resolvedId) || dietaryFactory.getDiet('sense')
     if (!dietaryApproach) {
-      throw new Error(`Dietary approach ${dietaryApproachId} not found`);
+      throw new Error(`Dietary approach ${dietaryApproachId} (resolved: ${resolvedId}) not found`)
     }
 
     // Calculate energy needs and macro targets
@@ -479,6 +483,8 @@ export class MealPlanGenerator {
   ): Promise<WeekPlan> {
     const startTime = Date.now();
 
+    await this.recipesLoadPromise
+
     // Determine primary dietary approach
     // If children exist, prioritize familiemad or kombi-tags
     // Otherwise use the adults' dietary approach
@@ -500,10 +506,11 @@ export class MealPlanGenerator {
       primaryDietaryApproach = familyProfile.adultsProfiles[0]?.dietaryApproach || 'sense'
     }
 
-    // Get dietary approach
-    const dietaryApproach = dietaryFactory.getDiet(primaryDietaryApproach);
+    const resolvedPrimaryId = resolveFactoryDietId(primaryDietaryApproach)
+    const dietaryApproach =
+      dietaryFactory.getDiet(resolvedPrimaryId) || dietaryFactory.getDiet('sense')
     if (!dietaryApproach) {
-      throw new Error(`Dietary approach ${primaryDietaryApproach} not found`);
+      throw new Error(`Dietary approach ${primaryDietaryApproach} (resolved: ${resolvedPrimaryId}) not found`)
     }
 
     // Combine all excluded ingredients from family and adults
@@ -587,14 +594,14 @@ export class MealPlanGenerator {
           : null
     };
 
-    // Load current offers from selected stores
-    console.log(`🛒 Loading offers from stores: ${familyProfile.selectedStores.join(', ')}`);
+    const storeIds = familyProfile.selectedStores ?? []
+    console.log(`🛒 Loading offers from stores: ${storeIds.length ? storeIds.join(', ') : '(ingen butikker valgt)'}`)
     if (familyProfile.weeklyBudgetKr != null && familyProfile.weeklyBudgetKr > 0) {
       console.log(
         `💶 Budgetloft: ${familyProfile.weeklyBudgetKr} kr/uge – tilbud vægtes stærkere (faktor op til ~${Math.min(2.2, Math.max(1, 1200 / familyProfile.weeklyBudgetKr)).toFixed(2)})`
       )
     }
-    await this.loadCurrentOffers(familyProfile.selectedStores);
+    await this.loadCurrentOffers(storeIds)
 
     // Generate 1 week of meal plans
     const weekPlan = await this.generateWeekPlan(1, config);
@@ -775,7 +782,7 @@ export class MealPlanGenerator {
         }
       }
       // Check dietary approach compatibility (slug vs DB label, hyphen vs space, aliases)
-      const hasDietaryApproach = recipe.dietaryApproaches.some(approach =>
+      const hasDietaryApproach = (recipe.dietaryApproaches ?? []).some((approach) =>
         recipeDietTagMatches(approach, acceptableDietKeys)
       );
       
@@ -787,15 +794,17 @@ export class MealPlanGenerator {
       // Additional keto-specific filtering (pr. 100g hvis kendt; ellers grov grænse pr. portion)
       if (config.dietaryApproach.id.toLowerCase() === 'keto') {
         const ni = recipe.nutritionalInfo
-        const c100 = ni.carbsPer100g || 0
-        const cPort = ni.carbsPerPortion || 0
-        if (c100 > 10) {
-          excludedByCarbs++
-          return false
-        }
-        if (c100 === 0 && cPort > 40) {
-          excludedByCarbs++
-          return false
+        if (ni) {
+          const c100 = ni.carbsPer100g || 0
+          const cPort = ni.carbsPerPortion || 0
+          if (c100 > 10) {
+            excludedByCarbs++
+            return false
+          }
+          if (c100 === 0 && cPort > 40) {
+            excludedByCarbs++
+            return false
+          }
         }
       }
 
@@ -807,7 +816,7 @@ export class MealPlanGenerator {
 
       // Check for allergies
       for (const allergy of config.allergies) {
-        const hasAllergy = recipe.ingredients.some(ingredient => {
+        const hasAllergy = (recipe.ingredients ?? []).some((ingredient) => {
           const ingredientData = ingredientService.getIngredientById(ingredient.ingredientId);
           return ingredientData?.allergens?.includes(allergy);
         });
@@ -906,6 +915,7 @@ export class MealPlanGenerator {
    */
   private calculateMacroAlignment(recipe: Recipe, mealDistribution: any): number {
     const ni = recipe.nutritionalInfo
+    if (!ni) return 50
     const usePortion =
       typeof ni.caloriesPerPortion === 'number' && ni.caloriesPerPortion > 0
 
@@ -1055,7 +1065,7 @@ export class MealPlanGenerator {
     const selectedRecipe = topRecipes[randomIndex].recipe;
     
     // Track selected ingredients for overlap scoring
-    selectedRecipe.ingredients.forEach(ing => {
+    ;(selectedRecipe.ingredients ?? []).forEach((ing) => {
       this.selectedIngredientIds.add(ing.ingredientId);
     });
     
@@ -1076,15 +1086,17 @@ export class MealPlanGenerator {
    */
   private calculateServings(recipe: Recipe, mealDistribution: any): number {
     const targetCalories = mealDistribution.targetCalories;
+    const ni = recipe.nutritionalInfo
+    if (!ni) return 1
     // Prefer per-portion calories if available (from Frida per-portion JSON)
-    const perPortionCalories = recipe.nutritionalInfo.caloriesPerPortion;
+    const perPortionCalories = ni.caloriesPerPortion;
     if (perPortionCalories && perPortionCalories > 0) {
       const servings = targetCalories / perPortionCalories;
       return Math.max(0.5, Math.min(3, Math.round(servings * 10) / 10));
     }
 
     // Fallback to per-100g
-    const recipeCaloriesPer100g = recipe.nutritionalInfo.caloriesPer100g || 100;
+    const recipeCaloriesPer100g = ni.caloriesPer100g || 100;
     const servings = targetCalories / recipeCaloriesPer100g;
     return Math.max(0.5, Math.min(3, Math.round(servings * 10) / 10));
   }
@@ -1104,8 +1116,12 @@ export class MealPlanGenerator {
     vitamins?: { [key: string]: number };
     minerals?: { [key: string]: number };
   } {
+    const ni = recipe.nutritionalInfo
+    if (!ni) {
+      return { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    }
     // Prefer per-portion nutrition if present (Frida per-portion JSON stored on recipe)
-    const hasPerPortion = typeof recipe.nutritionalInfo.caloriesPerPortion === 'number' && recipe.nutritionalInfo.caloriesPerPortion > 0;
+    const hasPerPortion = typeof ni.caloriesPerPortion === 'number' && ni.caloriesPerPortion > 0;
     const multiplier = servings; // multiplier scales per-portion values directly
 
     const result: {
@@ -1120,65 +1136,65 @@ export class MealPlanGenerator {
       minerals?: { [key: string]: number };
     } = {
       calories: hasPerPortion
-        ? (recipe.nutritionalInfo.caloriesPerPortion || 0) * multiplier
-        : (recipe.nutritionalInfo.caloriesPer100g * recipe.servings / 100) * (servings / recipe.servings),
+        ? (ni.caloriesPerPortion || 0) * multiplier
+        : (ni.caloriesPer100g * recipe.servings / 100) * (servings / recipe.servings),
       protein: hasPerPortion
-        ? (recipe.nutritionalInfo.proteinPerPortion || 0) * multiplier
-        : (recipe.nutritionalInfo.proteinPer100g * recipe.servings / 100) * (servings / recipe.servings),
+        ? (ni.proteinPerPortion || 0) * multiplier
+        : (ni.proteinPer100g * recipe.servings / 100) * (servings / recipe.servings),
       carbs: hasPerPortion
-        ? (recipe.nutritionalInfo.carbsPerPortion || 0) * multiplier
-        : (recipe.nutritionalInfo.carbsPer100g * recipe.servings / 100) * (servings / recipe.servings),
+        ? (ni.carbsPerPortion || 0) * multiplier
+        : (ni.carbsPer100g * recipe.servings / 100) * (servings / recipe.servings),
       fat: hasPerPortion
-        ? (recipe.nutritionalInfo.fatPerPortion || 0) * multiplier
-        : (recipe.nutritionalInfo.fatPer100g * recipe.servings / 100) * (servings / recipe.servings)
+        ? (ni.fatPerPortion || 0) * multiplier
+        : (ni.fatPer100g * recipe.servings / 100) * (servings / recipe.servings)
     };
 
     // Add micro-nutrition if available (prefer per-portion, fallback to per-100g)
     if (hasPerPortion) {
-      if (typeof recipe.nutritionalInfo.fiberPerPortion === 'number') {
-        result.fiber = recipe.nutritionalInfo.fiberPerPortion * multiplier;
+      if (typeof ni.fiberPerPortion === 'number') {
+        result.fiber = ni.fiberPerPortion * multiplier;
       }
-      if (typeof recipe.nutritionalInfo.sugarPerPortion === 'number') {
-        result.sugar = recipe.nutritionalInfo.sugarPerPortion * multiplier;
+      if (typeof ni.sugarPerPortion === 'number') {
+        result.sugar = ni.sugarPerPortion * multiplier;
       }
-      if (typeof recipe.nutritionalInfo.sodiumPerPortion === 'number') {
-        result.sodium = recipe.nutritionalInfo.sodiumPerPortion * multiplier;
+      if (typeof ni.sodiumPerPortion === 'number') {
+        result.sodium = ni.sodiumPerPortion * multiplier;
       }
     } else {
-      if (recipe.nutritionalInfo.fiberPer100g) {
-        result.fiber = (recipe.nutritionalInfo.fiberPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      if (ni.fiberPer100g) {
+        result.fiber = (ni.fiberPer100g * recipe.servings / 100) * (servings / recipe.servings);
       }
-      if (recipe.nutritionalInfo.sugarPer100g) {
-        result.sugar = (recipe.nutritionalInfo.sugarPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      if (ni.sugarPer100g) {
+        result.sugar = (ni.sugarPer100g * recipe.servings / 100) * (servings / recipe.servings);
       }
-      if (recipe.nutritionalInfo.sodiumPer100g) {
-        result.sodium = (recipe.nutritionalInfo.sodiumPer100g * recipe.servings / 100) * (servings / recipe.servings);
+      if (ni.sodiumPer100g) {
+        result.sodium = (ni.sodiumPer100g * recipe.servings / 100) * (servings / recipe.servings);
       }
     }
 
     // Add vitamins and minerals if available
     // Vitamins & minerals
-    if (hasPerPortion && recipe.nutritionalInfo.vitaminMap) {
+    if (hasPerPortion && ni.vitaminMap) {
       result.vitamins = {};
-      Object.entries(recipe.nutritionalInfo.vitaminMap).forEach(([k, v]) => {
+      Object.entries(ni.vitaminMap).forEach(([k, v]) => {
         result.vitamins![k] = (v || 0) * multiplier;
       });
-    } else if (recipe.nutritionalInfo.vitamins) {
+    } else if (ni.vitamins) {
       result.vitamins = {};
-      recipe.nutritionalInfo.vitamins.forEach(vitamin => {
+      ni.vitamins.forEach(vitamin => {
         const baseAmount = (vitamin.amountPer100g * recipe.servings) / 100;
         result.vitamins![vitamin.vitamin] = baseAmount * (servings / recipe.servings);
       });
     }
 
-    if (hasPerPortion && recipe.nutritionalInfo.mineralMap) {
+    if (hasPerPortion && ni.mineralMap) {
       result.minerals = {};
-      Object.entries(recipe.nutritionalInfo.mineralMap).forEach(([k, v]) => {
+      Object.entries(ni.mineralMap).forEach(([k, v]) => {
         result.minerals![k] = (v || 0) * multiplier;
       });
-    } else if (recipe.nutritionalInfo.minerals) {
+    } else if (ni.minerals) {
       result.minerals = {};
-      recipe.nutritionalInfo.minerals.forEach(mineral => {
+      ni.minerals.forEach(mineral => {
         const baseAmount = (mineral.amountPer100g * recipe.servings) / 100;
         result.minerals![mineral.mineral] = baseAmount * (servings / recipe.servings);
       });
@@ -2315,8 +2331,8 @@ export class MealPlanGenerator {
    */
   private countIngredientOverlap(recipe: Recipe): number {
     if (this.selectedIngredientIds.size === 0) return 0;
-    
-    return recipe.ingredients.filter(ing => 
+
+    return (recipe.ingredients ?? []).filter((ing) =>
       this.selectedIngredientIds.has(ing.ingredientId)
     ).length;
   }

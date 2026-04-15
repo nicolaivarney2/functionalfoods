@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Paleo/LCHF opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på naturlige ingredienser vores forfædre spiste.`
+            content: `Generer en ny Paleo/LCHF opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på naturlige ingredienser inden for paleo-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden (stadig uden korn, bælgfrugt, mælk og sukker).`
           }
         ],
         temperature: 0.8,
@@ -220,7 +220,10 @@ UNDGÅ:
 - Bælgfrugter: bønner, linser, kikærter, soja
 - Mælkeprodukter: mælk, ost, yoghurt (undtagen ghee)
 - Sukker: alle former for sukker
-- Processerede fødevarer`
+- Processerede fødevarer
+
+SMAG OG KØKKEN:
+- Du må gerne lave tydelige internationale paleo-venlige smagsprofiler (karry uden sukker, chipotle, harissa, chimichurri, citrongræs-ingefær, za'atar …), så længe undgå-listen overholdes.`
 }
 
 function parseGeneratedRecipe(content: string): any {

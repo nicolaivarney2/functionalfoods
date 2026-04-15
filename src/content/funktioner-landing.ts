@@ -2,6 +2,7 @@ export type FunktionSlug =
   | 'madbudget-ai-madplaner'
   | 'madplaner-ud-fra-tilbud'
   | 'vaegttabsrejse'
+  | 'personlig-vejledning'
   | 'makro-mikro-opskrifter'
   | '5000-opskrifter-i-8-nicher'
   | 'smart-indkob-liste-sms'
@@ -16,6 +17,7 @@ export type FunktionIconName =
   | 'LayoutGrid'
   | 'MessageSquare'
   | 'Scale'
+  | 'Users'
 
 export type FunktionImagePlacement = 'hero' | 'betweenHeroAndBullets' | 'afterBullets'
 
@@ -199,6 +201,43 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
         alt: 'Vægttabsrejse og profil i Functional Foods',
       },
     ],
+  },
+  'personlig-vejledning': {
+    slug: 'personlig-vejledning',
+    title: 'Personlig vejledning og fællesskab | Functional Foods',
+    shortTitle: 'Personlig vejledning',
+    description:
+      'Det tredje led i et vægttab der holder: struktur og madplaner er vigtige – men menneskelig vejledning og community gør det lettere at blive ved.',
+    iconName: 'Users',
+    heroEyebrow: 'Funktion',
+    heroTitle: 'Personlig vejledning – tredje led i et vægttab der holder',
+    heroLeadParagraphs: [
+      'Mange tænker vægttab som kalorier og træning. Det er centrale brikker – men for langt de fleste er det tredje led afgørende: vejledning, sparring og et sted, hvor du ikke står alene med beslutningerne.',
+      'Derfor stiller vi personlig vejledning og fællesskab til rådighed som en naturlig del af Functional Foods – så du kan få svar på tvivl, motivation i svære uger og et fællesskab, der forstår hverdagen med job, familie og indkøb.',
+    ],
+    bullets: [
+      {
+        title: 'Mennesker bag teknikken',
+        text: 'AI og madplaner kan spare dig tid – men rigtig fremgang handler også om at blive mødt, justeret og hørt, når virkeligheden ikke passer i et regneark.',
+      },
+      {
+        title: 'Mindre ensomhed om målet',
+        text: 'Vægttab er lettere, når du deler erfaringer med andre, der er i samme båd – og når du har et sted at vende tilbage, når vanerne glipper en uge.',
+      },
+      {
+        title: 'Koblet til din madprofil',
+        text: 'Vejledningen kan tage udgangspunkt i det, du faktisk spiser og planlægger i platformen – så rådene bliver konkrete, ikke generiske.',
+      },
+      {
+        title: 'Holdbar adfærd',
+        text: 'Community og støtte hjælper dig med at normalisere små skridt, fejl og genstart – så ét dårligt valg ikke bliver til en hel måned væk fra målet.',
+      },
+    ],
+    howItHelps:
+      'Brug personlig vejledning og fællesskab, når du har brug for mere end tal på skærmen: et tredje ben under dit vægttab, der gør det realistisk at blive ved året ud.',
+    ctaLabel: 'Kom i gang',
+    ctaHref: '/kom-i-gang',
+    secondaryCta: { label: 'Læs om vægttab', href: '/vaegttab' },
   },
   'makro-mikro-opskrifter': {
     slug: 'makro-mikro-opskrifter',
@@ -387,6 +426,7 @@ export const FUNKTION_OVERVIEW_ORDER: FunktionSlug[] = [
   'madbudget-ai-madplaner',
   'madplaner-ud-fra-tilbud',
   'vaegttabsrejse',
+  'personlig-vejledning',
   'makro-mikro-opskrifter',
   '5000-opskrifter-i-8-nicher',
   'smart-indkob-liste-sms',

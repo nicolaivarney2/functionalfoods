@@ -6,6 +6,7 @@ import {
   normalizeAiRecipeIngredients,
   normalizeAiRecipeInstructions,
 } from '@/lib/ai-recipe-ingredient-normalize'
+import { flattenRecipeIngredientsForMj } from '@/lib/recipe-ingredients-flatten'
 
 interface RecipeCategory {
   id: string
@@ -36,7 +37,7 @@ const RECIPE_CATEGORIES: RecipeCategory[] = [
   {
     id: 'sense',
     name: 'Sense',
-    description: 'Sunde, balancerede retter med fokus på næring',
+    description: 'Spisekasse med håndfulde: grønt, protein, stivelse/frugt og fedt — uden kalorietælling',
     icon: '✋',
     color: 'bg-purple-500',
     difficulty: 'Easy'
@@ -92,6 +93,12 @@ interface GeneratedRecipe {
     unit: string
     notes?: string
   }>
+  /** Sense: gruppeoversigt — skal have samme antal linjer som den flade ingrediensliste. */
+  ingredientGroups?: Array<{
+    id?: string
+    name: string
+    ingredients: Array<{ id?: string; name: string; amount: number; unit: string; notes?: string }>
+  }>
   instructions: Array<{
     stepNumber: number
     instruction: string
@@ -137,7 +144,7 @@ interface KetoParameters {
 
 interface ProteinrigParameters {
   maaltid: 'morgenmad' | 'frokost' | 'aftensmad' | 'snacks'
-  proteinKilde: 'frit-valg' | 'kylling' | 'fisk' | 'æg' | 'oksekød' | 'vegetarisk'
+  proteinKilde: 'frit-valg' | 'kylling' | 'kalkun' | 'fisk' | 'æg' | 'oksekød' | 'svinekød' | 'vegetarisk'
   recipeType?: string
   inspiration?: string
 }
@@ -147,6 +154,14 @@ interface Glp1Parameters {
   proteinKilde: 'frit-valg' | 'kylling' | 'fisk' | 'æg' | 'vegetarisk'
   fiberFokus: 0 | 1 | 2 | 3
   maethedsProfil: 0 | 1 | 2 | 3
+  recipeType?: string
+  inspiration?: string
+}
+
+/** Matcher `generate-recipe-sense` API (stivelse = 0–1 håndfuld i prompten). */
+interface SenseParameters {
+  maaltid: 'morgenmad' | 'frokost' | 'aftensmad' | 'snacks'
+  stivelse: 'ingen' | 'standard' | 'ekstra'
   recipeType?: string
   inspiration?: string
 }
@@ -169,6 +184,8 @@ export default function CreateRecipePage() {
   const [midjourneyPrompt, setMidjourneyPrompt] = useState<string>('')
   const [midjourneyPromptSource, setMidjourneyPromptSource] = useState<string>('')
   const [midjourneyPromptError, setMidjourneyPromptError] = useState<string>('')
+  const [midjourneyLoading, setMidjourneyLoading] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const [aiTips, setAiTips] = useState<string>('')
   const [ingredientAmountDrafts, setIngredientAmountDrafts] = useState<Record<number, string>>({})
   const [isDragging, setIsDragging] = useState(false)
@@ -201,6 +218,7 @@ export default function CreateRecipePage() {
 
   const [show52Modal, setShow52Modal] = useState(false)
   const [showProteinrigModal, setShowProteinrigModal] = useState(false)
+  const [showSenseModal, setShowSenseModal] = useState(false)
   const [showGlp1Modal, setShowGlp1Modal] = useState(false)
   const [fiveTwoParams, setFiveTwoParams] = useState<FiveTwoParameters>({ dayType: '2' })
   const [proteinrigParams, setProteinrigParams] = useState<ProteinrigParameters>({
@@ -214,6 +232,12 @@ export default function CreateRecipePage() {
     proteinKilde: 'frit-valg',
     fiberFokus: 2,
     maethedsProfil: 2,
+    recipeType: '',
+    inspiration: '',
+  })
+  const [senseParams, setSenseParams] = useState<SenseParameters>({
+    maaltid: 'aftensmad',
+    stivelse: 'standard',
     recipeType: '',
     inspiration: '',
   })
@@ -267,6 +291,10 @@ export default function CreateRecipePage() {
     if (categoryId === 'glp1') {
       setShowGlp1Modal(true)
     }
+
+    if (categoryId === 'sense') {
+      setShowSenseModal(true)
+    }
   }
   
   const handleFamiliemadGenerate = () => {
@@ -291,6 +319,11 @@ export default function CreateRecipePage() {
 
   const handleGlp1Generate = () => {
     setShowGlp1Modal(false)
+    handleGenerateRecipe()
+  }
+
+  const handleSenseGenerate = () => {
+    setShowSenseModal(false)
     handleGenerateRecipe()
   }
 
@@ -342,6 +375,10 @@ export default function CreateRecipePage() {
       if (selectedCategory === 'glp1') {
         requestBody.parameters = glp1Params
       }
+
+      if (selectedCategory === 'sense') {
+        requestBody.parameters = senseParams
+      }
       
       // Generate new recipe using category-specific ChatGPT assistant
       const generateResponse = await fetch(`/api/admin/generate-recipe-${selectedCategory}`, {
@@ -354,29 +391,67 @@ export default function CreateRecipePage() {
 
       if (!generateResponse.ok) {
         const errorData = await generateResponse.json()
-        throw new Error(errorData.error || 'Fejl ved generering af opskrift')
+        const genMsg = errorData.error || 'Fejl ved generering af opskrift'
+        const genDet = typeof errorData.details === 'string' ? errorData.details : ''
+        throw new Error(
+          genDet && genDet !== genMsg ? `${genMsg} (${genDet})` : genMsg
+        )
       }
 
       const recipeData = await generateResponse.json()
-      
-      // Store Midjourney prompt if available
-      if (recipeData.midjourneyPrompt) {
-        setMidjourneyPrompt(recipeData.midjourneyPrompt)
-      }
-      setMidjourneyPromptSource(recipeData.midjourneyPromptSource || '')
-      setMidjourneyPromptError(recipeData.midjourneyPromptError || '')
-      
+
+      setMidjourneyPrompt(
+        typeof recipeData.midjourneyPrompt === 'string' ? recipeData.midjourneyPrompt : ''
+      )
+      setMidjourneyPromptSource(
+        typeof recipeData.midjourneyPromptSource === 'string' ? recipeData.midjourneyPromptSource : ''
+      )
+      setMidjourneyPromptError(
+        typeof recipeData.midjourneyPromptError === 'string' ? recipeData.midjourneyPromptError : ''
+      )
+
       // Store AI tips if available
       if (recipeData.aiTips) {
         setAiTips(recipeData.aiTips)
       }
       
       setProgress('Validerer opskrift...')
-      
+
+      const mergedForNormalize = flattenRecipeIngredientsForMj(recipeData.recipe)
+      const rawIngredients = Array.isArray(mergedForNormalize.ingredients)
+        ? (mergedForNormalize.ingredients as GeneratedRecipe['ingredients'])
+        : []
+
       const normalizedRecipe = {
         ...recipeData.recipe,
-        ingredients: normalizeAiRecipeIngredients(recipeData.recipe?.ingredients || []),
-        instructions: normalizeAiRecipeInstructions(recipeData.recipe?.instructions || [])
+        ingredients: normalizeAiRecipeIngredients(rawIngredients),
+        instructions: normalizeAiRecipeInstructions(recipeData.recipe?.instructions || []),
+      }
+
+      if (!String(recipeData.midjourneyPrompt || '').trim()) {
+        setProgress('Henter Midjourney-prompt...')
+        try {
+          const mjRes = await fetch('/api/admin/recipe-midjourney-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipe: normalizedRecipe }),
+          })
+          if (mjRes.ok) {
+            const mj = await mjRes.json()
+            if (typeof mj.midjourneyPrompt === 'string' && mj.midjourneyPrompt.trim()) {
+              setMidjourneyPrompt(mj.midjourneyPrompt)
+              setMidjourneyPromptSource(
+                typeof mj.midjourneyPromptSource === 'string' ? mj.midjourneyPromptSource : ''
+              )
+              setMidjourneyPromptError(
+                typeof mj.midjourneyPromptError === 'string' ? mj.midjourneyPromptError : ''
+              )
+            }
+          }
+        } catch (mjFetchErr) {
+          console.warn('Midjourney fallback fetch fejlede:', mjFetchErr)
+        }
+        setProgress('Validerer opskrift...')
       }
 
       // Validate recipe
@@ -398,7 +473,11 @@ export default function CreateRecipePage() {
       const validationData = await validateResponse.json()
       
       if (!validationData.isValid) {
-        throw new Error(`Validering fejlede: ${validationData.reasons.join(', ')}`)
+        const r = Array.isArray(validationData.reasons) ? validationData.reasons.filter(Boolean) : []
+        const s = Array.isArray(validationData.suggestions) ? validationData.suggestions.filter(Boolean) : []
+        const reasonPart = r.length ? r.join('; ') : 'ingen detaljer fra validering'
+        const sugPart = s.length ? ` Forslag: ${s.join('; ')}.` : ''
+        throw new Error(`Validering fejlede: ${reasonPart}.${sugPart}`)
       }
 
       setProgress('Opskrift genereret!')
@@ -425,6 +504,45 @@ export default function CreateRecipePage() {
     }
   }
 
+  const handleRefreshMidjourneyPrompt = async () => {
+    const source = editableRecipe ?? generatedRecipe
+    if (!source) return
+    setMidjourneyLoading(true)
+    setMidjourneyPromptError('')
+    try {
+      const merged = flattenRecipeIngredientsForMj(source)
+      const raw = Array.isArray(merged.ingredients)
+        ? (merged.ingredients as GeneratedRecipe['ingredients'])
+        : []
+      const payload = {
+        ...source,
+        ingredients: normalizeAiRecipeIngredients(raw),
+        instructions: normalizeAiRecipeInstructions(source.instructions || []),
+      }
+      const mjRes = await fetch('/api/admin/recipe-midjourney-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipe: payload }),
+      })
+      if (!mjRes.ok) {
+        const err = await mjRes.json().catch(() => ({}))
+        throw new Error(err.error || 'Kunne ikke generere Midjourney-prompt')
+      }
+      const mj = await mjRes.json()
+      setMidjourneyPrompt(typeof mj.midjourneyPrompt === 'string' ? mj.midjourneyPrompt : '')
+      setMidjourneyPromptSource(
+        typeof mj.midjourneyPromptSource === 'string' ? mj.midjourneyPromptSource : ''
+      )
+      setMidjourneyPromptError(
+        typeof mj.midjourneyPromptError === 'string' ? mj.midjourneyPromptError : ''
+      )
+    } catch (e) {
+      setMidjourneyPromptError(e instanceof Error ? e.message : 'Midjourney-prompt fejlede')
+    } finally {
+      setMidjourneyLoading(false)
+    }
+  }
+
   const loadExistingRecipes = async () => {
     const allRecipes = []
     let page = 0
@@ -447,6 +565,7 @@ export default function CreateRecipePage() {
 
   const handleSaveRecipe = async () => {
     if (!editableRecipe) return
+    if (savingDraft) return
 
     // Check if image is uploaded
     if (recipeStatus !== 'ready-to-save') {
@@ -455,6 +574,7 @@ export default function CreateRecipePage() {
     }
 
     try {
+      setSavingDraft(true)
       setProgress('Gemmer AI-kladde som rigtig kladde...')
       
       const response = await fetch('/api/admin/save-ai-draft', {
@@ -470,11 +590,16 @@ export default function CreateRecipePage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Fejl ved gemning')
+        const errorData = await response.json().catch(() => ({}))
+        const msg = errorData.error || 'Fejl ved gemning'
+        const det = typeof errorData.details === 'string' ? errorData.details : ''
+        throw new Error(det && det !== msg ? `${msg} — ${det}` : msg)
       }
 
-      alert('✅ AI-kladde gemt som rigtig kladde! Du kan nu finde den i Publishing siden.')
+      alert(
+        '✅ Opskriften er gemt og sat i udgivelseskøen (planlagt).\n\n' +
+          'På Publishing-siden: vælg fanen «Planlagte» eller «Alle» — standardfilter er «Udgivne», så nye opskrifter skjules dér.'
+      )
       setGeneratedRecipe(null)
       setEditableRecipe(null)
       setIsEditing(false)
@@ -485,6 +610,7 @@ export default function CreateRecipePage() {
       console.error('Error saving recipe:', error)
       setError(error instanceof Error ? error.message : 'Fejl ved gemning')
     } finally {
+      setSavingDraft(false)
       setProgress('')
     }
   }
@@ -1270,10 +1396,12 @@ export default function CreateRecipePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="frit-valg">Frit valg</option>
-                    <option value="kylling">Kylling/kalkun</option>
+                    <option value="kylling">Kylling</option>
+                    <option value="kalkun">Kalkun</option>
                     <option value="fisk">Fisk/skaldyr</option>
                     <option value="æg">Æg</option>
                     <option value="oksekød">Oksekød</option>
+                    <option value="svinekød">Svinekød</option>
                     <option value="vegetarisk">Vegetarisk</option>
                   </select>
                 </div>
@@ -1322,6 +1450,133 @@ export default function CreateRecipePage() {
                 </button>
                 <button
                   onClick={handleProteinrigGenerate}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? 'Genererer...' : '🤖 Generer Opskrift'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sense Parameter Modal */}
+      {showSenseModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">✋ Tilpas Sense</h2>
+                <button
+                  onClick={() => {
+                    setShowSenseModal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-gray-600 mb-6">
+                Sense handler om spisekassen (håndfulde), mæthed og 2–3 måltider — ikke kalorietælling. Vælg måltid og hvor
+                &quot;tung&quot; stivelsesdelen skal være i prompten.
+              </p>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Måltid</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(['morgenmad', 'frokost', 'aftensmad', 'snacks'] as const).map((maaltid) => (
+                      <button
+                        key={maaltid}
+                        type="button"
+                        onClick={() => setSenseParams((prev) => ({ ...prev, maaltid }))}
+                        className={`py-2 px-3 rounded-lg transition-colors text-sm ${
+                          senseParams.maaltid === maaltid
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {maaltid.charAt(0).toUpperCase() + maaltid.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Stivelse i retten (prompt)</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {(
+                      [
+                        { id: 'ingen' as const, label: 'Minimal / ingen', sub: 'Ekstra grønt, evt. bælgfrugt' },
+                        { id: 'standard' as const, label: 'Standard Sense', sub: '0–1 håndfuld som passer' },
+                        { id: 'ekstra' as const, label: 'Mere stivelse', sub: 'Sultne dage / motion' },
+                      ] as const
+                    ).map(({ id, label, sub }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setSenseParams((prev) => ({ ...prev, stivelse: id }))}
+                        className={`py-3 px-3 rounded-lg text-left text-sm transition-colors ${
+                          senseParams.stivelse === id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span className="font-medium block">{label}</span>
+                        <span className={`block text-xs mt-1 ${senseParams.stivelse === id ? 'text-white/90' : 'text-gray-500'}`}>
+                          {sub}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ret-type (valgfrit)</label>
+                  <select
+                    value={senseParams.recipeType || ''}
+                    onChange={(e) => setSenseParams((prev) => ({ ...prev, recipeType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Frit valg</option>
+                    <option value="tallerken med kød/fisk, kartoffel/korn og grønt">Klassisk tallerken</option>
+                    <option value="one-pan ovnret">One-pan ovnret</option>
+                    <option value="gryderet">Gryderet</option>
+                    <option value="wok med lidt ris eller nudler">Wok</option>
+                    <option value="pastaret med salat til">Pastaret + salat</option>
+                    <option value="suppe med brød">Suppe med brød</option>
+                    <option value="taco eller wraps med fyld og salat">Taco/wraps</option>
+                    <option value="fiskefrikadeller med kartofler">Fiskefrikadeller</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Inspiration (valgfrit)</label>
+                  <input
+                    type="text"
+                    value={senseParams.inspiration || ''}
+                    onChange={(e) => setSenseParams((prev) => ({ ...prev, inspiration: e.target.value }))}
+                    placeholder="fx. 'hverdags lasagne' eller 'hurtig frokost rugbrød'"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-8 pt-6 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowSenseModal(false)
+                    setSelectedCategory(null)
+                  }}
+                  className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={handleSenseGenerate}
                   disabled={isGenerating}
                   className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -1644,6 +1899,8 @@ export default function CreateRecipePage() {
                           handleCategorySelect(category.id)
                         } else if (category.id === 'glp1') {
                           handleCategorySelect(category.id)
+                        } else if (category.id === 'sense') {
+                          handleCategorySelect(category.id)
                         } else {
                           setSelectedCategory(category.id)
                           handleGenerateRecipe()
@@ -1797,48 +2054,62 @@ export default function CreateRecipePage() {
                     )}
                   </div>
                   
-                  {/* Midjourney Prompt */}
-                  {midjourneyPrompt && (
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-3">
-                        🎨 Midjourney Prompt
-                        <span className="ml-2 text-gray-500 text-sm font-normal">(Kopier til Midjourney)</span>
-                      </h4>
-                      {(midjourneyPromptSource || midjourneyPromptError) && (
-                        <div className="mb-2 text-xs text-gray-600">
-                          {midjourneyPromptSource && (
-                            <span>
-                              Kilde: {midjourneyPromptSource === 'openai' ? 'model' : 'fallback'}
-                            </span>
-                          )}
-                          {midjourneyPromptError && (
-                            <span className="ml-2 text-amber-700">
-                              ({midjourneyPromptError})
-                            </span>
-                          )}
-                        </div>
-                      )}
+                  {/* Midjourney Prompt — vises altid; Sense m.fl. kan få prompt via fallback-endpoint */}
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">
+                      🎨 Midjourney-prompt
+                      <span className="ml-2 text-gray-500 text-sm font-normal">(kopier til Midjourney)</span>
+                    </h4>
+                    {(midjourneyPromptSource || midjourneyPromptError) && (
+                      <div className="mb-2 text-xs text-gray-600">
+                        {midjourneyPromptSource && (
+                          <span>
+                            Kilde: {midjourneyPromptSource === 'openai' ? 'model' : 'fallback'}
+                          </span>
+                        )}
+                        {midjourneyPromptError && (
+                          <span className="ml-2 text-amber-700">({midjourneyPromptError})</span>
+                        )}
+                      </div>
+                    )}
+                    {midjourneyLoading && (
+                      <p className="text-sm text-gray-500 mb-2">Genererer Midjourney-prompt…</p>
+                    )}
+                    {!midjourneyLoading && !midjourneyPrompt.trim() && (
+                      <p className="text-sm text-amber-800 mb-2">
+                        Ingen prompt endnu. Klik knappen for at bygge den ud fra titel, beskrivelse og ingredienser
+                        (inkl. Sense-grupper).
+                      </p>
+                    )}
+                    {midjourneyPrompt.trim() ? (
                       <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                         <textarea
                           value={midjourneyPrompt}
                           readOnly
-                          rows={3}
-                          className="w-full bg-transparent border-none resize-none text-sm text-gray-700 font-mono"
+                          rows={4}
+                          className="w-full bg-transparent border-none resize-y min-h-[5rem] text-sm text-gray-700 font-mono"
                           onClick={(e) => e.currentTarget.select()}
                         />
-                        <div className="mt-2 flex justify-end">
+                        <div className="mt-2 flex flex-wrap justify-end gap-2">
                           <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(midjourneyPrompt)
-                            }}
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(midjourneyPrompt)}
                             className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                           >
                             📋 Kopier
                           </button>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void handleRefreshMidjourneyPrompt()}
+                      disabled={midjourneyLoading || (!editableRecipe && !generatedRecipe)}
+                      className="mt-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {midjourneyLoading ? 'Arbejder…' : 'Generér / opdatér Midjourney-prompt'}
+                    </button>
+                  </div>
                   
                   {/* Recipe Meta */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
@@ -2142,22 +2413,24 @@ export default function CreateRecipePage() {
                   {isEditing ? (
                     <>
                       <button
-                        onClick={handleSaveRecipe}
-                        disabled={recipeStatus !== 'ready-to-save'}
+                        type="button"
+                        onClick={() => void handleSaveRecipe()}
+                        disabled={recipeStatus !== 'ready-to-save' || savingDraft}
                         className={`flex-1 py-2 px-4 rounded-lg transition-colors ${
-                          recipeStatus === 'ready-to-save'
+                          recipeStatus === 'ready-to-save' && !savingDraft
                             ? 'bg-green-600 text-white hover:bg-green-700'
                             : recipeStatus === 'ai-preview'
                             ? 'bg-yellow-500 text-white cursor-not-allowed'
                             : 'bg-gray-400 text-white cursor-not-allowed'
                         }`}
                       >
-                        {recipeStatus === 'ai-preview' 
-                          ? '📸 Upload billede først' 
+                        {savingDraft
+                          ? '⏳ Gemmer…'
+                          : recipeStatus === 'ai-preview'
+                          ? '📸 Upload billede først'
                           : recipeStatus === 'ready-to-save'
                           ? '💾 Gem som Rigtig Kladde'
-                          : '✅ Gemt'
-                        }
+                          : '✅ Gemt'}
                       </button>
                       <button
                         onClick={handleCancelEdit}

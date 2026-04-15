@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         },
         {
           role: "user",
-          content: `Generer en ny ${categoryName} opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner.`
+          content: `Generer en ny ${categoryName} opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter kategori og kostkrav. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
         }
       ],
       temperature: 0.8,
@@ -95,7 +95,9 @@ export async function POST(request: NextRequest) {
 }
 
 function createSystemPrompt(category: string, existingTitles: string[]): string {
-  const basePrompt = `Du er en ekspert i dansk madlavning og ernæring. Generer en detaljeret opskrift i JSON format.
+  const basePrompt = `Du er en ekspert i ernæring og praktisk madlavning. Skriv på dansk. Generer en detaljeret opskrift i JSON format.
+
+SMAG: Du må gerne bruge tydelige internationale smagsprofiler og retninger, så længe opskriften overholder den valgte kategori og kostkrav.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
@@ -142,8 +144,8 @@ OPPSKRIFT FORMAT (returner kun JSON):
 KATEGORI: FAMILIEMAD
 - Klassiske, næringsrige retter der passer til hele familien
 - Bør være nemme at lave og populære hos børn og voksne
-- Fokus på danske traditioner og smag
-- Brug almindelige ingredienser der er lette at få fat i`
+- Varier gerne smag og køkken globalt, så længe det er børnevenligt og realistisk i hverdagen
+- Brug ingredienser der er realistiske at handle til hjemme`
 
     case 'keto':
       return basePrompt + `

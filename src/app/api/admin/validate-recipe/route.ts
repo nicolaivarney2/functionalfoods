@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { validateRecipeStructuralIntegrity } from '@/lib/recipe-structural-integrity'
 
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,6 +14,15 @@ interface Recipe {
     amount: number
     unit: string
     notes?: string
+  }>
+  ingredientGroups?: Array<{
+    name?: string
+    ingredients?: Array<{
+      name: string
+      amount: number
+      unit: string
+      notes?: string
+    }>
   }>
   instructions: Array<{
     stepNumber: number
@@ -53,19 +63,24 @@ export async function POST(request: NextRequest) {
 
     // Basic validation
     const basicValidation = validateBasicFields(recipe)
-    if (!basicValidation.isValid) {
+    const structural = validateRecipeStructuralIntegrity(recipe)
+    const preAiValid = basicValidation.isValid && structural.isValid
+    const preAiReasons = [...basicValidation.reasons, ...structural.issues]
+
+    if (!preAiValid) {
       return NextResponse.json({
         success: true,
         isValid: false,
-        reasons: basicValidation.reasons
+        reasons: preAiReasons,
+        structuralIssues: structural.issues,
       })
     }
 
     // AI validation for content quality
     const aiValidation = await validateWithAI(recipe)
     
-    const isValid = basicValidation.isValid && aiValidation.isValid
-    const allReasons = [...basicValidation.reasons, ...aiValidation.reasons]
+    const isValid = basicValidation.isValid && structural.isValid && aiValidation.isValid
+    const allReasons = [...basicValidation.reasons, ...structural.issues, ...aiValidation.reasons]
 
     console.log(`✅ Recipe validation result: ${isValid ? 'VALID' : 'INVALID'}`)
     if (!isValid) {
@@ -79,6 +94,7 @@ export async function POST(request: NextRequest) {
       success: true,
       isValid,
       reasons: allReasons,
+      structuralIssues: structural.issues,
       suggestions: aiValidation.suggestions || []
     })
 
@@ -103,8 +119,8 @@ function validateBasicFields(recipe: Recipe): { isValid: boolean, reasons: strin
     reasons.push('Titel skal være mindst 3 tegn')
   }
 
-  if (!recipe.description || recipe.description.trim().length < 10) {
-    reasons.push('Beskrivelse skal være mindst 10 tegn')
+  if (!recipe.description || recipe.description.trim().length < 8) {
+    reasons.push('Beskrivelse skal være mindst 8 tegn')
   }
 
   if (!recipe.ingredients || recipe.ingredients.length === 0) {
@@ -127,50 +143,57 @@ function validateBasicFields(recipe: Recipe): { isValid: boolean, reasons: strin
     reasons.push('Tilberedningstid skal være mellem 0 og 480 minutter')
   }
 
-  // Validate ingredients
+  // Validate ingredients (amount kan komme som streng fra JSON)
   if (recipe.ingredients) {
     for (const ingredient of recipe.ingredients) {
       if (!ingredient.name || ingredient.name.trim().length < 2) {
         reasons.push('Alle ingredienser skal have et navn')
         break
       }
-      if (ingredient.amount <= 0) {
+      const amt = Number(ingredient.amount)
+      if (!Number.isFinite(amt) || amt <= 0) {
         reasons.push('Alle ingredienser skal have et positivt antal')
         break
       }
-      if (!ingredient.unit || ingredient.unit.trim().length === 0) {
+      if (!ingredient.unit || String(ingredient.unit).trim().length === 0) {
         reasons.push('Alle ingredienser skal have en enhed')
         break
       }
     }
   }
 
-  // Validate instructions
+  // Validate instructions (AI skriver ofte korte trin; 5 tegn min.)
   if (recipe.instructions) {
     for (const instruction of recipe.instructions) {
-      if (!instruction.instruction || instruction.instruction.trim().length < 10) {
-        reasons.push('Alle instruktioner skal være mindst 10 tegn')
+      const text = String(instruction.instruction || '').trim()
+      if (text.length < 5) {
+        reasons.push('Alle instruktioner skal være mindst 5 tegn')
         break
       }
     }
   }
 
-  // Validate nutritional info
+  // Validate nutritional info (per portion — lidt slack til store måltider / model-skøn)
   if (recipe.nutritionalInfo) {
-    if (recipe.nutritionalInfo.calories < 0 || recipe.nutritionalInfo.calories > 2000) {
-      reasons.push('Kalorier skal være mellem 0 og 2000')
+    const cal = Number(recipe.nutritionalInfo.calories)
+    const prot = Number(recipe.nutritionalInfo.protein)
+    const carbs = Number(recipe.nutritionalInfo.carbs)
+    const fat = Number(recipe.nutritionalInfo.fat)
+    const fiber = Number(recipe.nutritionalInfo.fiber)
+    if (!Number.isFinite(cal) || cal < 0 || cal > 2500) {
+      reasons.push('Kalorier skal være mellem 0 og 2500 per portion')
     }
-    if (recipe.nutritionalInfo.protein < 0 || recipe.nutritionalInfo.protein > 200) {
-      reasons.push('Protein skal være mellem 0 og 200g')
+    if (!Number.isFinite(prot) || prot < 0 || prot > 250) {
+      reasons.push('Protein skal være mellem 0 og 250g')
     }
-    if (recipe.nutritionalInfo.carbs < 0 || recipe.nutritionalInfo.carbs > 300) {
-      reasons.push('Kulhydrater skal være mellem 0 og 300g')
+    if (!Number.isFinite(carbs) || carbs < 0 || carbs > 400) {
+      reasons.push('Kulhydrater skal være mellem 0 og 400g')
     }
-    if (recipe.nutritionalInfo.fat < 0 || recipe.nutritionalInfo.fat > 200) {
-      reasons.push('Fedt skal være mellem 0 og 200g')
+    if (!Number.isFinite(fat) || fat < 0 || fat > 250) {
+      reasons.push('Fedt skal være mellem 0 og 250g')
     }
-    if (recipe.nutritionalInfo.fiber < 0 || recipe.nutritionalInfo.fiber > 100) {
-      reasons.push('Fiber skal være mellem 0 og 100g')
+    if (!Number.isFinite(fiber) || fiber < 0 || fiber > 120) {
+      reasons.push('Fiber skal være mellem 0 og 120g')
     }
   }
 
@@ -191,74 +214,76 @@ async function validateWithAI(recipe: Recipe): Promise<{ isValid: boolean, reaso
       }
     }
 
-    const prompt = `Valider denne opskrift og giv feedback på kvalitet, nøjagtighed og brugbarhed:
-
-OPSKRIFT:
-Titel: ${recipe.title}
-Beskrivelse: ${recipe.description}
-Portioner: ${recipe.servings}
-Forberedelse: ${recipe.prepTime} min
-Tilberedning: ${recipe.cookTime} min
-Sværhedsgrad: ${recipe.difficulty}
-
-INGREDIENSER:
-${recipe.ingredients.map(ing => `- ${ing.amount} ${ing.unit} ${ing.name}${ing.notes ? ` (${ing.notes})` : ''}`).join('\n')}
-
-INSTRUKTIONER:
-${recipe.instructions.map(inst => `${inst.stepNumber}. ${inst.instruction}${inst.time ? ` (${inst.time} min)` : ''}${inst.tips ? ` - Tip: ${inst.tips}` : ''}`).join('\n')}
-
-NÆRINGSINDHOLD (per portion):
-Kalorier: ${recipe.nutritionalInfo.calories}
-Protein: ${recipe.nutritionalInfo.protein}g
-Kulhydrater: ${recipe.nutritionalInfo.carbs}g
-Fedt: ${recipe.nutritionalInfo.fat}g
-Fiber: ${recipe.nutritionalInfo.fiber}g
-
-Valider og giv feedback i dette format:
-VALID: true/false
-REASONS: [liste af problemer, hvis nogen]
-SUGGESTIONS: [liste af forbedringsforslag, hvis nogen]
-
-Fokus på:
-1. Er ingredienserne realistiske og tilgængelige?
-2. Er instruktionerne klare og følger de logisk?
-3. Er næringsindholdet realistisk for ingredienserne?
-4. Er tidsangivelserne realistiske?
-5. Er opskriften brugbar for målgruppen?`
+    const payload = {
+      title: recipe.title,
+      description: recipe.description,
+      servings: recipe.servings,
+      prepTime: recipe.prepTime,
+      cookTime: recipe.cookTime,
+      difficulty: recipe.difficulty,
+      dietaryCategories: recipe.dietaryCategories,
+      ingredients: recipe.ingredients.map((ing) => ({
+        amount: ing.amount,
+        unit: ing.unit,
+        name: ing.name,
+        notes: ing.notes,
+      })),
+      instructions: recipe.instructions.map((inst) => ({
+        stepNumber: inst.stepNumber,
+        instruction: inst.instruction,
+        time: inst.time,
+        tips: inst.tips,
+      })),
+      nutritionalInfoPerPortion: recipe.nutritionalInfo,
+    }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
       messages: [
         {
-          role: "system",
-          content: "Du er en ekspert i madlavning og opskriftvalidering. Vurder opskrifter objektivt og giv konstruktiv feedback."
+          role: 'system',
+          content: `Du validerer AI-genererede opskrifter til et dansk website (kladde før et menneske retter til).
+Returner KUN ét JSON-objekt med præcis disse nøgler:
+{ "valid": boolean, "reasons": string[], "suggestions": string[] }
+
+Vær tolerant over for AI-kladder:
+- Sæt "valid" til true medmindre der er alvorlige problemer: umulige mængder, logiske brud (fx kog pasta uden vand), tydelig fare, eller at retten ikke kan laves som beskrevet.
+- Små afvigelser i næringstal, korte trin, eller at Sense/almindelig mad har moderate kulhydrater = stadig valid true. Læg evt. forslag i "suggestions" i stedet for at afvise.
+- Sense-opskrifter må gerne have brød, pasta, kartoffel osv. — det er ikke en fejl.
+- Hvis titlen er en klassiker (fx lasagne, pizza, carbonara), skal ingredienserne matche almindelig forventning (lasagne → pasta/plader, pizza → bund, carbonara → pasta). Sæt valid false hvis det er et tydeligt logisk brud.`,
         },
         {
-          role: "user",
-          content: prompt
-        }
+          role: 'user',
+          content: `Vurder denne opskrift:\n${JSON.stringify(payload)}`,
+        },
       ],
-      temperature: 0.3,
-      max_tokens: 1000
+      temperature: 0.2,
+      max_tokens: 800,
     })
 
     const response = completion.choices[0]?.message?.content || ''
-    
-    // Parse AI response
-    const validMatch = response.match(/VALID:\s*(true|false)/i)
-    const reasonsMatch = response.match(/REASONS:\s*\[(.*?)\]/i)
-    const suggestionsMatch = response.match(/SUGGESTIONS:\s*\[(.*?)\]/i)
+    let parsed: { valid?: boolean; reasons?: unknown; suggestions?: unknown }
 
-    const isValid = validMatch ? validMatch[1].toLowerCase() === 'true' : true
-    const reasons = reasonsMatch ? 
-      reasonsMatch[1].split(',').map(r => r.trim()).filter(Boolean) : []
-    const suggestions = suggestionsMatch ? 
-      suggestionsMatch[1].split(',').map(s => s.trim()).filter(Boolean) : []
+    try {
+      parsed = JSON.parse(response) as typeof parsed
+    } catch {
+      console.warn('validate-recipe: kunne ikke parse AI JSON, godkender kladde')
+      return { isValid: true, reasons: [], suggestions: [] }
+    }
+
+    const isValid = parsed.valid !== false
+    const reasons = Array.isArray(parsed.reasons)
+      ? parsed.reasons.map((r) => String(r).trim()).filter(Boolean)
+      : []
+    const suggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions.map((s) => String(s).trim()).filter(Boolean)
+      : []
 
     return {
       isValid,
-      reasons,
-      suggestions
+      reasons: isValid ? [] : reasons,
+      suggestions,
     }
 
   } catch (error) {

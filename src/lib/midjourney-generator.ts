@@ -1,6 +1,7 @@
 import OpenAI from 'openai'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 import { getOpenAIConfig } from '@/lib/openai-config'
+import { flattenRecipeIngredientsForMj } from '@/lib/recipe-ingredients-flatten'
 
 /** Flere ingredienser + mængder så MJ ser hvad der dominerer (fx spidskål i salat). */
 const MJ_INGREDIENT_MAX = 14
@@ -62,16 +63,18 @@ export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<Mid
   const baseSuffix =
     'served on a dark gray ceramic plate on a rustic dark textured matte surface, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3'
 
-  if (!recipe || !recipe.title) {
+  const recipeForMj = flattenRecipeIngredientsForMj(recipe)
+
+  if (!recipeForMj || !recipeForMj.title) {
     return {
       prompt: buildFinalPrompt('a well-composed home-cooked meal', baseSuffix),
       source: 'heuristic',
     }
   }
 
-  const normalizedTitle = normalizeDanishRecipeTitle(recipe.title)
-  const ingredientsForPrompt = formatIngredientsForMjPrompt(recipe.ingredients)
-  const instructionsForPrompt = formatInstructionsForMjPrompt(recipe.instructions)
+  const normalizedTitle = normalizeDanishRecipeTitle(String(recipeForMj.title))
+  const ingredientsForPrompt = formatIngredientsForMjPrompt(recipeForMj.ingredients)
+  const instructionsForPrompt = formatInstructionsForMjPrompt(recipeForMj.instructions)
 
   const apiKey = resolveOpenAIApiKey()
   if (!apiKey) {
@@ -92,7 +95,7 @@ export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<Mid
     const finalPhrase = await composeMidjourneyFoodPhrase(
       openai,
       normalizedTitle,
-      typeof recipe.description === 'string' ? recipe.description : '',
+      typeof recipeForMj.description === 'string' ? recipeForMj.description : '',
       ingredientsForPrompt.numbered,
       instructionsForPrompt
     )

@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Proteinrig kost opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på retter med højt proteinindhold og optimal næring.`
+            content: `Generer en ny Proteinrig kost opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på retter med højt proteinindhold og optimal næring. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
           }
         ],
         temperature: 0.8,
@@ -172,7 +172,10 @@ PROTEINRIG KOST TIPS:
 - Tilføj grøntsager for fibre og mæthed
 - Brug sunde fedtstoffer for opfattelse
 - Balance protein med kulhydrater efter aktivitetsniveau
-- Vælg magre proteinkilder for vægttab`
+- Vælg magre proteinkilder for vægttab
+
+SMAG OG KØKKEN:
+- Varier gerne internationalt (wok, karry, tagine, bowl med tydelig smag …), så længe protein- og næringsmålene overholdes.`
 }
 
 function parseGeneratedRecipe(content: string): any {

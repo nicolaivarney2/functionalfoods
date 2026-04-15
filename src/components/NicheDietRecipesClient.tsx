@@ -49,6 +49,29 @@ export interface NicheRecipe {
   author: string
 }
 
+function proteinrigRecipeTextBlob(recipe: NicheRecipe): string {
+  const ing = (recipe.ingredients || []).map((i) => i.name).join(' ')
+  const steps = (recipe.instructions || []).map((i) => i.instruction).join(' ')
+  return [
+    recipe.title,
+    recipe.description,
+    recipe.shortDescription,
+    ...(recipe.keywords || []),
+    ...(recipe.subCategories || []),
+    ...(recipe.dietaryCategories || []),
+    ing,
+    steps,
+  ]
+    .join(' ')
+    .toLowerCase()
+}
+
+/** Opskrifter hvor kalkun er den dominerende proteinkilde (dansk hverdag: skal kunne filtreres fra kylling). */
+function proteinrigRecipeHasKalkun(recipe: NicheRecipe): boolean {
+  const t = proteinrigRecipeTextBlob(recipe)
+  return /\bkalkun\b/.test(t) || t.includes('turkey')
+}
+
 type ThemeKey =
   | 'purpleGreen'
   | 'tealGreen'
@@ -239,7 +262,9 @@ export default function NicheDietRecipesClient({
   const [isLoading, setIsLoading] = useState(true)
   const [prepTimeFilter, setPrepTimeFilter] = useState<'all' | 'quick' | 'medium' | 'long'>('all')
   const [mealTypeFilter, setMealTypeFilter] = useState<string>('all')
+  const [poultryFilter, setPoultryFilter] = useState<'all' | 'kylling' | 'kalkun'>('all')
   const [showFilters, setShowFilters] = useState(false)
+  const showPoultrySplit = dietQueryParam === 'proteinrig'
 
   useEffect(() => {
     setIsVisible(true)
@@ -296,19 +321,30 @@ export default function NicheDietRecipesClient({
         return mainCat.includes(filterLower) || filterLower.includes(mainCat)
       })
     }
+    if (showPoultrySplit && poultryFilter !== 'all') {
+      filtered = filtered.filter((recipe) => {
+        const hasKalkun = proteinrigRecipeHasKalkun(recipe)
+        if (poultryFilter === 'kalkun') return hasKalkun
+        return !hasKalkun
+      })
+    }
     setFilteredRecipes(filtered)
-  }, [searchQuery, prepTimeFilter, mealTypeFilter, allRecipes])
+  }, [searchQuery, prepTimeFilter, mealTypeFilter, poultryFilter, showPoultrySplit, allRecipes])
 
   const mealTypes = Array.from(new Set(allRecipes.map((r) => r.mainCategory).filter(Boolean))).sort()
 
   const clearFilters = () => {
     setPrepTimeFilter('all')
     setMealTypeFilter('all')
+    setPoultryFilter('all')
     setSearchQuery('')
   }
 
   const hasActiveFilters =
-    prepTimeFilter !== 'all' || mealTypeFilter !== 'all' || searchQuery !== ''
+    prepTimeFilter !== 'all' ||
+    mealTypeFilter !== 'all' ||
+    searchQuery !== '' ||
+    (showPoultrySplit && poultryFilter !== 'all')
 
   const BadgeIcon = badgeIcon === 'target' ? Target : Utensils
 
@@ -395,7 +431,14 @@ export default function NicheDietRecipesClient({
                 <span className="hidden md:inline">Flere filtre</span>
                 {hasActiveFilters && (
                   <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
-                    {[prepTimeFilter !== 'all', mealTypeFilter !== 'all', searchQuery !== ''].filter(Boolean).length}
+                    {
+                      [
+                        prepTimeFilter !== 'all',
+                        mealTypeFilter !== 'all',
+                        searchQuery !== '',
+                        showPoultrySplit && poultryFilter !== 'all',
+                      ].filter(Boolean).length
+                    }
                   </span>
                 )}
               </button>
@@ -464,6 +507,39 @@ export default function NicheDietRecipesClient({
                     </div>
                   </div>
                 </div>
+                {showPoultrySplit ? (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Fjerkræ (filtrér kylling og kalkun hver for sig)
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Mange proteinrige opskrifter bruger kylling i hverdagen. Her kan du skjule kalkunopskrifter, hvis du
+                      helst vil se kylling og alt andet.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(
+                        [
+                          { value: 'all' as const, label: 'Alle' },
+                          { value: 'kylling' as const, label: 'Uden kalkun' },
+                          { value: 'kalkun' as const, label: 'Kun kalkun' },
+                        ] as const
+                      ).map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setPoultryFilter(option.value)}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                            poultryFilter === option.value
+                              ? `${t.filterActive} text-white shadow-md`
+                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </div>
             )}
 

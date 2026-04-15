@@ -11,6 +11,7 @@ import {
   PiggyBank,
   Scale,
   Sparkles,
+  Users,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -30,6 +31,7 @@ const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
   LayoutGrid,
   MessageSquare,
   Scale,
+  Users,
 }
 
 type Props = { params: Promise<{ slug: string }> }

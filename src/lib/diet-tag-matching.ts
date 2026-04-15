@@ -82,6 +82,22 @@ export function recipeDietTagMatches(tag: string, acceptableKeys: Set<string>): 
   return acceptableKeys.has(normalizeDietMatchKey(tag))
 }
 
+/**
+ * Map profil-/API-værdi til id som `dietaryFactory.getDiet()` forventer
+ * (fx `proteinrig` → `proteinrig-kost`). Ukendte værdier returneres uændret.
+ */
+export function resolveFactoryDietId(slug: string | undefined | null): string {
+  const raw = cleanDietTag(slug || '')
+  if (!raw) return 'sense'
+  const direct = DIET_QUERY_TO_CANONICAL_IDS[raw]
+  if (direct?.length) return direct[0]
+  const nk = normalizeDietMatchKey(raw)
+  for (const [key, ids] of Object.entries(DIET_QUERY_TO_CANONICAL_IDS)) {
+    if (normalizeDietMatchKey(key) === nk && ids.length) return ids[0]
+  }
+  return raw
+}
+
 export function recipeTagsMatchDietQuery(
   tags: readonly string[] | undefined,
   dietQuery: string

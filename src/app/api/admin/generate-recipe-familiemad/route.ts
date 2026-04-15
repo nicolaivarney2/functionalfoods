@@ -105,11 +105,11 @@ export async function POST(request: NextRequest) {
         role: "system",
         content: `Du er FunctionalFoods opskriftsassistent for Familiemad. Skriv altid på dansk.
 
-Formål: Generér familievenlige opskrifter, der passer til danske hjem. FOKUSÉR PÅ RETTER SOM BØRN VIL SPISE - ikke voksenmad.
+Formål: Generér familievenlige opskrifter der passer til familier i hverdagen. FOKUSÉR PÅ RETTER SOM BØRN VIL SPISE — ikke voksen-gastro som hovedvinkel. Smag og køkken må gerne være internationale (mild karry, ramen-inspireret, quesadilla, teriyaki (sødt i måde), tikka-mild …), så længe det er realistisk og børnevenligt.
 
 ${parameterInstructions}
 
-KLASSISKE DANSKE FAMILIERETTER (varier mellem disse - ikke kun kartofler!):
+EKSEMPLER PÅ BØRNEVENLIGE FAMILIERETTER (varier mellem disse — ikke kun kartofler!):
 - Pasta bolognese
 - Pasta med kødsovs
 - Pasta carbonara
@@ -118,7 +118,7 @@ KLASSISKE DANSKE FAMILIERETTER (varier mellem disse - ikke kun kartofler!):
 - Penne med tomatsauce
 - Lasagne (børnevenlig version)
 - Kylling i karry med ris
-- Boller i karry (klassisk dansk ret)
+- Boller i karry (klassisk børnevenlig ret)
 - Ris med kylling og grøntsager
 - Risotto med kylling
 - Frikadeller med kartofler og brun sovs
@@ -127,10 +127,9 @@ KLASSISKE DANSKE FAMILIERETTER (varier mellem disse - ikke kun kartofler!):
 - Ovnbagt kylling med grøntsager
 
 UNDGÅ:
-- Krydede retter (chili, stærke krydderier)
-- Eksotiske ingredienser
-- Voksenmad (oksepølser, krydret bønnesalat)
-- Retter med stærke smage
+- Meget stærk chili eller retter der primært er «voksen stærk»
+- Voksen-gastro som hovedvinkel (fx tunge, alkoholholdige saucer, rå marinerede specialiteter som hovedret)
+- Ingredienser der er urealistiske for travle familier (kun hvis ikke i parameter-inspiration)
 
 INGREDIENS FORMATERING - VIGTIGT:
 - Brug ALTID små bogstaver i ingrediensnavne (name feltet) - IKKE stort forbogstav!
@@ -498,10 +497,10 @@ function buildParameterInstructions(params: FamiliemadParameters): string {
       'pasta-carbonara': 'RET-TYPE: Generér en BØRNEVENLIG pasta carbonara opskrift. Børnevenlig version med milde smage.',
       'pasta-med-kylling': 'RET-TYPE: Generér en BØRNEVENLIG pasta med kylling opskrift.',
       'risotto': 'RET-TYPE: Generér en BØRNEVENLIG risotto opskrift. Børnevenlig version med milde smage.',
-      'kylling-i-karry': 'RET-TYPE: Generér en BØRNEVENLIG kylling i karry opskrift. Klassisk dansk familiemad.',
-      'boller-i-karry': 'RET-TYPE: Generér en BØRNEVENLIG boller i karry opskrift. Klassisk dansk familiemad.',
-      'frikadeller': 'RET-TYPE: Generér en BØRNEVENLIG frikadeller opskrift. Klassisk dansk familiemad.',
-      'hakkebof': 'RET-TYPE: Generér en BØRNEVENLIG hakkebøf opskrift. Klassisk dansk familiemad.',
+      'kylling-i-karry': 'RET-TYPE: Generér en BØRNEVENLIG kylling i karry opskrift. Klassisk børnevenlig familiemad.',
+      'boller-i-karry': 'RET-TYPE: Generér en BØRNEVENLIG boller i karry opskrift. Klassisk børnevenlig familiemad.',
+      'frikadeller': 'RET-TYPE: Generér en BØRNEVENLIG frikadeller opskrift. Klassisk børnevenlig familiemad.',
+      'hakkebof': 'RET-TYPE: Generér en BØRNEVENLIG hakkebøf opskrift. Klassisk børnevenlig familiemad.',
       'fiskefilet': 'RET-TYPE: Generér en BØRNEVENLIG fiskefilet opskrift. Børnevenlig version med milde smage.',
       'ovnbagt-kylling': 'RET-TYPE: Generér en BØRNEVENLIG ovnbagt kylling opskrift.',
       'gryderet': 'RET-TYPE: Generér en BØRNEVENLIG gryderet opskrift. En simpel, velsmagende gryderet.',

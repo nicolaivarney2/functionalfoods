@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til antiinflammatorisk kost.`
+            content: `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter antiinflammatoriske principper. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
           }
         ],
         temperature: 0.8,
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
 }
 
 function createAntiinflammatoriskSystemPrompt(existingTitles: string[]): string {
-  return `Du er en ekspert i Antiinflammatorisk kost og dansk madlavning. Generer en detaljeret Antiinflammatorisk opskrift i JSON format.
+  return `Du er en ekspert i Antiinflammatorisk kost og praktisk madlavning. Skriv på dansk. Generer en detaljeret Antiinflammatorisk opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
@@ -214,7 +214,10 @@ UNDGÅ:
 - For meget omega-6 (solsikkeolie, majsolie)
 - Sukker og sødemidler
 - Transfedt
-- For meget rødt kød`
+- For meget rødt kød
+
+SMAG OG KØKKEN:
+- Krydderiprofiler og retter må gerne være tydeligt internationale (asiatisk, latinamerikansk, mellemøstlig, afrikansk, europæisk …), så længe principperne ovenfor overholdes.`
 }
 
 function parseGeneratedRecipe(content: string): any {

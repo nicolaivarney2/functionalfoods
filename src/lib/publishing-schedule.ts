@@ -98,7 +98,7 @@ export class PublishingScheduler {
     plan += '• Maks 2 opskrifter om dagen\n'
     plan += '• Manuel review af hver opskrift\n'
     plan += '• Unikke billeder og personlige tips\n'
-    plan += '• Fokus på danske ingredienser\n'
+    plan += '• Varierede opskrifter og titler der matcher søgning\n'
     
     return plan
   }
@@ -141,7 +141,7 @@ export class PublishingScheduler {
     overview += `• Manuel review af hver opskrift\n`
     overview += `• Personlige tips og erfaringer\n`
     overview += `• Unikke billeder (lokalt lagret)\n`
-    overview += `• Fokus på danske ingredienser\n`
+    overview += `• Varierede opskrifter og titler der matcher søgning\n`
     
     return overview
   }

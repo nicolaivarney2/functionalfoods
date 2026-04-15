@@ -1,6 +1,6 @@
-
 import Link from 'next/link'
 import Image from 'next/image'
+import CookieSettingsFooterLink from '@/components/CookieSettingsFooterLink'
 
 const columns = [
   {
@@ -10,6 +10,7 @@ const columns = [
       { label: 'Madbudget (AI madplaner)', href: '/funktioner/madbudget-ai-madplaner' },
       { label: 'Madplaner ud fra tilbud', href: '/funktioner/madplaner-ud-fra-tilbud' },
       { label: 'Vægttabsrejse (50+ parametre)', href: '/funktioner/vaegttabsrejse' },
+      { label: 'Personlig vejledning', href: '/funktioner/personlig-vejledning' },
       { label: 'Makro + mikro opskrifter', href: '/funktioner/makro-mikro-opskrifter' },
       { label: '5000 opskrifter i 8 nicher', href: '/funktioner/5000-opskrifter-i-8-nicher' },
       { label: 'Smart-indkøbliste på sms', href: '/funktioner/smart-indkob-liste-sms' },
@@ -43,6 +44,7 @@ const columns = [
     title: 'Om FunctionalFoods',
     links: [
       { label: 'Om os', href: '/bag-om-ff' },
+      { label: 'Cookies og privatliv', href: '/cookies-og-privatliv' },
       { label: 'Opret dig', href: '/kom-i-gang' },
       { label: 'Opskrifter', href: '/opskriftsoversigt' },
       { label: 'Dagligvarer', href: '/dagligvarer' },
@@ -98,7 +100,7 @@ export default function Footer() {
 
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-white/50">
           <p>© {new Date().getFullYear()} FunctionalFoods</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Link href="/bag-om-ff" className="hover:text-white/80 transition-colors">
               Om os
             </Link>
@@ -108,6 +110,10 @@ export default function Footer() {
             <Link href="/opskriftsoversigt" className="hover:text-white/80 transition-colors">
               Opskrifter
             </Link>
+            <Link href="/cookies-og-privatliv" className="hover:text-white/80 transition-colors">
+              Cookies og privatliv
+            </Link>
+            <CookieSettingsFooterLink />
           </div>
         </div>
       </div>

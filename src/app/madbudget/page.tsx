@@ -1394,7 +1394,7 @@ export default function MadbudgetPage() {
               slug: meal.recipe.slug || '',
               title: meal.recipe.title,
               image: meal.recipe.images?.[0] || '',
-              ingredients: meal.recipe.ingredients.map((ing: any) => ({
+              ingredients: (meal.recipe.ingredients ?? []).map((ing: any) => ({
                 name: ing.name || ing.ingredientName,
                 amount: ing.amount,
                 unit: ing.unit
@@ -1498,7 +1498,8 @@ export default function MadbudgetPage() {
       console.error('Error generating meal plan:', error)
       setIsGeneratingMealPlan(false)
       setGenerationProgress('')
-      alert('Der opstod en fejl ved generering af madplan. Prøv igen.')
+      const hint = error instanceof Error && error.message ? `\n\nTeknisk: ${error.message}` : ''
+      alert(`Der opstod en fejl ved generering af madplan. Prøv igen.${hint}`)
     }
   }
 

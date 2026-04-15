@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Fokuser på danske ingredienser og traditioner, men tilpasset til keto kost.
+            content: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter keto-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
 
 ${parameterInstructions}
 ${variationPrompt}`
@@ -308,7 +308,7 @@ function buildParameterInstructions(params: KetoParameters): string {
 }
 
 function createKetoSystemPrompt(existingTitles: string[]): string {
-  return `Du er en ekspert i Keto kost og dansk madlavning. Generer en detaljeret Keto opskrift i JSON format.
+  return `Du er en ekspert i Keto kost og praktisk madlavning. Skriv på dansk. Generer en detaljeret Keto opskrift i JSON format.
 
 EKSISTERENDE OPSKRIFTER (undgå at duplikere disse):
 ${existingTitles.slice(0, 10).map(title => `- ${title}`).join('\n')}
@@ -364,7 +364,7 @@ INGREDIENS REGLER:
 - Fisk: "400 g laks", "300 g makrel"
 - Ingen notes felt på ingredienser
 - Portioner: altid 2
-- Titel: dansk sætningscase — kun første bogstav stort (fx "Kylling med broccoli"), ikke Title Case På Hvert Ord
+- Titel: sætningscase på dansk — kun første bogstav stort (fx "Kylling med broccoli"), ikke Title Case På Hvert Ord
 
 KETO INGREDIENSER AT FOKUSERE PÅ:
 - Fedt kød: oksekød, svinekød, lam, kylling med skind
@@ -385,6 +385,7 @@ UNDGÅ:
 VARIATION:
 - Undgå at falde tilbage til den samme sikre kombination af kylling/fisk + broccoli + peberfrugt + spinat.
 - Variér retformat, grøntsagsvalg, smagsprofil og proteinvalg fra opskrift til opskrift.
+- Smag: varier gerne internationalt (karry, harissa, chipotle, miso i små mængder, citrongræs, za'atar …) så længe kulhydratloftet overholdes.
 - Hvis brugeren beder om morgenmad, frokost eller snacks, skal opskriften ligne det måltid tydeligt og ikke bare være en standard aftensmad i mindre format.`
 }
 

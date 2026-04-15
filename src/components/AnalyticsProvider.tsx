@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState, Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { trackUserBehavior, getUserProfile, UserBehavior } from '@/lib/analytics'
+import { fireMarketingEvent, fireMarketingPageView } from '@/lib/marketing-tags'
+import { useCookieConsent } from '@/contexts/CookieConsentContext'
 
 interface AnalyticsContextType {
   trackEvent: (event: string, data?: any) => void
@@ -24,6 +26,10 @@ export function useAnalytics() {
 }
 
 function AnalyticsProviderContent({ children }: { children: React.ReactNode }) {
+  const { consent, marketingTagsReady } = useCookieConsent()
+  const marketingAllowed = consent === 'accepted'
+  const canSendMarketing = marketingAllowed && marketingTagsReady
+
   const [userProfile, setUserProfile] = useState<UserBehavior>({
     source: 'direct',
     interests: [],
@@ -40,8 +46,11 @@ function AnalyticsProviderContent({ children }: { children: React.ReactNode }) {
     const profile = getUserProfile()
     setUserProfile(profile)
 
-    // Track page view
+    // Lokal profil for alle; GA4 / Meta kun efter cookie-samtykke
     trackPageView(pathname)
+    if (canSendMarketing) {
+      fireMarketingPageView(pathname)
+    }
 
     // Track time on site
     const interval = setInterval(() => {
@@ -52,14 +61,11 @@ function AnalyticsProviderContent({ children }: { children: React.ReactNode }) {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [pathname])
+  }, [pathname, canSendMarketing])
 
   const trackEvent = (event: string, data?: any) => {
-    console.log('Analytics Event:', event, data)
-    
-    // Track to your analytics service (Google Analytics, etc.)
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', event, data)
+    if (marketingAllowed && marketingTagsReady) {
+      fireMarketingEvent(event, data && typeof data === 'object' ? data : undefined)
     }
     
     // Update local profile

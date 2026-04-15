@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { CookieConsentProvider } from '@/contexts/CookieConsentContext'
+import ConsentGatedMarketingScripts from '@/components/ConsentGatedMarketingScripts'
+import CookieConsentBanner from '@/components/CookieConsentBanner'
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
 import { AuthProvider } from '@/contexts/AuthContext'
 import Header from '@/components/Header'
@@ -45,16 +48,20 @@ export default function RootLayout({
   return (
     <html lang="da">
       <body className={inter.className} suppressHydrationWarning={true}>
-        <div className="min-h-screen bg-white">
-          <AnalyticsProvider>
-            <AuthProvider>
-              <Header />
-              {children}
-              <Footer />
-              <MessengerHumanGuidanceWidget />
-            </AuthProvider>
-          </AnalyticsProvider>
-        </div>
+        <CookieConsentProvider>
+          <ConsentGatedMarketingScripts />
+          <div className="min-h-screen bg-white">
+            <AnalyticsProvider>
+              <AuthProvider>
+                <Header />
+                {children}
+                <Footer />
+                <MessengerHumanGuidanceWidget />
+              </AuthProvider>
+            </AnalyticsProvider>
+          </div>
+          <CookieConsentBanner />
+        </CookieConsentProvider>
       </body>
     </html>
   )

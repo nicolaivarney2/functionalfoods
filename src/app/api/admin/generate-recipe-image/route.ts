@@ -130,7 +130,7 @@ function createImagePrompt(recipe: any, category: string): string {
   prompt += `featuring ${mainIngredients}, `
 
   // Add photography style
-  prompt += 'high resolution, studio lighting, appetizing, food styling, Danish cuisine style, '
+  prompt += 'high resolution, studio lighting, appetizing, food styling, authentic presentation matching the dish, '
   
   // Add technical specifications
   prompt += 'shot with professional camera, shallow depth of field, commercial food photography'

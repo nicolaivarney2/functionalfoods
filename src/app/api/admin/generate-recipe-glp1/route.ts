@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny GLP-1 opskrift der er unik og ikke ligner eksisterende opskrifter.
+            content: `Generer en ny GLP-1 opskrift der er unik og ikke ligner eksisterende opskrifter. Krydderier og køkkenstil må frit hente inspiration fra hele verden inden for GLP-1-principperne.
 
 Opskriften skal afspejle GLP-1 kost som mæthedskost:
 - højt på protein
@@ -242,6 +242,7 @@ ${complexCarbBlock}
 ${vaeskeRegel}
 ${maaltidKontekst}
 - Opskriften skal føles realistisk for vægttab og hverdagsmæthed, ikke som keto, dessert eller fitness-slankekur
+- Smag og køkken: varier gerne internationalt; undgå ikke smagsretninger fordi de lyder «udenlandske».
 
 OPPSKRIFT FORMAT (returner kun JSON):
 {
@@ -287,7 +288,7 @@ INGREDIENS REGLER:
 - Fisk: "400 g laks", "300 g makrel"
 - Ingen notes felt på ingredienser
 - Portioner: altid 2
-- Titel: dansk sætningscase — kun første bogstav stort (fx "Kylling med linser og broccoli")
+- Titel: sætningscase på dansk — kun første bogstav stort (fx "Kylling med linser og broccoli")
 
 GLP-1 INGREDIENSER (prioriter høj protein, fibre og sunde fedtstoffer):
 - Protein: æg, kylling, kalkun, fisk, græsk yoghurt, hytteost, magert oksekød, bælgfrugter
@@ -308,7 +309,7 @@ UNDGÅ:
 VIGTIGT:
 - Opskriften skal tydeligt afspejle GLP-1 kost som beskrevet ovenfor, ikke paleo, ikke klassisk LCHF og ikke ren keto.
 - Beskrivelsen skal nævne mæthed, protein, fibre eller stabil energi på en naturlig måde.
-- Opskriften må gerne være dansk og hverdagsrealistisk.
+- Opskriften skal være hverdagsrealistisk; smag og køkken må gerne være internationale (karry, urter, citrus, miso i små mængder …) så længe GLP-1-principperne overholdes.
 - Returner kun gyldig JSON.`
 }
 

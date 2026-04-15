@@ -1,13 +1,20 @@
 'use client'
 
 import { useState, useEffect, ChangeEvent } from 'react'
-import { Recipe } from '@/types/recipe'
+import type { IngredientGroup, Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import IngredientMatchesBox from '@/components/IngredientMatchesBox'
 import FridaIngredientMatchStatus from '@/components/FridaIngredientMatchStatus'
 import SlotScheduler from '@/components/SlotScheduler'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import {
+  SENSE_SPISEKASSE_GROUP_TITLES,
+  buildSenseIngredientGroupsFromAssignments,
+  inferSenseGroupLabelsInListOrder,
+  recipeHasSenseSpisekasse,
+  senseGroupAssignmentsFromRecipeGroups,
+} from '@/lib/sense-spisekasse'
 import { Pencil, Plus, X } from 'lucide-react'
 
 interface RecipeWithTips extends Recipe {
@@ -37,7 +44,8 @@ export default function AdminPublishingPage() {
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('published')
+  /** Default «alle» så nye AI-gem (planlagte) ikke forsvinder bag filteret «Udgivne». */
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('all')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [isScheduling, setIsScheduling] = useState(false)
@@ -50,6 +58,9 @@ export default function AdminPublishingPage() {
   const [editedInstructions, setEditedInstructions] = useState<any[]>([])
   const [editingServings, setEditingServings] = useState(false)
   const [servingsInput, setServingsInput] = useState<number>(1)
+  const [rebuildingSenseGroups, setRebuildingSenseGroups] = useState(false)
+  /** Sense: parallel med `editedIngredients` — spisekasse-rubrik pr. linje. */
+  const [ingredientSenseGroups, setIngredientSenseGroups] = useState<string[]>([])
 
   useEffect(() => {
     loadRecipes()
@@ -365,18 +376,60 @@ export default function AdminPublishingPage() {
   const saveIngredients = async () => {
     if (!selectedRecipe) return
 
+    const isSenseRecipe = selectedRecipe.dietaryCategories?.some(
+      (c) => String(c).toLowerCase() === 'sense'
+    )
+
     try {
       setSaving(true)
+
+      let payload: {
+        recipeId: string
+        ingredients: Recipe['ingredients']
+        ingredientGroups?: IngredientGroup[]
+      } = {
+        recipeId: selectedRecipe.id,
+        ingredients: editedIngredients,
+      }
+
+      if (
+        isSenseRecipe &&
+        ingredientSenseGroups.length === editedIngredients.length &&
+        editedIngredients.length > 0
+      ) {
+        const withIds = editedIngredients.map((ing: Record<string, unknown>) => {
+          const id =
+            typeof ing.id === 'string' && String(ing.id).trim().length > 0
+              ? String(ing.id)
+              : crypto.randomUUID()
+          return {
+            id,
+            name: String(ing.name ?? ''),
+            amount: Number(ing.amount) || 0,
+            unit: String(ing.unit ?? ''),
+            ...(ing.notes != null && String(ing.notes).trim() !== ''
+              ? { notes: String(ing.notes) }
+              : {}),
+          }
+        })
+        const built = buildSenseIngredientGroupsFromAssignments(withIds, ingredientSenseGroups)
+        if (built && built.length > 0) {
+          const flatIngredients = built.flatMap((g) => g.ingredients)
+          payload = {
+            recipeId: selectedRecipe.id,
+            ingredients: flatIngredients,
+            ingredientGroups: built,
+          }
+        }
+      }
+
       const response = await fetch(`/api/admin/recipes?timestamp=${new Date().getTime()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         },
-        body: JSON.stringify({
-          recipeId: selectedRecipe.id,
-          ingredients: editedIngredients
-        }),
+        body: JSON.stringify(payload),
         cache: 'no-store',
       })
 
@@ -388,7 +441,11 @@ export default function AdminPublishingPage() {
       await response.json()
       
       // Update local state
-      const updatedRecipe = { ...selectedRecipe, ingredients: editedIngredients }
+      const updatedRecipe = {
+        ...selectedRecipe,
+        ingredients: payload.ingredients as RecipeWithTips['ingredients'],
+        ...(payload.ingredientGroups ? { ingredientGroups: payload.ingredientGroups } : {}),
+      }
       setSelectedRecipe(updatedRecipe)
       
       const updatedRecipes = recipes.map(recipe =>
@@ -397,6 +454,7 @@ export default function AdminPublishingPage() {
       setRecipes(updatedRecipes)
       
       setEditingIngredients(false)
+      setIngredientSenseGroups([])
       console.log('✅ Ingredienser gemt for:', selectedRecipe.title)
       alert('✅ Ingredienser gemt!')
       
@@ -501,6 +559,46 @@ export default function AdminPublishingPage() {
 
   const removeCategory = (categoryToRemove: string) => {
     setCategories(categories.filter(cat => cat !== categoryToRemove))
+  }
+
+  const rebuildSenseSpisekasse = async () => {
+    if (!selectedRecipe?.id) return
+    setRebuildingSenseGroups(true)
+    try {
+      const res = await fetch('/api/admin/recipes/rebuild-sense-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipeId: selectedRecipe.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === 'string' ? data.error : 'Kunne ikke genbygge Sense-grupper'
+        )
+      }
+      const detailRes = await fetch(`/api/admin/recipes/${selectedRecipe.id}?t=${Date.now()}`, {
+        cache: 'no-store',
+      })
+      if (!detailRes.ok) {
+        throw new Error('Grupper gemt, men kunne ikke hente opdateret opskrift')
+      }
+      const full = await detailRes.json()
+      const merged: RecipeWithTips = {
+        ...full,
+        personalTips: selectedRecipe.personalTips,
+        scheduledDate: selectedRecipe.scheduledDate,
+        scheduledTime: selectedRecipe.scheduledTime,
+      }
+      setSelectedRecipe(merged)
+      setRecipes((prev) => prev.map((r) => (r.id === merged.id ? { ...r, ...merged } : r)))
+      setEditedIngredients(merged.ingredients || [])
+      alert('Sense-spisekasse-grupper er opdateret.')
+    } catch (e) {
+      console.error(e)
+      alert(e instanceof Error ? e.message : 'Fejl ved genbygning')
+    } finally {
+      setRebuildingSenseGroups(false)
+    }
   }
 
   const deleteRecipe = async (recipeSlug: string) => {
@@ -1143,8 +1241,41 @@ export default function AdminPublishingPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
-                              // Sørg for at ingredienser er sat før modal åbnes
-                              setEditedIngredients(selectedRecipe.ingredients || [])
+                              const ings = selectedRecipe.ingredients || []
+                              setEditedIngredients(ings)
+                              const sense = selectedRecipe.dietaryCategories?.some(
+                                (c) => String(c).toLowerCase() === 'sense'
+                              )
+                              if (sense) {
+                                if (ings.length > 0) {
+                                  if (
+                                    recipeHasSenseSpisekasse(selectedRecipe) &&
+                                    selectedRecipe.ingredientGroups?.length
+                                  ) {
+                                    setIngredientSenseGroups(
+                                      senseGroupAssignmentsFromRecipeGroups(
+                                        ings,
+                                        selectedRecipe.ingredientGroups
+                                      )
+                                    )
+                                  } else {
+                                    setIngredientSenseGroups(
+                                      inferSenseGroupLabelsInListOrder(
+                                        ings.map((i: { name: string; amount: number; unit: string; notes?: string | null }) => ({
+                                          name: i.name,
+                                          amount: Number(i.amount) || 0,
+                                          unit: i.unit,
+                                          notes: i.notes ?? null,
+                                        }))
+                                      )
+                                    )
+                                  }
+                                } else {
+                                  setIngredientSenseGroups([])
+                                }
+                              } else {
+                                setIngredientSenseGroups([])
+                              }
                               setEditingIngredients(true)
                             }}
                             className="text-blue-600 hover:text-blue-700 text-sm"
@@ -1167,6 +1298,25 @@ export default function AdminPublishingPage() {
                         <p>Ingredienser: {selectedRecipe.ingredients?.length || 0} stk</p>
                         <p>Fremgangsmåde: {selectedRecipe.instructions?.length || 0} steps</p>
                       </div>
+                      {selectedRecipe.dietaryCategories?.some(
+                        (c) => String(c).toLowerCase() === 'sense'
+                      ) &&
+                        !recipeHasSenseSpisekasse(selectedRecipe) && (
+                          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                            <p className="mb-2">
+                              Denne Sense-opskrift mangler <strong>ingredientGroups</strong> (spisekassen).
+                              At fjerne og tilføje Sense igen opdaterer kun tags — ikke gruppestrukturen.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={rebuildSenseSpisekasse}
+                              disabled={rebuildingSenseGroups}
+                              className="rounded-md bg-amber-700 px-3 py-1.5 text-white hover:bg-amber-800 disabled:opacity-50"
+                            >
+                              {rebuildingSenseGroups ? 'Genbygger…' : 'Genbyg Sense-spisekasse fra ingrediensliste'}
+                            </button>
+                          </div>
+                        )}
                     </div>
 
                     {/* Portioner */}
@@ -1486,7 +1636,7 @@ export default function AdminPublishingPage() {
                 <li>• Personlige tips og erfaringer</li>
                 <li>• Unikke billeder (lokalt lagret)</li>
                 <li>• Manuel review af hver opskrift</li>
-                <li>• Fokus på danske ingredienser</li>
+                <li>• Varierede opskrifter og titler der matcher søgning</li>
               </ul>
             </div>
           </div>
@@ -1510,7 +1660,11 @@ export default function AdminPublishingPage() {
       <AutoPublisher />
 
         {/* Edit Ingredients Modal */}
-        {editingIngredients && selectedRecipe && (
+        {editingIngredients && selectedRecipe && (() => {
+          const showSenseGroupPicks =
+            selectedRecipe.dietaryCategories?.some((c) => String(c).toLowerCase() === 'sense') &&
+            ingredientSenseGroups.length === editedIngredients.length
+          return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
@@ -1522,6 +1676,7 @@ export default function AdminPublishingPage() {
                     onClick={() => {
                       setEditingIngredients(false)
                       setEditedIngredients(selectedRecipe.ingredients || [])
+                      setIngredientSenseGroups([])
                     }}
                     className="text-gray-400 hover:text-gray-600"
                   >
@@ -1529,9 +1684,18 @@ export default function AdminPublishingPage() {
                   </button>
                 </div>
 
+                {showSenseGroupPicks && (
+                  <p className="mb-4 text-sm text-gray-600 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <strong>Sense-spisekasse:</strong> Vælg rubrik pr. linje (Håndfuld 1+2 = grønt, 3 = protein, 4 =
+                    stivelse). Ved gem sættes både <code className="text-xs">ingredientGroups</code> og en flad liste i
+                    kanonisk rækkefølge.
+                  </p>
+                )}
+
                 <div className="space-y-3 mb-6">
                   {editedIngredients.map((ingredient, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-3 border border-gray-200 rounded-lg">
+                    <div key={index} className="space-y-2 p-3 border border-gray-200 rounded-lg">
+                    <div className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-3">
                         <input
                           type="text"
@@ -1620,12 +1784,40 @@ export default function AdminPublishingPage() {
                           onClick={() => {
                             const updated = editedIngredients.filter((_, i) => i !== index)
                             setEditedIngredients(updated)
+                            if (ingredientSenseGroups.length === editedIngredients.length) {
+                              setIngredientSenseGroups(ingredientSenseGroups.filter((_, i) => i !== index))
+                            }
                           }}
                           className="w-full p-1 text-red-600 hover:text-red-800"
                         >
                           <X size={16} />
                         </button>
                       </div>
+                    </div>
+                    {showSenseGroupPicks && (
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        <label className="col-span-12 sm:col-span-3 text-xs font-medium text-gray-600 sm:pt-2">
+                          Sense-gruppe
+                        </label>
+                        <div className="col-span-12 sm:col-span-9">
+                          <select
+                            value={ingredientSenseGroups[index] || 'Håndfuld 1+2'}
+                            onChange={(e) => {
+                              const next = [...ingredientSenseGroups]
+                              next[index] = e.target.value
+                              setIngredientSenseGroups(next)
+                            }}
+                            className="w-full max-w-md px-2 py-2 border border-gray-300 rounded text-sm bg-white"
+                          >
+                            {SENSE_SPISEKASSE_GROUP_TITLES.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
                     </div>
                   ))}
                 </div>
@@ -1634,6 +1826,11 @@ export default function AdminPublishingPage() {
                   <button
                     onClick={() => {
                       setEditedIngredients([...editedIngredients, { name: '', amount: 0, unit: '', notes: '' }])
+                      if (
+                        selectedRecipe.dietaryCategories?.some((c) => String(c).toLowerCase() === 'sense')
+                      ) {
+                        setIngredientSenseGroups([...ingredientSenseGroups, 'Håndfuld 1+2'])
+                      }
                     }}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
@@ -1645,6 +1842,7 @@ export default function AdminPublishingPage() {
                     onClick={() => {
                       setEditingIngredients(false)
                       setEditedIngredients(selectedRecipe.ingredients || [])
+                      setIngredientSenseGroups([])
                     }}
                     className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                   >
@@ -1661,7 +1859,8 @@ export default function AdminPublishingPage() {
               </div>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {/* Edit Instructions Modal */}
         {editingInstructions && selectedRecipe && (
