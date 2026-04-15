@@ -149,7 +149,17 @@ export default function SharedMealPlanPage() {
   const sharedByName = plan.shared_by_name || null
   const planTitle = sharedByName ? `${sharedByName}s madplan` : 'Delt madplan'
 
-  const mealPlan = plan.meal_plan_data || {}
+  const rawMealPlan = plan.meal_plan_data || {}
+  const mealPlan = (
+    rawMealPlan &&
+    typeof rawMealPlan === 'object' &&
+    'grid' in rawMealPlan &&
+    rawMealPlan.grid &&
+    typeof rawMealPlan.grid === 'object' &&
+    'monday' in (rawMealPlan.grid as object)
+      ? rawMealPlan.grid
+      : rawMealPlan
+  ) as Record<string, Record<string, { title?: string; slug?: string; id?: string; image?: string; imageUrl?: string }>>
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   const mealKeys = ['breakfast', 'lunch', 'dinner']
   const shoppingList = plan.shopping_list || {}

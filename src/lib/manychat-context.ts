@@ -15,6 +15,11 @@ function getMealTitle(value: unknown): string | null {
 function formatLatestMealPlanSummary(mealPlanData: unknown): string | null {
   if (!isRecord(mealPlanData)) return null
 
+  const grid =
+    'grid' in mealPlanData && isRecord(mealPlanData.grid) && 'monday' in mealPlanData.grid
+      ? (mealPlanData.grid as Record<string, unknown>)
+      : mealPlanData
+
   const dayOrder = [
     { key: 'monday', label: 'Man' },
     { key: 'tuesday', label: 'Tir' },
@@ -35,7 +40,7 @@ function formatLatestMealPlanSummary(mealPlanData: unknown): string | null {
   const lines: string[] = []
 
   for (const day of dayOrder) {
-    const dayData = mealPlanData[day.key]
+    const dayData = grid[day.key]
     if (!isRecord(dayData)) continue
 
     const mealParts: string[] = []

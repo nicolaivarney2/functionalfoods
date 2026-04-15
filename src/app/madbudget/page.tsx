@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -84,6 +84,50 @@ function storeIdFromTabKey(tab: string): number | null {
   return found ? Number(found[0]) : null
 }
 
+type DayKeyPlanner = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+type MealTypePlanner = 'breakfast' | 'lunch' | 'dinner'
+
+function emptyMealPlanGrid(): Record<DayKeyPlanner, Record<MealTypePlanner, any | null>> {
+  return {
+    monday: { breakfast: null, lunch: null, dinner: null },
+    tuesday: { breakfast: null, lunch: null, dinner: null },
+    wednesday: { breakfast: null, lunch: null, dinner: null },
+    thursday: { breakfast: null, lunch: null, dinner: null },
+    friday: { breakfast: null, lunch: null, dinner: null },
+    saturday: { breakfast: null, lunch: null, dinner: null },
+    sunday: { breakfast: null, lunch: null, dinner: null },
+  }
+}
+
+/** meal_plan_data er enten legacy (kun grid) eller { v, grid, slotLocks }. */
+function parseMealPlanData(raw: unknown): {
+  grid: Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>
+  slotLocks: Record<string, boolean>
+} {
+  if (!raw || typeof raw !== 'object') {
+    return { grid: emptyMealPlanGrid(), slotLocks: {} }
+  }
+  const o = raw as Record<string, unknown>
+  if ('grid' in o && o.grid && typeof o.grid === 'object') {
+    const g = o.grid as Record<string, unknown>
+    if (g.monday) {
+      const locks = (o.slotLocks as Record<string, boolean>) || {}
+      return { grid: o.grid as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: locks }
+    }
+  }
+  if ('monday' in o) {
+    return { grid: raw as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: {} }
+  }
+  return { grid: emptyMealPlanGrid(), slotLocks: {} }
+}
+
+function wrapMealPlanForSave(
+  grid: Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>,
+  slotLocks: Record<string, boolean>
+) {
+  return { v: 2 as const, grid, slotLocks }
+}
+
 const mockStores = [
   { id: 1, name: 'REMA 1000', color: 'bg-blue-600', isSelected: true },
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
@@ -134,6 +178,11 @@ export default function MadbudgetPage() {
     saturday: { breakfast: null, lunch: null, dinner: null },
     sunday: { breakfast: null, lunch: null, dinner: null }
   })
+
+  /** Låste felter bevares ved «Generer ny madplan» (nøgle: `${dayKey}_${mealKey}`). */
+  const [slotLocks, setSlotLocks] = useState<Record<string, boolean>>({})
+  const [lockDishesMode, setLockDishesMode] = useState(false)
+  const [mealInfoKind, setMealInfoKind] = useState<'breakfast' | 'lunch' | null>(null)
 
   const smartShoppingWeekMeta: { dayKey: DayKey; dayLabel: string }[] = [
     { dayKey: 'monday', dayLabel: 'Mandag' },
@@ -772,7 +821,9 @@ export default function MadbudgetPage() {
             // Load active meal plan if exists
             const activePlan = plans.find((p: any) => p.is_active)
             if (activePlan && activePlan.meal_plan_data) {
-              setMealPlan(activePlan.meal_plan_data)
+              const parsed = parseMealPlanData(activePlan.meal_plan_data)
+              setMealPlan(parsed.grid)
+              setSlotLocks(parsed.slotLocks)
               setShoppingList(activePlan.shopping_list || [])
               setSelectedWeekNumber(activePlan.week_number || null)
               setActivePlanRef(activePlan)
@@ -831,7 +882,9 @@ export default function MadbudgetPage() {
   const loadWeekMealPlan = async (weekNumber: number) => {
     const plan = savedMealPlans.find((p: any) => p.week_number === weekNumber)
     if (plan && plan.meal_plan_data) {
-      setMealPlan(plan.meal_plan_data)
+      const parsed = parseMealPlanData(plan.meal_plan_data)
+      setMealPlan(parsed.grid)
+      setSlotLocks(parsed.slotLocks)
       setShoppingList(plan.shopping_list || [])
       setSelectedWeekNumber(weekNumber)
       setActivePlanRef(plan)
@@ -888,7 +941,7 @@ export default function MadbudgetPage() {
           weekNumber: weekInfo.weekNumber,
           variationLevel: activePlanRef?.variation_level ?? variationLevel,
           familyProfileSnapshot: activePlanRef?.family_profile_snapshot ?? null,
-          mealPlanData,
+          mealPlanData: wrapMealPlanForSave(mealPlanData, slotLocks),
           shoppingList: activePlanRef?.shopping_list ?? shoppingList,
           totalCost: activePlanRef?.total_cost ?? null,
           totalSavings: activePlanRef?.total_savings ?? null,
@@ -1121,35 +1174,83 @@ export default function MadbudgetPage() {
   }
   void [_updateBasisvarerQuantity, _removeFromBasisvarer]
 
-  // Get filtered recipes based on search, category, and meal type
+  const primaryDietForRecipePicker = useMemo(() => {
+    const complete = familyProfile.adultsProfiles.filter(
+      (p) =>
+        p.isComplete &&
+        p.gender &&
+        p.age &&
+        p.height &&
+        p.weight &&
+        p.activityLevel &&
+        p.dietaryApproach
+    )
+    const idx = Math.min(selectedNutritionAdultIndex, Math.max(0, complete.length - 1))
+    return (
+      complete[idx]?.dietaryApproach ||
+      complete[0]?.dietaryApproach ||
+      familyProfile.adultsProfiles[0]?.dietaryApproach ||
+      ''
+    )
+  }, [familyProfile.adultsProfiles, selectedNutritionAdultIndex])
+
+  const recipeMatchesMealSlot = (recipe: PlannerRecipe, meal: MealType): boolean => {
+    const blob = `${recipe.category || ''} ${recipe.title || ''} ${(recipe.dietaryTags || []).join(' ')}`.toLowerCase()
+    if (recipe.mealType === meal) return true
+    if (meal === 'breakfast') {
+      return /morgenmad|breakfast|brunch/.test(blob)
+    }
+    if (meal === 'lunch') {
+      return /frokost|lunch/.test(blob)
+    }
+    if (meal === 'dinner') {
+      if (recipe.mealType === 'breakfast' || recipe.mealType === 'lunch') return false
+      if (recipe.mealType === 'dinner') return true
+      return /aftensmad|middag|dinner|hovedret|one.?pot|gryde|ovn/.test(blob) || !recipe.mealType
+    }
+    return false
+  }
+
+  const recipeMatchesProfileDiet = (recipe: PlannerRecipe, dietId: string): boolean => {
+    if (!dietId) return true
+    const d = dietId.toLowerCase()
+    const blob = `${(recipe.dietaryTags || []).join(' ')} ${recipe.category || ''}`.toLowerCase()
+    if (d.includes('keto')) return blob.includes('keto')
+    if (d.includes('sense')) return blob.includes('sense')
+    if (d.includes('glp')) return blob.includes('glp') || blob.includes('glp-1')
+    if (d.includes('familie')) return true
+    if (d.includes('anti')) return blob.includes('anti') || blob.includes('inflamm')
+    if (d.includes('flex')) return blob.includes('flex') || blob.includes('plante')
+    if (d.includes('5-2') || d.includes('5:2')) return true
+    if (d.includes('protein')) return blob.includes('protein')
+    return blob.includes(d)
+  }
+
+  // Get filtered recipes based on search, category, måltidsslots og valgt kostprofil
   const getFilteredRecipes = () => {
     let filtered: PlannerRecipe[] = [...availableRecipes]
+    if (!selectedMealSlot || !selectedMealSlot.includes('-')) return filtered
     const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
 
-    // Filter by search query
+    filtered = filtered.filter((recipe) => recipeMatchesMealSlot(recipe, selectedMeal))
+    filtered = filtered.filter((recipe) => recipeMatchesProfileDiet(recipe, primaryDietForRecipePicker))
+
     if (recipeSearchQuery) {
-      filtered = filtered.filter(recipe => 
-        recipe.title.toLowerCase().includes(recipeSearchQuery.toLowerCase()) ||
-        recipe.ingredients.some(ing => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
+      filtered = filtered.filter(
+        (recipe) =>
+          recipe.title.toLowerCase().includes(recipeSearchQuery.toLowerCase()) ||
+          recipe.ingredients.some((ing) => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
       )
     }
 
-    // Filter by category
     if (recipeCategoryFilter !== 'all') {
-      filtered = filtered.filter(recipe => recipe.category === recipeCategoryFilter)
+      filtered = filtered.filter((recipe) => recipe.category === recipeCategoryFilter)
     }
 
-    // Prefer recipes matching selected meal type, but fallback to all if no matches
-    if (selectedMeal) {
-      const matches = filtered.filter(recipe => recipe.mealType === selectedMeal)
-      if (matches.length > 0) {
-        filtered = matches.map(recipe => ({ ...recipe, mealTypeMatch: true }))
-      } else {
-        filtered = filtered.map(recipe => ({ ...recipe, mealTypeMatch: false }))
-      }
-    }
-
-    return filtered
+    return filtered.map((recipe) => ({
+      ...recipe,
+      mealTypeMatch: recipe.mealType === selectedMeal,
+    }))
   }
 
 
@@ -1170,11 +1271,45 @@ export default function MadbudgetPage() {
     }
   }
 
+  const slotKey = (d: DayKey, m: MealType) => `${d}_${m}`
+
   const openRecipeSelector = (day: DayKey, meal: MealType) => {
     setSelectedMealSlot(`${day}-${meal}`)
     setShowRecipeSelector(true)
     setRecipeSearchQuery('')
     setRecipeCategoryFilter('all')
+  }
+
+  const handleMealCellClick = (dayKey: DayKey, mealKey: MealType) => {
+    if (lockDishesMode) {
+      const k = slotKey(dayKey, mealKey)
+      setSlotLocks((prev) => ({ ...prev, [k]: !prev[k] }))
+      return
+    }
+    openRecipeSelector(dayKey, mealKey)
+  }
+
+  const plannerMealToggles = useMemo(() => {
+    const src = familyProfile.adultsProfiles[0]
+    const set = new Set(src?.mealsPerDay || ['dinner'])
+    return {
+      breakfast: set.has('breakfast'),
+      lunch: set.has('lunch'),
+      dinner: true,
+    }
+  }, [familyProfile.adultsProfiles])
+
+  const setPlannerMealIncluded = (meal: 'breakfast' | 'lunch', checked: boolean) => {
+    setFamilyProfile((prev) => ({
+      ...prev,
+      adultsProfiles: prev.adultsProfiles.map((p) => {
+        const cur = new Set(p.mealsPerDay || ['dinner'])
+        cur.add('dinner')
+        if (checked) cur.add(meal)
+        else cur.delete(meal)
+        return { ...p, mealsPerDay: Array.from(cur) }
+      }),
+    }))
   }
 
   const openRecipeDetail = (recipe: any) => {
@@ -1414,8 +1549,19 @@ export default function MadbudgetPage() {
           }
         })
       })
-      
-      setMealPlan(newMealPlan)
+
+      // Bevar låste retter fra nuværende plan
+      const mergedMealPlan: Record<DayKey, Record<MealType, any | null>> = { ...newMealPlan }
+      for (const dayKey of dayNames) {
+        for (const mt of ['breakfast', 'lunch', 'dinner'] as MealType[]) {
+          const lockKey = `${dayKey}_${mt}`
+          if (slotLocks[lockKey] && mealPlan[dayKey]?.[mt]) {
+            mergedMealPlan[dayKey] = { ...mergedMealPlan[dayKey], [mt]: mealPlan[dayKey][mt] }
+          }
+        }
+      }
+
+      setMealPlan(mergedMealPlan)
       
       // Generate shopping list
       setShoppingList(weekPlan.shoppingList)
@@ -1463,7 +1609,7 @@ export default function MadbudgetPage() {
                 selectedStores: familyProfile.selectedStores,
                 weeklyBudgetKr: familyProfile.weeklyBudgetKr
               },
-              mealPlanData: newMealPlan, // Save the UI format
+              mealPlanData: wrapMealPlanForSave(mergedMealPlan, slotLocks), // grid + låse
               shoppingList: weekPlan.shoppingList,
               totalCost: null, // Will be calculated later with prices
               totalSavings: null, // Will be calculated later
@@ -1767,47 +1913,119 @@ export default function MadbudgetPage() {
                     Ugeplanlægger
                   </h2>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  {/* Week selector */}
-                  {savedMealPlans.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">Uge:</label>
-                      <select
-                        value={selectedWeekNumber || currentWeekNumber}
-                        onChange={(e) => {
-                          const weekNum = parseInt(e.target.value)
-                          loadWeekMealPlan(weekNum)
-                        }}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        {savedMealPlans
-                          .map((p: any) => {
-                            const weekNum = p.week_number || (() => {
-                              const date = new Date(p.week_start_date)
-                              const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-                              const dayNum = d.getUTCDay() || 7
-                              d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-                              const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-                              return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-                            })()
-                            return { weekNum, plan: p }
-                          })
-                          .sort((a, b) => b.weekNum - a.weekNum)
-                          .map(({ weekNum, plan }) => (
-                            <option key={plan.id} value={weekNum}>
-                              Uge {weekNum} {weekNum === currentWeekNumber ? '(Nuværende)' : ''}
-                            </option>
-                          ))}
-                      </select>
+                <div className="flex flex-col gap-4 w-full">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
+                    {savedMealPlans.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-gray-700">Uge:</label>
+                        <select
+                          value={selectedWeekNumber || currentWeekNumber}
+                          onChange={(e) => {
+                            const weekNum = parseInt(e.target.value)
+                            loadWeekMealPlan(weekNum)
+                          }}
+                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          {savedMealPlans
+                            .map((p: any) => {
+                              const weekNum =
+                                p.week_number ||
+                                (() => {
+                                  const date = new Date(p.week_start_date)
+                                  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+                                  const dayNum = d.getUTCDay() || 7
+                                  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+                                  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+                                  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+                                })()
+                              return { weekNum, plan: p }
+                            })
+                            .sort((a, b) => b.weekNum - a.weekNum)
+                            .map(({ weekNum, plan }) => (
+                              <option key={plan.id} value={weekNum}>
+                                Uge {weekNum} {weekNum === currentWeekNumber ? '(Nuværende)' : ''}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/90 p-4">
+                    <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-x-5 gap-y-2 text-sm">
+                      <span className="font-medium text-gray-800 shrink-0">Måltider i planen</span>
+                      <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={plannerMealToggles.breakfast}
+                          onChange={(e) => setPlannerMealIncluded('breakfast', e.target.checked)}
+                        />
+                        <span>Morgenmad</span>
+                        <button
+                          type="button"
+                          onClick={() => setMealInfoKind('breakfast')}
+                          className="rounded-full p-0.5 text-gray-400 hover:bg-white hover:text-blue-700"
+                          aria-label="Info om morgenmad i madplanen"
+                        >
+                          <HelpCircle size={16} />
+                        </button>
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          checked={plannerMealToggles.lunch}
+                          onChange={(e) => setPlannerMealIncluded('lunch', e.target.checked)}
+                        />
+                        <span>Frokost</span>
+                        <button
+                          type="button"
+                          onClick={() => setMealInfoKind('lunch')}
+                          className="rounded-full p-0.5 text-gray-400 hover:bg-white hover:text-blue-700"
+                          aria-label="Info om frokost i madplanen"
+                        >
+                          <HelpCircle size={16} />
+                        </button>
+                      </label>
+                      <label className="inline-flex items-center gap-2 select-none text-gray-500">
+                        <input type="checkbox" className="rounded border-gray-300" checked disabled readOnly />
+                        <span>Aftensmad</span>
+                        <span className="text-xs">(altid)</span>
+                      </label>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setLockDishesMode((v) => !v)}
+                        className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                          lockDishesMode
+                            ? 'border-amber-600 bg-amber-600 text-white shadow'
+                            : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Lock size={16} aria-hidden />
+                        {lockDishesMode ? 'Afslut låsning' : 'Lås retter'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLockDishesMode(false)
+                          void generateMealPlan()
+                        }}
+                        disabled={isGeneratingMealPlan}
+                        className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Generer ny madplan
+                      </button>
+                    </div>
+                  </div>
+                  {lockDishesMode && (
+                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      Klik på en ret eller et tomt felt for at låse eller låse op. Låste felter beholdes, når du
+                      genererer en ny madplan — der kommer kun nye retter på de pladser, der ikke er låst.
+                    </p>
                   )}
-                  
-                  <button
-                    onClick={generateMealPlan}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
-                  >
-                    Generer AI madplan
-                  </button>
                 </div>
               </div>
 
@@ -1827,22 +2045,31 @@ export default function MadbudgetPage() {
                         const dayKey = day as DayKey
                         const mealKey = mealType.key as MealType
                         const currentMeal = mealPlan[dayKey][mealKey]
-                        
-                                                    return (
+                        const sk = slotKey(dayKey, mealKey)
+                        const isLocked = Boolean(slotLocks[sk])
+
+                        return (
                               <div
                                 key={`${day}-${mealType.key}`}
-                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                                className={`relative p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                                  lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
+                                } ${
                                   currentMeal
                                     ? 'border-green-500 bg-green-50'
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
-                                }`}
+                                } ${isLocked ? 'border-amber-500/90' : ''}`}
                                 onClick={() => {
                                   const dayKey = day as DayKey
                                   const mealKey = mealType.key as MealType
-                                  openRecipeSelector(dayKey, mealKey)
+                                  handleMealCellClick(dayKey, mealKey)
                                 }}
                                 title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
+                                {isLocked && (
+                                  <span className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-amber-600 text-white shadow" title="Låst ved næste generering">
+                                    <Lock size={12} aria-hidden />
+                                  </span>
+                                )}
                                 {currentMeal ? (
                                   <div className="flex flex-col text-left overflow-hidden -mx-3 -mt-3 rounded-t-lg">
                                     <div className="aspect-square w-full overflow-hidden bg-gray-100 rounded-t-lg relative">
@@ -1969,22 +2196,31 @@ export default function MadbudgetPage() {
                             const dayKey = day as DayKey
                             const mealKey = mealType.key as MealType
                             const currentMeal = mealPlan[dayKey][mealKey]
-                            
+                            const sk = slotKey(dayKey, mealKey)
+                            const isLocked = Boolean(slotLocks[sk])
+
                             return (
                               <div
                                 key={`${day}-${mealType.key}`}
-                                className={`p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                                className={`relative p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+                                  lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
+                                } ${
                                   currentMeal
                                     ? 'border-green-500 bg-green-50'
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
-                                }`}
+                                } ${isLocked ? 'border-amber-500/90' : ''}`}
                                 onClick={() => {
                                   const dayKey = day as DayKey
                                   const mealKey = mealType.key as MealType
-                                  openRecipeSelector(dayKey, mealKey)
+                                  handleMealCellClick(dayKey, mealKey)
                                 }}
                                 title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
+                                {isLocked && (
+                                  <span className="absolute bottom-1 right-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white shadow sm:bottom-1.5 sm:right-1.5 sm:h-6 sm:w-6" title="Låst ved næste generering">
+                                    <Lock size={10} className="sm:w-3 sm:h-3" aria-hidden />
+                                  </span>
+                                )}
                                 {currentMeal ? (
                                   <div className="flex flex-col text-left overflow-hidden -mx-3 -mt-3 rounded-t-lg">
                                     <div className="aspect-square w-full overflow-hidden bg-gray-100 rounded-t-lg relative">
@@ -2178,14 +2414,23 @@ export default function MadbudgetPage() {
                       const dayKey = days[selectedDayIndex] as DayKey
                       const mealKey = mealType.key as MealType
                       const currentMeal = mealPlan[dayKey][mealKey]
+                      const sk = slotKey(dayKey, mealKey)
+                      const isLocked = Boolean(slotLocks[sk])
                       return (
                         <div
                           key={mealType.key}
-                          onClick={() => openRecipeSelector(dayKey, mealKey)}
-                          className={`rounded-xl border-2 cursor-pointer transition-colors overflow-hidden ${
+                          onClick={() => handleMealCellClick(dayKey, mealKey)}
+                          className={`relative rounded-xl border-2 cursor-pointer transition-colors overflow-hidden ${
+                            lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
+                          } ${
                             currentMeal ? 'border-green-500 bg-green-50/50' : 'border-dashed border-gray-200 hover:border-green-300 hover:bg-gray-50'
-                          }`}
+                          } ${isLocked ? 'border-amber-500/90' : ''}`}
                         >
+                          {isLocked && (
+                            <span className="absolute bottom-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-amber-600 text-white shadow" title="Låst ved næste generering">
+                              <Lock size={14} aria-hidden />
+                            </span>
+                          )}
                           <div className="aspect-square w-full bg-gray-100 relative">
                             <span className={`absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shadow-sm z-10 ${mealType.color}`}>
                               <mealType.icon size={14} />
@@ -2880,6 +3125,55 @@ export default function MadbudgetPage() {
         </div>
       </div>
 
+      {/* Info: morgenmad / frokost i madplanen */}
+      {mealInfoKind && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setMealInfoKind(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="meal-info-title"
+        >
+          <div
+            className="max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="meal-info-title" className="text-lg font-semibold text-gray-900 mb-3">
+              {mealInfoKind === 'breakfast' ? 'Morgenmad i madplanen' : 'Frokost i madplanen'}
+            </h3>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {mealInfoKind === 'breakfast' ? (
+                <>
+                  Har du afkrydset morgenmad, dannes morgenmad ud fra dine udregninger og ønsker. Dog er morgenmad og
+                  frokost meget individuelt, og du kan nemt klikke på et frit morgenmadsfelt og her vælge morgenmad
+                  manuelt.
+                  <span className="mt-3 block text-gray-700">
+                    <strong>Tip:</strong> Dine favorit-morgenmadsopskrifter kan du markere som favorit, så du nemmere
+                    finder dem i listen.
+                  </span>
+                </>
+              ) : (
+                <>
+                  Når frokost er afkrydset, indgår frokost i dine beregninger og i den automatiske madplan — men
+                  frokost er ofte meget individuelt. Klik på et frit frokostfelt for at vælge ret manuelt, præcis som ved
+                  morgenmad.
+                  <span className="mt-3 block text-gray-700">
+                    <strong>Tip:</strong> Markér ofte brugte frokostopskrifter som favoritter for hurtig adgang.
+                  </span>
+                </>
+              )}
+            </p>
+            <button
+              type="button"
+              className="mt-5 w-full rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+              onClick={() => setMealInfoKind(null)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Recipe Selector Modal */}
       {showRecipeSelector && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -3227,10 +3521,17 @@ export default function MadbudgetPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setMealPlan(prev => {
+                    const { dayKey, mealKey } = recipeViewSlot
+                    const lk = slotKey(dayKey, mealKey)
+                    setMealPlan((prev) => {
                       const next = { ...prev }
-                      next[recipeViewSlot.dayKey] = { ...prev[recipeViewSlot.dayKey], [recipeViewSlot.mealKey]: null }
+                      next[dayKey] = { ...prev[dayKey], [mealKey]: null }
                       return next
+                    })
+                    setSlotLocks((prev) => {
+                      const n = { ...prev }
+                      delete n[lk]
+                      return n
                     })
                     setRecipeViewSlugOrId(null)
                     setRecipeViewSlot(null)
@@ -3831,14 +4132,14 @@ export default function MadbudgetPage() {
               <div className="mt-4">
                 <div className="flex items-center justify-center space-x-4 mb-2">
                   <span className="text-sm text-gray-500">
-                    Trin {weightLossProfileStep + 1} af 5
+                    Trin {weightLossProfileStep + 1} af 4
                   </span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                   <motion.div
                     className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
                     initial={{ width: 0 }}
-                    animate={{ width: `${((weightLossProfileStep + 1) / 5) * 100}%` }}
+                    animate={{ width: `${((weightLossProfileStep + 1) / 4) * 100}%` }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>
@@ -4072,66 +4373,10 @@ export default function MadbudgetPage() {
                   </motion.div>
                 )}
 
-                {/* Step 4: Måltider om dagen */}
+                {/* Step 4: Mål (måltider vælges på madplan-siden) */}
                 {weightLossProfileStep === 3 && (
                   <motion.div
-                    key="step3"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
-                  >
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Hvor mange måltider om dagen?</h4>
-                    <div className="space-y-3">
-                      {[
-                        { id: 'dinner', label: 'Aftensmad', desc: 'Altid inkluderet', required: true },
-                        { id: 'breakfast', label: 'Morgenmad', desc: 'Valgfrit' },
-                        { id: 'lunch', label: 'Frokost', desc: 'Valgfrit' }
-                      ].map((meal) => (
-                        <label
-                          key={meal.id}
-                          className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            currentWeightLossProfile.mealsPerDay?.includes(meal.id)
-                              ? 'border-[#1B365D] bg-[#1B365D]/5'
-                              : meal.required
-                              ? 'border-gray-300 bg-gray-50'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={currentWeightLossProfile.mealsPerDay?.includes(meal.id) || meal.required}
-                            disabled={meal.required}
-                            onChange={(e) => {
-                              if (meal.required) return
-                              if (e.target.checked) {
-                                setCurrentWeightLossProfile(prev => ({
-                                  ...prev,
-                                  mealsPerDay: [...(prev.mealsPerDay || []), meal.id]
-                                }))
-                              } else {
-                                setCurrentWeightLossProfile(prev => ({
-                                  ...prev,
-                                  mealsPerDay: (prev.mealsPerDay || []).filter(id => id !== meal.id)
-                                }))
-                              }
-                            }}
-                            className="mr-3"
-                          />
-                          <div>
-                            <div className="font-semibold text-gray-900">{meal.label}</div>
-                            <div className="text-sm text-gray-600">{meal.desc}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 5: Mål */}
-                {weightLossProfileStep === 4 && (
-                  <motion.div
-                    key="step4"
+                    key="step4goals"
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
@@ -4196,13 +4441,13 @@ export default function MadbudgetPage() {
 
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-gray-500">
-                  Trin {weightLossProfileStep + 1} af 5
+                  Trin {weightLossProfileStep + 1} af 4
                 </span>
               </div>
 
               <button
                 onClick={() => {
-                  if (weightLossProfileStep < 4) {
+                  if (weightLossProfileStep < 3) {
                     setWeightLossProfileStep(prev => prev + 1)
                   } else {
                     saveWeightLossProfile()
@@ -4210,8 +4455,8 @@ export default function MadbudgetPage() {
                 }}
                 className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white rounded-lg hover:shadow-lg transition-all"
               >
-                <span>{weightLossProfileStep === 4 ? 'Gem' : 'Næste'}</span>
-                {weightLossProfileStep < 4 && <ChevronRight size={20} />}
+                <span>{weightLossProfileStep === 3 ? 'Gem' : 'Næste'}</span>
+                {weightLossProfileStep < 3 && <ChevronRight size={20} />}
               </button>
             </div>
           </motion.div>
