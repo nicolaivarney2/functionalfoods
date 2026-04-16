@@ -1176,7 +1176,7 @@ export default function CreateRecipePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Frit valg</option>
-                    <option value="rodt-kod">Rødt kød (oksekød, svinekød, lam)</option>
+                    <option value="rodt-kod">Rødt kød (okse/svin — lam kun sjældent)</option>
                     <option value="fjaerkrae">Fjerkræ (80% kylling, kalkun, and)</option>
                     <option value="fisk">Fisk (laks, makrel, tun)</option>
                     <option value="vegetarisk">Vegetarisk</option>

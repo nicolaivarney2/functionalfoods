@@ -1,11 +1,11 @@
 import type { Recipe } from '@/types/recipe'
 
 /**
- * Visnings-tal for opskrifter: i en indledende periode vises tallet × multiplier,
- * så det matcher øget synlighed i starten. Samme logik som "hver visning tæller som 3".
+ * Visnings-tal for opskrifter: valgfri "boost" ganger kun baseline (Ketoliv/slug-fallback),
+ * så hver registreret FF-sidevisning (`pageViews` i DB) øger det viste tal med præcis +1.
  *
- * Slå fra: sæt `NEXT_PUBLIC_RECIPE_VIEW_BOOST_UNTIL` til en dato i fortiden (fx 2000-01-01).
- * Eller sæt `NEXT_PUBLIC_RECIPE_VIEW_BOOST_MULTIPLIER=1`.
+ * Slå boost fra: sæt `NEXT_PUBLIC_RECIPE_VIEW_BOOST_UNTIL` til en dato i fortiden (fx 2000-01-01),
+ * eller sæt `NEXT_PUBLIC_RECIPE_VIEW_BOOST_MULTIPLIER=1`.
  */
 
 function endOfDayLocal(yyyyMmDd: string): Date | null {
@@ -35,11 +35,20 @@ export function getRecipeViewDisplayMultiplier(): number {
   return isRecipeViewBoostActive() ? Math.floor(n) : 1
 }
 
-/** Brug til visning (ikke til analytics/JSON-LD). */
-export function getDisplayedRecipeViews(rawViews: number): number {
-  const base = Math.max(0, Math.round(rawViews))
+/**
+ * Vist antal visninger: boost gælder kun baseline; hver FF-pageView tæller +1 i UI.
+ * (Tidligere blev hele summen ganget med multiplier, så ét besøg så ud som +3.)
+ */
+export function getDisplayedRecipeViewTotal(
+  recipe: Pick<Recipe, 'slug' | 'ketolivViews' | 'pageViews'> & { page_views?: number; pageviews?: number }
+): number {
+  const baseline = getRecipeViewBaseline(recipe)
+  const pv = readPageViewsIncrement(recipe)
   const m = getRecipeViewDisplayMultiplier()
-  return Math.round(base * m)
+  const b = Math.max(0, Math.round(baseline))
+  const p = Math.max(0, Math.round(pv))
+  if (m <= 1) return b + p
+  return Math.round(b * m) + p
 }
 
 function coerceNonNegativeInt(value: unknown): number {

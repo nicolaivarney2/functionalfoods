@@ -220,7 +220,8 @@ function buildParameterInstructions(params: KetoParameters): string {
   // Hovedingrediens instructions
   if (params.hovedingrediens) {
     const hovedingrediensMap: Record<string, string> = {
-      'rodt-kod': 'HOVEDINGREDIENS: Rødt kød (oksekød, svinekød, lam, etc.). Fokusér på fedt kød som oksekød, svinekød, lam. Brug kød som primær ingrediens.',
+      'rodt-kod':
+        'HOVEDINGREDIENS: Rødt kød til dansk hverdag — primært oksekød, hakket oksekød, svinekød, bacon, koteletter, bøf. Brug lam eller lammekød kun sjældent (under ca. hver 8.–10. ret); det sælges og spises meget mindre end okse, svin og kylling i Danmark.',
       'fjaerkrae': 'HOVEDINGREDIENS: Fjerkræ (80% kylling, men kan også være kalkun, and, etc.). Fokusér på kylling som primær ingrediens i 80% af tilfældene. Kylling med skind er at foretrække for fedtindhold.',
       'fisk': 'HOVEDINGREDIENS: Fisk (laks, makrel, tun, etc.). Fokusér på fedt fisk som laks, makrel, sardiner, tun. Disse er rig på omega-3 og fedt.',
       'vegetarisk': 'HOVEDINGREDIENS: Vegetarisk. Fokusér på æg, avocado, nødder, frø, tofu, grøntsager. Ingen kød eller fisk.',
@@ -317,7 +318,7 @@ KETO KOST REGLER:
 - Maksimalt 20g netto kulhydrater per portion
 - Høj fedtindhold (70-80% af kalorier)
 - Moderat protein (20-25% af kalorier)
-- Fokus på: fedt kød, fisk, æg, avocado, nødder, oliven, kokosolie, smør
+- Fokus på: fedt kød og fisk, æg, avocado, nødder, oliven, kokosolie, smør (jævnfør dansk supermarked — ikke lam som standardprotein)
 - Undgå: brød, pasta, ris, kartofler, sukker, frugt (undtagen bær), bælgfrugter
 
 OPPSKRIFT FORMAT (returner kun JSON):
@@ -367,8 +368,8 @@ INGREDIENS REGLER:
 - Titel: sætningscase på dansk — kun første bogstav stort (fx "Kylling med broccoli"), ikke Title Case På Hvert Ord
 
 KETO INGREDIENSER AT FOKUSERE PÅ:
-- Fedt kød: oksekød, svinekød, lam, kylling med skind
-- Fisk: laks, makrel, sardiner, tun
+- Fedt kød (dansk hverdag): oksekød, svinekød, kylling med skind, hakket kød, bacon — varier disse. Lam/lammekød kun undtagelsesvist (ikke hver tredje ret).
+- Fisk: laks, makrel, sardiner, tun, sild
 - Æg: hele æg, ikke kun hvide
 - Fedt: avocado, nødder, frø, oliven, kokosolie, smør, ghee
 - Grøntsager: broccoli, spinat, kål, zucchini, blomkål
@@ -384,6 +385,7 @@ UNDGÅ:
 
 VARIATION:
 - Undgå at falde tilbage til den samme sikre kombination af kylling/fisk + broccoli + peberfrugt + spinat.
+- Undgå at lammekød bliver «go-to» rødt kød — dansk keto er typisk kylling, svine- og oksekød plus fisk.
 - Variér retformat, grøntsagsvalg, smagsprofil og proteinvalg fra opskrift til opskrift.
 - Smag: varier gerne internationalt (karry, harissa, chipotle, miso i små mængder, citrongræs, za'atar …) så længe kulhydratloftet overholdes.
 - Hvis brugeren beder om morgenmad, frokost eller snacks, skal opskriften ligne det måltid tydeligt og ikke bare være en standard aftensmad i mindre format.`

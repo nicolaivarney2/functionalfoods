@@ -503,9 +503,6 @@ export default function BlogCategoryHubPage() {
                     return m > 0 ? `${h}t ${m}min` : `${h}t`
                   }
                   const img = (r.imageUrl || r.image_url || '/images/recipes/placeholder.jpg') as string
-                  const difficultyColors = r.difficulty === 'Nem' ? 'bg-green-100 text-green-800' :
-                                          r.difficulty === 'Mellem' ? 'bg-yellow-100 text-yellow-800' :
-                                          'bg-red-100 text-red-800'
                   return (
                     <Link 
                       key={r.id} 
@@ -528,26 +525,19 @@ export default function BlogCategoryHubPage() {
                       <div className="p-5">
                         <h3 className="font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-blue-600 transition-colors">{r.title}</h3>
                         {r.shortDescription && <p className="text-sm text-gray-600 mb-3 line-clamp-2">{r.shortDescription}</p>}
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <div className="flex items-center gap-3">
-                            <span className="flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {formatTime(r.totalTime)}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                              </svg>
-                              {r.servings || 1} pers
-                            </span>
-                          </div>
-                          {r.difficulty && (
-                            <span className={`px-2 py-1 text-xs font-medium rounded ${difficultyColors}`}>
-                              {r.difficulty}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-3 text-xs text-gray-500 pt-2 border-t border-gray-100">
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {formatTime(r.totalTime)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            {r.servings || 1} pers
+                          </span>
                         </div>
                       </div>
                     </Link>

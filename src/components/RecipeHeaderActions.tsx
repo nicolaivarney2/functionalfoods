@@ -3,11 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Star, MessageCircle, Clock, Eye } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
-import {
-  getDisplayedRecipeViews,
-  getRecipeViewBaseline,
-  getRecipeViewRawTotal,
-} from '@/lib/recipe-view-display'
+import { getDisplayedRecipeViewTotal } from '@/lib/recipe-view-display'
 import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 
 interface RecipeHeaderActionsProps {
@@ -15,12 +11,10 @@ interface RecipeHeaderActionsProps {
 }
 
 export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps) {
-  const [displayedViews, setDisplayedViews] = useState(() =>
-    getDisplayedRecipeViews(getRecipeViewRawTotal(recipe))
-  )
+  const [displayedViews, setDisplayedViews] = useState(() => getDisplayedRecipeViewTotal(recipe))
 
   useEffect(() => {
-    setDisplayedViews(getDisplayedRecipeViews(getRecipeViewRawTotal(recipe)))
+    setDisplayedViews(getDisplayedRecipeViewTotal(recipe))
     let cancelled = false
     const slug = recipe.slug
     if (!slug) return () => { cancelled = true }
@@ -51,7 +45,7 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
               ? Math.floor(Number(rawPv))
               : NaN
         if (cancelled || !Number.isFinite(pv) || pv < 0) return
-        setDisplayedViews(getDisplayedRecipeViews(getRecipeViewBaseline(recipe) + pv))
+        setDisplayedViews(getDisplayedRecipeViewTotal({ ...recipe, pageViews: pv }))
       } catch {
         /* ignorer netværksfejl — visning forbliver SSR-værdi */
       }

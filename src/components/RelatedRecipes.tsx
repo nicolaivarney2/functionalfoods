@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { Heart, ShoppingCart, Star } from 'lucide-react'
+import { Heart, ShoppingCart } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Recipe } from '@/types/recipe'
@@ -76,18 +76,6 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
     }
   }
 
-  const handleShoppingList = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    if (!user) {
-      alert('Du skal være logget ind for at bruge indkøbslisten')
-      return
-    }
-    
-    alert('Indkøbsliste funktionalitet kommer snart!')
-  }
-
   if (relatedRecipes.length === 0) {
     return null
   }
@@ -132,31 +120,30 @@ export default function RelatedRecipes({ recipes, currentRecipeId }: RelatedReci
                         className={favorites.has(recipe.id) ? 'text-white fill-current' : 'text-gray-600'} 
                       />
                     </button>
-                    <button 
-                      onClick={handleShoppingList}
+                    <Link
+                      href="/madbudget"
+                      onClick={(e) => e.stopPropagation()}
                       className="w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors"
+                      aria-label="Åbn Madbudget"
                     >
                       <ShoppingCart size={16} className="text-gray-600" />
-                    </button>
+                    </Link>
                   </div>
                 </div>
                 
                 {/* Recipe Info */}
                 <div className="p-4">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-sm font-medium text-gray-500">
                       {((recipe.preparationTime || 0) + (recipe.cookingTime || 0))} MIN
                     </span>
-                    <div className="flex items-center space-x-1">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          size={12}
-                          className={i < 4 ? 'text-yellow-400 fill-current' : 'text-gray-300'}
-                        />
-                      ))}
-                      <span className="text-xs text-gray-500 ml-1">(12)</span>
-                    </div>
+                    <Link
+                      href="/madbudget"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-sm font-medium text-green-700 hover:text-green-800 shrink-0"
+                    >
+                      Madbudget →
+                    </Link>
                   </div>
                   
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">

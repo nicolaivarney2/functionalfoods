@@ -1,74 +1,74 @@
 'use client'
 
 import Image from 'next/image'
-import { Users, BookOpen, Target } from 'lucide-react'
+import Link from 'next/link'
+import { BookOpen, Sparkles, Store } from 'lucide-react'
 
 export default function AboutFunctionalFoods() {
   return (
     <section className="py-12 bg-green-50">
       <div className="container">
         <div className="grid md:grid-cols-2 gap-8 items-center">
-          {/* Image Section */}
           <div className="relative">
-            <div className="aspect-square rounded-lg overflow-hidden">
+            <div className="aspect-square relative rounded-lg overflow-hidden border border-emerald-100 shadow-sm bg-white">
               <Image
-                src="/images/recipes/kyllingesalat-med-et-pift-af-vandmlon-5e10163b.jpeg"
-                alt="Functional Foods Team"
+                src="/billeder/andet/nicolai-om-os-founder.png"
+                alt="Stifter af Functional Foods"
                 fill
-                className="object-cover"
+                className="object-cover object-top"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>
           </div>
 
-          {/* Content Section */}
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-gray-900">Om Functional Foods</h2>
-            
+
             <p className="text-gray-700 leading-relaxed">
-              Vi er et team af madentusiaster og sundhedseksperter, der brænder for at hjælpe dig med at leve en sundere livsstil gennem funktionelle fødevarer. Vores mission er at gøre det nemt og lækkert at følge en keto-venlig diæt.
-            </p>
-            
-            <p className="text-gray-700 leading-relaxed">
-              Alle vores opskrifter er testet i vores eget køkken og tilpasset til at understøtte din sundhed og velvære. Vi fokuserer på kvalitetsråvarer og smagfulde kombinationer, der holder dig mæt og tilfreds.
+              Vi bygger værktøjer der tager udgangspunkt i danske butikker, rigtige priser og den hverdag du faktisk lever i – ikke i perfekte slides. Functional Foods er vokset fra keto-fokus til en bredere platform med madplaner, madbudget og opskrifter på tværs af flere kostretninger.
             </p>
 
-            {/* Features Grid */}
+            <p className="text-gray-700 leading-relaxed">
+              Målet er at fjerne friktionen mellem dig og de valg du alligevel vil træffe: færre regneark, mere mad der kan laves med det udvalg og de tilbud du møder i butikken.
+            </p>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
               <div className="flex items-center space-x-3">
-                <Users size={20} className="text-green-600" />
+                <Store size={20} className="text-green-600 shrink-0" />
                 <div>
-                  <div className="font-medium text-gray-900">Testet</div>
-                  <div className="text-sm text-gray-600">Alle opskrifter</div>
+                  <div className="font-medium text-gray-900">Tæt på butikken</div>
+                  <div className="text-sm text-gray-600">Planer der taler med tilbud</div>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-3">
-                <Target size={20} className="text-green-600" />
+                <Sparkles size={20} className="text-green-600 shrink-0" />
                 <div>
-                  <div className="font-medium text-gray-900">Keto-venlig</div>
-                  <div className="text-sm text-gray-600">Lav kulhydrat</div>
+                  <div className="font-medium text-gray-900">Madbudget &amp; plan</div>
+                  <div className="text-sm text-gray-600">Struktur uden støj</div>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-3">
-                <BookOpen size={20} className="text-green-600" />
+                <BookOpen size={20} className="text-green-600 shrink-0" />
                 <div>
-                  <div className="font-medium text-gray-900">Edukativ</div>
-                  <div className="text-sm text-gray-600">Lær om sundhed</div>
+                  <div className="font-medium text-gray-900">Opskrifter &amp; viden</div>
+                  <div className="text-sm text-gray-600">Indhold du kan bruge</div>
                 </div>
               </div>
             </div>
 
-            {/* CTA Button */}
             <div className="pt-4">
-              <button className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors">
+              <Link
+                href="/bag-om-ff"
+                className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+              >
                 Læs mere om Functional Foods
-              </button>
+              </Link>
             </div>
           </div>
         </div>
       </div>
     </section>
   )
-} 
+}

@@ -57,6 +57,7 @@ const SIGNAL_ALIASES: Record<string, string[]> = {
   tun: ['tun'],
   oksekød: ['oksekød', 'oksekoed', 'hakkebøf', 'hakkebof', 'okse'],
   svinekød: ['svinekød', 'svinekoed', 'svin', 'flæsk', 'skinke', 'kotelet'],
+  lam: ['lam', 'lammekød', 'lammekoed', 'lammek'],
   kikærter: ['kikærter', 'kikaerter'],
   linser: ['linser'],
   avocado: ['avocado'],
@@ -414,6 +415,12 @@ export function buildRecipeVariationPrompt({
     )
   } else {
     lines.push('- Gør retten tydeligt anderledes end standardmønstret "protein + broccoli/peberfrugt + bladgrønt".')
+  }
+
+  if (niche === 'keto') {
+    lines.push(
+      '- PROTEIN (DK): Varier primært mellem kylling med skind, svinekød, oksekød, hakket kød, bacon/pølser i passende mængder og fed fisk (laks, makrel, sild, tun). Brug **lam/lammekød højst sjældent** (ca. hver 8.–10. ret eller sjældnere) — det er niche i dansk hverdagskost og må ikke dominere keto-opskrifterne.'
+    )
   }
 
   if (niche === 'proteinrig') {
