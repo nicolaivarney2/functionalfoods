@@ -109,8 +109,6 @@ export default function WeightLossBlogSection() {
     (p): p is HubPost & { category: { slug: string; name: string } } => !!p.category?.slug
   )
 
-  if (!loading && selectedSlug === null && withCategory.length === 0) return null
-
   const blogHubHref = selectedSlug ? `/blog/${selectedSlug}` : '/blog/mentalt'
 
   return (
@@ -158,64 +156,75 @@ export default function WeightLossBlogSection() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
-            ))}
-          </div>
-        ) : withCategory.length === 0 ? (
-          <div className="text-center py-12 mb-10 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/80">
-            <p className="text-gray-600 mb-4">
-              Ingen artikler at vise her lige nu{selectedSlug ? ' i denne kategori' : ''}.
-            </p>
-            {selectedSlug && (
-              <Link
-                href={`/blog/${selectedSlug}`}
-                className="inline-flex items-center gap-2 text-green-700 font-semibold hover:underline"
-              >
-                Åbn hele blog-sektionen for dette emne
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+        {/* Kun selve blog-kortene sløres – filtre og CTA-link ovenfor/nedenfor forbliver skarpe */}
+        <div className="relative mb-10 min-h-[12rem] rounded-2xl">
+          <div
+            className="pointer-events-none select-none blur-md sm:blur-[10px]"
+            aria-hidden
+          >
+            {loading ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-64 bg-gray-100 rounded-2xl animate-pulse" />
+                ))}
+              </div>
+            ) : withCategory.length === 0 ? (
+              <div className="text-center py-12 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/80">
+                <p className="text-gray-600 mb-4">
+                  Ingen artikler at vise her lige nu{selectedSlug ? ' i denne kategori' : ''}.
+                </p>
+                {selectedSlug && (
+                  <span className="inline-flex items-center gap-2 text-green-700 font-semibold">
+                    Åbn hele blog-sektionen for dette emne
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {withCategory.map((p) => {
+                  const catSlug = p.category.slug
+                  return (
+                    <div
+                      key={p.id}
+                      className="group flex flex-col bg-white rounded-2xl border-2 border-gray-100 overflow-hidden"
+                    >
+                      <div className="relative aspect-[16/10] bg-gray-200 overflow-hidden">
+                        {p.header_image_url ? (
+                          <img
+                            src={p.header_image_url}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400">
+                            <BookOpen className="w-16 h-16 opacity-40" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-5 flex-1 flex flex-col">
+                        <div className="text-xs text-green-600 font-medium mb-2">
+                          {(p.category?.name || 'Artikel').toUpperCase()} · {estimateReadTime(p.excerpt)} min
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2">{p.title}</h3>
+                        {p.excerpt && <p className="text-sm text-gray-600 line-clamp-2 flex-1">{p.excerpt}</p>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-10">
-            {withCategory.map((p) => {
-              const catSlug = p.category.slug
-              return (
-                <Link
-                  key={p.id}
-                  href={`/blog/${catSlug}/${p.slug}`}
-                  className="group flex flex-col bg-white rounded-2xl border-2 border-gray-100 overflow-hidden hover:border-green-200 hover:shadow-lg transition-all"
-                >
-                  <div className="relative aspect-[16/10] bg-gray-200 overflow-hidden">
-                    {p.header_image_url ? (
-                      <img
-                        src={p.header_image_url}
-                        alt={p.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <BookOpen className="w-16 h-16 opacity-40" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5 flex-1 flex flex-col">
-                    <div className="text-xs text-green-600 font-medium mb-2">
-                      {(p.category?.name || 'Artikel').toUpperCase()} · {estimateReadTime(p.excerpt)} min
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-green-700 transition-colors">
-                      {p.title}
-                    </h3>
-                    {p.excerpt && <p className="text-sm text-gray-600 line-clamp-2 flex-1">{p.excerpt}</p>}
-                  </div>
-                </Link>
-              )
-            })}
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/55 px-4"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-center text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 drop-shadow-sm">
+              Blogs på vej
+            </p>
           </div>
-        )}
+        </div>
 
         <p className="text-center">
           <Link
