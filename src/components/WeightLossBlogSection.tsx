@@ -183,7 +183,6 @@ export default function WeightLossBlogSection() {
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {withCategory.map((p) => {
-                  const catSlug = p.category.slug
                   return (
                     <div
                       key={p.id}
