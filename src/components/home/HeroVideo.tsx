@@ -79,8 +79,7 @@ export default function HeroVideo() {
         </div>
         <p className="text-sm font-semibold">Video på vej</p>
         <p className="mt-2 max-w-xs text-xs text-white/75 leading-relaxed">
-          Sæt <code className="rounded bg-black/30 px-1 py-0.5 text-[11px]">NEXT_PUBLIC_HOME_HERO_VIDEO_URL</code> i{' '}
-          <code className="rounded bg-black/30 px-1 py-0.5 text-[11px]">.env.local</code> til en MP4 eller et YouTube-link.
+          Vi tilføjer snart en kort introduktion til Functional Foods.
         </p>
       </div>
     </div>

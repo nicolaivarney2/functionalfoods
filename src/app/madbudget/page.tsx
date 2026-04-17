@@ -152,6 +152,31 @@ interface AdultProfile {
   isComplete: boolean
 }
 
+/** Sand hvis alle felter til madgenerering er sat (uafhængigt af DB-flaget is_complete, som historisk kan være forkert). */
+function adultProfileHasRequiredFieldsForMealPlan(p: Partial<AdultProfile>): boolean {
+  const age = Number(p.age)
+  const h = Number(p.height)
+  const w = Number(p.weight)
+  return Boolean(
+    p.gender &&
+    Number.isFinite(age) &&
+    age > 0 &&
+    age < 130 &&
+    Number.isFinite(h) &&
+    h > 40 &&
+    h < 260 &&
+    Number.isFinite(w) &&
+    w > 25 &&
+    w < 400 &&
+    p.activityLevel != null &&
+    String(p.activityLevel) !== '' &&
+    p.dietaryApproach &&
+    String(p.dietaryApproach).trim() !== '' &&
+    p.weightGoal != null &&
+    String(p.weightGoal).trim() !== ''
+  )
+}
+
 export default function MadbudgetPage() {
   const [familyProfile, setFamilyProfile] = useState({
     adults: 2,
@@ -697,18 +722,24 @@ export default function MadbudgetPage() {
             if (result.data.adultProfiles && result.data.adultProfiles.length > 0) {
               setFamilyProfile(prev => ({
                 ...prev,
-                adultsProfiles: result.data.adultProfiles.map((p: any) => ({
-                  id: p.id,
-                  gender: p.gender,
-                  age: p.age,
-                  height: p.height,
-                  weight: p.weight,
-                  activityLevel: p.activity_level,
-                  dietaryApproach: p.dietary_approach,
-                  mealsPerDay: p.meals_per_day || ['dinner'],
-                  weightGoal: p.weight_goal,
-                  isComplete: p.is_complete
-                }))
+                adultsProfiles: result.data.adultProfiles.map((p: any) => {
+                  const row: AdultProfile = {
+                    id: String(p.id ?? `adult-${p.adult_index ?? 0}`),
+                    gender: p.gender,
+                    age: p.age,
+                    height: p.height,
+                    weight: p.weight,
+                    activityLevel: p.activity_level,
+                    dietaryApproach: p.dietary_approach,
+                    mealsPerDay: Array.isArray(p.meals_per_day) ? p.meals_per_day : ['dinner'],
+                    weightGoal: p.weight_goal,
+                    isComplete: Boolean(p.is_complete),
+                  }
+                  return {
+                    ...row,
+                    isComplete: row.isComplete || adultProfileHasRequiredFieldsForMealPlan(row),
+                  }
+                }),
               }))
             }
           }
@@ -1176,14 +1207,7 @@ export default function MadbudgetPage() {
 
   const primaryDietForRecipePicker = useMemo(() => {
     const complete = familyProfile.adultsProfiles.filter(
-      (p) =>
-        p.isComplete &&
-        p.gender &&
-        p.age &&
-        p.height &&
-        p.weight &&
-        p.activityLevel &&
-        p.dietaryApproach
+      (p) => adultProfileHasRequiredFieldsForMealPlan(p)
     )
     const idx = Math.min(selectedNutritionAdultIndex, Math.max(0, complete.length - 1))
     return (
@@ -1418,8 +1442,10 @@ export default function MadbudgetPage() {
 
   // Check if all adults have complete profiles
   const allAdultsHaveProfiles = () => {
-    return familyProfile.adultsProfiles.length === familyProfile.adults &&
-           familyProfile.adultsProfiles.every(p => p.isComplete)
+    if (familyProfile.adultsProfiles.length !== familyProfile.adults) return false
+    return familyProfile.adultsProfiles.every(
+      (p) => p.isComplete || adultProfileHasRequiredFieldsForMealPlan(p)
+    )
   }
 
   // Validate dietary approaches - voksne skal have samme kostretning eller en på familiemad
@@ -1427,8 +1453,11 @@ export default function MadbudgetPage() {
     if (familyProfile.adults === 0) return true
     
     const approaches = familyProfile.adultsProfiles
-      .filter(p => p.isComplete && p.dietaryApproach)
-      .map(p => p.dietaryApproach)
+      .filter(
+        (p) =>
+          (p.isComplete || adultProfileHasRequiredFieldsForMealPlan(p)) && p.dietaryApproach
+      )
+      .map((p) => p.dietaryApproach)
     
     if (approaches.length === 0) return false
     
@@ -2531,7 +2560,7 @@ export default function MadbudgetPage() {
                 {viewMode === 'week' && (() => {
                   const completeAdults = familyProfile.adultsProfiles
                     .map((p, i) => ({ ...p, index: i }))
-                    .filter(p => p.isComplete && p.gender && p.age && p.height && p.weight && p.activityLevel)
+                    .filter((p) => adultProfileHasRequiredFieldsForMealPlan(p))
                   const activeIndex = Math.min(selectedNutritionAdultIndex, Math.max(0, completeAdults.length - 1))
                   const selectedAdult = completeAdults[activeIndex] || completeAdults[0]
                   const mealsFilter = selectedAdult?.mealsPerDay?.length
@@ -3588,12 +3617,13 @@ export default function MadbudgetPage() {
               </button>
             </div>
             <p className="mb-4 text-sm text-gray-600">
-              Vi sender et kort link til din telefon via SMS (sms.dk). Nummeret gemmes kun i denne browser til næste gang.
+              Vi sender et kort link til din telefon via SMS.
             </p>
             {pendingSmartUrl && (
               <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                 <p className="mb-2 text-xs text-emerald-900">
-                  Test uden SMS-credits: kopier linket her, eller tryk &quot;Send SMS&quot; – linket kopieres automatisk til udklipsholder.
+                  Tryk &quot;Send SMS&quot;, eller kopier linket her og tilgå den mobil-optimerede indkøbsliste – linket
+                  kopieres automatisk til udklipsholder.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
                   <input
@@ -3817,7 +3847,9 @@ export default function MadbudgetPage() {
                   <div className="space-y-2">
                     {Array.from({ length: familyProfile.adults }, (_, index) => {
                       const profile = familyProfile.adultsProfiles[index]
-                      const isComplete = profile?.isComplete || false
+                      const isComplete =
+                        Boolean(profile?.isComplete) ||
+                        adultProfileHasRequiredFieldsForMealPlan(profile ?? {})
                       return (
                         <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                           <div className="flex items-center space-x-3">

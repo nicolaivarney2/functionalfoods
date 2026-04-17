@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
 import { createSupabaseClient } from '@/lib/supabase'
 import { ArrowRight, BookOpen } from 'lucide-react'
 
@@ -109,8 +108,6 @@ export default function WeightLossBlogSection() {
     (p): p is HubPost & { category: { slug: string; name: string } } => !!p.category?.slug
   )
 
-  const blogHubHref = selectedSlug ? `/blog/${selectedSlug}` : '/blog/mentalt'
-
   return (
     <section className="py-20 bg-gradient-to-b from-white to-gray-50 border-b border-gray-100">
       <div className="container max-w-6xl mx-auto px-4">
@@ -156,7 +153,7 @@ export default function WeightLossBlogSection() {
           </div>
         </div>
 
-        {/* Kun selve blog-kortene sløres – filtre og CTA-link ovenfor/nedenfor forbliver skarpe */}
+        {/* Blog-grid + «Se flere artikler» sløres; filtre og intro forbliver skarpe */}
         <div className="relative mb-10 min-h-[12rem] rounded-2xl">
           <div
             className="pointer-events-none select-none blur-md sm:blur-[10px]"
@@ -213,6 +210,12 @@ export default function WeightLossBlogSection() {
                 })}
               </div>
             )}
+            <p className="text-center pt-8">
+              <span className="inline-flex items-center gap-2 text-gray-700 font-semibold">
+                {selectedSlug ? 'Se flere artikler i denne blog-sektion' : 'Se flere artikler på bloggen'}
+                <ArrowRight className="w-4 h-4" aria-hidden />
+              </span>
+            </p>
           </div>
           <div
             className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/55 px-4"
@@ -224,16 +227,6 @@ export default function WeightLossBlogSection() {
             </p>
           </div>
         </div>
-
-        <p className="text-center">
-          <Link
-            href={blogHubHref}
-            className="inline-flex items-center gap-2 text-gray-700 font-semibold hover:text-green-700 transition-colors"
-          >
-            {selectedSlug ? 'Se flere artikler i denne blog-sektion' : 'Se flere artikler på bloggen'}
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </p>
       </div>
     </section>
   )

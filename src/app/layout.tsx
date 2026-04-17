@@ -9,6 +9,7 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import MessengerHumanGuidanceWidget from '@/components/MessengerHumanGuidanceWidget'
+import SoftLaunchBanner from '@/components/SoftLaunchBanner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -54,6 +55,7 @@ export default function RootLayout({
             <AnalyticsProvider>
               <AuthProvider>
                 <Header />
+                <SoftLaunchBanner />
                 {children}
                 <Footer />
                 <MessengerHumanGuidanceWidget />

@@ -205,34 +205,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save family profile' }, { status: 500 })
     }
 
-    // Upsert adult profiles
+    // Upsert adult profiles (gem også når alle felter er udfyldt, selv hvis klienten ikke satte isComplete)
     if (adultProfiles && Array.isArray(adultProfiles)) {
+      const fieldsComplete = (p: Record<string, unknown>) =>
+        Boolean(
+          p.gender &&
+          p.age != null &&
+          p.height != null &&
+          p.weight != null &&
+          p.activityLevel != null &&
+          String(p.activityLevel) !== '' &&
+          p.dietaryApproach &&
+          String(p.dietaryApproach).trim() !== '' &&
+          p.weightGoal != null &&
+          String(p.weightGoal).trim() !== ''
+        )
+
       for (const [index, profile] of adultProfiles.entries()) {
-        if (profile.isComplete) {
-          const { error: adultError } = await supabase
-            .from('adult_weight_loss_profiles')
-            .upsert({
+        const p = profile as Record<string, unknown>
+        const derivedComplete = fieldsComplete(p)
+        if (!derivedComplete && !p.isComplete) continue
+
+        const { error: adultError } = await supabase
+          .from('adult_weight_loss_profiles')
+          .upsert(
+            {
               user_id: user.id,
               adult_index: index,
-              gender: profile.gender,
-              age: profile.age,
-              height: profile.height,
-              weight: profile.weight,
-              activity_level: profile.activityLevel,
-              dietary_approach: profile.dietaryApproach,
-              excluded_foods: [], // Not used per adult - only in family settings
-              meals_per_day: profile.mealsPerDay || ['dinner'],
-              weight_goal: profile.weightGoal,
-              is_complete: profile.isComplete,
-              updated_at: new Date().toISOString()
-            }, {
-              onConflict: 'user_id,adult_index'
-            })
+              gender: p.gender,
+              age: p.age,
+              height: p.height,
+              weight: p.weight,
+              activity_level: p.activityLevel,
+              dietary_approach: p.dietaryApproach,
+              excluded_foods: [],
+              meals_per_day: (p.mealsPerDay as string[]) || ['dinner'],
+              weight_goal: p.weightGoal,
+              is_complete: derivedComplete || Boolean(p.isComplete),
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: 'user_id,adult_index',
+            }
+          )
 
-          if (adultError) {
-            console.error(`Error saving adult profile ${index}:`, adultError)
-            // Continue with other profiles even if one fails
-          }
+        if (adultError) {
+          console.error(`Error saving adult profile ${index}:`, adultError)
         }
       }
     }
