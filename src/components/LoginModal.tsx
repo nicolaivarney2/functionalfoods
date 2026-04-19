@@ -178,7 +178,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] overflow-y-auto bg-black/50 p-4"
+      className="fixed inset-0 z-[250] overflow-y-auto bg-black/50 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="login-modal-title"

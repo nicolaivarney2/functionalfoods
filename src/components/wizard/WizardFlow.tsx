@@ -131,7 +131,7 @@ const WizardFlow: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#FEFDF8] via-white to-[#87A96B]/10">
-      <div className="pointer-events-none select-none" aria-hidden="true">
+      <div>
         {/* Header */}
       <div className="bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">

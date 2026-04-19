@@ -27,8 +27,20 @@ export default function VaegttabsbogPromoModal() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
 
+  /** `router.back()` alene gør ingenting synligt uden historik (fx direkte åbning af /wizard). */
   const goBack = () => {
-    router.back()
+    if (typeof window !== 'undefined') {
+      try {
+        const ref = document.referrer
+        if (ref && new URL(ref).origin === window.location.origin) {
+          router.back()
+          return
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    router.push('/')
   }
 
   useEffect(() => {

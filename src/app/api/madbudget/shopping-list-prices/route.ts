@@ -34,12 +34,13 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseClient()
 
     // Map store IDs from frontend (1, 2, 8) to database store_id slugs
+    // Skal matche `stores.id` / `product_offers.store_id` fra Goma-import (se goma-import.ts: slug = navn lowercase, mellemrum → -).
     const storeIdMap: Record<number, string> = {
       1: 'rema-1000',
       2: 'netto',
       3: 'føtex',
       4: 'bilka',
-      5: 'nemlig-com',
+      5: 'nemlig',
       6: 'meny',
       7: 'spar',
       8: 'løvbjerg'
@@ -409,7 +410,7 @@ export async function POST(request: NextRequest) {
             'netto': ['Netto'],
             'føtex': ['Føtex'],
             'bilka': ['Bilka'],
-            'nemlig-com': ['Nemlig.com'],
+            'nemlig': ['Nemlig', 'Nemlig.com'],
             'meny': ['MENY'],
             'spar': ['Spar'],
             'løvbjerg': ['Løvbjerg']

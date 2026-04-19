@@ -73,7 +73,7 @@ const STORE_KEY_BY_ID: Record<number, string> = {
   2: 'netto',
   3: 'føtex',
   4: 'bilka',
-  5: 'nemlig-com',
+  5: 'nemlig',
   6: 'meny',
   7: 'spar',
   8: 'løvbjerg',
@@ -179,9 +179,9 @@ function adultProfileHasRequiredFieldsForMealPlan(p: Partial<AdultProfile>): boo
 
 export default function MadbudgetPage() {
   const [familyProfile, setFamilyProfile] = useState({
-    adults: 2,
-    children: 2,
-    childrenAges: ['4-8', '4-8'],
+    adults: 1,
+    children: 0,
+    childrenAges: [] as string[],
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
@@ -2871,7 +2871,7 @@ export default function MadbudgetPage() {
                                           storeId === 2 ? 'netto' :
                                           storeId === 3 ? 'føtex' :
                                           storeId === 4 ? 'bilka' :
-                                          storeId === 5 ? 'nemlig-com' :
+                                          storeId === 5 ? 'nemlig' :
                                           storeId === 6 ? 'meny' :
                                           storeId === 7 ? 'spar' :
                                           storeId === 8 ? 'løvbjerg' : ''
@@ -3687,261 +3687,356 @@ export default function MadbudgetPage() {
 
       {/* Family Settings Modal */}
       {showFamilySettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-100 flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-900">Familieindstillinger</h3>
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+          onClick={() => setShowFamilySettings(false)}
+          role="presentation"
+        >
+          <div
+            className="flex max-h-[min(92vh,900px)] w-full max-w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="family-settings-title"
+          >
+            <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
+              <h3 id="family-settings-title" className="pr-2 text-lg font-semibold text-gray-900">
+                Familieindstillinger
+              </h3>
               <button
+                type="button"
+                aria-label="Luk"
                 onClick={() => setShowFamilySettings(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="touch-manipulation -m-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
               >
-                <X size={24} />
+                <X size={24} strokeWidth={2} />
               </button>
             </div>
-            
-            <div className="space-y-4 p-4 sm:p-6 overflow-y-auto flex-1">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Antal voksne i familien</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10"
-                  value={familyProfile.adults}
-                  onChange={(e) => setFamilyProfile(prev => ({ ...prev, adults: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Antal børn</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  value={familyProfile.children}
-                  onChange={(e) => setFamilyProfile(prev => ({ ...prev, children: parseInt(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-              
-              {/* Dynamic Age Fields */}
-              {familyProfile.children > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Børnenes aldre</label>
-                  <p className="text-xs text-gray-500 mb-3">Vi spørger om dit barns alder for at optimere madplanen efter det.</p>
-                  <div className="space-y-2">
-                    {Array.from({ length: familyProfile.children }, (_, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600 w-16">Barn {index + 1}:</span>
-                        <select
-                          value={familyProfile.childrenAges?.[index] || '0-3'}
-                          onChange={(e) => {
-                            const newAges = [...(familyProfile.childrenAges || [])]
-                            newAges[index] = e.target.value
-                            setFamilyProfile(prev => ({ ...prev, childrenAges: newAges }))
-                          }}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="0-3">0-3 år</option>
-                          <option value="4-8">4-8 år</option>
-                          <option value="8+">8+ år</option>
-                        </select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={familyProfile.prioritizeOrganic}
-                    onChange={(e) => setFamilyProfile(prev => ({ ...prev, prioritizeOrganic: e.target.checked }))}
-                    className="text-blue-600 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Prioriter økologi</span>
-                </label>
-                
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={familyProfile.prioritizeAnimalOrganic}
-                    onChange={(e) => setFamilyProfile(prev => ({ ...prev, prioritizeAnimalOrganic: e.target.checked }))}
-                    className="text-blue-600 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Prioriter animalsk økologi</span>
-                </label>
-              </div>
-              
-              {/* Store Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Vælg butikker tæt på dig</label>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {mockStores.map(store => (
-                    <label key={store.id} className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={familyProfile.selectedStores.includes(store.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFamilyProfile(prev => ({
-                              ...prev,
-                              selectedStores: [...prev.selectedStores, store.id]
-                            }))
-                          } else {
-                            setFamilyProfile(prev => ({
-                              ...prev,
-                              selectedStores: prev.selectedStores.filter(id => id !== store.id)
-                            }))
-                          }
-                        }}
-                        className="text-blue-600 rounded"
-                      />
-                      <div className={`w-4 h-4 rounded-full ${store.color}`}></div>
-                      <span className="text-sm text-gray-700">{store.name}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Disse butikker bruges til at beregne besparelser og generere madplaner
-                </p>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Budgetloft pr. uge (valgfrit)
-                </label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Vi prøver at lægge planen, så den rammer dit loft, ved at prioritere tilbud. Ved meget lave beløb er det ikke altid muligt at få det til at hænge sammen.
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    placeholder="Fx 1200"
-                    value={familyProfile.weeklyBudgetKr === null ? '' : familyProfile.weeklyBudgetKr}
-                    onChange={(e) => {
-                      const raw = e.target.value.trim()
-                      if (raw === '') {
-                        setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: null }))
-                        return
-                      }
-                      const n = parseInt(raw, 10)
-                      if (!Number.isFinite(n) || n < 0) return
-                      setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: Math.min(500_000, n) }))
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <span className="text-sm text-gray-600 shrink-0">kr</span>
-                </div>
-              </div>
-              
-              {/* Vægttabsprofiler for voksne */}
-              {familyProfile.adults > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Vægttabsprofiler for voksne
-                  </label>
-                  <div className="space-y-2">
-                    {Array.from({ length: familyProfile.adults }, (_, index) => {
-                      const profile = familyProfile.adultsProfiles[index]
-                      const isComplete =
-                        Boolean(profile?.isComplete) ||
-                        adultProfileHasRequiredFieldsForMealPlan(profile ?? {})
-                      return (
-                        <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-sm font-medium text-gray-700">Voksen {index + 1}</span>
-                            {isComplete && (
-                              <CheckCircle className="w-5 h-5 text-green-500" />
-                            )}
-                          </div>
-                          <button
-                            onClick={() => openWeightLossProfile(index)}
-                            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                          >
-                            {isComplete ? 'Rediger profil' : 'Udfyld profil'}
-                          </button>
-                        </div>
-                      )
-                    })}
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:space-y-6 sm:px-6 sm:py-5">
+              {/* 1. Madprofiler */}
+              <section className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 sm:p-5">
+                <div className="mb-4 flex gap-3 sm:gap-4">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
+                    aria-hidden
+                  >
+                    1
+                  </span>
+                  <div className="min-w-0">
+                    <h4 className="text-base font-semibold text-gray-900">Madprofiler</h4>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Tilføj det antal der spiser med hos jer til dagligt.
+                    </p>
                   </div>
                 </div>
-              )}
-              
-              {/* Variation (flyttet ind i familieindstillinger) */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Variation i madplanen
-                </label>
-                <div className="flex items-center space-x-3 mb-2">
-                  <span className="text-xs text-gray-500">Ensartet</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="3"
-                    step="1"
-                    value={variationLevel}
-                    onChange={(e) => setVariationLevel(parseInt(e.target.value))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <span className="text-xs text-gray-500">Varieret</span>
+                <div className="space-y-4 sm:pl-12">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Antal voksne i familien
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={familyProfile.adults}
+                      onChange={(e) =>
+                        setFamilyProfile((prev) => ({ ...prev, adults: parseInt(e.target.value, 10) || 1 }))
+                      }
+                      className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Antal børn</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={familyProfile.children}
+                      onChange={(e) =>
+                        setFamilyProfile((prev) => ({ ...prev, children: parseInt(e.target.value, 10) || 0 }))
+                      }
+                      className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {familyProfile.children > 0 && (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">Børnenes aldre</label>
+                      <p className="mb-3 text-xs text-gray-500">
+                        Vi spørger om dit barns alder for at optimere madplanen efter det.
+                      </p>
+                      <div className="space-y-2">
+                        {Array.from({ length: familyProfile.children }, (_, index) => (
+                          <div key={index} className="flex items-center space-x-2">
+                            <span className="w-16 shrink-0 text-sm text-gray-600">Barn {index + 1}:</span>
+                            <select
+                              value={familyProfile.childrenAges?.[index] || '0-3'}
+                              onChange={(e) => {
+                                const newAges = [...(familyProfile.childrenAges || [])]
+                                newAges[index] = e.target.value
+                                setFamilyProfile((prev) => ({ ...prev, childrenAges: newAges }))
+                              }}
+                              className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="0-3">0-3 år</option>
+                              <option value="4-8">4-8 år</option>
+                              <option value="8+">8+ år</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {familyProfile.adults > 0 && (
+                    <div>
+                      <label className="mb-3 block text-sm font-medium text-gray-700">
+                        Vægttabsprofiler for voksne
+                      </label>
+                      <div className="space-y-2">
+                        {Array.from({ length: familyProfile.adults }, (_, index) => {
+                          const profile = familyProfile.adultsProfiles[index]
+                          const isComplete =
+                            Boolean(profile?.isComplete) ||
+                            adultProfileHasRequiredFieldsForMealPlan(profile ?? {})
+                          return (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white p-3"
+                            >
+                              <div className="flex min-w-0 items-center space-x-3">
+                                <span className="text-sm font-medium text-gray-700">Voksen {index + 1}</span>
+                                {isComplete && <CheckCircle className="h-5 w-5 shrink-0 text-green-500" />}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => openWeightLossProfile(index)}
+                                className="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-700"
+                              >
+                                {isComplete ? 'Rediger profil' : 'Udfyld profil'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-gray-500">
-                  {variationLevel === 0 && 'Samme retter flere dage i træk'}
-                  {variationLevel === 1 && 'Lidt gentagelse, primært nye retter'}
-                  {variationLevel === 2 && 'God balance mellem nyt og kendt'}
-                  {variationLevel === 3 && 'Maksimal variation, undgår gentagelse'}
-                </p>
-              </div>
-              
-              {/* Ekskluderede ingredienser */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Madvarer vi ikke kan lide (ekskluder fra madplan)
-                </label>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  {[
-                    { id: 'red-meat', label: 'Rødt kød' },
-                    { id: 'poultry', label: 'Fjerkræ' },
-                    { id: 'pork', label: 'Svinekød' },
-                    { id: 'fish', label: 'Fisk' },
-                    { id: 'eggs', label: 'Æg' },
-                    { id: 'shellfish', label: 'Skaldyr' },
-                    { id: 'nuts', label: 'Nødder' },
-                    { id: 'dairy', label: 'Mælkeprodukter' },
-                    { id: 'gluten', label: 'Gluten' },
-                    { id: 'soy', label: 'Soja' }
-                  ].map((food) => (
-                    <label key={food.id} className="flex items-center p-2 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+              </section>
+
+              {/* 2. Indkøbsindstillinger */}
+              <section className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 sm:p-5">
+                <div className="mb-4 flex gap-3 sm:gap-4">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
+                    aria-hidden
+                  >
+                    2
+                  </span>
+                  <div className="min-w-0">
+                    <h4 className="text-base font-semibold text-gray-900">Indkøbsindstillinger</h4>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Vælg bl.a. de indkøbscentre du har i nærheden og bruger.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-4 sm:pl-12">
+                  <div>
+                    <label className="mb-3 block text-sm font-medium text-gray-700">
+                      Vælg butikker tæt på dig
+                    </label>
+                    <div className="max-h-40 space-y-2 overflow-y-auto sm:max-h-48">
+                      {mockStores.map((store) => (
+                        <label key={store.id} className="flex cursor-pointer items-center space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={familyProfile.selectedStores.includes(store.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFamilyProfile((prev) => ({
+                                  ...prev,
+                                  selectedStores: [...prev.selectedStores, store.id],
+                                }))
+                              } else {
+                                setFamilyProfile((prev) => ({
+                                  ...prev,
+                                  selectedStores: prev.selectedStores.filter((id) => id !== store.id),
+                                }))
+                              }
+                            }}
+                            className="rounded text-blue-600"
+                          />
+                          <div className={`h-4 w-4 shrink-0 rounded-full ${store.color}`} />
+                          <span className="text-sm text-gray-700">{store.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Disse butikker bruges til at beregne besparelser og generere madplaner.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
+                    <label className="flex cursor-pointer items-start gap-3">
                       <input
                         type="checkbox"
-                        checked={familyProfile.excludedIngredients.includes(food.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFamilyProfile(prev => ({
-                              ...prev,
-                              excludedIngredients: [...prev.excludedIngredients, food.id]
-                            }))
-                          } else {
-                            setFamilyProfile(prev => ({
-                              ...prev,
-                              excludedIngredients: prev.excludedIngredients.filter(id => id !== food.id)
-                            }))
-                          }
-                        }}
-                        className="mr-2"
+                        checked={familyProfile.prioritizeOrganic}
+                        onChange={(e) =>
+                          setFamilyProfile((prev) => ({ ...prev, prioritizeOrganic: e.target.checked }))
+                        }
+                        className="mt-0.5 rounded text-blue-600"
                       />
-                      <span className="text-sm text-gray-700">{food.label}</span>
+                      <span>
+                        <span className="text-sm font-medium text-gray-800">Prioriter økologi</span>
+                        <span className="mt-0.5 block text-xs text-gray-500">
+                          Gemmes på profilen og bruges til at favorisere økologiske retter i madplanen, hvor det er
+                          understøttet.
+                        </span>
+                      </span>
                     </label>
-                  ))}
+                    <label className="flex cursor-pointer items-start gap-3 border-t border-gray-100 pt-3">
+                      <input
+                        type="checkbox"
+                        checked={familyProfile.prioritizeAnimalOrganic}
+                        onChange={(e) =>
+                          setFamilyProfile((prev) => ({ ...prev, prioritizeAnimalOrganic: e.target.checked }))
+                        }
+                        className="mt-0.5 rounded text-blue-600"
+                      />
+                      <span>
+                        <span className="text-sm font-medium text-gray-800">Prioriter animalsk økologi</span>
+                        <span className="mt-0.5 block text-xs text-gray-500">
+                          Gemmes på profilen (kød, fisk, mælk m.m.); udvidet brug i planlægning kan tilføjes løbende.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Budgetloft pr. uge (valgfrit)
+                    </label>
+                    <p className="mb-2 text-xs text-gray-500">
+                      Vi prøver at lægge planen, så den rammer dit loft, ved at prioritere tilbud. Ved meget lave beløb
+                      er det ikke altid muligt at få det til at hænge sammen.
+                    </p>
+                    <div className="flex max-w-xs items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        placeholder="Fx 1200"
+                        value={familyProfile.weeklyBudgetKr === null ? '' : familyProfile.weeklyBudgetKr}
+                        onChange={(e) => {
+                          const raw = e.target.value.trim()
+                          if (raw === '') {
+                            setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: null }))
+                            return
+                          }
+                          const n = parseInt(raw, 10)
+                          if (!Number.isFinite(n) || n < 0) return
+                          setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: Math.min(500_000, n) }))
+                        }}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="shrink-0 text-sm text-gray-600">kr</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
+
+              {/* 3. Madplans forbehold */}
+              <section className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 sm:p-5">
+                <div className="mb-4 flex gap-3 sm:gap-4">
+                  <span
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
+                    aria-hidden
+                  >
+                    3
+                  </span>
+                  <div className="min-w-0">
+                    <h4 className="text-base font-semibold text-gray-900">Madplans forbehold</h4>
+                    <p className="mt-1 text-sm text-gray-600">
+                      Styr hvad der ikke skal med, og hvor meget I vil variere retterne.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-5 sm:pl-12">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Madvarer vi ikke kan lide (ekskluder fra madplan)
+                    </label>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {[
+                        { id: 'red-meat', label: 'Rødt kød' },
+                        { id: 'poultry', label: 'Fjerkræ' },
+                        { id: 'pork', label: 'Svinekød' },
+                        { id: 'fish', label: 'Fisk' },
+                        { id: 'eggs', label: 'Æg' },
+                        { id: 'shellfish', label: 'Skaldyr' },
+                        { id: 'nuts', label: 'Nødder' },
+                        { id: 'dairy', label: 'Mælkeprodukter' },
+                        { id: 'gluten', label: 'Gluten' },
+                        { id: 'soy', label: 'Soja' },
+                      ].map((food) => (
+                        <label
+                          key={food.id}
+                          className="flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white p-2.5 hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={familyProfile.excludedIngredients.includes(food.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFamilyProfile((prev) => ({
+                                  ...prev,
+                                  excludedIngredients: [...prev.excludedIngredients, food.id],
+                                }))
+                              } else {
+                                setFamilyProfile((prev) => ({
+                                  ...prev,
+                                  excludedIngredients: prev.excludedIngredients.filter((id) => id !== food.id),
+                                }))
+                              }
+                            }}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">{food.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Variation i madplanen</label>
+                    <div className="mb-2 flex items-center space-x-3">
+                      <span className="shrink-0 text-xs text-gray-500">Ensartet</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="3"
+                        step="1"
+                        value={variationLevel}
+                        onChange={(e) => setVariationLevel(parseInt(e.target.value, 10))}
+                        className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-200"
+                      />
+                      <span className="shrink-0 text-xs text-gray-500">Varieret</span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {variationLevel === 0 && 'Samme retter flere dage i træk'}
+                      {variationLevel === 1 && 'Lidt gentagelse, primært nye retter'}
+                      {variationLevel === 2 && 'God balance mellem nyt og kendt'}
+                      {variationLevel === 3 && 'Maksimal variation, undgår gentagelse'}
+                    </p>
+                  </div>
+                </div>
+              </section>
             </div>
-            <div className="p-4 sm:p-6 border-t border-gray-100 flex-shrink-0 bg-gray-50 sm:bg-transparent sm:border-0">
+            <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:bg-white sm:px-6">
               <button
+                type="button"
                 onClick={async () => {
                   try {
                     const { data: { session } } = await supabase.auth.getSession()

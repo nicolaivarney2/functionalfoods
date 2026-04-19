@@ -64,6 +64,8 @@ export default function ProductIngredientMatchingPage() {
   const itemsPerPage = 20
   const [selectedStore, setSelectedStore] = useState('all')
   const [hideLowPriorityCategories, setHideLowPriorityCategories] = useState(true)
+  /** Kun ingredienser uden mindst ét match i databasen — standard på for en ren arbejdskø. */
+  const [onlyUnmatched, setOnlyUnmatched] = useState(true)
   const [pendingMatchIds, setPendingMatchIds] = useState<Set<string>>(new Set())
   const [isSyncingMatches, setIsSyncingMatches] = useState(false)
   const [copySourceByIngredient, setCopySourceByIngredient] = useState<Record<string, string>>({})
@@ -87,6 +89,10 @@ export default function ProductIngredientMatchingPage() {
     updateStats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingMatches])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [onlyUnmatched, searchTerm, selectedCategory, hideLowPriorityCategories])
 
   const loadData = async () => {
     try {
@@ -427,7 +433,10 @@ export default function ProductIngredientMatchingPage() {
         const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
         const ingredientCategory = (ingredient.category || '').toLowerCase().trim()
         const keepByPriority = !hideLowPriorityCategories || !lowPriorityCategories.has(ingredientCategory)
-        return matchesSearch && matchesCategory && keepByPriority
+        const matchList = matchesByIngredient.get(String(ingredient.id).trim()) || []
+        const hasAnyMatch = matchList.length > 0
+        const keepByMatchFilter = !onlyUnmatched || !hasAnyMatch
+        return matchesSearch && matchesCategory && keepByPriority && keepByMatchFilter
       })
       .sort((a, b) => {
         const aHasMatch = (matchesByIngredient.get(String(a.id).trim()) || []).length > 0
@@ -443,7 +452,7 @@ export default function ProductIngredientMatchingPage() {
 
         return a.name.localeCompare(b.name)
       })
-  }, [ingredients, searchTerm, selectedCategory, hideLowPriorityCategories, matchesByIngredient])
+  }, [ingredients, searchTerm, selectedCategory, hideLowPriorityCategories, onlyUnmatched, matchesByIngredient])
 
   // Pagination
   const totalPages = useMemo(
@@ -589,7 +598,16 @@ export default function ProductIngredientMatchingPage() {
               </select>
             </div>
           </div>
-          <div className="mt-4 flex items-center">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={onlyUnmatched}
+                onChange={(e) => setOnlyUnmatched(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Kun umatch ingredienser (skjul dem der allerede har produktmatch)
+            </label>
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input
                 type="checkbox"

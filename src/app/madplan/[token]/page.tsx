@@ -123,7 +123,7 @@ const STORE_ID_TO_KEY: Record<number, string> = {
   2: 'netto',
   3: 'føtex',
   4: 'bilka',
-  5: 'nemlig-com',
+  5: 'nemlig',
   6: 'meny',
   7: 'spar',
   8: 'løvbjerg'
