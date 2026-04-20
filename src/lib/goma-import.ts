@@ -44,7 +44,7 @@ type GomaProduct = {
   current_price: number
   sale_valid_to: string | null
   price_per_unit: number | null
-  base_product_id: string
+  base_product_id: string | null
   department_name: string | null
   sale_valid_from: string | null
   price_per_kilogram: number | null
@@ -309,6 +309,7 @@ function resolveStoreSlug(storeName: string): string {
 export async function importGomaProducts(options: ImportOptions) {
   const supabase = getSupabaseAdminClient()
   const apiKey = getGomaApiKey()
+  const importStartedAtIso = new Date().toISOString()
 
   const limit = options.limit ?? 100
   const pages = options.pages ?? 1
@@ -317,6 +318,7 @@ export async function importGomaProducts(options: ImportOptions) {
 
   for (const storeName of options.stores) {
     const storeId = resolveStoreSlug(storeName)
+    let fullyScannedStore = false
 
     // Upsert store row
     await supabase
@@ -426,14 +428,8 @@ export async function importGomaProducts(options: ImportOptions) {
 
       // Upsert global products (dedupe by our generated product ID)
       const productMap = new Map<string, { productId: string; product: GomaProduct }>()
-      let skippedNoBaseId = 0
       let hashErrors = 0
       for (const p of products) {
-        if (!p.base_product_id) {
-          skippedNoBaseId++
-          continue // Skip products without base_product_id
-        }
-        
         try {
           const productId = generateProductId(p)
           if (!productId || productId.length === 0) {
@@ -459,10 +455,6 @@ export async function importGomaProducts(options: ImportOptions) {
       
       if (hashErrors > 0) {
         console.error(`❌ Failed to generate productId for ${hashErrors} products`)
-      }
-
-      if (skippedNoBaseId > 0) {
-        console.log(`⚠️ Skipped ${skippedNoBaseId} products without base_product_id for ${storeName} page ${page}`)
       }
 
       const nowIso = new Date().toISOString()
@@ -546,9 +538,6 @@ export async function importGomaProducts(options: ImportOptions) {
       // Upsert offers (dedupe by store_id + store_product_id within this batch)
       const offerMap = new Map<string, { productId: string; product: GomaProduct }>()
       for (const p of products) {
-        // Skip products without a global/base id – we can't link them korrekt til products-tabellen
-        if (!p.base_product_id) continue
-        
         const productId = generateProductId(p)
         const key = `${storeId}:${p.product_id}`
         if (!offerMap.has(key)) {
@@ -660,17 +649,22 @@ export async function importGomaProducts(options: ImportOptions) {
       }
 
       if (products.length < limit) {
+        fullyScannedStore = true
         break
       }
     }
 
     // Cleanup stale Goma offers for this store
     try {
-      const days = 10
-      const staleThreshold = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+      // If we completed a full scan for this store (API returned < limit), we can safely
+      // disable offers not seen in this import run immediately.
+      // Otherwise (partial scan / hard page cap), keep conservative cleanup window.
+      const staleThreshold = fullyScannedStore
+        ? importStartedAtIso
+        : new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
 
       console.log(
-        `🧹 Cleaning up stale Goma offers for ${storeId} last seen before ${staleThreshold}`,
+        `🧹 Cleaning up stale Goma offers for ${storeId} last seen before ${staleThreshold} (fullScan=${fullyScannedStore})`,
       )
 
       const { error: cleanupError } = await supabase
