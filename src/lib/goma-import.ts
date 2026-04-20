@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
 
 // Deterministic hash function as fallback if crypto fails
@@ -74,6 +74,91 @@ function getGomaApiKey() {
     throw new Error('GOMA_API_KEY is not set in environment variables')
   }
   return key
+}
+
+/**
+ * Nye produkter (første gang de ses i DB) lander i kø til manuel ingrediens-match.
+ * Sæt PRODUCT_MATCH_QUEUE_ENABLED=false for at slå fra. Kræver tabellen product_ingredient_match_queue.
+ */
+async function enqueueNewProductsForIngredientMatching(
+  supabase: SupabaseClient,
+  storeId: string,
+  newProductIds: string[],
+  productMap: Map<string, { productId: string; product: GomaProduct }>,
+) {
+  if (process.env.PRODUCT_MATCH_QUEUE_ENABLED === 'false') return
+  if (newProductIds.length === 0) return
+
+  try {
+    const queueRows: Array<{
+      product_id: string
+      store_product_id: string
+      store_id: string
+      product_name_snapshot: string | null
+      status: string
+    }> = []
+
+    for (const pid of newProductIds) {
+      const entry = productMap.get(pid)
+      if (!entry) continue
+      const p = entry.product
+      queueRows.push({
+        product_id: pid,
+        store_product_id: p.product_id,
+        store_id: storeId,
+        product_name_snapshot: p.product_name,
+        status: 'pending',
+      })
+    }
+
+    if (queueRows.length === 0) return
+
+    const extIds = [...new Set(queueRows.map((r) => r.store_product_id))]
+    const matchedExt = new Set<string>()
+    for (let i = 0; i < extIds.length; i += 150) {
+      const chunk = extIds.slice(i, i + 150)
+      const { data: rows } = await supabase
+        .from('product_ingredient_matches')
+        .select('product_external_id')
+        .in('product_external_id', chunk)
+      rows?.forEach((r: { product_external_id: string }) =>
+        matchedExt.add(r.product_external_id),
+      )
+    }
+
+    const filtered = queueRows.filter((r) => !matchedExt.has(r.store_product_id))
+    if (filtered.length === 0) return
+
+    const pids = [...new Set(filtered.map((r) => r.product_id))]
+    const pendingProducts = new Set<string>()
+    for (let i = 0; i < pids.length; i += 150) {
+      const chunk = pids.slice(i, i + 150)
+      const { data: rows } = await supabase
+        .from('product_ingredient_match_queue')
+        .select('product_id')
+        .eq('status', 'pending')
+        .in('product_id', chunk)
+      rows?.forEach((r: { product_id: string }) => pendingProducts.add(r.product_id))
+    }
+
+    const toInsert = filtered.filter((r) => !pendingProducts.has(r.product_id))
+    if (toInsert.length === 0) return
+
+    const { error } = await supabase.from('product_ingredient_match_queue').insert(toInsert)
+    if (error) {
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.warn(
+          '⚠️ product_ingredient_match_queue mangler — kør migration supabase/migrations/20260417120000_product_ingredient_match_queue.sql',
+        )
+        return
+      }
+      console.error('⚠️ Error enqueueing product match queue:', error)
+    } else {
+      console.log(`📋 Sat ${toInsert.length} nye produkt(er) i ingrediens-match-kø`)
+    }
+  } catch (e) {
+    console.error('⚠️ enqueueNewProductsForIngredientMatching:', e)
+  }
 }
 
 export type ImportOptions = {
@@ -285,7 +370,16 @@ export async function importGomaProducts(options: ImportOptions) {
       } else {
         console.log(`💾 Attempting to upsert ${productRows.length} products for ${storeName} page ${page}`)
         console.log(`💾 Sample product ID: ${productRows[0].id} (length: ${productRows[0].id.length}, is UUID: ${productRows[0].id.includes('-')})`)
-        
+
+        const productIdsForBatch = productRows.map((r) => r.id)
+        const existingIdsBefore = new Set<string>()
+        for (let i = 0; i < productIdsForBatch.length; i += 150) {
+          const chunk = productIdsForBatch.slice(i, i + 150)
+          const { data: existingRows } = await supabase.from('products').select('id').in('id', chunk)
+          existingRows?.forEach((r: { id: string }) => existingIdsBefore.add(r.id))
+        }
+        const newProductIdsForQueue = productIdsForBatch.filter((id) => !existingIdsBefore.has(id))
+
         const { error: productError, data: productData } = await supabase
           .from('products')
           .upsert(productRows, {
@@ -319,6 +413,13 @@ export async function importGomaProducts(options: ImportOptions) {
             console.log(`✅ Verified: ${verifyData?.length || 0}/${sampleIds.length} sample products exist in database (count: ${verifyCount})`)
           }
         }
+
+        await enqueueNewProductsForIngredientMatching(
+          supabase,
+          storeId,
+          newProductIdsForQueue,
+          productMap,
+        )
       }
 
       // Upsert offers (dedupe by store_id + store_product_id within this batch)

@@ -41,6 +41,23 @@ interface ExistingMatch {
   product_is_on_sale: boolean
 }
 
+/** Nye Goma-varer der venter på ingrediens (vare → ingrediens) */
+interface MatchQueueItem {
+  id: string
+  product_id: string
+  store_product_id: string
+  store_id: string
+  store_label: string
+  product_name_snapshot: string | null
+  name_generic: string | null
+  brand: string | null
+  category: string | null
+  queued_at: string
+  current_price: number | null
+  normal_price: number | null
+  name_store: string | null
+}
+
 const categoryOptions = [
   'Frugt og grønt',
   'Kød og fisk',
@@ -64,19 +81,23 @@ export default function ProductIngredientMatchingPage() {
   const itemsPerPage = 20
   const [selectedStore, setSelectedStore] = useState('all')
   const [hideLowPriorityCategories, setHideLowPriorityCategories] = useState(true)
-  /** Kun ingredienser uden mindst ét match i databasen — standard på for en ren arbejdskø. */
-  const [onlyUnmatched, setOnlyUnmatched] = useState(true)
+  /** Skjul ingredienser der allerede har mindst ét produktmatch */
+  const [onlyUnmatched, setOnlyUnmatched] = useState(false)
+  /**
+   * `newest` = stabilt overblik (rækken hopper ikke når du tilføjer et match).
+   * `fewest_matches` = god til at finde huller, men listen omrokeres ved match.
+   */
+  const [listSort, setListSort] = useState<'newest' | 'name' | 'fewest_matches'>('newest')
   const [pendingMatchIds, setPendingMatchIds] = useState<Set<string>>(new Set())
   const [isSyncingMatches, setIsSyncingMatches] = useState(false)
   const [copySourceByIngredient, setCopySourceByIngredient] = useState<Record<string, string>>({})
   const [gramsDraftByIngredient, setGramsDraftByIngredient] = useState<Record<string, string>>({})
   const [savingGramsByIngredient, setSavingGramsByIngredient] = useState<Record<string, boolean>>({})
-  const [stats, setStats] = useState({
-    total: 0,
-    confirmed: 0,
-    rejected: 0,
-    pending: 0
-  })
+  const [matchQueueItems, setMatchQueueItems] = useState<MatchQueueItem[]>([])
+  const [matchQueueLoading, setMatchQueueLoading] = useState(false)
+  const [matchQueueTableMissing, setMatchQueueTableMissing] = useState(false)
+  const [queueIngredientChoice, setQueueIngredientChoice] = useState<Record<string, string>>({})
+  const [queueActionId, setQueueActionId] = useState<string | null>(null)
 
   // Load data on component mount
   useEffect(() => {
@@ -84,15 +105,9 @@ export default function ProductIngredientMatchingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update stats when matches change
-  useEffect(() => {
-    updateStats()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [existingMatches])
-
   useEffect(() => {
     setCurrentPage(1)
-  }, [onlyUnmatched, searchTerm, selectedCategory, hideLowPriorityCategories])
+  }, [onlyUnmatched, searchTerm, selectedCategory, hideLowPriorityCategories, listSort])
 
   const loadData = async () => {
     try {
@@ -122,7 +137,7 @@ export default function ProductIngredientMatchingPage() {
       if (existingMatchesData) {
         setExistingMatches(existingMatchesData)
       }
-      
+
       console.log(`📊 Loaded ${allProducts.length} grocery products`)
       console.log(`📋 Loaded ${existingMatchesData?.length ?? 0} existing matches`)
       
@@ -219,13 +234,81 @@ export default function ProductIngredientMatchingPage() {
     }
   }
 
-  const updateStats = () => {
-    const total = ingredients.length
-    const confirmed = existingMatches.length
-    const rejected = 0 // We don't track rejected matches
-    const pending = total - confirmed
-    
-    setStats({ total, confirmed, rejected, pending })
+  const loadMatchQueue = useCallback(async () => {
+    setMatchQueueLoading(true)
+    try {
+      const res = await fetch('/api/admin/product-match-queue')
+      const data = await res.json()
+      if (data.success && data.data) {
+        setMatchQueueItems(data.data.items || [])
+        setMatchQueueTableMissing(!!data.data.queueTableMissing)
+      }
+    } catch (e) {
+      console.error('loadMatchQueue:', e)
+    } finally {
+      setMatchQueueLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isLoading) {
+      void loadMatchQueue()
+    }
+  }, [isLoading, loadMatchQueue])
+
+  const handleQueueMatch = async (queueId: string) => {
+    const ingredientId = queueIngredientChoice[queueId]?.trim()
+    if (!ingredientId) {
+      alert('Vælg en ingrediens først')
+      return
+    }
+    setQueueActionId(queueId)
+    try {
+      const res = await fetch('/api/admin/product-match-queue/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue_id: queueId, ingredient_id: ingredientId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Match fejlede')
+        return
+      }
+      const refreshed = await loadExistingMatches()
+      if (refreshed) setExistingMatches(refreshed)
+      await loadMatchQueue()
+      setQueueIngredientChoice((prev) => {
+        const next = { ...prev }
+        delete next[queueId]
+        return next
+      })
+    } finally {
+      setQueueActionId(null)
+    }
+  }
+
+  const handleQueueDismiss = async (queueId: string) => {
+    setQueueActionId(queueId)
+    try {
+      const res = await fetch('/api/admin/product-match-queue/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queue_id: queueId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Kunne ikke afvise')
+        return
+      }
+      await loadMatchQueue()
+      setQueueIngredientChoice((prev) => {
+        const next = { ...prev }
+        delete next[queueId]
+        return next
+      })
+    } finally {
+      setQueueActionId(null)
+    }
   }
 
   const getGramsInputValue = (ingredient: Ingredient): string => {
@@ -285,6 +368,27 @@ export default function ProductIngredientMatchingPage() {
     }
     return map
   }, [existingMatches])
+
+  const matchStats = useMemo(() => {
+    let withoutProductMatch = 0
+    for (const ing of ingredients) {
+      const n = (matchesByIngredient.get(String(ing.id).trim()) || []).length
+      if (n === 0) withoutProductMatch++
+    }
+    const totalIngredients = ingredients.length
+    const withProductMatch = totalIngredients - withoutProductMatch
+    const pctWithMatch =
+      totalIngredients > 0
+        ? Math.round((withProductMatch / totalIngredients) * 100)
+        : 0
+    return {
+      totalIngredients,
+      withoutProductMatch,
+      withProductMatch,
+      totalProductMatches: existingMatches.length,
+      pctWithMatch,
+    }
+  }, [ingredients, matchesByIngredient, existingMatches.length])
 
   const ingredientOptions = useMemo(
     () =>
@@ -433,26 +537,39 @@ export default function ProductIngredientMatchingPage() {
         const matchesCategory = selectedCategory === 'all' || ingredient.category === selectedCategory
         const ingredientCategory = (ingredient.category || '').toLowerCase().trim()
         const keepByPriority = !hideLowPriorityCategories || !lowPriorityCategories.has(ingredientCategory)
-        const matchList = matchesByIngredient.get(String(ingredient.id).trim()) || []
+        const idKey = String(ingredient.id).trim()
+        const matchList = matchesByIngredient.get(idKey) || []
         const hasAnyMatch = matchList.length > 0
         const keepByMatchFilter = !onlyUnmatched || !hasAnyMatch
         return matchesSearch && matchesCategory && keepByPriority && keepByMatchFilter
       })
       .sort((a, b) => {
-        const aHasMatch = (matchesByIngredient.get(String(a.id).trim()) || []).length > 0
-        const bHasMatch = (matchesByIngredient.get(String(b.id).trim()) || []).length > 0
-
-        // Unmatched first (the active work queue)
-        if (aHasMatch !== bHasMatch) return aHasMatch ? 1 : -1
-
-        // Newest first
+        const countA = (matchesByIngredient.get(String(a.id).trim()) || []).length
+        const countB = (matchesByIngredient.get(String(b.id).trim()) || []).length
         const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
         const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
-        if (aTime !== bTime) return bTime - aTime
 
+        if (listSort === 'fewest_matches') {
+          if (countA !== countB) return countA - countB
+          if (aTime !== bTime) return bTime - aTime
+          return a.name.localeCompare(b.name)
+        }
+        if (listSort === 'name') {
+          return a.name.localeCompare(b.name)
+        }
+        // newest — standard: nyeste først; rækker skifter ikke plads når match-tal ændres
+        if (aTime !== bTime) return bTime - aTime
         return a.name.localeCompare(b.name)
       })
-  }, [ingredients, searchTerm, selectedCategory, hideLowPriorityCategories, onlyUnmatched, matchesByIngredient])
+  }, [
+    ingredients,
+    searchTerm,
+    selectedCategory,
+    hideLowPriorityCategories,
+    onlyUnmatched,
+    matchesByIngredient,
+    listSort,
+  ])
 
   // Pagination
   const totalPages = useMemo(
@@ -498,36 +615,61 @@ export default function ProductIngredientMatchingPage() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Overblik — tal er pr. ingrediens / produktlinks (ikke det gamle misvisende total − antal rækker) */}
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <strong className="font-semibold">{matchStats.withoutProductMatch}</strong>{' '}
+          ingrediens{matchStats.withoutProductMatch === 1 ? '' : 'er'} mangler mindst ét produktmatch.
+          {matchStats.withoutProductMatch > 0 ? (
+            <span className="text-amber-900/90">
+              {' '}
+              Tjek tallet når der kommer nye opskrifter — så ser du hurtigt om noget mangler.
+            </span>
+          ) : (
+            <span className="text-amber-900/90"> Alle ingredienser har mindst ét match.</span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Ingredients</div>
+            <div className="text-2xl font-bold text-blue-600">{matchStats.totalIngredients}</div>
+            <div className="text-sm text-gray-600">Ingredienser i alt</div>
+          </div>
+          <div className="bg-white p-6 rounded-lg shadow ring-2 ring-amber-300/80">
+            <div className="text-2xl font-bold text-amber-700">{matchStats.withoutProductMatch}</div>
+            <div className="text-sm text-gray-700 font-medium">Mangler produktmatch</div>
+            <div className="text-xs text-gray-500 mt-1">0 tilknyttede produkter</div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{stats.confirmed}</div>
-            <div className="text-sm text-gray-600">Matched Products</div>
+            <div className="text-2xl font-bold text-green-600">{matchStats.withProductMatch}</div>
+            <div className="text-sm text-gray-600">Har mindst ét produkt</div>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
-            <div className="text-sm text-gray-600">Unmatched Ingredients</div>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">
-              {stats.total > 0 ? Math.round((stats.confirmed / stats.total) * 100) : 0}%
+            <div className="text-2xl font-bold text-purple-600">{matchStats.pctWithMatch}%</div>
+            <div className="text-sm text-gray-600">Ingredienser med dækning</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {matchStats.totalProductMatches} produktlink i alt
             </div>
-            <div className="text-sm text-gray-600">Match Rate</div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end mb-6">
+        <div className="flex items-center justify-end gap-2 mb-6 flex-wrap">
           <button
+            type="button"
+            onClick={() => void loadMatchQueue()}
+            className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-60"
+            disabled={matchQueueLoading}
+          >
+            {matchQueueLoading ? 'Opdaterer kø…' : 'Opdater kø (nye varer)'}
+          </button>
+          <button
+            type="button"
             onClick={async () => {
               setIsSyncingMatches(true)
               const updatedMatches = await loadExistingMatches()
               if (updatedMatches) {
                 setExistingMatches(updatedMatches)
               }
+              await loadMatchQueue()
               setIsSyncingMatches(false)
             }}
             className="px-4 py-2 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-60"
@@ -539,7 +681,7 @@ export default function ProductIngredientMatchingPage() {
 
         {/* Filters */}
         <div className="bg-white p-6 rounded-lg shadow mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Search Ingredients
@@ -597,6 +739,27 @@ export default function ProductIngredientMatchingPage() {
                 <option value="ABC Lavpris">ABC Lavpris</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Sortér liste
+              </label>
+              <select
+                value={listSort}
+                onChange={(e) =>
+                  setListSort(e.target.value as 'newest' | 'name' | 'fewest_matches')
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="newest">
+                  Nyeste ingredienser først (stabilt når du matcher)
+                </option>
+                <option value="name">Alfabetisk A–Å</option>
+                <option value="fewest_matches">
+                  Færrest produktmatches først (listen flytter sig ved nye matches)
+                </option>
+              </select>
+            </div>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
@@ -606,7 +769,7 @@ export default function ProductIngredientMatchingPage() {
                 onChange={(e) => setOnlyUnmatched(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              Kun umatch ingredienser (skjul dem der allerede har produktmatch)
+              Kun ingredienser uden produktmatch (skjul dem der allerede har mindst ét produkt)
             </label>
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input
@@ -618,6 +781,127 @@ export default function ProductIngredientMatchingPage() {
               Skjul krydderier og urter (viser de mest relevante nye først)
             </label>
           </div>
+        </div>
+
+        {/* Kø: nye Goma-varer → vælg ingrediens (omvendt matching) */}
+        <div className="bg-white p-6 rounded-lg shadow mb-8 border-t-4 border-indigo-500">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Kø: nye varer fra Goma</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Varer der landede i kataloget efter denne funktion blev slået til (typisk efter nat-sync).
+                Vælg ingrediens og bekræft — eller afvis hvis den ikke skal kobles.
+              </p>
+            </div>
+            {matchQueueItems.length > 0 && (
+              <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-800 shrink-0">
+                {matchQueueItems.length} i køen
+              </span>
+            )}
+          </div>
+
+          {matchQueueTableMissing && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Tabellen <code className="text-xs">product_ingredient_match_queue</code> findes ikke endnu.
+              Kør migrationen i Supabase:{' '}
+              <code className="text-xs break-all">supabase/migrations/20260417120000_product_ingredient_match_queue.sql</code>
+            </p>
+          )}
+
+          {!matchQueueTableMissing && matchQueueLoading && matchQueueItems.length === 0 && (
+            <p className="text-sm text-gray-500">Henter kø…</p>
+          )}
+
+          {!matchQueueTableMissing && !matchQueueLoading && matchQueueItems.length === 0 && (
+            <p className="text-sm text-gray-600">Ingen nye varer i køen lige nu.</p>
+          )}
+
+          {!matchQueueTableMissing && matchQueueItems.length > 0 && (
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Vare</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Butik</th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-700">Pris</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700">Kø siden</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-700 min-w-[14rem]">
+                      Ingrediens
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium text-gray-700">Handling</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {matchQueueItems.map((q) => {
+                    const label = q.name_store || q.name_generic || q.product_name_snapshot || 'Vare'
+                    const busy = queueActionId === q.id
+                    return (
+                      <tr key={q.id}>
+                        <td className="px-3 py-2 align-top">
+                          <div className="font-medium text-gray-900">{label}</div>
+                          {q.brand && (
+                            <div className="text-xs text-gray-500">{q.brand}</div>
+                          )}
+                          {q.category && (
+                            <div className="text-xs text-gray-500">{q.category}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 align-top text-gray-700">{q.store_label}</td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                          {q.current_price != null
+                            ? `${Number(q.current_price).toFixed(2)} kr`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 align-top text-gray-600 whitespace-nowrap">
+                          {new Date(q.queued_at).toLocaleString('da-DK', {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <select
+                            value={queueIngredientChoice[q.id] || ''}
+                            onChange={(e) =>
+                              setQueueIngredientChoice((prev) => ({
+                                ...prev,
+                                [q.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                          >
+                            <option value="">Vælg ingrediens…</option>
+                            {ingredientOptions.map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 align-top text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleQueueMatch(q.id)}
+                            className="mr-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                            {busy ? '…' : 'Match'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void handleQueueDismiss(q.id)}
+                            className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Afvis
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Ingredients List */}
