@@ -487,25 +487,40 @@ export class MealPlanGenerator {
 
     await this.recipesLoadPromise
 
-    // Determine primary dietary approach
-    // If children exist, prioritize familiemad or kombi-tags
-    // Otherwise use the adults' dietary approach
-    let primaryDietaryApproach = 'familiemad'
+    // Determine primary dietary approach from actually completed profiles.
+    // This avoids one stale keto value hijacking all generated plans.
     const hasChildren = familyProfile.children > 0
-    const hasKetoAdults = familyProfile.adultsProfiles.some(p => p.dietaryApproach === 'keto')
-    
-    if (hasChildren) {
-      // If children exist, check if any adult is on familiemad
-      const hasFamiliemadAdult = familyProfile.adultsProfiles.some(p => p.dietaryApproach === 'familiemad')
-      if (hasFamiliemadAdult) {
-        primaryDietaryApproach = 'familiemad'
-      } else if (hasKetoAdults) {
-        // Use kombi-tags if keto adults with children
-        primaryDietaryApproach = 'keto' // Will prioritize kombi-tags in filtering
+    const completedAdults = familyProfile.adultsProfiles.filter((p) => {
+      const age = Number((p as any).age)
+      const h = Number((p as any).height)
+      const w = Number((p as any).weight)
+      return Boolean(
+        p.dietaryApproach &&
+        String(p.dietaryApproach).trim() !== '' &&
+        Number.isFinite(age) && age > 0 &&
+        Number.isFinite(h) && h > 0 &&
+        Number.isFinite(w) && w > 0 &&
+        p.weightGoal &&
+        String(p.weightGoal).trim() !== '' &&
+        (p as any).activityLevel != null &&
+        String((p as any).activityLevel) !== ''
+      )
+    })
+    const completedApproaches = completedAdults
+      .map((p) => String(p.dietaryApproach || '').trim())
+      .filter(Boolean)
+    let primaryDietaryApproach =
+      completedApproaches[0] ||
+      familyProfile.adultsProfiles[0]?.dietaryApproach ||
+      'sense'
+
+    if (hasChildren && completedApproaches.includes('familiemad')) {
+      primaryDietaryApproach = 'familiemad'
+    } else if (hasChildren && completedApproaches.length > 0) {
+      const allKeto = completedApproaches.every((d) => d === 'keto')
+      if (allKeto) {
+        primaryDietaryApproach = 'keto'
       }
-    } else {
-      // No children - use first adult's dietary approach
-      primaryDietaryApproach = familyProfile.adultsProfiles[0]?.dietaryApproach || 'sense'
     }
 
     const resolvedPrimaryId = resolveFactoryDietId(primaryDietaryApproach)

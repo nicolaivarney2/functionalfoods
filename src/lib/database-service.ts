@@ -448,11 +448,9 @@ export class DatabaseService {
         query = query.in('store_id', this.mapStoreFilterToIds(stores))
       }
 
-      if (offersOnly) {
-        // Include both explicit sale flag and active-offer flag to avoid missing valid offers.
-        // Final offer truth is still computed in mapping/filtering below.
-        query = query.or('is_on_sale.eq.true,is_offer_active.eq.true')
-      }
+      // IMPORTANT: Do not pre-filter by DB sale flags here.
+      // We compute real offers later from (price drop OR sale flags) + valid date,
+      // because DB flags can be stale/inconsistent across sources.
 
       // Filter by organic - find product IDs with organic labels first
       let organicProductIds: string[] | undefined
@@ -589,9 +587,7 @@ export class DatabaseService {
               chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
             }
             
-            if (offersOnly) {
-              chunkQuery = chunkQuery.or('is_on_sale.eq.true,is_offer_active.eq.true')
-            }
+            // IMPORTANT: do not pre-filter on sale flags here; evaluate real offer in-app.
             
             // Organic filter already applied via productIds intersection above
             
@@ -741,9 +737,7 @@ export class DatabaseService {
               chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
             }
             
-            if (offersOnly) {
-              chunkQuery.or('is_on_sale.eq.true,is_offer_active.eq.true')
-            }
+            // IMPORTANT: do not pre-filter on sale flags here; evaluate real offer in-app.
             
             // Organic filter already applied via productIds intersection above
             
@@ -1150,21 +1144,22 @@ export class DatabaseService {
     const mapping: Record<string, string> = {
       'Netto': 'netto',
       'REMA 1000': 'rema-1000',
-      '365discount': '365-discount', // Goma uses "365discount" (no space)
-      '365 Discount': '365-discount', // Also support display name
+      '365discount': '365discount',
+      '365 Discount': '365discount',
       'Lidl': 'lidl',
+      'Føtex': 'fotex',
+      'Foetex': 'fotex',
       'Bilka': 'bilka',
       'Nemlig': 'nemlig',
-      'MENY': 'meny', // Goma uses "MENY" (not "MENU")
-      'MENU': 'meny', // Also support old name for backwards compatibility
+      'MENY': 'meny',
+      'MENU': 'meny',
       'Spar': 'spar',
       'Kvickly': 'kvickly',
-      'superbrugsen': 'super-brugsen', // Goma uses "superbrugsen" (no space, lowercase)
-      'Super Brugsen': 'super-brugsen', // Also support display name
+      'superbrugsen': 'superbrugsen',
+      'Super Brugsen': 'superbrugsen',
       'Brugsen': 'brugsen',
-      'Løvbjerg': 'løvbjerg',
+      'Løvbjerg': 'lovbjerg',
       'ABC Lavpris': 'abc-lavpris',
-      // Note: Føtex removed - Goma has no products for this store
     }
 
     return stores.map((s) => mapping[s] || s.toLowerCase().replace(/\s+/g, '-'))

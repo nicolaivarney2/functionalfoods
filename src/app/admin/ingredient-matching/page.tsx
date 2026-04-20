@@ -538,12 +538,20 @@ export default function IngredientMatchingPage() {
                 Match recipe ingredients with Frida DTU nutritional data
               </p>
             </div>
-            <Link
-              href="/admin/ingredient-matching/recent"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Seneste matches
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/admin/ingredient-matching/add-frida"
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              >
+                Tilføj til Frida
+              </Link>
+              <Link
+                href="/admin/ingredient-matching/recent"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Seneste matches
+              </Link>
+            </div>
           </div>
         </div>
 

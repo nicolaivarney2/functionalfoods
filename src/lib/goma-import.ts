@@ -76,6 +76,103 @@ function getGomaApiKey() {
   return key
 }
 
+function normalizeForQueueFilter(v: string | null | undefined): string {
+  return String(v || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+/**
+ * Keep ingredient-match queue focused on edible products.
+ * We still import ALL products to product feed, but non-food should not pollute the queue.
+ */
+function isFoodRelevantForIngredientQueue(p: GomaProduct): boolean {
+  const department = normalizeForQueueFilter(p.department_name)
+  const category = normalizeForQueueFilter(p.category)
+  const subcategory = normalizeForQueueFilter(p.s_category)
+
+  // 1) Fast path: deterministic whitelist by top-level department from Goma
+  // (cheaper and less fragile than wide text-marker scanning).
+  const allowedDepartments = new Set([
+    'frugt og gront',
+    'kod og fisk',
+    'mejeri og kol',
+    'kolonial',
+    'frost',
+    'brod og kager',
+    'drikkevarer',
+    'slik og snacks',
+    'nemt og hurtigt',
+    'kiosk',
+  ])
+  const blockedDepartments = new Set([
+    'husholdning',
+    'personlig pleje',
+    'baby og familie',
+    'non-food',
+    'non food',
+  ])
+
+  if (department) {
+    if (blockedDepartments.has(department)) return false
+    if (allowedDepartments.has(department)) return true
+  }
+
+  // 2) Fallback when department is missing/inconsistent.
+  // We only inspect category fields (not full product title) to stay deterministic.
+  const text = `${category} | ${subcategory}`
+  if (!text.trim()) return true
+
+  const blockedCategoryMarkers = [
+    'kattemad',
+    'hund',
+    'pet',
+    'husholdning',
+    'personlig pleje',
+    'tekstil',
+    'stearin',
+    'duftlys',
+    'fyrfadslys',
+    'kronelys',
+    'bloklys',
+    'rengoring',
+    'opvask',
+    'toiletpapir',
+    'kokkenrulle',
+    'serviet',
+  ]
+  if (blockedCategoryMarkers.some((marker) => text.includes(marker))) return false
+
+  const foodCategoryMarkers = [
+    'frugt',
+    'gront',
+    'kod',
+    'fisk',
+    'mejeri',
+    'brod',
+    'kager',
+    'frost',
+    'drikke',
+    'vin',
+    'ol',
+    'sodavand',
+    'vand',
+    'kolonial',
+    'konserves',
+    'is',
+    'slik',
+    'snack',
+    'pasta',
+    'ost',
+    'saucer',
+    'dressing',
+    'paalaeg',
+  ]
+  return foodCategoryMarkers.some((marker) => text.includes(marker))
+}
+
 /**
  * Nye produkter (første gang de ses i DB) lander i kø til manuel ingrediens-match.
  * Sæt PRODUCT_MATCH_QUEUE_ENABLED=false for at slå fra. Kræver tabellen product_ingredient_match_queue.
@@ -98,10 +195,15 @@ async function enqueueNewProductsForIngredientMatching(
       status: string
     }> = []
 
+    let skippedNonFood = 0
     for (const pid of newProductIds) {
       const entry = productMap.get(pid)
       if (!entry) continue
       const p = entry.product
+      if (!isFoodRelevantForIngredientQueue(p)) {
+        skippedNonFood++
+        continue
+      }
       queueRows.push({
         product_id: pid,
         store_product_id: p.product_id,
@@ -109,6 +211,10 @@ async function enqueueNewProductsForIngredientMatching(
         product_name_snapshot: p.product_name,
         status: 'pending',
       })
+    }
+
+    if (skippedNonFood > 0) {
+      console.log(`🧹 Sprang ${skippedNonFood} non-food produkter over (ikke sat i ingrediens-kø)`)
     }
 
     if (queueRows.length === 0) return
@@ -168,6 +274,21 @@ export type ImportOptions = {
   onProgress?: (info: { store: string; page: number; imported: number; total: number }) => void
 }
 
+function resolveStoreSlug(storeName: string): string {
+  const key = String(storeName || '').trim().toLowerCase()
+  const explicit: Record<string, string> = {
+    'føtex': 'fotex',
+    'foetex': 'fotex',
+    'løvbjerg': 'lovbjerg',
+    'lovbjerg': 'lovbjerg',
+    '365discount': '365discount',
+    'abc lavpris': 'abc-lavpris',
+    'superbrugsen': 'superbrugsen',
+    'rema 1000': 'rema-1000',
+  }
+  return explicit[key] || key.replace(/\s+/g, '-')
+}
+
 /**
  * ⚠️ IMPORTANT: Product ID Generation Strategy
  * 
@@ -195,7 +316,7 @@ export async function importGomaProducts(options: ImportOptions) {
   let totalImported = 0
 
   for (const storeName of options.stores) {
-    const storeId = storeName.toLowerCase().replace(/\s+/g, '-')
+    const storeId = resolveStoreSlug(storeName)
 
     // Upsert store row
     await supabase

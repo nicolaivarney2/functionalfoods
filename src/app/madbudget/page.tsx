@@ -1474,11 +1474,22 @@ export default function MadbudgetPage() {
   // Save weight loss profile
   const saveWeightLossProfile = async () => {
     if (editingAdultIndex === null) return
+    const candidate = {
+      ...currentWeightLossProfile,
+      mealsPerDay: currentWeightLossProfile.mealsPerDay?.length
+        ? currentWeightLossProfile.mealsPerDay
+        : ['dinner'],
+    } as AdultProfile
+    const complete = adultProfileHasRequiredFieldsForMealPlan(candidate)
+    if (!complete) {
+      alert('Udfyld køn, alder, højde, vægt, aktivitet, kostretning og mål før du gemmer.')
+      return
+    }
     
     const updatedProfiles = [...familyProfile.adultsProfiles]
     updatedProfiles[editingAdultIndex] = {
-      ...currentWeightLossProfile,
-      isComplete: true
+      ...candidate,
+      isComplete: complete
     } as AdultProfile
     
     setFamilyProfile(prev => ({
@@ -1525,7 +1536,7 @@ export default function MadbudgetPage() {
   const allAdultsHaveProfiles = () => {
     if (familyProfile.adultsProfiles.length !== familyProfile.adults) return false
     return familyProfile.adultsProfiles.every(
-      (p) => p.isComplete || adultProfileHasRequiredFieldsForMealPlan(p)
+      (p) => adultProfileHasRequiredFieldsForMealPlan(p)
     )
   }
 
@@ -1536,7 +1547,7 @@ export default function MadbudgetPage() {
     const approaches = familyProfile.adultsProfiles
       .filter(
         (p) =>
-          (p.isComplete || adultProfileHasRequiredFieldsForMealPlan(p)) && p.dietaryApproach
+          adultProfileHasRequiredFieldsForMealPlan(p) && p.dietaryApproach
       )
       .map((p) => p.dietaryApproach)
     

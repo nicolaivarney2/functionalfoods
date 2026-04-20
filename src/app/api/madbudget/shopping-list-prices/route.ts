@@ -33,22 +33,39 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseClient()
 
-    // Map store IDs from frontend (1, 2, 8) to database store_id slugs
-    // Skal matche `stores.id` / `product_offers.store_id` fra Goma-import (se goma-import.ts: slug = navn lowercase, mellemrum → -).
-    const storeIdMap: Record<number, string> = {
-      1: 'rema-1000',
-      2: 'netto',
-      3: 'føtex',
-      4: 'bilka',
-      5: 'nemlig',
-      6: 'meny',
-      7: 'spar',
-      8: 'løvbjerg'
+    // Map frontend store IDs to a canonical UI key + possible DB slug aliases.
+    // We support both legacy slugs (føtex/løvbjerg) and ASCII slugs (fotex/lovbjerg).
+    const storeIdMap: Record<number, { key: string; candidates: string[] }> = {
+      1: { key: 'rema-1000', candidates: ['rema-1000'] },
+      2: { key: 'netto', candidates: ['netto'] },
+      3: { key: 'føtex', candidates: ['føtex', 'foetex', 'fotex'] },
+      4: { key: 'bilka', candidates: ['bilka'] },
+      5: { key: 'nemlig', candidates: ['nemlig'] },
+      6: { key: 'meny', candidates: ['meny'] },
+      7: { key: 'spar', candidates: ['spar'] },
+      8: { key: 'løvbjerg', candidates: ['løvbjerg', 'lovbjerg'] },
     }
 
-    const dbStoreIds = selectedStoreIds
+    const requestedStores = selectedStoreIds
       .map((id: number) => storeIdMap[id])
-      .filter(Boolean)
+      .filter((s): s is { key: string; candidates: string[] } => Boolean(s))
+    const storeKeys = Array.from(new Set(requestedStores.map((s) => s.key)))
+    const dbStoreIds = Array.from(
+      new Set(requestedStores.flatMap((s) => s.candidates))
+    )
+
+    const normalizeStoreKey = (v: string): string =>
+      String(v || '')
+        .toLowerCase()
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+    const canonicalStoreKey = (raw: string): string => {
+      const n = normalizeStoreKey(raw)
+      if (n === 'fotex' || n === 'foetex' || n === 'føtex') return 'føtex'
+      if (n === 'lovbjerg' || n === 'løvbjerg') return 'løvbjerg'
+      return raw
+    }
 
     if (dbStoreIds.length === 0) {
       return NextResponse.json(
@@ -283,7 +300,7 @@ export async function POST(request: NextRequest) {
     )
 
     console.log(`🔍 Step 3: Found ${productExternalIds.length} unique products from matches`)
-    console.log(`🔍 Step 4: Looking for offers in stores: ${dbStoreIds.join(', ')}`)
+    console.log(`🔍 Step 4: Looking for prices in stores: ${dbStoreIds.join(', ')}`)
 
     // Fetch product offers for these products, filtered by selected stores
     // Support both old (supermarket_products) and new (products + product_offers) structures
@@ -345,6 +362,7 @@ export async function POST(request: NextRequest) {
               productOffersMap.get(externalId)!.push({
                 ...offer,
                 product_external_id: externalId,
+                store_id: canonicalStoreKey(String(offer.store_id || '')),
                 amount: amountInfo?.amount ?? offer.amount,
                 unit: amountInfo?.unit ?? offer.unit
               })
@@ -389,7 +407,8 @@ export async function POST(request: NextRequest) {
 
           productOffersMap.get(externalId)!.push({
             ...offer,
-            product_external_id: externalId
+            product_external_id: externalId,
+            store_id: canonicalStoreKey(String(offer.store_id || '')),
           })
         })
       } else if (offersByStoreProductIdError) {
@@ -408,16 +427,16 @@ export async function POST(request: NextRequest) {
           const storeNameMap: Record<string, string[]> = {
             'rema-1000': ['REMA 1000', 'REMA'],
             'netto': ['Netto'],
-            'føtex': ['Føtex'],
+            'føtex': ['Føtex', 'Fotex', 'Foetex'],
             'bilka': ['Bilka'],
             'nemlig': ['Nemlig', 'Nemlig.com'],
             'meny': ['MENY'],
             'spar': ['Spar'],
-            'løvbjerg': ['Løvbjerg']
+            'løvbjerg': ['Løvbjerg', 'Lovbjerg'],
           }
 
           const productStore = product.store || ''
-          const matchesStore = dbStoreIds.some(storeId => {
+          const matchesStore = storeKeys.some(storeId => {
             const storeNames = storeNameMap[storeId] || []
             return storeNames.some(name => productStore.includes(name))
           })
@@ -431,7 +450,7 @@ export async function POST(request: NextRequest) {
           productOffersMap.get(product.external_id)!.push({
             id: product.external_id,
             product_external_id: product.external_id,
-            store_id: dbStoreIds.find(sid => {
+            store_id: storeKeys.find(sid => {
               const storeNames = storeNameMap[sid] || []
               return storeNames.some(name => productStore.includes(name))
             }) || '',
@@ -498,8 +517,7 @@ export async function POST(request: NextRequest) {
       }
 
       // For each store, find best matching product
-      for (const storeId of dbStoreIds) {
-        const storeKey = storeId // Use DB store ID as key
+      for (const storeKey of storeKeys) {
 
         if (!result[storeKey]) {
           result[storeKey] = {}
@@ -514,7 +532,7 @@ export async function POST(request: NextRequest) {
         const neededUnit = item.unit?.toLowerCase() || ''
 
         for (const match of matchesForIngredient) {
-          const storeOffers = productOffersByStore.get(match.product_external_id)?.get(storeId) || []
+            const storeOffers = productOffersByStore.get(match.product_external_id)?.get(storeKey) || []
 
           for (const offer of storeOffers) {
             // Parse product amount (e.g., "500g", "1 stk")
@@ -645,8 +663,8 @@ export async function POST(request: NextRequest) {
             const offersForMatchedProducts = matchedProductIds
               .map(id => productOffersMap.get(id) || [])
               .flat()
-            const storeOffers = offersForMatchedProducts.filter((o: any) => o.store_id === storeId)
-            console.log(`⚠️ "${shoppingItemName}" in ${storeId}: ${matchesForIngredient.length} matches, ${offersForMatchedProducts.length} total offers, ${storeOffers.length} for this store`)
+            const storeOffers = offersForMatchedProducts.filter((o: any) => o.store_id === storeKey)
+            console.log(`⚠️ "${shoppingItemName}" in ${storeKey}: ${matchesForIngredient.length} matches, ${offersForMatchedProducts.length} total offers, ${storeOffers.length} for this store`)
           }
         }
       }

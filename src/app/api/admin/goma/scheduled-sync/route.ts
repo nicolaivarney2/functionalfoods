@@ -9,6 +9,7 @@ type GomaStoreId =
   | 'REMA 1000'
   | '365discount'
   | 'Lidl'
+  | 'Føtex'
   | 'Bilka'
   | 'Nemlig'
   | 'MENY'
@@ -40,8 +41,7 @@ function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
       stores = ['365discount']
       break
     case 4: // Thursday (Torsdag)
-      // Føtex er ikke tilgængelig via Goma, så vi udelader den
-      stores = ['MENY', 'Spar', 'Kvickly', 'superbrugsen', 'Løvbjerg']
+      stores = ['MENY', 'Spar', 'Kvickly', 'superbrugsen', 'Løvbjerg', 'Føtex']
       break
     case 5: // Friday (Fredag)
       stores = ['Netto', 'Bilka', 'Brugsen']
