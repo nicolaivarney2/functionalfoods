@@ -13,7 +13,7 @@ type ShopPayload = {
 
 type MealDaySummary = {
   dayLabel: string
-  meals: Array<{ slot: string; title: string | null }>
+  meals: Array<{ slot: string; title: string | null; recipeSlug?: string | null }>
 }
 
 function formatQty(value: unknown) {
@@ -269,12 +269,29 @@ export default function IndkobTokenPage() {
                 <div key={day.dayLabel} className="border-b border-slate-100 pb-2 last:border-0">
                   <h3 className="text-xs font-semibold text-emerald-900">{day.dayLabel}</h3>
                   <ul className="mt-1 space-y-0.5">
-                    {withTitles.map((m) => (
-                      <li key={`${day.dayLabel}-${m.slot}`} className="flex gap-1.5 text-xs text-slate-800 leading-snug">
-                        <span className="text-slate-400 shrink-0 w-[4.25rem]">{m.slot}</span>
-                        <span className="min-w-0 flex-1">{m.title}</span>
-                      </li>
-                    ))}
+                    {withTitles.map((m) => {
+                      const slug =
+                        typeof m.recipeSlug === 'string' && m.recipeSlug.trim().length > 0
+                          ? m.recipeSlug.trim()
+                          : null
+                      return (
+                        <li key={`${day.dayLabel}-${m.slot}`} className="flex gap-1.5 text-xs text-slate-800 leading-snug">
+                          <span className="text-slate-400 shrink-0 w-[4.25rem]">{m.slot}</span>
+                          {slug && m.title ? (
+                            <a
+                              href={`/opskrift/${encodeURIComponent(slug)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-w-0 flex-1 font-medium text-emerald-800 underline decoration-emerald-600/50 underline-offset-2 hover:text-emerald-900 hover:decoration-emerald-800"
+                            >
+                              {m.title}
+                            </a>
+                          ) : (
+                            <span className="min-w-0 flex-1">{m.title}</span>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )

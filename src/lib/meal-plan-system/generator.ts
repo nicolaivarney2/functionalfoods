@@ -602,6 +602,111 @@ export class MealPlanGenerator {
   }
 
   /**
+   * Byg indkøbsliste ud fra den nuværende madplans-grid (fx efter manuelle ændringer).
+   * Bruger samme logik som ugen-generering.
+   */
+  public async buildShoppingListFromMadbudgetGrid(
+    grid: Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined>,
+    weekNumber: number = 1
+  ): Promise<ShoppingList> {
+    await this.recipesLoadPromise;
+
+    const dayKeys = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ] as const;
+    const mealTypes = ['breakfast', 'lunch', 'dinner'] as const;
+
+    const anchor = new Date();
+    const dayNum = anchor.getDay();
+    const mondayOffset = dayNum === 0 ? -6 : 1 - dayNum;
+    anchor.setDate(anchor.getDate() + mondayOffset);
+    anchor.setHours(0, 0, 0, 0);
+
+    const days: DayPlan[] = dayKeys.map((dayKey, dayIndex) => {
+      const date = new Date(anchor);
+      date.setDate(anchor.getDate() + dayIndex);
+      const row = grid[dayKey] || {};
+      const meals: MealAssignment[] = [];
+
+      for (const mt of mealTypes) {
+        const cell = row[mt];
+        if (cell == null || typeof cell !== 'object') continue;
+        const c = cell as Record<string, unknown>;
+        meals.push({
+          mealType: mt as MealType,
+          recipe: this.normalizePlannerCellToRecipe(c),
+          servings: Number(c.servings) > 0 ? Number(c.servings) : 4,
+          adjustedCalories: 0,
+          adjustedProtein: 0,
+          adjustedCarbs: 0,
+          adjustedFat: 0,
+        });
+      }
+
+      return {
+        date,
+        meals,
+        totalCalories: 0,
+        totalProtein: 0,
+        totalCarbs: 0,
+        totalFat: 0,
+      };
+    });
+
+    return this.generateShoppingList(weekNumber, days);
+  }
+
+  /** Map UI madplan-celle til Recipe til brug i indkøbsliste-aggregation */
+  private normalizePlannerCellToRecipe(cell: Record<string, unknown>): Recipe {
+    const rawIngs = Array.isArray(cell.ingredients) ? cell.ingredients : [];
+    const ingredients = rawIngs.map((ing: unknown, i: number) => {
+      const x = ing as Record<string, unknown>;
+      const base = {
+        ingredientId: String(x.ingredientId ?? x.ingredient_id ?? x.id ?? `temp-${i}`),
+        amount: Number(x.amount) || 0,
+        unit: String(x.unit ?? 'stk'),
+      };
+      return typeof x.name === 'string' ? { ...base, name: x.name } : base;
+    });
+
+    const dietaryApproaches = Array.isArray(cell.dietaryTags)
+      ? (cell.dietaryTags as string[])
+      : Array.isArray(cell.dietaryApproaches)
+        ? (cell.dietaryApproaches as string[])
+        : [];
+
+    return {
+      id: String(cell.id ?? 'unknown'),
+      title: String(cell.title ?? 'Opskrift'),
+      description: '',
+      ingredients: ingredients as Recipe['ingredients'],
+      instructions: [],
+      prepTime: 0,
+      cookTime: 0,
+      servings: Number(cell.servings) > 0 ? Number(cell.servings) : 4,
+      categories: [],
+      dietaryApproaches,
+      nutritionalInfo: {
+        caloriesPer100g: 0,
+        proteinPer100g: 0,
+        carbsPer100g: 0,
+        fatPer100g: 0,
+      },
+      images: [],
+      slug: String(cell.slug ?? ''),
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  /**
    * Generate a single week of meal plans
    */
   private async generateWeekPlan(

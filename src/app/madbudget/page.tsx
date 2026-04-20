@@ -4,13 +4,14 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
 import { mealPlanGenerator, getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
-import { recipeTagsMatchDietQuery } from '@/lib/diet-tag-matching'
+import { resolveFactoryDietId } from '@/lib/diet-tag-matching'
+import { recipeMatchesDiet } from '@/lib/recipe-diet-matcher'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -176,6 +177,53 @@ function adultProfileHasRequiredFieldsForMealPlan(p: Partial<AdultProfile>): boo
     p.weightGoal != null &&
     String(p.weightGoal).trim() !== ''
   )
+}
+
+/** Map én DB-række til AdultProfile; sikrer tal så validering ikke fejler pga. string fra Postgres/JSON */
+function adultProfileFromApiRow(p: any): AdultProfile {
+  const row: AdultProfile = {
+    id: String(p.id ?? `adult-${p.adult_index ?? 0}`),
+    gender: p.gender === 'male' || p.gender === 'female' ? p.gender : undefined,
+    age: p.age != null && p.age !== '' ? Number(p.age) : undefined,
+    height: p.height != null && p.height !== '' ? Number(p.height) : undefined,
+    weight: p.weight != null && p.weight !== '' ? Number(p.weight) : undefined,
+    activityLevel:
+      p.activity_level != null && p.activity_level !== ''
+        ? (Number(p.activity_level) as ActivityLevel)
+        : undefined,
+    dietaryApproach: p.dietary_approach ?? undefined,
+    mealsPerDay: Array.isArray(p.meals_per_day) ? p.meals_per_day : ['dinner'],
+    weightGoal: p.weight_goal ?? undefined,
+    isComplete: Boolean(p.is_complete),
+  }
+  return {
+    ...row,
+    isComplete: row.isComplete || adultProfileHasRequiredFieldsForMealPlan(row),
+  }
+}
+
+/**
+ * Synkroniser altid `adultsProfiles.length` med `adults` og respekter `adult_index` fra API.
+ * Ellers fejler `allAdultsHaveProfiles` (fx DB med adults=2 men kun én gemt profil, eller tom liste).
+ */
+function buildAdultsProfilesForFamily(adultsCount: number, rows: any[] | undefined | null): AdultProfile[] {
+  const n = Math.min(10, Math.max(1, Number(adultsCount) || 1))
+  const byIndex = new Map<number, any>()
+  for (const r of rows || []) {
+    const idx = typeof r?.adult_index === 'number' ? r.adult_index : 0
+    byIndex.set(idx, r)
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const p = byIndex.get(i)
+    if (!p) {
+      return {
+        id: `adult-${Date.now()}-${i}`,
+        mealsPerDay: ['dinner'],
+        isComplete: false,
+      } as AdultProfile
+    }
+    return adultProfileFromApiRow(p)
+  })
 }
 
 export default function MadbudgetPage() {
@@ -393,6 +441,9 @@ export default function MadbudgetPage() {
 
   // Shopping list state
   const [shoppingList, setShoppingList] = useState<any>(null)
+  /** Sand efter manuelle madplan-ændringer indtil indkøbslisten er genberegnet */
+  const [shoppingListStale, setShoppingListStale] = useState(false)
+  const [recalculatingShoppingList, setRecalculatingShoppingList] = useState(false)
   const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
   const [loadingPrices, setLoadingPrices] = useState(false)
@@ -586,10 +637,17 @@ export default function MadbudgetPage() {
             title: `Madplan uge ${selectedWeekNumber ?? currentWeekNumber}`,
             days: smartShoppingWeekMeta.map(({ dayKey, dayLabel }) => ({
               dayLabel,
-              meals: smartShoppingMealSlots.map(({ mealKey, label }) => ({
-                slot: label,
-                title: mealPlan[dayKey][mealKey]?.title ?? null,
-              })),
+              meals: smartShoppingMealSlots.map(({ mealKey, label }) => {
+                const slotRecipe = mealPlan[dayKey][mealKey]
+                const rawSlug = slotRecipe?.slug
+                const recipeSlug =
+                  typeof rawSlug === 'string' && rawSlug.trim().length > 0 ? rawSlug.trim() : null
+                return {
+                  slot: label,
+                  title: slotRecipe?.title ?? null,
+                  recipeSlug,
+                }
+              }),
             })),
           },
         }),
@@ -703,44 +761,33 @@ export default function MadbudgetPage() {
         if (response.ok) {
           const result = await response.json()
           if (result.success && result.data) {
-            if (result.data.familyProfile) {
-              setFamilyProfile(prev => ({
+            const fp = result.data.familyProfile
+            const adultRows = result.data.adultProfiles as any[] | undefined
+            if (fp) {
+              const adults = fp.adults ?? 1
+              setFamilyProfile((prev) => ({
                 ...prev,
-                adults: result.data.familyProfile.adults ?? prev.adults,
-                children: result.data.familyProfile.children ?? prev.children,
-                childrenAges: result.data.familyProfile.children_ages || prev.childrenAges,
-                prioritizeOrganic: result.data.familyProfile.prioritize_organic ?? prev.prioritizeOrganic,
-                prioritizeAnimalOrganic: result.data.familyProfile.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
-                excludedIngredients: result.data.familyProfile.excluded_ingredients || prev.excludedIngredients,
-                selectedStores: result.data.familyProfile.selected_stores || prev.selectedStores,
+                adults,
+                children: fp.children ?? prev.children,
+                childrenAges: fp.children_ages || prev.childrenAges,
+                prioritizeOrganic: fp.prioritize_organic ?? prev.prioritizeOrganic,
+                prioritizeAnimalOrganic: fp.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
+                excludedIngredients: fp.excluded_ingredients || prev.excludedIngredients,
+                selectedStores: fp.selected_stores || prev.selectedStores,
                 weeklyBudgetKr:
-                  result.data.familyProfile.weekly_budget_kr != null
-                    ? result.data.familyProfile.weekly_budget_kr
-                    : prev.weeklyBudgetKr
+                  fp.weekly_budget_kr != null ? fp.weekly_budget_kr : prev.weeklyBudgetKr,
+                adultsProfiles: buildAdultsProfilesForFamily(adults, adultRows),
               }))
-              setVariationLevel(result.data.familyProfile.variation_level || 2)
-            }
-            if (result.data.adultProfiles && result.data.adultProfiles.length > 0) {
-              setFamilyProfile(prev => ({
+              setVariationLevel(fp.variation_level || 2)
+            } else if (adultRows && adultRows.length > 0) {
+              const n = Math.max(
+                ...adultRows.map((r) => (typeof r.adult_index === 'number' ? r.adult_index + 1 : 1)),
+                1
+              )
+              setFamilyProfile((prev) => ({
                 ...prev,
-                adultsProfiles: result.data.adultProfiles.map((p: any) => {
-                  const row: AdultProfile = {
-                    id: String(p.id ?? `adult-${p.adult_index ?? 0}`),
-                    gender: p.gender,
-                    age: p.age,
-                    height: p.height,
-                    weight: p.weight,
-                    activityLevel: p.activity_level,
-                    dietaryApproach: p.dietary_approach,
-                    mealsPerDay: Array.isArray(p.meals_per_day) ? p.meals_per_day : ['dinner'],
-                    weightGoal: p.weight_goal,
-                    isComplete: Boolean(p.is_complete),
-                  }
-                  return {
-                    ...row,
-                    isComplete: row.isComplete || adultProfileHasRequiredFieldsForMealPlan(row),
-                  }
-                }),
+                adults: Math.max(prev.adults, n),
+                adultsProfiles: buildAdultsProfilesForFamily(Math.max(prev.adults, n), adultRows),
               }))
             }
           }
@@ -857,6 +904,7 @@ export default function MadbudgetPage() {
               setMealPlan(parsed.grid)
               setSlotLocks(parsed.slotLocks)
               setShoppingList(activePlan.shopping_list || [])
+              setShoppingListStale(false)
               setSelectedWeekNumber(activePlan.week_number || null)
               setActivePlanRef(activePlan)
             } else {
@@ -918,6 +966,7 @@ export default function MadbudgetPage() {
       setMealPlan(parsed.grid)
       setSlotLocks(parsed.slotLocks)
       setShoppingList(plan.shopping_list || [])
+      setShoppingListStale(false)
       setSelectedWeekNumber(weekNumber)
       setActivePlanRef(plan)
     }
@@ -947,10 +996,15 @@ export default function MadbudgetPage() {
     }
   }
 
-  const saveMealPlanToDb = async (mealPlanData: Record<DayKey, Record<MealType, any | null>>) => {
+  const saveMealPlanToDb = async (
+    mealPlanData: Record<DayKey, Record<MealType, any | null>>,
+    options?: { shoppingList?: any }
+  ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
+
+      const shoppingListToPersist = options?.shoppingList ?? activePlanRef?.shopping_list ?? shoppingList
 
       const weekInfo = activePlanRef
         ? {
@@ -974,7 +1028,7 @@ export default function MadbudgetPage() {
           variationLevel: activePlanRef?.variation_level ?? variationLevel,
           familyProfileSnapshot: activePlanRef?.family_profile_snapshot ?? null,
           mealPlanData: wrapMealPlanForSave(mealPlanData, slotLocks),
-          shoppingList: activePlanRef?.shopping_list ?? shoppingList,
+          shoppingList: shoppingListToPersist,
           totalCost: activePlanRef?.total_cost ?? null,
           totalSavings: activePlanRef?.total_savings ?? null,
           estimatedCaloriesPerDay: activePlanRef?.estimated_calories_per_day ?? null
@@ -996,6 +1050,21 @@ export default function MadbudgetPage() {
       }
     } catch (error) {
       console.error('Error saving meal plan:', error)
+    }
+  }
+
+  const recalculateShoppingList = async () => {
+    setRecalculatingShoppingList(true)
+    try {
+      const list = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(mealPlan, 1)
+      setShoppingList(list)
+      setShoppingListStale(false)
+      await saveMealPlanToDb(mealPlan, { shoppingList: list })
+    } catch (e) {
+      console.error('recalculateShoppingList:', e)
+      alert('Kunne ikke genberegne indkøbslisten. Prøv igen.')
+    } finally {
+      setRecalculatingShoppingList(false)
     }
   }
 
@@ -1242,48 +1311,40 @@ export default function MadbudgetPage() {
     return false
   }
 
-  const recipeMatchesProfileDiet = (recipe: PlannerRecipe, dietId: string): boolean => {
-    if (!dietId) return true
-    const tagList = [...(recipe.dietaryTags || [])]
-    if (recipe.category) tagList.push(recipe.category)
-    if (recipeTagsMatchDietQuery(tagList, dietId)) return true
+  /** Samme tag-logik som /api/recipes?diet= — undgår løse titel-match der blander keto og proteinrig sammen */
+  const recipeMatchesProfileDiet = (recipe: PlannerRecipe, dietSlug: string): boolean => {
+    if (!dietSlug || !String(dietSlug).trim()) return true
+    const canonical = resolveFactoryDietId(dietSlug)
+    const dLower = canonical.toLowerCase()
+    if (dLower.includes('familie') || dLower === 'familiemad') return true
+    if (dLower.includes('5-2') || dLower === '5-2' || dLower.includes('5:2')) return true
 
-    const blob = `${tagList.join(' ')} ${recipe.title || ''}`.toLowerCase()
-    const d = dietId.toLowerCase()
-    if (d.includes('keto')) return blob.includes('keto')
-    if (d.includes('sense')) return blob.includes('sense')
-    if (d.includes('glp')) return blob.includes('glp') || blob.includes('glp-1')
-    if (d.includes('familie')) return true
-    if (d.includes('anti')) return blob.includes('anti') || blob.includes('inflamm')
-    if (d.includes('flex')) return blob.includes('flex') || blob.includes('plante')
-    if (d.includes('5-2') || d.includes('5:2')) return true
-    // Vigtigt: "proteinrig-kost" indeholder substring "protein" — må ikke bruge blob.includes('protein'),
-    // det matcher også mange Keto-opskrifter ("højt protein" osv.)
-    if (d.includes('proteinrig')) {
-      return (
-        blob.includes('proteinrig') ||
-        blob.includes('proteinrig kost') ||
-        blob.includes('proteinrig-kost')
-      )
-    }
-    if (d.includes('protein')) return blob.includes('protein')
-    return blob.includes(d)
+    const categories = [...(recipe.dietaryTags || [])]
+    if (recipe.category) categories.push(recipe.category)
+    return recipeMatchesDiet({ dietaryCategories: categories }, canonical)
   }
 
   // Get filtered recipes based on search, category, måltidsslots og valgt kostprofil
   const getFilteredRecipes = () => {
     let filtered: PlannerRecipe[] = [...availableRecipes]
-    if (!selectedMealSlot || !selectedMealSlot.includes('-')) return filtered
-    const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
 
-    filtered = filtered.filter((recipe) => recipeMatchesMealSlot(recipe, selectedMeal))
-    filtered = filtered.filter((recipe) => recipeMatchesProfileDiet(recipe, primaryDietForRecipePicker))
+    if (primaryDietForRecipePicker) {
+      filtered = filtered.filter((recipe) =>
+        recipeMatchesProfileDiet(recipe, primaryDietForRecipePicker)
+      )
+    }
+
+    if (selectedMealSlot && selectedMealSlot.includes('-')) {
+      const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
+      filtered = filtered.filter((recipe) => recipeMatchesMealSlot(recipe, selectedMeal))
+    }
 
     if (recipeSearchQuery) {
+      const q = recipeSearchQuery.toLowerCase()
       filtered = filtered.filter(
         (recipe) =>
-          recipe.title.toLowerCase().includes(recipeSearchQuery.toLowerCase()) ||
-          recipe.ingredients.some((ing) => ing.name.toLowerCase().includes(recipeSearchQuery.toLowerCase()))
+          recipe.title.toLowerCase().includes(q) ||
+          recipe.ingredients.some((ing) => ing.name.toLowerCase().includes(q))
       )
     }
 
@@ -1291,10 +1352,15 @@ export default function MadbudgetPage() {
       filtered = filtered.filter((recipe) => recipe.category === recipeCategoryFilter)
     }
 
-    return filtered.map((recipe) => ({
-      ...recipe,
-      mealTypeMatch: recipe.mealType === selectedMeal,
-    }))
+    if (selectedMealSlot && selectedMealSlot.includes('-')) {
+      const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
+      return filtered.map((recipe) => ({
+        ...recipe,
+        mealTypeMatch: recipe.mealType === selectedMeal,
+      }))
+    }
+
+    return filtered
   }
 
 
@@ -1309,6 +1375,7 @@ export default function MadbudgetPage() {
         }
       }
       setMealPlan(updatedPlan)
+      setShoppingListStale(true)
       setShowRecipeSelector(false)
       setSelectedMealSlot('')
       saveMealPlanToDb(updatedPlan)
@@ -1614,6 +1681,7 @@ export default function MadbudgetPage() {
       
       // Generate shopping list
       setShoppingList(weekPlan.shoppingList)
+      setShoppingListStale(false)
       
       // Save meal plan to database
       try {
@@ -2826,9 +2894,18 @@ export default function MadbudgetPage() {
                   <ShoppingCart size={20} className="mr-2" />
                   Indkøbsliste
                 </h2>
-                {shoppingList && (
+                {(shoppingList || shoppingListStale) && (
                   <div className="flex flex-col gap-2 sm:items-end">
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void recalculateShoppingList()}
+                        disabled={recalculatingShoppingList}
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#1B365D] bg-white px-3 py-2 text-sm font-medium text-[#1B365D] hover:bg-[#1B365D]/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <RefreshCw size={16} className={recalculatingShoppingList ? 'animate-spin' : ''} />
+                        {recalculatingShoppingList ? 'Genberegner…' : 'Genberegn'}
+                      </button>
                       <label className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 cursor-pointer">
                         <input
                           type="checkbox"
@@ -2855,11 +2932,30 @@ export default function MadbudgetPage() {
                   </div>
                 )}
               </div>
+
+              {shoppingListStale && shoppingList && (
+                <div
+                  role="status"
+                  className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                >
+                  Du har ændret madplanen. Tryk på <strong>Genberegn</strong> ovenfor, så indkøbslisten matcher dine
+                  valgte retter.
+                </div>
+              )}
               
               {!shoppingList ? (
                 <div className="text-center py-8 text-gray-500">
-                  <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p>Din indkøbsliste vil blive genereret når du har planlagt din madplan</p>
+                  {shoppingListStale ? (
+                    <p className="max-w-md mx-auto">
+                      Tryk på <strong>Genberegn</strong> ovenfor for at oprette indkøbslisten ud fra din nuværende
+                      madplan.
+                    </p>
+                  ) : (
+                    <>
+                      <ShoppingCart size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p>Din indkøbsliste vil blive genereret når du har planlagt din madplan</p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -3580,6 +3676,7 @@ export default function MadbudgetPage() {
                       next[dayKey] = { ...prev[dayKey], [mealKey]: null }
                       return next
                     })
+                    setShoppingListStale(true)
                     setSlotLocks((prev) => {
                       const n = { ...prev }
                       delete n[lk]
