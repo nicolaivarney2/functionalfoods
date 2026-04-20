@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
 import { mealPlanGenerator, getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
+import { recipeTagsMatchDietQuery } from '@/lib/diet-tag-matching'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -1243,8 +1244,12 @@ export default function MadbudgetPage() {
 
   const recipeMatchesProfileDiet = (recipe: PlannerRecipe, dietId: string): boolean => {
     if (!dietId) return true
+    const tagList = [...(recipe.dietaryTags || [])]
+    if (recipe.category) tagList.push(recipe.category)
+    if (recipeTagsMatchDietQuery(tagList, dietId)) return true
+
+    const blob = `${tagList.join(' ')} ${recipe.title || ''}`.toLowerCase()
     const d = dietId.toLowerCase()
-    const blob = `${(recipe.dietaryTags || []).join(' ')} ${recipe.category || ''}`.toLowerCase()
     if (d.includes('keto')) return blob.includes('keto')
     if (d.includes('sense')) return blob.includes('sense')
     if (d.includes('glp')) return blob.includes('glp') || blob.includes('glp-1')
@@ -1252,6 +1257,15 @@ export default function MadbudgetPage() {
     if (d.includes('anti')) return blob.includes('anti') || blob.includes('inflamm')
     if (d.includes('flex')) return blob.includes('flex') || blob.includes('plante')
     if (d.includes('5-2') || d.includes('5:2')) return true
+    // Vigtigt: "proteinrig-kost" indeholder substring "protein" — må ikke bruge blob.includes('protein'),
+    // det matcher også mange Keto-opskrifter ("højt protein" osv.)
+    if (d.includes('proteinrig')) {
+      return (
+        blob.includes('proteinrig') ||
+        blob.includes('proteinrig kost') ||
+        blob.includes('proteinrig-kost')
+      )
+    }
     if (d.includes('protein')) return blob.includes('protein')
     return blob.includes(d)
   }
