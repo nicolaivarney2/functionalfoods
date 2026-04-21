@@ -443,6 +443,11 @@ export default function MadbudgetPage() {
   const [shoppingList, setShoppingList] = useState<any>(null)
   /** Sand efter manuelle madplan-ændringer indtil indkøbslisten er genberegnet */
   const [shoppingListStale, setShoppingListStale] = useState(false)
+
+  const selectedStoreIdsKey = useMemo(() => {
+    const ids = familyProfile.selectedStores || []
+    return [...ids].sort((a, b) => a - b).join(',')
+  }, [familyProfile.selectedStores])
   const [recalculatingShoppingList, setRecalculatingShoppingList] = useState(false)
   const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
@@ -569,13 +574,13 @@ export default function MadbudgetPage() {
     }
   }
 
-  // Fetch prices when shopping list changes
+  // Fetch prices when shopping list OR selected stores change
   useEffect(() => {
     if (shoppingList && familyProfile.selectedStores && familyProfile.selectedStores.length > 0) {
       fetchStorePrices()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shoppingList])
+  }, [shoppingList, selectedStoreIdsKey])
 
   // Debug: log what frontend received for shopping list (categories + ingredientId/isBasis per item)
   useEffect(() => {
@@ -803,8 +808,17 @@ export default function MadbudgetPage() {
   useEffect(() => {
     const timeoutId = setTimeout(async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        // Validate auth state before autosave to avoid noisy 401 spam on stale sessions
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser()
+        if (userError || !user) return
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.access_token) return
 
         const response = await fetch('/api/madbudget/family-profile', {
           method: 'POST',
@@ -829,6 +843,10 @@ export default function MadbudgetPage() {
         })
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Session may have expired between checks; skip silently.
+            return
+          }
           console.error('Autosave family profile failed:', await response.text())
         }
       } catch (error) {

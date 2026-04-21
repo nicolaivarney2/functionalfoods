@@ -1,7 +1,9 @@
 import { MetadataRoute } from 'next'
-import { sampleRecipes } from '@/lib/sample-data'
+import { databaseService } from '@/lib/database-service'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export const revalidate = 60 * 30 // refresh sitemap every 30 minutes
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://functionalfoods.dk'
   
   // Static pages
@@ -20,10 +22,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ]
 
-  // Recipe pages
-  const recipePages = sampleRecipes.map((recipe) => ({
+  // Recipe pages (real published recipes from DB)
+  const publishedRecipes = await databaseService.getRecipes()
+  const recipePages = publishedRecipes
+    .filter((recipe) => Boolean(recipe.slug))
+    .map((recipe) => ({
     url: `${baseUrl}/opskrift/${recipe.slug}`,
-    lastModified: recipe.updatedAt,
+    lastModified: recipe.updatedAt || new Date(),
     changeFrequency: 'weekly' as const,
     priority: 0.8,
   }))

@@ -18,10 +18,55 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const resolvedParams = await params
-  
+  const recipe = await databaseService.getPublishedRecipeBySlug(resolvedParams.slug)
+
+  if (!recipe) {
+    return {
+      title: 'Opskrift ikke fundet | Functional Foods',
+      description: 'Opskriften kunne ikke findes.',
+      robots: {
+        index: false,
+        follow: true,
+      },
+    }
+  }
+
+  const metaTitle =
+    recipe.metaTitle?.trim() ||
+    `${recipe.title} | Functional Foods`
+  const metaDescription =
+    recipe.metaDescription?.trim() ||
+    recipe.shortDescription?.trim() ||
+    recipe.description?.trim() ||
+    `Se opskriften på ${recipe.title} hos Functional Foods.`
+  const canonicalUrl = `https://functionalfoods.dk/opskrift/${recipe.slug}`
+
   return {
-    title: `Opskrift - ${resolvedParams.slug}`,
-    description: 'Se denne lækre opskrift',
+    title: metaTitle,
+    description: metaDescription,
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: metaTitle,
+      description: metaDescription,
+      type: 'article',
+      url: canonicalUrl,
+      images: recipe.imageUrl
+        ? [
+            {
+              url: recipe.imageUrl,
+              alt: recipe.imageAlt || recipe.title,
+            },
+          ]
+        : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: metaTitle,
+      description: metaDescription,
+      images: recipe.imageUrl ? [recipe.imageUrl] : undefined,
+    },
   }
 }
 

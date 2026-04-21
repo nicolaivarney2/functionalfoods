@@ -50,6 +50,10 @@ export async function POST(request: NextRequest) {
       .map((id: number) => storeIdMap[id])
       .filter((s): s is { key: string; candidates: string[] } => Boolean(s))
     const storeKeys = Array.from(new Set(requestedStores.map((s) => s.key)))
+    const storeCandidatesByKey = new Map<string, string[]>()
+    requestedStores.forEach((s) => {
+      storeCandidatesByKey.set(s.key, s.candidates)
+    })
     const dbStoreIds = Array.from(
       new Set(requestedStores.flatMap((s) => s.candidates))
     )
@@ -397,6 +401,8 @@ export async function POST(request: NextRequest) {
 
       if (!offersByStoreProductIdError && offersByStoreProductId) {
         totalOffersFound += offersByStoreProductId.length
+        const externalIdToProductIds = new Map<string, Set<string>>()
+
         offersByStoreProductId.forEach(offer => {
           const externalId = offer.store_product_id
           if (!externalId) return
@@ -405,12 +411,87 @@ export async function POST(request: NextRequest) {
             productOffersMap.set(externalId, [])
           }
 
+           if (offer.product_id) {
+            const existing = externalIdToProductIds.get(externalId) || new Set<string>()
+            existing.add(String(offer.product_id))
+            externalIdToProductIds.set(externalId, existing)
+          }
+
           productOffersMap.get(externalId)!.push({
             ...offer,
             product_external_id: externalId,
             store_id: canonicalStoreKey(String(offer.store_id || '')),
           })
         })
+
+        // Critical: product_ingredient_matches often stores a store-specific external id.
+        // Resolve that id to product_id and then load offers for the same product across
+        // all selected stores, so Føtex/Løvbjerg can participate in cross-store pricing.
+        const linkedProductIds = Array.from(
+          new Set(
+            Array.from(externalIdToProductIds.values()).flatMap((ids) => Array.from(ids))
+          )
+        )
+
+        if (linkedProductIds.length > 0) {
+          const { data: linkedOffers, error: linkedOffersError } = await supabase
+            .from('product_offers')
+            .select(`
+              id,
+              product_id,
+              store_id,
+              store_product_id,
+              name_store,
+              current_price,
+              normal_price,
+              is_on_sale,
+              is_offer_active,
+              discount_percentage,
+              is_available,
+              amount,
+              unit
+            `)
+            .in('product_id', linkedProductIds)
+            .in('store_id', dbStoreIds)
+            .eq('is_available', true)
+
+          if (!linkedOffersError && linkedOffers) {
+            totalOffersFound += linkedOffers.length
+            const offersByProductId = new Map<string, any[]>()
+            linkedOffers.forEach((offer) => {
+              const pid = String(offer.product_id || '')
+              if (!pid) return
+              const list = offersByProductId.get(pid)
+              if (list) list.push(offer)
+              else offersByProductId.set(pid, [offer])
+            })
+
+            for (const [externalId, productIds] of externalIdToProductIds.entries()) {
+              if (!productOffersMap.has(externalId)) {
+                productOffersMap.set(externalId, [])
+              }
+              const target = productOffersMap.get(externalId)!
+              const seenOfferIds = new Set(target.map((o: any) => String(o.id || '')))
+
+              for (const pid of productIds) {
+                const offersForPid = offersByProductId.get(pid) || []
+                for (const offer of offersForPid) {
+                  const offerId = String(offer.id || '')
+                  if (offerId && seenOfferIds.has(offerId)) continue
+                  if (offerId) seenOfferIds.add(offerId)
+
+                  target.push({
+                    ...offer,
+                    product_external_id: externalId,
+                    store_id: canonicalStoreKey(String(offer.store_id || '')),
+                  })
+                }
+              }
+            }
+          } else if (linkedOffersError) {
+            console.error('❌ Error fetching linked product_offers by product_id:', linkedOffersError)
+          }
+        }
       } else if (offersByStoreProductIdError) {
         console.error('❌ Error fetching product_offers by store_product_id:', offersByStoreProductIdError)
       }
@@ -490,6 +571,7 @@ export async function POST(request: NextRequest) {
     const result: Record<string, Record<string, any>> = {}
     let itemsWithProducts = 0
     let itemsWithoutProducts = 0
+    const nameFallbackCache = new Map<string, any | null>()
 
     for (const item of shoppingListItems) {
       const shoppingItemName = item.name?.toLowerCase().trim()
@@ -656,6 +738,128 @@ export async function POST(request: NextRequest) {
           result[storeKey][shoppingItemName] = bestProduct
           itemsWithProducts++
         } else {
+          // Fallback: if matched products do not produce a usable candidate in this store,
+          // try a direct name lookup in the target store.
+          const fallbackCacheKey = `${storeKey}::${shoppingItemName}`
+          let fallbackProduct = nameFallbackCache.get(fallbackCacheKey)
+          if (fallbackProduct === undefined) {
+            fallbackProduct = null
+            const candidatesForStore = storeCandidatesByKey.get(storeKey) || [storeKey]
+            const searchTerm = String(item.name || '').trim()
+            if (searchTerm.length >= 2) {
+              const { data: fallbackOffers, error: fallbackOffersError } = await supabase
+                .from('product_offers')
+                .select(`
+                  id,
+                  store_id,
+                  store_product_id,
+                  name_store,
+                  current_price,
+                  normal_price,
+                  is_on_sale,
+                  is_offer_active,
+                  discount_percentage,
+                  amount,
+                  unit
+                `)
+                .in('store_id', candidatesForStore)
+                .eq('is_available', true)
+                .ilike('name_store', `%${searchTerm}%`)
+                .order('current_price', { ascending: true })
+                .limit(30)
+
+              if (!fallbackOffersError && fallbackOffers && fallbackOffers.length > 0) {
+                const normalizedSearch = normalizeName(searchTerm)
+                const searchTokens = normalizedSearch.split(/\s+/).filter(Boolean)
+
+                const scored = fallbackOffers.map((offer) => {
+                  const nameRaw = String(offer.name_store || '')
+                  const nameNorm = normalizeName(nameRaw)
+                  const nameLower = nameRaw.toLowerCase()
+                  let score = 0
+
+                  if (nameNorm === normalizedSearch) score += 1200
+                  if (nameNorm.startsWith(normalizedSearch)) score += 900
+                  if (nameNorm.includes(normalizedSearch)) score += 500
+
+                  let tokenHits = 0
+                  for (const t of searchTokens) {
+                    if (nameNorm.includes(t)) {
+                      score += 180
+                      tokenHits++
+                    }
+                  }
+                  if (searchTokens.length > 1 && tokenHits === searchTokens.length) {
+                    score += 250
+                  }
+
+                  // De-prioritize "flavor-like" false positives (e.g. kyllingesmag noodles).
+                  if (nameLower.includes('smag')) score -= 500
+                  if (nameLower.includes('nudler')) score -= 220
+
+                  return { offer, score }
+                })
+                scored.sort((a, b) => {
+                  if (b.score !== a.score) return b.score - a.score
+                  const pa = Number(a.offer.current_price || 0)
+                  const pb = Number(b.offer.current_price || 0)
+                  return pa - pb
+                })
+
+                const chosen = scored[0]?.offer
+                if (!chosen) {
+                  nameFallbackCache.set(fallbackCacheKey, null)
+                  continue
+                }
+
+                const offerIsActive = chosen.is_offer_active === true
+                  ? true
+                  : !!chosen.is_on_sale || (
+                    chosen.normal_price &&
+                    chosen.current_price &&
+                    chosen.normal_price > chosen.current_price
+                  )
+
+                let discountPercentage = chosen.discount_percentage
+                if (
+                  offerIsActive &&
+                  chosen.normal_price &&
+                  chosen.current_price &&
+                  chosen.normal_price > chosen.current_price
+                ) {
+                  discountPercentage = Math.round(
+                    ((chosen.normal_price - chosen.current_price) / chosen.normal_price) * 100
+                  )
+                }
+
+                fallbackProduct = {
+                  product_external_id: chosen.store_product_id || null,
+                  name: chosen.name_store,
+                  price: chosen.current_price,
+                  totalPrice: chosen.current_price || 0,
+                  normalPrice: chosen.normal_price,
+                  totalNormalPrice: chosen.normal_price ?? null,
+                  isOnSale: offerIsActive,
+                  discountPercentage,
+                  amount: chosen.amount,
+                  unit: chosen.unit,
+                  productAmount: null,
+                  neededAmount,
+                  quantityNeeded: 1,
+                  isSufficient: true,
+                  isNameFallback: true,
+                }
+              }
+            }
+            nameFallbackCache.set(fallbackCacheKey, fallbackProduct)
+          }
+
+          if (fallbackProduct) {
+            result[storeKey][shoppingItemName] = fallbackProduct
+            itemsWithProducts++
+            continue
+          }
+
           itemsWithoutProducts++
           // Only log if there were matches but no offers found
           if (matchesForIngredient.length > 0) {

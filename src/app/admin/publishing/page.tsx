@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ChangeEvent } from 'react'
+import { useState, useEffect, ChangeEvent, useMemo } from 'react'
 import type { IngredientGroup, Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
@@ -46,6 +46,10 @@ export default function AdminPublishingPage() {
   const [selectedTime, setSelectedTime] = useState('09:00')
   /** Default «alle» så nye AI-gem (planlagte) ikke forsvinder bag filteret «Udgivne». */
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'scheduled' | 'published'>('all')
+  const [searchFilter, setSearchFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [tipsFilter, setTipsFilter] = useState<'all' | 'with' | 'without'>('all')
+  const [qualityFilter, setQualityFilter] = useState<'all' | 'missing-image' | 'missing-description' | 'missing-categories'>('all')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [isScheduling, setIsScheduling] = useState(false)
@@ -771,9 +775,65 @@ export default function AdminPublishingPage() {
     }
   }
 
+  const availableFilterCategories = useMemo(() => {
+    const set = new Set<string>()
+    for (const recipe of recipes) {
+      if (recipe.mainCategory?.trim()) set.add(recipe.mainCategory.trim())
+      for (const c of recipe.subCategories || []) {
+        if (c?.trim()) set.add(c.trim())
+      }
+      for (const c of recipe.dietaryCategories || []) {
+        if (c?.trim()) set.add(c.trim())
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'da'))
+  }, [recipes])
+
   const filteredRecipes = recipes.filter(recipe => {
-    if (statusFilter === 'all') return true
-    return recipe.status === statusFilter
+    if (statusFilter !== 'all' && recipe.status !== statusFilter) return false
+
+    const search = searchFilter.trim().toLowerCase()
+    if (search) {
+      const haystack = [
+        recipe.title || '',
+        recipe.slug || '',
+        recipe.description || '',
+        recipe.mainCategory || '',
+        ...(recipe.subCategories || []),
+        ...(recipe.dietaryCategories || []),
+      ]
+        .join(' ')
+        .toLowerCase()
+      if (!haystack.includes(search)) return false
+    }
+
+    if (categoryFilter !== 'all') {
+      const recipeCategories = [
+        recipe.mainCategory || '',
+        ...(recipe.subCategories || []),
+        ...(recipe.dietaryCategories || []),
+      ]
+        .map((c) => c.trim())
+        .filter(Boolean)
+      if (!recipeCategories.includes(categoryFilter)) return false
+    }
+
+    const hasTips = Boolean(recipe.personalTips?.trim())
+    if (tipsFilter === 'with' && !hasTips) return false
+    if (tipsFilter === 'without' && hasTips) return false
+
+    if (qualityFilter === 'missing-image' && Boolean(recipe.imageUrl?.trim())) return false
+    if (qualityFilter === 'missing-description' && Boolean(recipe.description?.trim())) return false
+    if (qualityFilter === 'missing-categories') {
+      const hasAnyCategory = Boolean(
+        recipe.mainCategory?.trim() ||
+          (recipe.subCategories && recipe.subCategories.length > 0) ||
+          (recipe.dietaryCategories && recipe.dietaryCategories.length > 0)
+      )
+      if (hasAnyCategory) return false
+    }
+
+    return true
   })
 
   const handleBulkNutritionRecalculation = async () => {
@@ -950,6 +1010,81 @@ export default function AdminPublishingPage() {
               }`}
             >
               Alle ({recipes.length})
+            </button>
+          </div>
+
+          {/* Advanced filters */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div className="xl:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Søg</label>
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Søg i titel, slug, beskrivelse, kategori..."
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Kategori</label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Alle kategorier</option>
+                {availableFilterCategories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tips</label>
+              <select
+                value={tipsFilter}
+                onChange={(e) => setTipsFilter(e.target.value as 'all' | 'with' | 'without')}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Alle</option>
+                <option value="with">Kun med tips</option>
+                <option value="without">Kun uden tips</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Kvalitet</label>
+              <select
+                value={qualityFilter}
+                onChange={(e) => setQualityFilter(e.target.value as 'all' | 'missing-image' | 'missing-description' | 'missing-categories')}
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">Alle</option>
+                <option value="missing-image">Mangler billede</option>
+                <option value="missing-description">Mangler beskrivelse</option>
+                <option value="missing-categories">Mangler kategori</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-gray-600">
+              Viser {filteredRecipes.length} af {recipes.length} opskrifter
+            </p>
+            <button
+              onClick={() => {
+                setSearchFilter('')
+                setCategoryFilter('all')
+                setTipsFilter('all')
+                setQualityFilter('all')
+                setStatusFilter('all')
+              }}
+              className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Nulstil filtre
             </button>
           </div>
           
