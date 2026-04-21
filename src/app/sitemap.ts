@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 import { databaseService } from '@/lib/database-service'
 
-export const revalidate = 60 * 30 // refresh sitemap every 30 minutes
+export const revalidate = 1800 // 30 minutes
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://functionalfoods.dk'

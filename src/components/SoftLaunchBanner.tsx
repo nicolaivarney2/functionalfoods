@@ -6,16 +6,22 @@ import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 
 const STORAGE_KEY = 'ff-soft-launch-banner-dismissed'
+const SHOW_DELAY_MS = 7000
 
 export default function SoftLaunchBanner() {
   const pathname = usePathname()
-  const [visible, setVisible] = useState(true)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
     try {
-      if (localStorage.getItem(STORAGE_KEY) === '1') setVisible(false)
+      if (localStorage.getItem(STORAGE_KEY) === '1') return
+      timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS)
     } catch {
-      /* ignore */
+      timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS)
+    }
+    return () => {
+      if (timer) clearTimeout(timer)
     }
   }, [])
 
@@ -47,29 +53,24 @@ export default function SoftLaunchBanner() {
         >
           <X className="h-5 w-5" strokeWidth={2} />
         </button>
-        <div className="text-sm sm:text-[15px] leading-relaxed text-gray-800 text-center sm:text-left space-y-2">
+        <div className="text-sm sm:text-[15px] leading-relaxed text-gray-800 text-center sm:text-left">
           <p>
-            <span className="font-semibold text-gray-900">Vi har lige åbnet Functional Foods i en soft launch.</span>{' '}
-            Siden er levende, men vi finder stadig fejl og mangler — vi er taknemmelige for lidt tålmodighed, mens vi
-            retter til. Falder du over noget der driller, eller har du spørgsmål, så skriv til{' '}
+            <span className="font-semibold text-gray-900">Soft launch:</span> vi retter stadig småting. Fejl eller
+            spørgsmål? Skriv til{' '}
             <a
               href="mailto:w@nicolaivarney.dk"
               className="font-medium text-emerald-800 underline decoration-emerald-600/50 underline-offset-2 hover:text-emerald-950"
             >
               w@nicolaivarney.dk
             </a>
-            . Ellers er du velkommen til at udforske siden i dit eget tempo.
-          </p>
-          <p className="text-gray-700">
-            Vil du have en konto, kan du oprette dig gratis: gå til{' '}
+            . Opret gratis profil på{' '}
             <Link
               href="/kom-i-gang"
               className="font-medium text-emerald-800 underline decoration-emerald-600/50 underline-offset-2 hover:text-emerald-950"
             >
               Kom i gang
-            </Link>{' '}
-            og vælg <strong className="font-semibold text-gray-900">0 kr</strong> — så opretter du en gratis profil
-            uden betaling.
+            </Link>
+            .
           </p>
         </div>
       </div>
