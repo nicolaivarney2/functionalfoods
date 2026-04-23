@@ -131,12 +131,12 @@ export default async function RecipePage({ params }: PageProps) {
         {/* Breadcrumbs */}
         <section className="bg-white border-b border-gray-200">
           <div className="container py-2">
-            <nav className="text-sm text-gray-600">
+            <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-600 break-words">
               <Link href="/" className="hover:text-gray-900">Functional Foods</Link>
-              <span className="mx-2">›</span>
+              <span aria-hidden>›</span>
               <Link href="/opskriftsoversigt" className="hover:text-gray-900">Opskrifter</Link>
-              <span className="mx-2">›</span>
-              <span className="text-gray-900">{recipe.title}</span>
+              <span aria-hidden>›</span>
+              <span className="text-gray-900 min-w-0 break-words">{recipe.title}</span>
             </nav>
           </div>
         </section>

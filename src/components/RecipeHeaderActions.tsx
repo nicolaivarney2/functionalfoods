@@ -86,15 +86,15 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
   const reviewCount = recipe.reviewCount || 0
 
   return (
-    <div className="flex items-center space-x-6 text-sm">
-      <div className="flex items-center space-x-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm min-w-0">
+      <div className="flex items-center space-x-2 shrink-0">
         <Clock size={16} className="text-gray-500" />
         <span className="text-gray-700">{formatTime(recipe.preparationTime + recipe.cookingTime)}</span>
       </div>
       
-      <button 
+      <button
         onClick={handleRatingClick}
-        className="flex items-center space-x-1 hover:opacity-80 transition-opacity cursor-pointer"
+        className="flex items-center space-x-1 hover:opacity-80 transition-opacity cursor-pointer shrink-0"
         id="top-rating-stars"
         title="Klik for at bedømme opskriften"
       >
@@ -112,17 +112,17 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
         ) : null}
       </button>
       
-      <button 
+      <button
         onClick={handleCommentsClick}
-        className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer"
+        className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer min-w-0"
         id="top-comments"
       >
         <MessageCircle size={14} />
-        <span>Kommentarer ({commentCount})</span>
+        <span className="truncate">Kommentarer ({commentCount})</span>
       </button>
 
       {/* Simpel page counter */}
-      <div className="flex items-center space-x-2 text-gray-600">
+      <div className="flex items-center space-x-2 text-gray-600 shrink-0">
         <Eye size={14} className="text-gray-500" />
         <span>{viewCount.toLocaleString()}</span>
       </div>
