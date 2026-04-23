@@ -101,8 +101,7 @@ export default function FunktionerOversigtPage() {
             </div>
             <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Videoer om funktionerne</h2>
             <p className="mt-3 text-slate-600 leading-relaxed">
-              Her kan du senere indlejre korte videoer, hvor du forklarer hvert hovedområde. Nedenfor er tre pladsholdere —
-              erstat med embed (YouTube/Vimeo) eller upload, når du er klar.
+              Videoer er på vej - imens kan du se funktionerne herunder beskrevet
             </p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">

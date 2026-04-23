@@ -400,9 +400,9 @@ export function buildRecipeVariationPrompt({
     'VARIATIONS-SPOR (brug dette aktivt):',
     '- Smag og køkken: Varier gerne på tværs af hele verden (asiatisk, latinamerikansk, mellemøstlig, afrikansk, europæisk …). Undgå ikke krydderier eller retninger for at holde det «hjemligt» — niche, kategori og kostregler har førsteprioritet.',
     '- **Anti-gentagelse:** Undgå den samme «AI-skabelon» i hver ret: **ikke** fast combo af honning + dijonsennep + citron + hvidløg + olie + pandestegning som standard. Vælg **én** tydelig smagsakse ad gangen og skift tilberedning (ovn, gryde, damp, grill, lang simren, bagt i fad …).',
-    `- Retformat: ${formatHint}.`,
-    `- Smagsprofil: ${flavorHint}.`,
-    `- Grønt- og tilbehørsinspiration (vælg 2–4 elementer der passer til retten — ikke alt i én ret): ${produceRotation.join(' · ')}.`,
+    `- Retformat-inspiration (valgfrit, ikke tvang): ${formatHint}. Du må gerne vælge et andet format, hvis det giver en mere original ret.`,
+    `- Smagsprofil-inspiration (valgfrit): ${flavorHint}.`,
+    `- Grønt- og tilbehørsinspiration (valgfrit, vælg kun hvis det giver mening): ${produceRotation.join(' · ')}.`,
     `- Undgå denne gang, hvis muligt: ${avoidSignals.join(', ')}.`,
   ]
 
@@ -415,6 +415,7 @@ export function buildRecipeVariationPrompt({
     )
   } else {
     lines.push('- Gør retten tydeligt anderledes end standardmønstret "protein + broccoli/peberfrugt + bladgrønt".')
+    lines.push('- Strukturfrihed: Du må gerne bryde klassisk "ens-formel" og opbygge retten på en ny måde, så længe kostreglerne stadig overholdes.')
   }
 
   if (niche === 'keto') {

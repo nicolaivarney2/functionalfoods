@@ -87,47 +87,69 @@ export async function POST(request: NextRequest) {
       inspiration: params.inspiration,
     })
     
-    // Generate recipe using standard OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiConfig.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: createKetoSystemPrompt(existingTitles)
-          },
-          {
-            role: "user",
-            content: `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter keto-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
+    const baseUserPrompt = `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter keto-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
 
 ${parameterInstructions}
 ${variationPrompt}`
-          }
-        ],
-        temperature: 1.2,
-        max_tokens: 2500
+
+    // Generate recipe (with one corrective retry if protein rules are violated)
+    let recipe: any = null
+    let lastValidationError = ''
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const retryInstruction =
+        attempt === 0
+          ? ''
+          : `\n\nFORRIGE FORSØG BRØD PROTEINREGLER: ${lastValidationError}\nRet dette. Vælg en almindelig dansk keto-proteinbase (kylling, okse, svin eller fed fisk) og undgå mærkelige kombinationer.`
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiConfig.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: createKetoSystemPrompt(existingTitles)
+            },
+            {
+              role: "user",
+              content: `${baseUserPrompt}${retryInstruction}`
+            }
+          ],
+          temperature: attempt === 0 ? 1.2 : 0.7,
+          top_p: 0.95,
+          max_tokens: 2500
+        })
       })
-    })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
+      }
+
+      const data = await response.json()
+      const recipeContent = data.choices[0]?.message?.content
+      if (!recipeContent) {
+        throw new Error('No recipe content generated')
+      }
+
+      const parsed = parseGeneratedRecipe(recipeContent)
+      const validationError = validateKetoProteinRules(parsed)
+
+      if (!validationError) {
+        recipe = parsed
+        break
+      }
+      lastValidationError = validationError
     }
 
-    const data = await response.json()
-    const recipeContent = data.choices[0]?.message?.content
-    
-    if (!recipeContent) {
-      throw new Error('No recipe content generated')
+    if (!recipe) {
+      throw new Error(`Failed to generate a valid keto recipe. ${lastValidationError}`)
     }
-
-    // Parse the generated recipe
-    const recipe = parseGeneratedRecipe(recipeContent)
     
     console.log(`✅ Generated Keto recipe: ${recipe.title}`)
 
@@ -319,6 +341,9 @@ KETO KOST REGLER:
 - Høj fedtindhold (70-80% af kalorier)
 - Moderat protein (20-25% af kalorier)
 - Fokus på: fedt kød og fisk, æg, avocado, nødder, oliven, kokosolie, smør (jævnfør dansk supermarked — ikke lam som standardprotein)
+- KRITISK PROTEIN-REGEL: Opskriften skal have ÉN tydelig hovedproteinbase (kylling, oksekød, svinekød eller fed fisk).
+- KRITISK PROTEIN-REGEL: Kombinér ikke lam med skaldyr/fisk i samme ret (fx lam + krabbekød er ikke tilladt).
+- KRITISK PROTEIN-REGEL: Brug ikke eksotiske/skæve protein-kombinationer; vælg realistiske danske hverdagsråvarer.
 - Undgå: brød, pasta, ris, kartofler, sukker, frugt (undtagen bær), bælgfrugter
 
 OPPSKRIFT FORMAT (returner kun JSON):
@@ -386,9 +411,47 @@ UNDGÅ:
 VARIATION:
 - Undgå at falde tilbage til den samme sikre kombination af kylling/fisk + broccoli + peberfrugt + spinat.
 - Undgå at lammekød bliver «go-to» rødt kød — dansk keto er typisk kylling, svine- og oksekød plus fisk.
+- Lam må kun bruges sjældent; vælg som udgangspunkt kylling, oksekød, svinekød eller fed fisk.
 - Variér retformat, grøntsagsvalg, smagsprofil og proteinvalg fra opskrift til opskrift.
+- Giv retten en tydelig egen identitet og ikke bare "samme base med nyt krydderi".
+- Du må gerne bryde "samme faste opskriftsskabelon", så længe keto-reglerne holdes.
 - Smag: varier gerne internationalt (karry, harissa, chipotle, miso i små mængder, citrongræs, za'atar …) så længe kulhydratloftet overholdes.
 - Hvis brugeren beder om morgenmad, frokost eller snacks, skal opskriften ligne det måltid tydeligt og ikke bare være en standard aftensmad i mindre format.`
+}
+
+function validateKetoProteinRules(recipe: any): string | null {
+  const ingredients = Array.isArray(recipe?.ingredients) ? recipe.ingredients : []
+  const names = ingredients
+    .map((ing: any) => String(ing?.name || '').toLowerCase())
+    .filter(Boolean)
+
+  const hasLamb = names.some((n: string) => n.includes('lam'))
+  const hasCrab = names.some((n: string) => n.includes('krabbe') || n.includes('crab'))
+  const hasShellfish = names.some((n: string) =>
+    n.includes('reje') ||
+    n.includes('musling') ||
+    n.includes('kammusling') ||
+    n.includes('hummer') ||
+    n.includes('skaldyr')
+  )
+  const hasFish = names.some((n: string) =>
+    n.includes('laks') ||
+    n.includes('torsk') ||
+    n.includes('tun') ||
+    n.includes('makrel') ||
+    n.includes('sild') ||
+    n.includes('fisk')
+  )
+
+  if (hasLamb && (hasCrab || hasShellfish || hasFish)) {
+    return 'Lammekød er kombineret med fisk/skaldyr i samme ret.'
+  }
+
+  if (hasCrab && names.length > 0 && !hasFish && !hasShellfish) {
+    return 'Krabbekød fremstår som skæv hovedproteinbase uden klar keto-kontekst.'
+  }
+
+  return null
 }
 
 function parseGeneratedRecipe(content: string): any {
