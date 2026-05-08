@@ -2725,31 +2725,43 @@ export default function MadbudgetPage() {
 
                   const mergedVitamins = mergeVitaminsAgainstRda(avg.vitamins)
                   const lowVitamins = mergedVitamins.filter((v) => v.pct < 50)
+                  const isPartialData = mealsStatus.isPartial
+                  const includedMealsLabel = [
+                    mealsStatus.hasBreakfast && 'morgenmad',
+                    mealsStatus.hasLunch && 'frokost',
+                    mealsStatus.hasDinner && 'aftensmad'
+                  ].filter(Boolean).join(' og ')
 
                   const weekHighlights: string[] = []
                   const nutritionWarnings: string[] = []
 
-                  if (targetCal > 0) {
+                  if (targetCal > 0 && !isPartialData) {
                     const pctCal = Math.round((avg.calories / targetCal) * 100)
                     if (pctCal >= 90 && pctCal <= 110) weekHighlights.push(`Kalorier passer godt til vægttabsmål (${avg.calories} af ${targetCal} kcal)`)
                     else if (pctCal < 70) nutritionWarnings.push(`Lavt kalorieindtag ift. mål — overvej at tilføje flere måltider i planen.`)
                     else if (pctCal > 130) nutritionWarnings.push(`Højere kalorieindtag end mål — kan bremse vægttab ift. dit mål.`)
                   }
-                  if (targetP > 0 && avg.protein >= targetP * 0.9) {
+                  if (targetP > 0 && avg.protein >= targetP * 0.9 && !isPartialData) {
                     weekHighlights.push(`Godt proteinindtag (${Math.round(avg.protein)} g) — understøtter muskler og mæthed.`)
                   } else if (targetP > 0 && avg.protein < targetP * 0.85) {
                     const da = primaryAdult?.dietaryApproach || ''
                     const lowCarb = ['keto', 'lchf-paleo', 'glp-1'].includes(da)
                     nutritionWarnings.push(
-                      lowCarb
-                        ? `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej en ekstra proteinrig kilde med lavt kulhydrat — fx magert kød, fisk, æg, skyr eller en proteinshake uden tilsat sukker.`
-                        : `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej magert kød, fisk, æg, bælgfrugter eller skyr ved et måltid.`
+                      isPartialData
+                        ? `Protein i de valgte måltider er relativt lavt (${Math.round(avg.protein)} g). Supplér i dagens øvrige måltider for bedre dækning.`
+                        : lowCarb
+                          ? `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej en ekstra proteinrig kilde med lavt kulhydrat — fx magert kød, fisk, æg, skyr eller en proteinshake uden tilsat sukker.`
+                          : `Protein ligger under det vi anbefaler ud fra din profil (${Math.round(avg.protein)} g mod ca. ${Math.round(targetP)} g). Overvej magert kød, fisk, æg, bælgfrugter eller skyr ved et måltid.`
                     )
                   }
                   if (avg.fiber >= 20) {
                     weekHighlights.push(`Godt kostfiberindtag (${Math.round(avg.fiber * 10) / 10} g).`)
                   } else if (avg.fiber > 0 && avg.fiber < 15) {
-                    nutritionWarnings.push(`Kostfibre er lave (${Math.round(avg.fiber * 10) / 10} g mod vejledende ca. ${targetFiber} g). Tilføj grøntsager, bær eller fuldkorn ved et måltid.`)
+                    nutritionWarnings.push(
+                      isPartialData
+                        ? `Kostfibre i de valgte måltider er lave (${Math.round(avg.fiber * 10) / 10} g). Supplér gerne med grøntsager, bær eller fuldkorn i øvrige måltider.`
+                        : `Kostfibre er lave (${Math.round(avg.fiber * 10) / 10} g mod vejledende ca. ${targetFiber} g). Tilføj grøntsager, bær eller fuldkorn ved et måltid.`
+                    )
                   }
 
                   if (lowVitamins.length > 0) {
@@ -2782,14 +2794,9 @@ export default function MadbudgetPage() {
                             </div>
                           )}
                         </div>
-                      {mealsStatus.onlyDinner && (
+                      {isPartialData && (
                         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                          <strong>Bemærk:</strong> Kun aftensmad er inkluderet. Beregningerne giver ikke et fuldt billede. Tilføj morgenmad og/eller frokost for at vurdere vægttab.
-                        </div>
-                      )}
-                      {mealsStatus.isPartial && !mealsStatus.onlyDinner && (
-                        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                          <strong>Delvis data:</strong> Kun {[mealsStatus.hasBreakfast && 'morgenmad', mealsStatus.hasLunch && 'frokost', mealsStatus.hasDinner && 'aftensmad'].filter(Boolean).join(' og ')} inkluderet.
+                          <strong>Valgte måltider:</strong> {includedMealsLabel || 'Ingen'}. Tallene viser ernæring fra de valgte måltider og kan bruges som pejlemærke. Tilføj flere måltider for en fuld dagsvurdering.
                         </div>
                       )}
                       {!hasAnyData ? (
@@ -2806,18 +2813,24 @@ export default function MadbudgetPage() {
                             ].map(({ label, value, unit, target }) => {
                               const num = typeof value === 'number' ? Math.round(value * 10) / 10 : 0
                               const pct = target > 0 ? Math.min(100, Math.round((num / target) * 100)) : 0
+                              const showFullTargetComparison = target > 0 && !isPartialData
                               return (
                                 <div key={label}>
                                   <div className="flex justify-between text-xs mb-0.5">
                                     <span className="text-gray-600">{label}</span>
-                                    <span className="font-medium text-gray-900">
+                                    <span className="font-medium text-gray-900 text-right">
                                       {num} {unit}
-                                      {target > 0 && (
+                                      {showFullTargetComparison && (
                                         <span className="font-normal text-gray-500 ml-1">/ {target}</span>
+                                      )}
+                                      {target > 0 && isPartialData && (
+                                        <span className="block text-[11px] font-normal text-gray-500">
+                                          Dagsmål: {target} {unit}
+                                        </span>
                                       )}
                                     </span>
                                   </div>
-                                  {target > 0 && (
+                                  {showFullTargetComparison && (
                                     <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
                                       <div
                                         className="h-full bg-green-500 rounded-full transition-all"
