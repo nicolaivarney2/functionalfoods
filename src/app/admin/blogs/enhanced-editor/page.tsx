@@ -10,7 +10,9 @@ import {
   MoveDown,
   CheckCircle,
   Sparkles,
-  Upload
+  Upload,
+  Link2,
+  ImagePlus
 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 
@@ -95,6 +97,87 @@ interface BlogSeoBrief {
   notes: string[]
 }
 
+/** Kun relative stier og http(s)/mailto — bruges ved markdown [tekst](url) → HTML */
+function sanitizeBlogHref(raw: string): string | null {
+  const u = raw.trim()
+  if (!u) return null
+  if (u.startsWith('//')) return null
+  if (u.startsWith('/')) {
+    if (!/^\/\S*$/u.test(u)) return null
+    return u
+  }
+  try {
+    const parsed = new URL(u)
+    if (!['http:', 'https:', 'mailto:'].includes(parsed.protocol)) return null
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+/** Til img src i markdown — samme som links undtagen mailto */
+function sanitizeBlogImageSrc(raw: string): string | null {
+  const u = raw.trim()
+  if (!u) return null
+  if (u.startsWith('//')) return null
+  if (u.startsWith('/')) {
+    if (!/^\/\S*$/u.test(u)) return null
+    return u
+  }
+  try {
+    const parsed = new URL(u)
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null
+    return parsed.href
+  } catch {
+    return null
+  }
+}
+
+/** Konverterer ét <p>-elements indhold til markdown (bevarer img, links, fed/kursiv). */
+function paragraphInnerHtmlToMarkdown(p: HTMLElement): string {
+  let out = ''
+  const walk = (n: Node) => {
+    if (n.nodeType === Node.TEXT_NODE) {
+      out += n.textContent || ''
+      return
+    }
+    if (n.nodeType !== Node.ELEMENT_NODE) return
+    const el = n as Element
+    const tag = el.tagName.toUpperCase()
+    if (tag === 'BR') {
+      out += '\n'
+      return
+    }
+    if (tag === 'IMG') {
+      const src = el.getAttribute('src')?.trim() || ''
+      const alt = (el.getAttribute('alt') || '').replace(/\]/g, '')
+      out += `![${alt}](${src})`
+      return
+    }
+    if (tag === 'A') {
+      const href = el.getAttribute('href')?.trim() || ''
+      out += `[${el.textContent || ''}](${href})`
+      return
+    }
+    if (tag === 'STRONG' || tag === 'B') {
+      out += `**${el.textContent || ''}**`
+      return
+    }
+    if (tag === 'EM' || tag === 'I') {
+      out += `*${el.textContent || ''}*`
+      return
+    }
+    el.childNodes.forEach(walk)
+  }
+  p.childNodes.forEach(walk)
+  return out
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim()
+}
+
 /**
  * Udleder redigerbar tekst fra .section-content HTML. `element.textContent` klistrer
  * sammen uden mellemrum mellem </p><p> → "...ord.Næste" — derfor går vi blok for blok.
@@ -109,9 +192,20 @@ function sectionHtmlToPlainText(contentEl: Element | null): string {
 
   for (const child of Array.from(contentEl.children)) {
     const tag = child.tagName.toLowerCase()
-    if (tag === 'img' || child.classList.contains('takeaway-box')) continue
+    if (child.classList.contains('takeaway-box')) continue
+    if (tag === 'img') {
+      const src = (child as HTMLImageElement).getAttribute('src')?.trim() || ''
+      const alt = ((child as HTMLImageElement).getAttribute('alt') || '').replace(/\]/g, '')
+      if (src) chunks.push(`![${alt}](${src})`)
+      continue
+    }
     if (tag === 'p') {
-      pushLine(child.textContent || '')
+      if ((child as HTMLElement).classList.contains('blog-content-extra-break')) {
+        chunks.push('')
+        continue
+      }
+      const text = paragraphInnerHtmlToMarkdown(child as HTMLElement)
+      if (text) chunks.push(text)
     } else if (tag === 'ul' || tag === 'ol') {
       child.querySelectorAll(':scope > li').forEach((li) => {
         pushLine(`- ${li.textContent || ''}`)
@@ -128,7 +222,8 @@ function sectionHtmlToPlainText(contentEl: Element | null): string {
   if (chunks.length > 0) return chunks.join('\n\n')
   const clone = contentEl.cloneNode(true) as HTMLElement
   clone.querySelectorAll('img, .takeaway-box').forEach((n) => n.remove())
-  return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+  clone.querySelectorAll('br').forEach((br) => br.replaceWith('\n'))
+  return (clone.textContent || '').replace(/\r\n/g, '\n').trim()
 }
 
 /** Fuld HTML-streng → plain (fx fallback uden .blog-section) */
@@ -138,6 +233,67 @@ function htmlBlobToPlainText(html: string): string {
   const fromBlocks = sectionHtmlToPlainText(div)
   if (fromBlocks.length > 0) return fromBlocks
   return (div.innerText || div.textContent || '').replace(/\r\n/g, '\n').trim()
+}
+
+function parseContentSectionsFromHtml(html: string): Partial<ContentSection>[] {
+  if (!html) return []
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const htmlSections = doc.querySelectorAll('.blog-section')
+
+  return Array.from(htmlSections).map((section, index) => {
+    const heading = section.querySelector('.section-heading')
+    const content = section.querySelector('.section-content')
+    const sectionClass = section.className
+    const imgEl = section.querySelector('img.section-image') as HTMLImageElement | null
+    const imageUrlFromHtml = imgEl?.getAttribute('src')?.trim() || ''
+    const widgetEl = section.querySelector('.blog-widget[data-widget-id]')
+    const widgetIdAttr = widgetEl?.getAttribute('data-widget-id')
+    const widgetIdParsed = widgetIdAttr ? parseInt(widgetIdAttr, 10) : NaN
+
+    let sectionType: ContentSection['section_type'] = 'content'
+    if (sectionClass.includes('introduction-section')) {
+      sectionType = 'introduction'
+    } else if (sectionClass.includes('conclusion-section')) {
+      sectionType = 'conclusion'
+    } else if (sectionClass.includes('resume-section')) {
+      sectionType = 'content'
+    } else if (sectionClass.includes('widget-section')) {
+      sectionType = 'widget'
+    }
+
+    const rawFromHtml = content
+      ? (() => {
+          const structured = sectionHtmlToPlainText(content)
+          const fallback = (content.textContent || '').trim()
+          return structured.length > 0 ? structured : fallback
+        })()
+      : (section.textContent || '').trim()
+
+    return {
+      section_type: sectionType,
+      section_order: index + 1,
+      content: rawFromHtml,
+      title: heading ? heading.textContent || undefined : undefined,
+      image_url: imageUrlFromHtml,
+      ...(sectionType === 'widget' && !Number.isNaN(widgetIdParsed)
+        ? { widget_id: widgetIdParsed }
+        : {}),
+    }
+  })
+}
+
+function preferEditorContent(dbContent: string | null | undefined, htmlContent: string | null | undefined): string {
+  const db = dbContent || ''
+  const fromHtml = htmlContent || ''
+  const dbHasParagraphBreaks = /\n\s*\n/.test(db)
+  const htmlHasParagraphBreaks = /\n\s*\n/.test(fromHtml)
+
+  if (fromHtml && (!db || (htmlHasParagraphBreaks && !dbHasParagraphBreaks))) {
+    return fromHtml
+  }
+
+  return db
 }
 
 export default function EnhancedBlogEditor() {
@@ -160,9 +316,14 @@ export default function EnhancedBlogEditor() {
   const [selectedTopicBrief, setSelectedTopicBrief] = useState<BlogSeoBrief | null>(null)
   const [selectedTopicBriefTitle, setSelectedTopicBriefTitle] = useState<string>('')
   const [tagInput, setTagInput] = useState('')
-  /** 'header' | sektionens index | null */
-  const [uploadingBlogImage, setUploadingBlogImage] = useState<'header' | number | null>(null)
-  const pendingBlogImageRef = useRef<{ kind: 'header' } | { kind: 'section'; index: number } | null>(null)
+  /** 'header' | sektion (bund-billede) index | `inline-${n}` tekst-billede */
+  const [uploadingBlogImage, setUploadingBlogImage] = useState<'header' | number | string | null>(null)
+  const pendingBlogImageRef = useRef<
+    | { kind: 'header' }
+    | { kind: 'section'; index: number }
+    | { kind: 'inline'; sectionIndex: number; start: number; end: number }
+    | null
+  >(null)
   const blogImageFileInputRef = useRef<HTMLInputElement>(null)
 
   const [blogPost, setBlogPost] = useState<BlogPost>({
@@ -272,62 +433,31 @@ export default function EnhancedBlogEditor() {
             }
           ]
 
-          // If sections exist, use them; otherwise create from content
-          if (sections && sections.length > 0) {
-            defaultSections = sections.map(section => ({
-              ...section,
-              content: normalizeForEditor(section.content || ''),
-              section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion',
-              // Eksplicit så billed-URL ikke tabes (spread alene kan være fint, men vi sikrer feltet)
-              image_url: section.image_url ?? '',
-            }))
-          } else if (data.content) {
-            // Parse existing content by looking for .blog-section divs
-            const parser = new DOMParser()
-            const doc = parser.parseFromString(data.content, 'text/html')
-            const sections = doc.querySelectorAll('.blog-section')
-            
-            if (sections.length > 0) {
-              defaultSections = Array.from(sections).map((section, index) => {
-                const heading = section.querySelector('.section-heading')
-                const content = section.querySelector('.section-content')
-                const sectionClass = section.className
-                const imgEl = section.querySelector('img.section-image') as HTMLImageElement | null
-                const imageUrlFromHtml = imgEl?.getAttribute('src')?.trim() || ''
-                const widgetEl = section.querySelector('.blog-widget[data-widget-id]')
-                const widgetIdAttr = widgetEl?.getAttribute('data-widget-id')
-                const widgetIdParsed = widgetIdAttr ? parseInt(widgetIdAttr, 10) : NaN
-                
-                let sectionType: 'introduction' | 'content' | 'widget' | 'conclusion' = 'content'
-                if (sectionClass.includes('introduction-section')) {
-                  sectionType = 'introduction'
-                } else if (sectionClass.includes('conclusion-section')) {
-                  sectionType = 'conclusion'
-                } else if (sectionClass.includes('resume-section')) {
-                  sectionType = 'content' // Resume is treated as content
-                } else if (sectionClass.includes('widget-section')) {
-                  sectionType = 'widget'
-                }
-                
-                const rawFromHtml = content
-                  ? (() => {
-                      const structured = sectionHtmlToPlainText(content)
-                      const fallback = (content.textContent || '').trim()
-                      return structured.length > 0 ? structured : fallback
-                    })()
-                  : (section.textContent || '').trim()
+          const htmlDerivedSections = data.content ? parseContentSectionsFromHtml(data.content) : []
 
-                return {
-                  section_type: sectionType,
-                  section_order: index + 1,
-                  content: normalizeForEditor(rawFromHtml),
-                  title: heading ? heading.textContent || undefined : undefined,
-                  image_url: imageUrlFromHtml,
-                  ...(sectionType === 'widget' && !Number.isNaN(widgetIdParsed)
-                    ? { widget_id: widgetIdParsed }
-                    : {}),
-                }
-              })
+          // If sections exist, use them, but recover paragraph breaks from generated HTML if section rows were flattened.
+          if (sections && sections.length > 0) {
+            defaultSections = sections.map((section, index) => {
+              const htmlSection = htmlDerivedSections[index]
+              return {
+                ...section,
+                content: normalizeForEditor(preferEditorContent(section.content || '', htmlSection?.content || '')),
+                title: section.title || htmlSection?.title || undefined,
+                section_type: section.section_type as 'introduction' | 'content' | 'widget' | 'conclusion',
+                image_url: section.image_url ?? htmlSection?.image_url ?? '',
+                widget_id: section.widget_id ?? htmlSection?.widget_id,
+              }
+            })
+          } else if (data.content) {
+            if (htmlDerivedSections.length > 0) {
+              defaultSections = htmlDerivedSections.map((section, index) => ({
+                section_type: (section.section_type || 'content') as 'introduction' | 'content' | 'widget' | 'conclusion',
+                section_order: section.section_order || index + 1,
+                content: normalizeForEditor(section.content || ''),
+                title: section.title,
+                image_url: section.image_url || '',
+                ...(section.widget_id ? { widget_id: section.widget_id } : {}),
+              }))
             } else {
               // Fallback: hele body som HTML — strip ikke med regex (ødelægger mellemrum mellem tags)
               const contentText = htmlBlobToPlainText(data.content)
@@ -590,18 +720,34 @@ export default function EnhancedBlogEditor() {
     blogImageFileInputRef.current?.click()
   }
 
+  const openInlineImagePicker = (sectionIndex: number) => {
+    const textarea = sectionTextareaRefs.current[sectionIndex]
+    const content = blogPost.sections[sectionIndex]?.content ?? ''
+    const start = textarea?.selectionStart ?? content.length
+    const end = textarea?.selectionEnd ?? content.length
+    pendingBlogImageRef.current = { kind: 'inline', sectionIndex, start, end }
+    blogImageFileInputRef.current?.click()
+  }
+
   const handleBlogImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     const pending = pendingBlogImageRef.current
     e.target.value = ''
     if (!file || !pending) return
 
-    const loadingKey = pending.kind === 'header' ? 'header' : pending.index
+    const loadingKey =
+      pending.kind === 'header'
+        ? 'header'
+        : pending.kind === 'inline'
+          ? `inline-${pending.sectionIndex}`
+          : pending.index
     setUploadingBlogImage(loadingKey)
     try {
       const formData = new FormData()
       formData.append('image', file)
-      formData.append('purpose', pending.kind === 'header' ? 'header' : 'section')
+      const purpose =
+        pending.kind === 'header' ? 'header' : pending.kind === 'inline' ? 'section' : 'section'
+      formData.append('purpose', purpose)
       const resp = await fetch('/api/admin/upload-blog-section-image', {
         method: 'POST',
         body: formData,
@@ -611,6 +757,30 @@ export default function EnhancedBlogEditor() {
       const url = data.imageUrl as string
       if (pending.kind === 'header') {
         setBlogPost(prev => ({ ...prev, header_image_url: url }))
+      } else if (pending.kind === 'inline') {
+        const { sectionIndex, start, end } = pending
+        setBlogPost(prev => {
+          const currentContent = prev.sections[sectionIndex]?.content ?? ''
+          const insertion = `![Billede](${url})`
+          const before = currentContent.slice(0, start)
+          const after = currentContent.slice(end)
+          const nextContent = `${before}${insertion}${after}`
+          return {
+            ...prev,
+            sections: prev.sections.map((s, i) =>
+              i === sectionIndex ? { ...s, content: nextContent } : s
+            ),
+          }
+        })
+        setTimeout(() => {
+          const el = sectionTextareaRefs.current[sectionIndex]
+          if (!el) return
+          const label = 'Billede'
+          const labelStart = start + 2
+          const labelEnd = labelStart + label.length
+          el.focus()
+          el.setSelectionRange(labelStart, labelEnd)
+        }, 0)
       } else {
         updateSection(pending.index, { image_url: url })
       }
@@ -914,6 +1084,31 @@ export default function EnhancedBlogEditor() {
       >
         Kursiv
       </button>
+      <button
+        type="button"
+        title="Link: [markeret tekst](url) — intern /sti eller https://…"
+        onClick={() => insertLink(sectionIndex)}
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-gray-100 text-gray-900 rounded border border-gray-200 hover:bg-gray-200"
+      >
+        <Link2 className="w-3.5 h-3.5 shrink-0" aria-hidden />
+        Link
+      </button>
+      <button
+        type="button"
+        title="Indsæt billede i teksten her — placér markøren, upload (eller brug manuelt ![beskrivelse](https://…))"
+        onClick={() => openInlineImagePicker(sectionIndex)}
+        disabled={uploadingBlogImage === `inline-${sectionIndex}`}
+        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs bg-gray-100 text-gray-900 rounded border border-gray-200 hover:bg-gray-200 disabled:opacity-50"
+      >
+        {uploadingBlogImage === `inline-${sectionIndex}` ? (
+          '…'
+        ) : (
+          <>
+            <ImagePlus className="w-3.5 h-3.5 shrink-0" aria-hidden />
+            Billede
+          </>
+        )}
+      </button>
       {extras ? (
         <>
           <span className="text-gray-300 select-none" aria-hidden>
@@ -932,31 +1127,141 @@ export default function EnhancedBlogEditor() {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
 
+  /** Usynligt skilletegn mellem linjer i ét *...*- eller **...**-span (så split('\n') ikke bryder det). */
+  const MD_MERGED_BR = '\uE000'
+
   /** **fed** og *kursiv* (markdown-lignende); kører efter escape */
   const parseInlineMarkdown = (line: string) => {
     let t = escapeHtml(line)
     t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    t = t.replace(
-      /\[([^\]]+)\]\((\/[^)\s]+)\)/g,
-      '<a href="$2" class="text-blue-700 underline hover:text-blue-900">$1</a>'
-    )
+    /* [^*]+ (ikke [^*\n]+) så ét *…*-span kan rumme MD_MERGED_BR mellem “linjer” */
+    t = t.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>')
+    t = t.replace(/(^|[^_])_([^_]+)_(?!_)/g, '$1<em>$2</em>')
+    /* Markdown-billeder før [tekst](link), så ! ikke tolkes som link */
+    t = t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (full, alt: string, srcRaw: string) => {
+      const src = sanitizeBlogImageSrc(String(srcRaw).trim())
+      if (!src) return full
+      const escSrc = escapeHtml(src)
+      const escAlt = escapeHtml(alt)
+      return `<img src="${escSrc}" alt="${escAlt}" class="blog-inline-image" loading="lazy" decoding="async" />`
+    })
+    t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (full, label: string, hrefRaw: string) => {
+      const href = sanitizeBlogHref(String(hrefRaw).trim())
+      if (!href) return full
+      const esc = escapeHtml(href)
+      const ext = /^https?:\/\//i.test(href)
+      const attrs = ext ? ` target="_blank" rel="noopener noreferrer"` : ''
+      return `<a href="${esc}" class="text-blue-700 underline hover:text-blue-900"${attrs}>${label}</a>`
+    })
     return t
+  }
+
+  const parseInlineWithMergedBreaks = (chunk: string) =>
+    parseInlineMarkdown(chunk).replace(new RegExp(MD_MERGED_BR, 'g'), '<br/>')
+
+  /**
+   * Tillad *kursiv* og **fed** over flere linjer (textarea/markdown fra editoren).
+   * Linje-for-linje parsing kan ellers ikke lukke par på tværs af linjeskift.
+   */
+  const mergeMultilineMarkdownSpans = (raw: string): string => {
+    const lines = raw.replace(/\r\n/g, '\n').split('\n')
+    const out: string[] = []
+    let buf: string[] | null = null
+
+    const flushBuf = () => {
+      if (!buf || buf.length === 0) return
+      out.push(buf.join(MD_MERGED_BR))
+      buf = null
+    }
+
+    const startsBullet = (line: string) => /^[-•]\s/.test(line.trimStart())
+    const startsHeading = (line: string) => /^#{1,6}\s/.test(line.trimStart())
+
+    /** `* kursiv*` eller emoji-bullet `*🔥...` — ikke Markdown-liste `* punkt` */
+    const startsItalicLine = (line: string) => {
+      const s = line.trimStart()
+      if (!s.startsWith('*') || s.startsWith('**') || startsBullet(line) || startsHeading(line)) {
+        return false
+      }
+      if (/^\*\s+\S/.test(s)) return false
+      return true
+    }
+
+    const startsBoldLine = (line: string) => {
+      const s = line.trimStart()
+      return s.startsWith('**')
+    }
+
+    const countClosingDelimsOnLine = (line: string, delim: 'singleStar' | 'doubleStar') => {
+      const s = line
+      let count = 0
+      if (delim === 'doubleStar') {
+        let i = 0
+        while (i < s.length - 1) {
+          if (s[i] === '*' && s[i + 1] === '*') {
+            count++
+            i += 2
+          } else {
+            i++
+          }
+        }
+        return count
+      }
+      return (s.match(/\*(?!\*)/g) || []).length
+    }
+
+    for (const rawLine of lines) {
+      const line = rawLine
+
+      if (buf === null) {
+        if (startsItalicLine(line)) {
+          buf = [line]
+          const opens = countClosingDelimsOnLine(line, 'singleStar')
+          if (opens >= 2) flushBuf()
+          continue
+        }
+        if (startsBoldLine(line)) {
+          buf = [line]
+          const pairs = countClosingDelimsOnLine(line, 'doubleStar')
+          if (pairs >= 2) flushBuf()
+          continue
+        }
+        out.push(line)
+        continue
+      }
+
+      buf.push(line)
+
+      if (buf[0].trimStart().startsWith('**')) {
+        const joined = buf.join('\n')
+        const pairs = countClosingDelimsOnLine(joined, 'doubleStar')
+        if (pairs >= 2) flushBuf()
+      } else {
+        const joined = buf.join('\n')
+        const stars = countClosingDelimsOnLine(joined, 'singleStar')
+        if (stars >= 2) flushBuf()
+      }
+    }
+
+    flushBuf()
+
+    return out.join('\n')
   }
 
   const formatContent = (text: string) => {
     if (!text) return ''
 
-    const normalized = text.replace(/\r\n/g, '\n')
+    const normalized = mergeMultilineMarkdownSpans(text.replace(/\r\n/g, '\n'))
     const lines = normalized.split('\n')
     const htmlParts: string[] = []
     let inList = false
     let listItems: string[] = []
     let paragraphLines: string[] = []
+    let consecutiveBlankLines = 0
 
     const flushParagraph = () => {
       if (paragraphLines.length > 0) {
-        const content = paragraphLines.map((ln) => parseInlineMarkdown(ln)).join('<br/>')
+        const content = paragraphLines.map((ln) => parseInlineWithMergedBreaks(ln)).join('<br/>')
         htmlParts.push(`<p>${content}</p>`)
         paragraphLines = []
       }
@@ -973,12 +1278,18 @@ export default function EnhancedBlogEditor() {
     for (const rawLine of lines) {
       const line = rawLine.trim()
 
-      // Blank line: new paragraph or end list
+      // Blank line: nyt afsnit; *ekstra* tomme linjer → synligt mellemrum (HTML kollapser ellers flere \n)
       if (line === '') {
         flushList()
         flushParagraph()
+        consecutiveBlankLines++
+        if (consecutiveBlankLines >= 2) {
+          htmlParts.push('<p class="blog-content-extra-break">&nbsp;</p>')
+        }
         continue
       }
+
+      consecutiveBlankLines = 0
 
       // Markdown-style headings
       const headingMatch = line.match(/^(#{1,6})\s+(.+)$/)
@@ -986,7 +1297,7 @@ export default function EnhancedBlogEditor() {
         flushList()
         flushParagraph()
         const level = Math.min(headingMatch[1].length, 6)
-        const textContent = parseInlineMarkdown(headingMatch[2].trim())
+        const textContent = parseInlineWithMergedBreaks(headingMatch[2].trim())
         htmlParts.push(`<h${level}>${textContent}</h${level}>`)
         continue
       }
@@ -996,7 +1307,7 @@ export default function EnhancedBlogEditor() {
       if (bulletMatch) {
         flushParagraph()
         inList = true
-        listItems.push(parseInlineMarkdown(bulletMatch[1].trim()))
+        listItems.push(parseInlineWithMergedBreaks(bulletMatch[1].trim()))
         continue
       }
 
@@ -1013,12 +1324,60 @@ export default function EnhancedBlogEditor() {
 
   const insertHeading = (sectionIndex: number, level: number = 1) => {
     const headingText = level === 1 ? 'Ny Overskrift' : level === 2 ? 'Underoverskrift' : 'Under-underoverskrift'
-    const headingMarkup = `${'#'.repeat(level)} ${headingText}`
-    
     const currentContent = blogPost.sections[sectionIndex].content
-    const newContent = currentContent ? `${currentContent}\n\n${headingMarkup}\n\n` : `${headingMarkup}\n\n`
-    
+    const textarea = sectionTextareaRefs.current[sectionIndex]
+    const start = textarea?.selectionStart ?? currentContent.length
+    const end = textarea?.selectionEnd ?? currentContent.length
+    const selected = currentContent.slice(start, end).trim()
+    const headingMarkup = `${'#'.repeat(level)} ${selected || headingText}`
+
+    const before = currentContent.slice(0, start).replace(/[ \t]+$/g, '')
+    const after = currentContent.slice(end).replace(/^[ \t]+/g, '')
+    const prefix = before ? (before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n') : ''
+    const suffix = after ? (after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n') : '\n\n'
+    const newContent = `${before}${prefix}${headingMarkup}${suffix}${after}`
+
     updateSection(sectionIndex, { content: newContent })
+
+    setTimeout(() => {
+      const el = sectionTextareaRefs.current[sectionIndex]
+      if (!el) return
+      const cursor = `${before}${prefix}${headingMarkup}`.length
+      el.focus()
+      el.setSelectionRange(cursor, cursor)
+    }, 0)
+  }
+
+  const insertLink = (sectionIndex: number) => {
+    const currentContent = blogPost.sections[sectionIndex].content
+    const textarea = sectionTextareaRefs.current[sectionIndex]
+    const start = textarea?.selectionStart ?? currentContent.length
+    const end = textarea?.selectionEnd ?? currentContent.length
+    const selected = currentContent.slice(start, end)
+    const urlInput = window.prompt(
+      'Link-URL (intern sti fx /blog/keto eller https://… eller mailto:)',
+      'https://'
+    )
+    if (urlInput === null) return
+    const href = sanitizeBlogHref(urlInput)
+    if (!href) {
+      window.alert('Ugyldig URL. Brug fx /blog/slug, https://… eller mailto:navn@domæne.dk')
+      return
+    }
+    const label = selected.trim() || 'linktekst'
+    const insertion = `[${label}](${href})`
+    const before = currentContent.slice(0, start)
+    const after = currentContent.slice(end)
+    const newContent = `${before}${insertion}${after}`
+    updateSection(sectionIndex, { content: newContent })
+    setTimeout(() => {
+      const el = sectionTextareaRefs.current[sectionIndex]
+      if (!el) return
+      const labelStart = before.length + 1
+      const labelEnd = labelStart + label.length
+      el.focus()
+      el.setSelectionRange(labelStart, labelEnd)
+    }, 0)
   }
 
   const generateContentFromSections = () => {
@@ -1279,26 +1638,19 @@ export default function EnhancedBlogEditor() {
   }
 
   const saveSections = async (blogPostId: number) => {
-    try {
-      // Delete existing sections
-      await supabase
-        .from('blog_content_sections')
-        .delete()
-        .eq('blog_post_id', blogPostId)
+    const session = (await supabase.auth.getSession()).data.session
+    const response = await fetch(`/api/blogs/${blogPostId}/sections`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ sections: blogPost.sections }),
+    })
 
-      // Insert new sections
-      const sectionsToInsert = blogPost.sections.map(({ id: _omitId, ...section }) => ({
-        blog_post_id: blogPostId,
-        ...section
-      }))
-
-      const { error } = await supabase
-        .from('blog_content_sections')
-        .insert(sectionsToInsert)
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error saving sections:', error)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.details || errorData.error || 'Kunne ikke gemme blogsektioner')
     }
   }
 
@@ -1547,7 +1899,7 @@ export default function EnhancedBlogEditor() {
                       rows={10}
                       spellCheck
                       className="w-full min-h-[200px] px-3 py-2.5 border border-gray-300 rounded-md leading-normal focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
-                      placeholder="Skriv en indledning… Brug **fed** og *kursiv*. Tom linje = nyt afsnit."
+                      placeholder="Skriv en indledning… **fed**, *kursiv*, [link](/sti), ![billede](https://…). Brug knappen Billede for upload. Tom linje = nyt afsnit."
                     />
                     
                     {/* Auto-generated Table of Contents */}
@@ -1669,7 +2021,7 @@ export default function EnhancedBlogEditor() {
                         rows={8}
                         spellCheck
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
-                        placeholder="Skriv indhold… Tom linje = nyt afsnit. # Overskrift, • punkt. **fed**, *kursiv*."
+                        placeholder="Skriv indhold… **Fed**, *kursiv*, [link](/blog/…), billeder med knappen Billede eller ![alt](url). Tom linje = nyt afsnit."
                       />
                     </div>
                     
@@ -1696,7 +2048,8 @@ export default function EnhancedBlogEditor() {
                         Billede
                       </label>
                       <p className="text-xs text-gray-500 mb-2">
-                        Upload fra computer eller indsæt et direkte link til et billede.
+                        Valgfrit billede efter afsnittet. Billeder i selve teksten: brug <strong className="font-medium">Billede</strong> i
+                        formateringslinjen over tekstfeltet (eller <code className="text-[11px]">![alt](https://…)</code>).
                       </p>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input
@@ -1779,7 +2132,7 @@ export default function EnhancedBlogEditor() {
                       rows={6}
                       spellCheck
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans text-sm"
-                      placeholder="Afslutning… **fed**, *kursiv*. Tom linje = nyt afsnit."
+                      placeholder="Afslutning… **fed**, *kursiv*, [link], ![billede](https://…). Tom linje = nyt afsnit."
                     />
 
                     {/* One Takeaway */}

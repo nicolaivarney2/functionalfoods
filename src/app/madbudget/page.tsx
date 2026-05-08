@@ -1849,6 +1849,17 @@ export default function MadbudgetPage() {
     return { calories, protein, carbs, fat, fiber, vitamins }
   }
 
+  const getMealCardNutrition = (meal: any, mealKey: MealType) => {
+    const divisor = Math.max(1, peoplePerMealForNutrition[mealKey] || 1)
+    const scale = (value: unknown) => (typeof value === 'number' ? value / divisor : undefined)
+    return {
+      calories: scale(meal?.calories),
+      protein: scale(meal?.protein),
+      carbs: scale(meal?.carbs),
+      fat: scale(meal?.fat),
+    }
+  }
+
   const getWeekAverageNutrition = (mealsFilter?: MealType[], perPersonSharedMeals = false) => {
     let totalCal = 0, totalP = 0, totalK = 0, totalF = 0, totalFiber = 0
     const totalVitamins: Record<string, number> = {}
@@ -2196,6 +2207,7 @@ export default function MadbudgetPage() {
                         const dayKey = day as DayKey
                         const mealKey = mealType.key as MealType
                         const currentMeal = mealPlan[dayKey][mealKey]
+                        const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal, mealKey) : null
                         const sk = slotKey(dayKey, mealKey)
                         const isLocked = Boolean(slotLocks[sk])
 
@@ -2256,22 +2268,22 @@ export default function MadbudgetPage() {
                                         {currentMeal.title}
                                       </div>
                                       <div className="text-[10px] text-gray-500 truncate">{currentMeal.store}</div>
-                                      {(typeof currentMeal.calories === 'number' || typeof currentMeal.protein === 'number' || typeof currentMeal.carbs === 'number' || typeof currentMeal.fat === 'number') && (
+                                      {(typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number' || typeof mealCardNut?.carbs === 'number' || typeof mealCardNut?.fat === 'number') && (
                                         <div className="grid grid-cols-4 gap-px rounded-md overflow-hidden bg-gray-200 mt-1">
                                           <div className="bg-gray-50 py-1 px-0.5 text-center">
-                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof currentMeal.calories === 'number' ? Math.round(currentMeal.calories) : '–'}</div>
+                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.calories === 'number' ? Math.round(mealCardNut.calories) : '–'}</div>
                                             <div className="text-[8px] text-gray-500 leading-tight">kcal</div>
                                           </div>
                                           <div className="bg-gray-50 py-1 px-0.5 text-center">
-                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof currentMeal.protein === 'number' ? `${Math.round(currentMeal.protein)}g` : '–'}</div>
+                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.protein === 'number' ? `${Math.round(mealCardNut.protein)}g` : '–'}</div>
                                             <div className="text-[8px] text-gray-500 leading-tight">P</div>
                                           </div>
                                           <div className="bg-gray-50 py-1 px-0.5 text-center">
-                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof currentMeal.carbs === 'number' ? `${Math.round(currentMeal.carbs)}g` : '–'}</div>
+                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.carbs === 'number' ? `${Math.round(mealCardNut.carbs)}g` : '–'}</div>
                                             <div className="text-[8px] text-gray-500 leading-tight">K</div>
                                           </div>
                                           <div className="bg-gray-50 py-1 px-0.5 text-center">
-                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof currentMeal.fat === 'number' ? `${Math.round(currentMeal.fat)}g` : '–'}</div>
+                                            <div className="text-[10px] sm:text-xs text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.fat === 'number' ? `${Math.round(mealCardNut.fat)}g` : '–'}</div>
                                             <div className="text-[8px] text-gray-500 leading-tight">F</div>
                                           </div>
                                         </div>
@@ -2347,6 +2359,7 @@ export default function MadbudgetPage() {
                             const dayKey = day as DayKey
                             const mealKey = mealType.key as MealType
                             const currentMeal = mealPlan[dayKey][mealKey]
+                            const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal, mealKey) : null
                             const sk = slotKey(dayKey, mealKey)
                             const isLocked = Boolean(slotLocks[sk])
 
@@ -2407,22 +2420,22 @@ export default function MadbudgetPage() {
                                         {currentMeal.title}
                                       </div>
                                       <div className="text-[9px] sm:text-[10px] text-gray-500 truncate">{currentMeal.store}</div>
-                                      {(typeof currentMeal.calories === 'number' || typeof currentMeal.protein === 'number' || typeof currentMeal.carbs === 'number' || typeof currentMeal.fat === 'number') && (
+                                      {(typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number' || typeof mealCardNut?.carbs === 'number' || typeof mealCardNut?.fat === 'number') && (
                                         <div className="grid grid-cols-4 gap-px rounded overflow-hidden bg-gray-200 mt-0.5 sm:mt-1">
                                           <div className="bg-gray-50 py-0.5 sm:py-1 px-0.5 text-center">
-                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof currentMeal.calories === 'number' ? Math.round(currentMeal.calories) : '–'}</div>
+                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.calories === 'number' ? Math.round(mealCardNut.calories) : '–'}</div>
                                             <div className="text-[7px] sm:text-[8px] text-gray-500 leading-tight">kcal</div>
                                           </div>
                                           <div className="bg-gray-50 py-0.5 sm:py-1 px-0.5 text-center">
-                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof currentMeal.protein === 'number' ? `${Math.round(currentMeal.protein)}g` : '–'}</div>
+                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.protein === 'number' ? `${Math.round(mealCardNut.protein)}g` : '–'}</div>
                                             <div className="text-[7px] sm:text-[8px] text-gray-500 leading-tight">P</div>
                                           </div>
                                           <div className="bg-gray-50 py-0.5 sm:py-1 px-0.5 text-center">
-                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof currentMeal.carbs === 'number' ? `${Math.round(currentMeal.carbs)}g` : '–'}</div>
+                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.carbs === 'number' ? `${Math.round(mealCardNut.carbs)}g` : '–'}</div>
                                             <div className="text-[7px] sm:text-[8px] text-gray-500 leading-tight">K</div>
                                           </div>
                                           <div className="bg-gray-50 py-0.5 sm:py-1 px-0.5 text-center">
-                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof currentMeal.fat === 'number' ? `${Math.round(currentMeal.fat)}g` : '–'}</div>
+                                            <div className="text-[9px] sm:text-[10px] text-gray-700 tabular-nums leading-tight">{typeof mealCardNut?.fat === 'number' ? `${Math.round(mealCardNut.fat)}g` : '–'}</div>
                                             <div className="text-[7px] sm:text-[8px] text-gray-500 leading-tight">F</div>
                                           </div>
                                         </div>
@@ -2565,6 +2578,7 @@ export default function MadbudgetPage() {
                       const dayKey = days[selectedDayIndex] as DayKey
                       const mealKey = mealType.key as MealType
                       const currentMeal = mealPlan[dayKey][mealKey]
+                      const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal, mealKey) : null
                       const sk = slotKey(dayKey, mealKey)
                       const isLocked = Boolean(slotLocks[sk])
                       return (
@@ -2620,12 +2634,12 @@ export default function MadbudgetPage() {
                             <div className="font-medium text-gray-900 text-sm min-h-[2.5rem]">
                               {currentMeal ? currentMeal.title : `Vælg ${mealType.label.toLowerCase()}`}
                             </div>
-                            {currentMeal && (typeof currentMeal.calories === 'number' || typeof currentMeal.protein === 'number') && (
+                            {currentMeal && (typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number') && (
                               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0 text-xs text-gray-600">
-                                <span>{Math.round(currentMeal.calories ?? 0)} kcal</span>
-                                <span>{Math.round(currentMeal.protein ?? 0)}g P</span>
-                                <span>{Math.round(currentMeal.carbs ?? 0)}g K</span>
-                                <span>{Math.round(currentMeal.fat ?? 0)}g F</span>
+                                <span>{Math.round(mealCardNut?.calories ?? 0)} kcal</span>
+                                <span>{Math.round(mealCardNut?.protein ?? 0)}g P</span>
+                                <span>{Math.round(mealCardNut?.carbs ?? 0)}g K</span>
+                                <span>{Math.round(mealCardNut?.fat ?? 0)}g F</span>
                               </div>
                             )}
                           </div>

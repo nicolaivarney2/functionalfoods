@@ -161,21 +161,31 @@ export default function BlogPostPage() {
       const placeInside = (host: HTMLElement) => {
         // Build TOC block
         const tocWrapper = document.createElement('div')
-        tocWrapper.className = 'mt-4 p-4 sm:p-5 bg-blue-50 rounded-md border border-blue-100 shadow-sm border-l-4 border-l-blue-500'
+        tocWrapper.className = 'mt-6 p-4 sm:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-sm border-l-4 border-l-blue-500'
 
         if (mainToc.length > 0) {
           const title = document.createElement('h3')
-          title.className = 'text-sm font-semibold text-gray-900 mb-3'
+          title.className = 'text-base sm:text-lg font-semibold text-gray-900 mb-4'
           title.textContent = 'Indholdsfortegnelse'
           tocWrapper.appendChild(title)
 
           const nav = document.createElement('nav')
-          nav.className = 'space-y-1'
-          mainToc.forEach(item => {
+          nav.className = 'space-y-2'
+          mainToc.forEach((item, index) => {
             const a = document.createElement('a')
             a.href = `#${item.id}`
-            a.textContent = item.text
-            a.className = 'block text-[13px] sm:text-sm text-gray-700 hover:text-blue-600 hover:underline underline-offset-2'
+            a.className = 'group flex items-start gap-3 rounded-md px-2 py-1.5 text-[15px] text-gray-700 hover:bg-white/70 hover:text-blue-700 transition-colors'
+
+            const bullet = document.createElement('span')
+            bullet.className = 'inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white border border-blue-200 text-[11px] font-semibold text-blue-700 leading-none mt-0.5'
+            bullet.textContent = String(index + 1)
+
+            const label = document.createElement('span')
+            label.className = 'leading-snug'
+            label.textContent = item.text
+
+            a.appendChild(bullet)
+            a.appendChild(label)
             nav.appendChild(a)
           })
           tocWrapper.appendChild(nav)
@@ -196,8 +206,8 @@ export default function BlogPostPage() {
           h4Toc.forEach(item => {
             const a = document.createElement('a')
             a.href = `#${item.id}`
-            a.textContent = `- ${item.text}`
-            a.className = 'block text-[13px] sm:text-sm text-blue-700 hover:text-blue-800 hover:underline underline-offset-2'
+            a.textContent = item.text
+            a.className = 'block text-[13px] sm:text-sm text-blue-800 hover:text-blue-900 hover:underline underline-offset-2 pl-4 relative before:content-["•"] before:absolute before:left-0 before:text-blue-500'
             nav2.appendChild(a)
           })
           tocWrapper.appendChild(nav2)
@@ -424,6 +434,11 @@ export default function BlogPostPage() {
                 {post.view_count > 0 && (
                   <p className="mt-1">{post.view_count} visninger</p>
                 )}
+                <p className="mt-3 text-[13px] sm:text-sm text-gray-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                  <span className="font-semibold text-green-800">Skrevet uden AI:</span>{' '}
+                  Vi erklærer at indholdet i bloggen er skrevet af{' '}
+                  <strong>Nicolai Varney</strong> og IKKE af AI.
+                </p>
               </div>
 
               {/* Disclaimer link */}
@@ -598,15 +613,27 @@ export default function BlogPostPage() {
         @media (min-width: 640px) { .blog-content .blog-section { padding: 1.5rem !important; margin-bottom: 2rem !important; } }
         .blog-content .section-heading { font-family: 'Playfair Display', serif !important; font-size: 1.5rem !important; font-weight: 600 !important; color: #1f2937 !important; margin-bottom: 0.75rem !important; display: block !important; }
         .blog-content .section-content { font-family: 'Raleway', sans-serif !important; font-weight: 400 !important; line-height: 1.7 !important; color: #374151 !important; display: block !important; }
-        .blog-content .section-content p { margin-bottom: 0.5rem !important; }
+        .blog-content .section-content p { margin-bottom: 0.65rem !important; }
         .blog-content .section-content p:last-child { margin-bottom: 0 !important; }
+        .blog-content .section-content p.blog-content-extra-break {
+          margin: 0 !important;
+          padding: 0 !important;
+          min-height: 0.85rem !important;
+          line-height: 1.2 !important;
+          font-size: 1px !important;
+          overflow: hidden !important;
+          color: transparent !important;
+        }
         .blog-content .section-content strong { font-weight: 700 !important; }
         .blog-content .section-content em { font-style: italic !important; }
         .blog-content .section-content ul { margin: 1rem 0 !important; padding-left: 1.5rem !important; }
         .blog-content .section-content li { margin-bottom: 0.5rem !important; list-style-type: disc !important; }
-        .blog-content .section-content img.section-image { width: 100% !important; height: auto !important; margin-top: 1rem !important; border-radius: 0.5rem !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; }
-        .blog-content .section-content h3 { font-size: 1.25rem !important; font-weight: 600 !important; color: #1f2937 !important; margin: 1.5rem 0 1rem 0 !important; }
-        .blog-content .section-content h4 { font-size: 1.1rem !important; font-weight: 600 !important; color: #374151 !important; margin: 1rem 0 0.5rem 0 !important; }
+        .blog-content .section-content img.section-image,
+        .blog-content .section-content img.blog-inline-image { width: 100% !important; height: auto !important; max-width: 100% !important; margin-top: 1rem !important; margin-bottom: 0.5rem !important; border-radius: 0.5rem !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important; display: block !important; }
+        .blog-content .section-content h1 { font-family: 'Playfair Display', serif !important; font-size: 1.45rem !important; font-weight: 600 !important; color: #1f2937 !important; margin: 1.75rem 0 1rem 0 !important; }
+        .blog-content .section-content h2 { font-size: 1.3rem !important; font-weight: 700 !important; color: #1f2937 !important; margin: 1.5rem 0 0.85rem 0 !important; }
+        .blog-content .section-content h3 { font-size: 1.15rem !important; font-weight: 600 !important; color: #374151 !important; margin: 1.25rem 0 0.65rem 0 !important; }
+        .blog-content .section-content h4 { font-size: 1.05rem !important; font-weight: 600 !important; color: #374151 !important; margin: 1rem 0 0.5rem 0 !important; }
         .blog-content .takeaway-box { border: 1px solid #FDE68A !important; background: #FFFBEB !important; color: #92400E !important; padding: 0.75rem !important; border-radius: 0.5rem !important; }
         .blog-content .widget-placeholder { background: #f3f4f6 !important; border: 2px dashed #d1d5db !important; padding: 2rem !important; text-align: center !important; color: #6b7280 !important; border-radius: 0.5rem !important; display: block !important; }
         .blog-content .introduction-section { background: white !important; border-left: 4px solid #3b82f6 !important; }
