@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
+import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
+
+// Manual sync from admin UI may target large stores like Bilka or Nemlig.
+// Bump function timeout to Vercel's 300s ceiling so big stores complete.
+export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
   console.log('🚀 Goma import endpoint called')
@@ -30,6 +35,20 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Import completed: ${result.totalImported} products imported`)
 
+    // Run expired-offer cleanup after every manual import too, so admins don't
+    // need a separate click to make stale offers disappear from the UI.
+    let cleanup: Awaited<ReturnType<typeof cleanupExpiredOffers>> | null = null
+    let cleanupError: string | null = null
+    try {
+      cleanup = await cleanupExpiredOffers()
+      console.log(
+        `🧹 Cleanup efter manuel sync: deaktiverede ${cleanup.cleaned} udløbne tilbud (${cleanup.durationMs} ms)`
+      )
+    } catch (err) {
+      cleanupError = err instanceof Error ? err.message : 'Ukendt cleanup-fejl'
+      console.error('⚠️ Cleanup efter manuel sync fejlede:', err)
+    }
+
     // Verify products were actually saved
     const { createClient } = await import('@supabase/supabase-js')
     const supabase = createClient(
@@ -59,6 +78,14 @@ export async function POST(request: NextRequest) {
       limit,
       pages,
       timestamp: new Date().toISOString(),
+      cleanup: cleanup
+        ? {
+            cleaned: cleanup.cleaned,
+            byStore: cleanup.byStore,
+            durationMs: cleanup.durationMs,
+          }
+        : null,
+      cleanupError,
       database: {
         products: productCount || 0,
         offers: offerCount || 0,

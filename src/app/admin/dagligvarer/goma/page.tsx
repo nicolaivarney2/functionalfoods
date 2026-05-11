@@ -1,9 +1,84 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
-import { Store, RefreshCw, CheckCircle2, AlertCircle, CalendarDays, ArrowLeft } from 'lucide-react'
+import {
+  Store,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  CalendarDays,
+  ArrowLeft,
+  Activity,
+} from 'lucide-react'
 import Link from 'next/link'
+
+type SyncHealthStore = {
+  storeId: string
+  label: string
+  offerDay: string
+  lastSyncAt: string | null
+  daysSinceSync: number | null
+  daysSinceLastOfferDay: number
+  totalOffers: number
+  activeOffers: number
+  onSaleFlag: number
+  expiredButStillFlagged: number
+  updatedLast24h: number
+  updatedLast7d: number
+  status: 'healthy' | 'late' | 'stale' | 'empty'
+  statusReason: string
+}
+
+type SyncHealthSummary = {
+  totalStores: number
+  healthy: number
+  late: number
+  stale: number
+  empty: number
+  totalOffers: number
+  totalActiveOffers: number
+  totalExpiredButStillFlagged: number
+  generatedAt: string
+  durationMs: number
+}
+
+function formatLastSync(iso: string | null): string {
+  if (!iso) return 'aldrig'
+  const date = new Date(iso)
+  return date.toLocaleString('da-DK', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatDaysSince(days: number | null): string {
+  if (days == null) return '–'
+  if (days < 1 / 24) return 'lige nu'
+  if (days < 1) {
+    const hours = Math.round(days * 24)
+    return `${hours} time${hours === 1 ? '' : 'r'} siden`
+  }
+  const rounded = Math.round(days)
+  return `${rounded} dag${rounded === 1 ? '' : 'e'} siden`
+}
+
+const STATUS_LABELS: Record<SyncHealthStore['status'], string> = {
+  healthy: 'OK',
+  late: 'Forsinket',
+  stale: 'Stale',
+  empty: 'Ingen data',
+}
+
+const STATUS_COLORS: Record<SyncHealthStore['status'], string> = {
+  healthy: 'bg-green-100 text-green-700 border-green-200',
+  late: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  stale: 'bg-red-100 text-red-700 border-red-200',
+  empty: 'bg-gray-100 text-gray-700 border-gray-200',
+}
 
 type GomaStoreId =
   | 'Netto'
@@ -47,6 +122,34 @@ export default function AdminGomaDagligvarerPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [statusType, setStatusType] = useState<'success' | 'error' | null>(null)
   const [cleaningUp, setCleaningUp] = useState(false)
+  const [healthLoading, setHealthLoading] = useState(false)
+  const [healthError, setHealthError] = useState<string | null>(null)
+  const [healthSummary, setHealthSummary] = useState<SyncHealthSummary | null>(null)
+  const [healthStores, setHealthStores] = useState<SyncHealthStore[]>([])
+
+  const fetchHealth = useCallback(async () => {
+    setHealthLoading(true)
+    setHealthError(null)
+    try {
+      const res = await fetch('/api/admin/dagligvarer/sync-health', { cache: 'no-store' })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || data.message || 'Kunne ikke hente sync-status')
+      }
+      setHealthSummary(data.summary as SyncHealthSummary)
+      setHealthStores((data.stores as SyncHealthStore[]) || [])
+    } catch (err) {
+      setHealthError(err instanceof Error ? err.message : 'Ukendt fejl ved hentning af sync-status')
+    } finally {
+      setHealthLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchHealth()
+    }
+  }, [isAdmin, fetchHealth])
 
   if (checking) {
     return (
@@ -77,9 +180,10 @@ export default function AdminGomaDagligvarerPage() {
         body: JSON.stringify({
           stores: [storeId],
           limit: 150,
-          // Hent så mange sider som muligt – selve import-funktionen stopper,
-          // når en side er tom, så vi ender reelt med "alle produkter" for butikken.
-          pages: 40
+          // 250 * 150 = 37.500 produkter pr. butik – nok til selv Nemlig (~30k).
+          // Selve import-funktionen stopper når en side er tom, så det her er
+          // bare loftet, ikke det faktiske antal kald.
+          pages: 250
         })
       })
 
@@ -90,12 +194,26 @@ export default function AdminGomaDagligvarerPage() {
       }
 
       const imported = typeof data.imported === 'number' ? data.imported : undefined
-      setStatusMessage(
+      const cleanedExpired =
+        data.cleanup && typeof data.cleanup.cleaned === 'number'
+          ? (data.cleanup.cleaned as number)
+          : null
+      const parts: string[] = []
+      parts.push(
         imported != null
           ? `Synkronisering for ${storeId} gennemført. Importerede ca. ${imported} produkter.`
           : `Synkronisering for ${storeId} gennemført.`
       )
+      if (cleanedExpired != null) {
+        parts.push(
+          cleanedExpired === 0
+            ? 'Ingen udløbne tilbud at rydde op i.'
+            : `Ryddet op i ${cleanedExpired} udløbne tilbud på tværs af alle butikker.`
+        )
+      }
+      setStatusMessage(parts.join(' '))
       setStatusType('success')
+      fetchHealth()
     } catch (error) {
       console.error('GOMA sync fejl:', error)
       setStatusMessage(
@@ -132,6 +250,7 @@ export default function AdminGomaDagligvarerPage() {
         `Ryddet op i ${data.cleaned || 0} udløbne tilbud. ${data.byStore ? Object.entries(data.byStore).map(([store, count]) => `${store}: ${count}`).join(', ') : ''}`
       )
       setStatusType('success')
+      fetchHealth()
     } catch (error) {
       console.error('Cleanup fejl:', error)
       setStatusMessage(
@@ -175,8 +294,9 @@ export default function AdminGomaDagligvarerPage() {
             <div className="flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2 border border-blue-100">
               <CalendarDays className="h-4 w-4 text-blue-600 mt-0.5" />
               <p className="text-xs text-blue-800">
-                Der kører også en automatisk daglig sync via GitHub Actions kl. 23.50, som
-                synker de butikker der får nye tilbud den pågældende dag.
+                Automatisk sync kører via GitHub Actions kl. 04:00 og 16:00 dansk tid.
+                Begge kørsler synker butikker med nye tilbud den pågældende dag og rydder
+                op i udløbne tilbud bagefter.
               </p>
             </div>
           </div>
@@ -197,6 +317,128 @@ export default function AdminGomaDagligvarerPage() {
               <p>{statusMessage}</p>
             </div>
           )}
+
+          {/* Sync health overview */}
+          <div className="mb-6 rounded-lg border border-gray-200 bg-white">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Activity className="h-4 w-4 text-indigo-600" />
+                <h2 className="text-sm font-semibold text-gray-900">Sync-status pr. butik</h2>
+                {healthSummary && (
+                  <span className="text-xs text-gray-500">
+                    ({healthSummary.totalActiveOffers.toLocaleString('da-DK')} aktive tilbud i alt)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={fetchHealth}
+                disabled={healthLoading}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                <RefreshCw className={`h-3 w-3 ${healthLoading ? 'animate-spin' : ''}`} />
+                {healthLoading ? 'Henter…' : 'Opdater'}
+              </button>
+            </div>
+
+            {healthError && (
+              <div className="mx-4 my-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {healthError}
+              </div>
+            )}
+
+            {healthSummary && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">OK</p>
+                  <p className="text-lg font-semibold text-green-700">{healthSummary.healthy}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Forsinket</p>
+                  <p className="text-lg font-semibold text-yellow-700">{healthSummary.late}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Stale</p>
+                  <p className="text-lg font-semibold text-red-700">{healthSummary.stale}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500">Udløbne flagget</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {healthSummary.totalExpiredButStillFlagged}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 text-gray-600">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium">Butik</th>
+                    <th className="px-3 py-2 text-left font-medium">Status</th>
+                    <th className="px-3 py-2 text-left font-medium">Sidst synket</th>
+                    <th className="px-3 py-2 text-right font-medium">Tilbud</th>
+                    <th className="px-3 py-2 text-right font-medium">Aktive</th>
+                    <th className="px-3 py-2 text-right font-medium">Udløbne flagget</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {healthStores.length === 0 && !healthLoading && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-gray-500">
+                        Ingen sync-data endnu.
+                      </td>
+                    </tr>
+                  )}
+                  {healthStores.map((store) => (
+                    <tr key={store.storeId} className="border-t border-gray-100">
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        <div className="flex flex-col">
+                          <span>{store.label}</span>
+                          <span className="text-[10px] text-gray-500">
+                            Nye tilbud: {store.offerDay}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATUS_COLORS[store.status]}`}
+                          title={store.statusReason}
+                        >
+                          {STATUS_LABELS[store.status]}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-700">
+                        <div className="flex flex-col">
+                          <span>{formatLastSync(store.lastSyncAt)}</span>
+                          <span className="text-[10px] text-gray-500">
+                            {formatDaysSince(store.daysSinceSync)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {store.totalOffers.toLocaleString('da-DK')}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {store.activeOffers.toLocaleString('da-DK')}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <span
+                          className={
+                            store.expiredButStillFlagged > 0
+                              ? 'text-red-700 font-semibold'
+                              : 'text-gray-700'
+                          }
+                        >
+                          {store.expiredButStillFlagged.toLocaleString('da-DK')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {GOMA_STORES.map((store) => (
@@ -221,9 +463,9 @@ export default function AdminGomaDagligvarerPage() {
                     </p>
                   )}
                   <p className="mt-2 text-xs text-gray-600">
-                    Synker både produkter og tilbud for denne butik fra Goma. Der hentes
-                    alle sider (op til ca. 6000 produkter pr. butik), så hele kataloget bliver
-                    opdateret ved hvert manuelt sync.
+                    Synker både produkter og tilbud for denne butik fra Goma. Henter
+                    op til ~37.500 produkter pr. butik (nok til selv Nemlig), parallelt
+                    i batches af 6 sider. Stopper automatisk når kataloget er tomt.
                   </p>
                 </div>
 

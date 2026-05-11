@@ -425,8 +425,8 @@ export default function DagligvarerPage() {
   const [modalOpen, setModalOpen] = useState(false)
 
   // Refs
-  const searchTimeoutRef = useRef<NodeJS.Timeout>()
-  const loadingRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const latestRequestIdRef = useRef(0)
   const filterBarRef = useRef<HTMLDivElement>(null)
   const startY = useRef(0)
   const isDragging = useRef(false)
@@ -469,13 +469,23 @@ export default function DagligvarerPage() {
 
   // Fetch products
   const fetchProducts = useCallback(async (page: number = 1, append: boolean = false) => {
-    // Prevent concurrent requests
-    if (loadingRef.current) return
-    loadingRef.current = true
-    
+    // Cancel any in-flight request so a newer filter selection always wins.
+    // (Tidligere brugte vi en loadingRef der droppede den nye request — det
+    // betød at hurtige filter-klik kunne efterlade UI'et med data fra et
+    // tidligere filter, hvilket lignede at siden "gik i kuk".)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
+    // Sequential request ID so even race-y responses (where a stale fetch
+    // resolves after a newer one) cannot overwrite fresh data.
+    const requestId = ++latestRequestIdRef.current
+
     try {
       if (!append) setLoading(true)
-      
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '50'
@@ -494,15 +504,18 @@ export default function DagligvarerPage() {
       if (showOnlyOrganic) params.append('organic', 'true')
 
       const url = `/api/supermarket/products?${params}`
-      const response = await fetch(url)
+      const response = await fetch(url, { signal: controller.signal })
       const data = await response.json()
+
+      // Discard if a newer request has been issued in the meantime
+      if (requestId !== latestRequestIdRef.current) return
 
       if (data.success && data.products) {
         let newProducts = data.products
 
         // Apply sorting
         newProducts = sortProducts(newProducts, sortBy)
-        
+
         if (append) {
           // Prevent duplicates when appending
           setProducts(prev => {
@@ -513,15 +526,20 @@ export default function DagligvarerPage() {
         } else {
           setProducts(newProducts)
         }
-        
+
         setCurrentPage(page)
         setHasMore(data.pagination?.hasMore || false)
       }
     } catch (error) {
+      // Aborted requests are expected when filters change rapidly – ignore
+      if ((error as { name?: string })?.name === 'AbortError') return
       console.error('Failed to fetch products:', error)
     } finally {
-      setLoading(false)
-      loadingRef.current = false
+      // Only reset loading state if this is still the latest request
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false)
+        abortControllerRef.current = null
+      }
     }
   }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, sortBy])
 
@@ -562,18 +580,10 @@ export default function DagligvarerPage() {
     })
   }
 
-  // Debounced search
+  // Just update state. The debounced fetch is handled by a useEffect below
+  // which always sees the latest fetchProducts closure (no stale-data bug).
   const handleSearchChange = (value: string) => {
     setSearchQuery(value)
-    
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-    
-    searchTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(1)
-      fetchProducts(1, false)
-    }, 300)
   }
 
   // Filter change handlers
@@ -647,12 +657,27 @@ export default function DagligvarerPage() {
     isDragging.current = false
   }
 
-  // Re-fetch when filters change
+  // Single source of truth for filter-driven re-fetches. Includes searchQuery
+  // here so a pending search timer can no longer fire AFTER a filter toggle
+  // and resurrect old filter values via a stale fetchProducts closure.
+  // - searchQuery changes are debounced (300 ms)
+  // - all other filter changes fire immediately on next tick
   useEffect(() => {
-    setCurrentPage(1)
-    fetchProducts(1, false)
+    const debounceMs = searchQuery ? 300 : 0
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      fetchProducts(1, false)
+    }, debounceMs)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, selectedCategories, selectedStores])
+  }, [
+    searchQuery,
+    showOnlyOffers,
+    showOnlyFoodProducts,
+    showOnlyOrganic,
+    selectedCategories,
+    selectedStores,
+  ])
 
 
 
@@ -673,9 +698,9 @@ export default function DagligvarerPage() {
   useEffect(() => {
     const handleScroll = () => {
       if (
-        hasMore && 
-        !loading && 
-        !loadingRef.current &&
+        hasMore &&
+        !loading &&
+        abortControllerRef.current === null &&
         window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 500
       ) {
         fetchProducts(currentPage + 1, true)
@@ -686,12 +711,13 @@ export default function DagligvarerPage() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [hasMore, loading, currentPage, fetchProducts])
 
-  // Initial load - only run once on mount
+  // Initial counts only — products are fetched by the filter useEffect above
+  // (which fires on mount because of its dependencies). Calling fetchProducts
+  // here too caused a duplicate request on every page load.
   useEffect(() => {
     fetchCounts()
-    fetchProducts(1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only run on mount
+  }, [])
 
   // Get filter summary text
   const getFilterSummary = () => {

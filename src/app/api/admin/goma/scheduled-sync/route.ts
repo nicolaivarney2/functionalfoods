@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
+import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+// Vercel Pro plan max. Required for fully syncing big stores like Nemlig
+// (~30k products) within a single function invocation.
+export const maxDuration = 300
 
 type GomaStoreId =
   | 'Netto'
@@ -76,32 +80,66 @@ export async function POST(req: NextRequest) {
 
     const { dayIndex, stores } = getStoresForToday()
 
-    if (stores.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No Goma stores scheduled for sync today',
-        dayIndex,
-        stores
-      })
+    let imported: number | null = null
+    let importError: string | null = null
+
+    if (stores.length > 0) {
+      try {
+        const result = await importGomaProducts({
+          stores,
+          limit: 150,
+          // 250 * 150 = 37.500 produkter pr. butik – nok til Nemlig (~30k).
+          // Små butikker exit'er tidligt via fullyScannedStore-tjekket, så
+          // dette koster ikke noget for REMA, Netto, etc.
+          pages: 250,
+        })
+        imported = result?.totalImported ?? 0
+      } catch (err) {
+        importError = err instanceof Error ? err.message : 'Ukendt importfejl'
+        console.error('❌ Goma import fejlede i scheduled-sync:', err)
+      }
     }
 
-    // Hent alle produkter for de planlagte butikker.
-    // Vi bruger moderat limit og høj pages-værdi – importGomaProducts stopper selv,
-    // når en side returnerer 0 produkter, så vi ender reelt med "alle produkter pr. butik".
-    // Bemærk: Hvis en butik har meget store kataloger, kan dette nærme sig Vercels timeoutgrænse.
-    const result = await importGomaProducts({
-      stores,
-      limit: 150,
-      pages: 40 // 40 * 150 = 6000+ potentielle produkter pr. butik
-    })
+    // Always run expired-offer cleanup, even on days with no scheduled imports
+    // and even if the import itself failed. This ensures udløbne tilbud
+    // forsvinder hver gang cron'en kalder os.
+    let cleanupResult: Awaited<ReturnType<typeof cleanupExpiredOffers>> | null = null
+    let cleanupError: string | null = null
+    try {
+      cleanupResult = await cleanupExpiredOffers()
+      console.log(
+        `🧹 Expired-offer cleanup: deaktiverede ${cleanupResult.cleaned} udløbne tilbud (varighed ${cleanupResult.durationMs} ms)`
+      )
+    } catch (err) {
+      cleanupError = err instanceof Error ? err.message : 'Ukendt cleanup-fejl'
+      console.error('❌ Expired-offer cleanup fejlede:', err)
+    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Scheduled Goma sync completed',
-      dayIndex,
-      stores,
-      imported: result?.totalImported ?? null
-    })
+    const overallSuccess = !importError && !cleanupError
+
+    return NextResponse.json(
+      {
+        success: overallSuccess,
+        message: overallSuccess
+          ? stores.length === 0
+            ? 'Ingen butikker planlagt til sync i dag, men cleanup blev kørt'
+            : 'Scheduled Goma sync + cleanup gennemført'
+          : 'Scheduled Goma sync kørt med fejl',
+        dayIndex,
+        stores,
+        imported,
+        importError,
+        cleanup: cleanupResult
+          ? {
+              cleaned: cleanupResult.cleaned,
+              byStore: cleanupResult.byStore,
+              durationMs: cleanupResult.durationMs,
+            }
+          : null,
+        cleanupError,
+      },
+      { status: overallSuccess ? 200 : 500 }
+    )
   } catch (error) {
     console.error('❌ Error in scheduled Goma sync:', error)
     return NextResponse.json(
@@ -114,5 +152,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
-

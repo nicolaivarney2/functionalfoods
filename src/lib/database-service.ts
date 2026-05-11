@@ -3,6 +3,31 @@ import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 
+/**
+ * Run async work over a list with bounded concurrency.
+ * Used for chunked Supabase fetches so we don't fire dozens of sequential
+ * roundtrips (slow) or hundreds in parallel (rate limit / connection storms).
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T, idx: number) => Promise<R>
+): Promise<R[]> {
+  if (items.length === 0) return []
+  const results: R[] = new Array(items.length)
+  let nextIndex = 0
+  const workerCount = Math.max(1, Math.min(concurrency, items.length))
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const idx = nextIndex++
+      if (idx >= items.length) return
+      results[idx] = await fn(items[idx], idx)
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
 export class DatabaseService {
   private readonly RECIPES_CACHE_TTL_MS = 60_000
   private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
@@ -14,6 +39,14 @@ export class DatabaseService {
     data: { total: number; categories: { [key: string]: number }; offers: number }
     expiresAt: number
   } | null = null
+
+  /**
+   * Category → product IDs is expensive (multiple ilike queries with fallbacks)
+   * but the answer changes rarely. Cache aggressively in-process so repeat
+   * filter clicks on the same category re-use the work.
+   */
+  private readonly CATEGORY_PRODUCT_IDS_TTL_MS = 5 * 60_000
+  private categoryProductIdsCache = new Map<string, { data: string[]; expiresAt: number }>()
 
   private readonly CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
     'frugt & grønt': 'Frugt og grønt',
@@ -439,8 +472,7 @@ export class DatabaseService {
             amount,
             image_url
           )
-        `,
-          { count: 'exact' }
+        `
         )
         .eq('is_available', true)
 
@@ -571,65 +603,73 @@ export class DatabaseService {
           sale_valid_to: string | null
         }>()
         let chunkErrors = 0
-        
-        for (let i = 0; i < chunks.length; i++) {
-          const chunk = chunks[i]
-          
+
+        // Run chunks in parallel (with bounded concurrency) instead of
+        // sequentially. With ~50 chunks @ 100ms each, sequential = ~5s wait.
+        // Parallel-8 = ~700ms. We cap at 8 concurrent so we don't blow up
+        // Supabase's connection pool.
+        const CHUNK_CONCURRENCY = 8
+        const chunkResults = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, async (chunk, idx) => {
           try {
-            // Build query for this chunk with all filters
             let chunkQuery = supabase
               .from('product_offers')
               .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to')
               .eq('is_available', true)
               .in('product_id', chunk)
-            
+
             if (stores && stores.length > 0) {
               chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
             }
-            
+
             // IMPORTANT: do not pre-filter on sale flags here; evaluate real offer in-app.
-            
-            // Organic filter already applied via productIds intersection above
-            
+            // Organic filter already applied via productIds intersection above.
+
             const { data: chunkOffers, error: chunkError } = await chunkQuery
-            
+
             if (chunkError) {
-              chunkErrors++
-              console.error(`[CATEGORY FILTER] Error fetching chunk ${i + 1}/${chunks.length}:`, chunkError)
-              // Log full error details for Vercel
-              if (chunkError.message) {
-                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
-              }
-              if (chunkError.code) {
-                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
-              }
-              continue
+              console.error(`[CATEGORY FILTER] Error fetching chunk ${idx + 1}/${chunks.length}:`, chunkError)
+              if (chunkError.message) console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
+              if (chunkError.code) console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
+              return null
             }
-            
-            if (chunkOffers && chunkOffers.length > 0) {
-              chunkOffers.forEach((offer: any) => {
-                if (!offer?.id) return
-                allMatchingOffers.set(String(offer.id), {
-                  id: String(offer.id),
-                  is_on_sale: !!offer.is_on_sale,
-                  is_offer_active: !!offer.is_offer_active,
-                  discount_percentage: offer.discount_percentage ?? null,
-                  current_price: offer.current_price ?? null,
-                  normal_price: offer.normal_price ?? null,
-                  sale_valid_to: offer.sale_valid_to ?? null,
-                })
-              })
-            }
+            return chunkOffers || []
           } catch (error) {
-            chunkErrors++
-            console.error(`[CATEGORY FILTER] Exception in chunk ${i + 1}/${chunks.length}:`, error)
+            console.error(`[CATEGORY FILTER] Exception in chunk ${idx + 1}/${chunks.length}:`, error)
             if (error instanceof Error) {
               console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
               console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
             }
+            return null
+          }
+        })
+
+        for (const rows of chunkResults) {
+          if (rows === null) {
+            chunkErrors++
+            continue
+          }
+          for (const offer of rows as Array<{
+            id?: string | number
+            is_on_sale?: boolean
+            is_offer_active?: boolean
+            discount_percentage?: number | null
+            current_price?: number | null
+            normal_price?: number | null
+            sale_valid_to?: string | null
+          }>) {
+            if (!offer?.id) continue
+            allMatchingOffers.set(String(offer.id), {
+              id: String(offer.id),
+              is_on_sale: !!offer.is_on_sale,
+              is_offer_active: !!offer.is_offer_active,
+              discount_percentage: offer.discount_percentage ?? null,
+              current_price: offer.current_price ?? null,
+              normal_price: offer.normal_price ?? null,
+              sale_valid_to: offer.sale_valid_to ?? null,
+            })
           }
         }
-        
+
         if (chunkErrors > 0) {
           console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
         }
@@ -890,21 +930,28 @@ export class DatabaseService {
       // This ensures we catch products that are actually on sale (normal_price > current_price)
       // even if the is_on_sale flag is incorrectly set to false
       
+      // Fetch limit+1 rows so we can detect "hasMore" without an expensive
+      // separate COUNT(*) query. count: 'exact' on this join with multiple
+      // sort keys was previously costing ~100-300 ms per request.
       query = query
         .order('is_offer_active', { ascending: false }) // tilbud først
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
-        .range(offset, offset + limit - 1)
+        .range(offset, offset + limit) // inclusive: returns up to limit+1 rows
 
-      const { data, error, count } = await query
+      const { data, error } = await query
 
       if (error) {
         console.error('Error fetching supermarket products (V2):', error)
         return { products: [], total: 0, hasMore: false }
       }
 
+      const fetched = (data || []) as Array<Record<string, unknown>>
+      const hasMore = fetched.length > limit
+      const pageRows = hasMore ? fetched.slice(0, limit) : fetched
+
         // Map the data first to determine which are actually on sale
-      const mapped = (data || []).map((row: any) => {
+      const mapped = pageRows.map((row: any) => {
         const p = row.products || {}
         
         // Debug: Log if products object is missing
@@ -964,9 +1011,11 @@ export class DatabaseService {
         return (a.price || 0) - (b.price || 0)
       })
       
-      const total = count || 0
-      const hasMore = offset + limit < total
-      
+      // Approximate total: we no longer do an exact COUNT for performance.
+      // Consumers (dagligvarer page) only use hasMore; meal-plan generator
+      // logs `total` for diagnostics where exactness is not required.
+      const total = offset + finalMapped.length + (hasMore ? 1 : 0)
+
       return { products: finalMapped, total, hasMore }
     } catch (error) {
       console.error('Error in getSupermarketProductsV2:', error)
@@ -1001,6 +1050,22 @@ export class DatabaseService {
   }
 
   private async findProductIdsForCategories(categories: string[]): Promise<string[]> {
+    // Cache lookup: same categories produce the same answer for ~5 minutes.
+    // Repeat clicks on the same filter (or quick toggle of unrelated filters)
+    // skip 2-4 ilike queries entirely.
+    const cacheKey = categories
+      .map((c) => (c || '').trim().toLowerCase())
+      .filter(Boolean)
+      .sort()
+      .join('|')
+    const now = Date.now()
+    if (cacheKey) {
+      const cached = this.categoryProductIdsCache.get(cacheKey)
+      if (cached && cached.expiresAt > now) {
+        return cached.data
+      }
+    }
+
     const supabase = createSupabaseClient()
     const seen = new Set<string>()
 
@@ -1094,7 +1159,14 @@ export class DatabaseService {
     if (seen.size === 0) {
       console.warn(`[CATEGORY FILTER] No products found for categories: ${categories.join(', ')}`)
     }
-    return Array.from(seen)
+    const result = Array.from(seen)
+    if (cacheKey) {
+      this.categoryProductIdsCache.set(cacheKey, {
+        data: result,
+        expiresAt: now + this.CATEGORY_PRODUCT_IDS_TTL_MS,
+      })
+    }
+    return result
   }
 
   /**

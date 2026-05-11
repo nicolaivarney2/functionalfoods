@@ -2,10 +2,12 @@ name: Goma Scheduled Sync
 
 on:
   schedule:
-    # Daily at 02:00 UTC (04:00 Danish time in summer, 03:00 in winter)
-    # This ensures we're still on the correct day when checking getUTCDay()
-    # and catches store updates that typically happen during the day
+    # Two runs per day in UTC:
+    #   02:00 UTC ≈ 04:00 dansk (sommer) / 03:00 (vinter) — fanger morgen-opdateringer
+    #   14:00 UTC ≈ 16:00 dansk (sommer) / 15:00 (vinter) — fanger sene tilbud + virker som gratis retry hvis morgensync fejlede
+    # Begge kald kører også expired-offer cleanup, så udløbne tilbud forsvinder samme dag.
     - cron: '0 2 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:
 
 jobs:

@@ -314,6 +314,13 @@ export async function importGomaProducts(options: ImportOptions) {
   const limit = options.limit ?? 100
   const pages = options.pages ?? 1
 
+  // How many Goma pages to fetch+upsert in parallel per store.
+  // Goma calls dominate runtime (~1-2s each). Without parallelism, syncing
+  // a 30k-product store like Nemlig would exceed Vercel's 300s limit.
+  // 6 is a conservative balance: well below Goma rate-limits and below
+  // PostgREST connection pool limits, but gives ~6x speedup.
+  const PAGE_CONCURRENCY = 6
+
   let totalImported = 0
 
   for (const storeName of options.stores) {
@@ -332,7 +339,13 @@ export async function importGomaProducts(options: ImportOptions) {
         { onConflict: 'id' },
       )
 
-    for (let page = 0; page < pages; page++) {
+    /**
+     * Process a single page of products from Goma for this store.
+     * Returns metadata so the outer batch loop knows when to stop.
+     */
+    const processPage = async (
+      page: number,
+    ): Promise<{ page: number; imported: number; isLastPage: boolean }> => {
       const offset = page * limit
 
       const body = {
@@ -376,7 +389,7 @@ export async function importGomaProducts(options: ImportOptions) {
 
       if (products.length === 0) {
         console.log(`⚠️ No products returned for ${storeName} page ${page}, stopping`)
-        break
+        return { page, imported: 0, isLastPage: true }
       }
 
       // Generate unique product IDs based on brand + normalized name + amount + unit
@@ -637,8 +650,6 @@ export async function importGomaProducts(options: ImportOptions) {
         }
       }
 
-      totalImported += products.length
-
       if (options.onProgress) {
         options.onProgress({
           store: storeName,
@@ -648,23 +659,187 @@ export async function importGomaProducts(options: ImportOptions) {
         })
       }
 
-      if (products.length < limit) {
-        fullyScannedStore = true
-        break
+      // products.length < limit means Goma has no more rows after this page.
+      const isLastPage = products.length < limit
+      return { page, imported: products.length, isLastPage }
+    } // end processPage
+
+    // Run pages in parallel batches. Stop dispatching new batches once any
+    // page in a batch reports isLastPage. Wasted-fetch ceiling per store is
+    // PAGE_CONCURRENCY-1 pages (e.g. 5 extra Goma calls), well worth the
+    // overall speedup.
+    let stopAfterCurrentBatch = false
+    for (
+      let batchStart = 0;
+      batchStart < pages && !stopAfterCurrentBatch;
+      batchStart += PAGE_CONCURRENCY
+    ) {
+      const batchSize = Math.min(PAGE_CONCURRENCY, pages - batchStart)
+      const batchPages = Array.from({ length: batchSize }, (_, i) => batchStart + i)
+
+      const batchResults = await Promise.all(batchPages.map((p) => processPage(p)))
+
+      for (const result of batchResults) {
+        totalImported += result.imported
+        if (result.isLastPage) {
+          fullyScannedStore = true
+          stopAfterCurrentBatch = true
+        }
       }
     }
 
-    // Cleanup stale Goma offers for this store
+    // Step 2: Authoritative offer verification.
+    //
+    // Problem: Goma sorterer produkter med "is_on_sale DESC". Når et tilbud slutter,
+    // synker produktet ned i resultatlisten og falder typisk uden for vores 6000-produkts
+    // vindue. Resultatet er, at vores DB beholder gamle on-sale-data selvom REMA og Goma
+    // er enige om at tilbuddet er forbi.
+    //
+    // Løsning: Lav en separat letvægts-forespørgsel mod Goma med p_on_sale_only=true.
+    // Den returnerer kun aktuelle tilbud (typisk <500 produkter pr. butik). Alt vi har
+    // i DB med is_offer_active=true men IKKE i Gomas tilbudsliste => tilbuddet er slut.
+    let verificationSuccessful = false
+    const currentOfferStoreProductIds = new Set<string>()
     try {
-      // If we completed a full scan for this store (API returned < limit), we can safely
-      // disable offers not seen in this import run immediately.
-      // Otherwise (partial scan / hard page cap), keep conservative cleanup window.
-      const staleThreshold = fullyScannedStore
-        ? importStartedAtIso
-        : new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      const offerVerifyLimit = 200
+      const offerVerifyMaxPages = 10 // 10 * 200 = 2000 tilbud pr. butik – rigeligt
+      let offersFetched = 0
+
+      for (let page = 0; page < offerVerifyMaxPages; page++) {
+        const offset = page * offerVerifyLimit
+        const verifyBody = {
+          p_search_term: '',
+          p_on_sale_only: true,
+          p_category_filter: null,
+          p_department_filter: null,
+          p_store_filter: [storeName],
+          p_food_departments: null,
+          p_is_available_only: true,
+          p_my_products_only: false,
+          p_previously_bought_only: false,
+          p_labels_filter: null,
+          p_order_by_clause: 'is_on_sale DESC, discount_percentage DESC NULLS LAST, similarity DESC',
+          p_limit_val: offerVerifyLimit,
+          p_offset_val: offset,
+          p_session_id: 'functionalfoods-internal-verify',
+          p_log_search: false,
+          p_source: null,
+        }
+
+        const verifyRes = await fetch(
+          'https://api.goma.gg/rest/v1/rpc/search_products_advanced_v2',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: apiKey,
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(verifyBody),
+          },
+        )
+
+        if (!verifyRes.ok) {
+          console.warn(
+            `⚠️ Offer verification API non-OK for ${storeName} page ${page}: ${verifyRes.status}`,
+          )
+          break // hold verificationSuccessful=false så vi IKKE wiper offers
+        }
+        verificationSuccessful = true
+
+        const verifyJson = (await verifyRes.json()) as GomaSearchResponse
+        const products = verifyJson.products || []
+        for (const p of products) {
+          if (p.product_id) currentOfferStoreProductIds.add(p.product_id)
+        }
+        offersFetched += products.length
+        if (products.length < offerVerifyLimit) break
+      }
 
       console.log(
-        `🧹 Cleaning up stale Goma offers for ${storeId} last seen before ${staleThreshold} (fullScan=${fullyScannedStore})`,
+        `📋 Offer verification: ${storeName} har ${currentOfferStoreProductIds.size} aktive tilbud iflg. Goma (success=${verificationSuccessful})`,
+      )
+    } catch (verifyErr) {
+      console.warn(
+        `⚠️ Offer verification fejlede for ${storeName}, springer auto-deaktivering over:`,
+        verifyErr,
+      )
+    }
+
+    if (verificationSuccessful) {
+      try {
+        // Hent alle DB-tilbud for butikken markeret aktive
+        const { data: dbActive, error: dbActiveError } = await supabase
+          .from('product_offers')
+          .select('id, store_product_id, normal_price')
+          .eq('store_id', storeId)
+          .eq('source', 'goma')
+          .eq('is_offer_active', true)
+
+        if (dbActiveError) {
+          console.error(
+            `⚠️ Kunne ikke hente DB offers for verification cleanup for ${storeId}:`,
+            dbActiveError.message,
+          )
+        } else {
+          const ended = (dbActive || []).filter(
+            (row: { store_product_id: string | null }) =>
+              row.store_product_id && !currentOfferStoreProductIds.has(row.store_product_id),
+          )
+
+          if (ended.length === 0) {
+            console.log(`✅ ${storeName}: Ingen tilbud at deaktivere efter verification`)
+          } else {
+            console.log(
+              `🛑 ${storeName}: Deaktiverer ${ended.length} tilbud som Goma ikke længere rapporterer som aktive`,
+            )
+
+            const BATCH = 500
+            for (let i = 0; i < ended.length; i += BATCH) {
+              const batch = ended.slice(i, i + BATCH)
+              const ids = batch.map((r: { id: string }) => r.id)
+              const { error: deactivateError } = await supabase
+                .from('product_offers')
+                .update({
+                  is_on_sale: false,
+                  is_offer_active: false,
+                  discount_percentage: null,
+                  // Marker som lige udløbet, så frontendens
+                  // isOfferDateValid-check ('sale_valid_to >= now()') sætter offer = false
+                  // selv hvis current_price < normal_price stadig findes i DB.
+                  sale_valid_to: importStartedAtIso,
+                })
+                .in('id', ids)
+
+              if (deactivateError) {
+                console.error(
+                  `⚠️ Fejl ved deaktivering af endte tilbud for ${storeId}:`,
+                  deactivateError.message,
+                )
+              }
+            }
+          }
+        }
+      } catch (cleanupErr) {
+        console.error(
+          `⚠️ Uventet fejl i offer-verification cleanup for ${storeId}:`,
+          cleanupErr,
+        )
+      }
+    }
+
+    // Step 3: Backup last_seen_at-baseret stale cleanup
+    //
+    // Verification ovenfor er primær. Denne fungerer som safety net for tilfælde
+    // hvor verification fejler, eller hvor der er produkter med last_seen_at fra
+    // en tid hvor de ikke længere bør være aktive.
+    try {
+      const staleThreshold = fullyScannedStore
+        ? importStartedAtIso
+        : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 24h, ned fra 2 dage
+
+      console.log(
+        `🧹 Stale-cleanup (last_seen_at) for ${storeId} før ${staleThreshold} (fullScan=${fullyScannedStore})`,
       )
 
       const { error: cleanupError } = await supabase
@@ -673,6 +848,7 @@ export async function importGomaProducts(options: ImportOptions) {
           is_on_sale: false,
           is_offer_active: false,
           discount_percentage: null,
+          sale_valid_to: importStartedAtIso,
         })
         .eq('store_id', storeId)
         .eq('source', 'goma')
@@ -685,7 +861,7 @@ export async function importGomaProducts(options: ImportOptions) {
           cleanupError,
         )
       } else {
-        console.log(`✅ Cleanup of stale Goma offers completed for ${storeId}`)
+        console.log(`✅ Stale cleanup completed for ${storeId}`)
       }
     } catch (error) {
       console.error(
