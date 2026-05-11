@@ -83,9 +83,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: page.title,
     description: page.description,
+    alternates: {
+      canonical: `https://functionalfoods.dk/funktioner/${slug}`,
+    },
     openGraph: {
       title: page.shortTitle,
       description: page.description,
+      url: `https://functionalfoods.dk/funktioner/${slug}`,
       ...(ogImages ? { images: ogImages } : {}),
     },
   }

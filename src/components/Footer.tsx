@@ -21,6 +21,7 @@ const columns = [
     title: 'Vægttab & guides',
     links: [
       { label: 'Vægttabsoverblik', href: '/vaegttab' },
+      { label: 'Succeshistorier', href: '/succeshistorier' },
       { label: 'Mentalt (adfærd & vaner)', href: '/blog/mentalt' },
       { label: 'Keto vægttab', href: '/keto/vaegttab' },
       { label: 'Sense vægttab', href: '/sense/vaegttab' },
@@ -109,6 +110,9 @@ export default function Footer() {
             </Link>
             <Link href="/opskriftsoversigt" className="hover:text-white/80 transition-colors">
               Opskrifter
+            </Link>
+            <Link href="/succeshistorier" className="hover:text-white/80 transition-colors">
+              Succeshistorier
             </Link>
             <Link href="/cookies-og-privatliv" className="hover:text-white/80 transition-colors">
               Cookies og privatliv

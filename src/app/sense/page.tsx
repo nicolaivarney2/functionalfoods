@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Target, TrendingDown, Leaf, Zap, Sparkles, ChevronRight, Hand, UtensilsCrossed, Ban, CheckCircle2, XCircle, BookOpen } from 'lucide-react'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 export default function SensePage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -48,6 +49,11 @@ export default function SensePage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+      <section className="py-4 bg-emerald-50/60 border-b border-emerald-100">
+        <div className="container">
+          <SuccessStoriesBar />
         </div>
       </section>
 

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseClient } from '@/lib/supabase'
 import { ArrowLeft, ExternalLink, CheckCircle, Info } from 'lucide-react'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 interface BlogPost {
   id: number
@@ -467,6 +468,10 @@ export default function BlogPostPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 pt-4">
+        <SuccessStoriesBar />
       </div>
 
       {/* Content */}

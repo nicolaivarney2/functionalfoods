@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Target, TrendingDown, Brain, ChevronRight, CheckCircle2, XCircle, UtensilsCrossed, Clock, BookOpen } from 'lucide-react'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 export default function GLP1Page() {
   const [isVisible, setIsVisible] = useState(false)
@@ -45,6 +46,11 @@ export default function GLP1Page() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+      <section className="py-4 bg-emerald-50/60 border-b border-emerald-100">
+        <div className="container">
+          <SuccessStoriesBar />
         </div>
       </section>
 

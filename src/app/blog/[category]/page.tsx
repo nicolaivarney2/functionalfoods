@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseClient } from '@/lib/supabase'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 interface HubPost {
   id: number
@@ -11,7 +12,8 @@ interface HubPost {
   slug: string
   excerpt?: string
   published_at?: string
-  post_type?: 'core' | 'blog'
+  post_type?: 'core' | 'blog' | 'podcast'
+  tags?: string[]
   view_count?: number
   header_image_url?: string
   category?: { slug: string; name: string } | null
@@ -39,6 +41,47 @@ type CategoryConfig = {
   introTitle: string
   introLead: string
   showRecipes: boolean
+}
+
+function BlogComingSoonCard({ categoryName, compact = false }: { categoryName: string; compact?: boolean }) {
+  return (
+    <div className={`rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 shadow-sm ${compact ? 'p-4' : 'p-5 sm:p-6'}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600/10 text-xl">
+          ✍️
+        </div>
+        <div className="min-w-0">
+          <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm' : 'text-base sm:text-lg'}`}>
+            Artikler i {categoryName} er på vej
+          </h3>
+          <p className={`mt-1 text-gray-600 leading-relaxed ${compact ? 'text-xs' : 'text-sm'}`}>
+            Vi er i gang med at udgive nye, evidensbaserede blogindlæg i denne kategori. Kig forbi igen snart.
+          </p>
+          <p className={`mt-2 text-gray-500 ${compact ? 'text-[11px]' : 'text-xs'}`}>
+            Indtil da kan du udforske vores andre kategorier og opskrifter.
+          </p>
+          <Link
+            href="/blog"
+            className={`mt-3 inline-flex items-center rounded-lg bg-blue-600 px-3 py-2 font-medium text-white hover:bg-blue-700 transition-colors ${compact ? 'text-xs' : 'text-xs sm:text-sm'}`}
+          >
+            Se alle blogkategorier
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function isPodcastPost(post: Partial<HubPost> & { slug?: string; title?: string; tags?: string[]; post_type?: string }) {
+  const slug = String(post.slug || '').toLowerCase()
+  const title = String(post.title || '').toLowerCase()
+  const type = String(post.post_type || '').toLowerCase()
+  const tags = Array.isArray(post.tags) ? post.tags.map((t) => String(t).toLowerCase()) : []
+  if (type === 'podcast') return true
+  if (slug.includes('podcast')) return true
+  if (title.includes('podcast')) return true
+  if (tags.includes('podcast')) return true
+  return false
 }
 
 const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
@@ -139,6 +182,9 @@ export default function BlogCategoryHubPage() {
   const [latestArticles, setLatestArticles] = useState<HubPost[]>([])
   const [mustReads, setMustReads] = useState<HubPost[]>([])
   const [popularArticles, setPopularArticles] = useState<HubPost[]>([])
+  const [podcastEpisodes, setPodcastEpisodes] = useState<HubPost[]>([])
+  const [feedArticles, setFeedArticles] = useState<HubPost[]>([])
+  const [visibleFeedCount, setVisibleFeedCount] = useState(6)
   const [recipes, setRecipes] = useState<HubRecipe[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -162,72 +208,46 @@ export default function BlogCategoryHubPage() {
           setLatestArticles([])
           setMustReads([])
           setPopularArticles([])
+          setPodcastEpisodes([])
           setRecipes([])
           return
         }
 
-        // First article (latest published for category)
-        const { data: latestData } = await supabase
+        // Load all posts for category once, then partition (prevents duplicate content across sections)
+        const { data: categoryPosts } = await supabase
           .from('blog_posts')
-          .select('id,title,slug,excerpt,published_at,view_count,header_image_url,category:blog_categories(slug,name)')
+          .select('id,title,slug,excerpt,published_at,view_count,post_type,tags,header_image_url,category:blog_categories(slug,name)')
           .eq('status', 'published')
           .eq('category_id', categoryId)
           .order('published_at', { ascending: false, nullsFirst: false })
-          .limit(1)
+          .limit(200)
 
-        const first = (latestData || []).map((p: any) => {
+        const normalizedPosts: HubPost[] = (categoryPosts || []).map((p: any) => {
           const cat = Array.isArray(p.category) ? p.category[0] : p.category
-          return { ...p, category: cat }
-        })[0]
-        setFirstArticle(first || null)
-
-        // Latest 3-4 articles (excluding first)
-        const { data: latestPosts } = await supabase
-          .from('blog_posts')
-          .select('id,title,slug,excerpt,published_at,view_count,header_image_url,category:blog_categories(slug,name)')
-          .eq('status', 'published')
-          .eq('category_id', categoryId)
-          .order('published_at', { ascending: false, nullsFirst: false })
-          .limit(5)
-
-        const latestFiltered = (latestPosts || [])
-          .filter((p: any) => p.id !== first?.id)
-          .map((p: any) => {
-            const cat = Array.isArray(p.category) ? p.category[0] : p.category
-            return { ...p, category: cat }
-          })
-          .slice(0, 4)
-        setLatestArticles(latestFiltered)
-
-        // Must Reads (core articles)
-        const { data: corePosts } = await supabase
-          .from('blog_posts')
-          .select('id,title,slug,excerpt,view_count,header_image_url,category:blog_categories(slug,name)')
-          .eq('status', 'published')
-          .eq('post_type', 'core')
-          .eq('category_id', categoryId)
-          .order('published_at', { ascending: false, nullsFirst: false })
-          .limit(6)
-
-        const mustReadsFiltered = (corePosts || []).map((p: any) => {
-          const cat = Array.isArray(p.category) ? p.category[0] : p.category
-          return { ...p, category: cat }
+          return { ...p, category: cat } as HubPost
         })
+        const podcast = normalizedPosts.filter(isPodcastPost)
+        const articles = normalizedPosts.filter((p) => !isPodcastPost(p))
+
+        setPodcastEpisodes(podcast)
+
+        const first = articles[0] || null
+        const heroSide = articles.slice(1, 5)
+        const feed = articles.slice(5)
+        setFirstArticle(first)
+        setLatestArticles(heroSide)
+        setFeedArticles(feed)
+        setVisibleFeedCount(6)
+
+        const mustReadsFiltered = articles
+          .filter((p) => p.post_type === 'core' && p.id !== first?.id)
+          .slice(0, 6)
         setMustReads(mustReadsFiltered)
 
-        // Popular Articles (by view_count)
-        const { data: popularPosts } = await supabase
-          .from('blog_posts')
-          .select('id,title,slug,excerpt,view_count,published_at,category:blog_categories(slug,name)')
-          .eq('status', 'published')
-          .eq('category_id', categoryId)
-          .order('view_count', { ascending: false, nullsFirst: false })
-          .limit(5)
-
-        const popularFiltered = (popularPosts || []).map((p: any) => {
-          const cat = Array.isArray(p.category) ? p.category[0] : p.category
-          return { ...p, category: cat }
-        })
+        const popularFiltered = [...articles]
+          .filter((p) => p.id !== first?.id)
+          .sort((a, b) => (Number(b.view_count) || 0) - (Number(a.view_count) || 0))
+          .slice(0, 5)
         setPopularArticles(popularFiltered)
 
         // Recipes matching dietary category
@@ -283,6 +303,17 @@ export default function BlogCategoryHubPage() {
     return Math.max(1, Math.round(words / 200))
   }
   const categoryBgColor = categoryCfg?.bgColor || '#FFFFFF'
+  const featuredPodcast = podcastEpisodes[0] || null
+  const morePodcastEpisodes = podcastEpisodes.slice(1)
+  const hasAnyArticlePosts =
+    Boolean(firstArticle) ||
+    latestArticles.length > 0 ||
+    feedArticles.length > 0 ||
+    mustReads.length > 0 ||
+    popularArticles.length > 0
+  const hasAnyBlogPosts =
+    hasAnyArticlePosts ||
+    podcastEpisodes.length > 0
 
   return (
     <div className="min-h-screen bg-white">
@@ -305,7 +336,20 @@ export default function BlogCategoryHubPage() {
           </div>
         </div>
       </section>
+      <section className="pb-6 sm:pb-8">
+        <div className="container">
+          <SuccessStoriesBar />
+        </div>
+      </section>
+      {!loading && !hasAnyBlogPosts && (
+        <section className="pb-2 sm:pb-4">
+          <div className="container">
+            <BlogComingSoonCard categoryName={categoryName} />
+          </div>
+        </section>
+      )}
       {/* Hero Section: First Article + Latest 3-4 */}
+      {(loading || hasAnyArticlePosts) && (
       <section className="border-b border-gray-200">
         <div className="container py-8 lg:py-12">
           <div className="grid lg:grid-cols-2 gap-8">
@@ -361,6 +405,7 @@ export default function BlogCategoryHubPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Must Reads Section */}
       {mustReads.length > 0 && (
@@ -393,20 +438,21 @@ export default function BlogCategoryHubPage() {
         </section>
       )}
 
-      {/* Latest Articles List + Popular Articles Sidebar */}
+      {/* More Articles + Popular Articles Sidebar */}
+      {(loading || feedArticles.length > 0 || popularArticles.length > 0) && (
       <section className="py-12 bg-gray-50">
         <div className="container">
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Latest Articles with Images (Left - 2 columns) */}
+            {/* More Articles (Left - 2 columns) */}
             <div className="lg:col-span-2">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Seneste nyt</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Flere artikler</h2>
               <div className="space-y-6">
                 {loading ? (
                   <div className="text-gray-500">Indlæser…</div>
-                ) : latestArticles.length === 0 ? (
+                ) : feedArticles.length === 0 ? (
                   <div className="text-gray-500">Ingen artikler endnu.</div>
                 ) : (
-                  latestArticles.slice(0, 3).map(p => (
+                  feedArticles.slice(0, visibleFeedCount).map(p => (
                     <Link key={p.id} href={`/blog/${categorySlug}/${p.slug}`} className="group flex gap-4">
                       <div className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-gray-200">
                         {p.header_image_url ? (
@@ -429,6 +475,17 @@ export default function BlogCategoryHubPage() {
                   ))
                 )}
               </div>
+              {!loading && visibleFeedCount < feedArticles.length && (
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleFeedCount((prev) => prev + 6)}
+                    className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100 transition-colors"
+                  >
+                    Indlæs flere artikler
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Popular Articles (Right - 1 column) */}
@@ -458,6 +515,114 @@ export default function BlogCategoryHubPage() {
           </div>
         </div>
       </section>
+      )}
+      {categoryKey === 'keto' && (
+        <section id="podcast" className="py-12 bg-[#fcf8ea] border-y border-amber-100">
+          <div className="container">
+            <div className="rounded-2xl border border-amber-200 bg-[#fffdf4] p-6 sm:p-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-2">
+                Den danske Keto podcast
+              </h2>
+              <p className="text-base sm:text-lg text-center text-gray-700 mb-6 font-medium">
+                Keto / LCHF - Best practise - Vægttab og sundhed
+              </p>
+
+              <div className="flex items-center justify-center gap-3 mb-8">
+                {['🎧', '🟢', '🎙️', '📻', '▶️', '🎤'].map((icon, i) => (
+                  <span key={`${icon}-${i}`} className="h-10 w-10 rounded-full bg-white border border-amber-200 flex items-center justify-center text-lg">
+                    {icon}
+                  </span>
+                ))}
+              </div>
+
+              {loading ? (
+                <p className="text-sm text-gray-600 text-center">Indlæser afsnit…</p>
+              ) : featuredPodcast ? (
+                <>
+                  <div className="grid lg:grid-cols-[1fr_1fr] gap-8 items-start">
+                    <Link
+                      href={`/blog/${categorySlug}/${featuredPodcast.slug}`}
+                      className="group block"
+                    >
+                      <div className="relative aspect-square overflow-hidden rounded-xl bg-gray-200 border border-amber-200">
+                        {featuredPodcast.header_image_url ? (
+                          <img
+                            src={featuredPodcast.header_image_url}
+                            alt={featuredPodcast.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                            Podcast cover
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+
+                    <div className="text-gray-800">
+                      <div className="text-amber-800 text-sm italic font-medium">Om Keto</div>
+                      <Link href={`/blog/${categorySlug}/${featuredPodcast.slug}`} className="group">
+                        <h3 className="mt-1 text-xl sm:text-2xl font-bold text-gray-900 leading-tight tracking-tight group-hover:text-amber-700 transition-colors">
+                          {featuredPodcast.title}
+                        </h3>
+                      </Link>
+                      <div className="mt-2 mb-4 text-sm text-gray-600 font-medium">
+                        {estimateReadTime(featuredPodcast.excerpt)} min læsetid
+                      </div>
+                      <p className="text-sm sm:text-base leading-relaxed mb-4 text-gray-700 font-normal">
+                        Den danske Keto podcast er en dansk talende podcast, der går i dybden med alt Keto, lige fra vægttab, best practises, faste, kost, og motion.
+                      </p>
+                      <p className="text-sm sm:text-base leading-relaxed mb-6 text-gray-700 font-normal">
+                        Den dykker ned i faglige emner, og gør dem spiselige for alle, samt interviewer nøglepersoner, der er relevante inden for Keto, kost og sundhed.
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Link
+                          href={`/blog/${categorySlug}/${featuredPodcast.slug}`}
+                          className="inline-flex items-center justify-center rounded-xl bg-amber-400 hover:bg-amber-500 text-white font-semibold px-6 py-3 transition-colors"
+                        >
+                          ▶ Hør podcast
+                        </Link>
+                        <a
+                          href="#podcast-episodes-list"
+                          className="inline-flex items-center justify-center rounded-xl bg-amber-800/80 hover:bg-amber-800 text-white font-semibold px-6 py-3 transition-colors"
+                        >
+                          Alle episoder
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="podcast-episodes-list" className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[featuredPodcast, ...morePodcastEpisodes].slice(0, 9).map((episode) => (
+                      <Link
+                        key={episode.id}
+                        href={`/blog/${categorySlug}/${episode.slug}`}
+                        className="group rounded-xl border border-amber-200 bg-white p-4 hover:shadow-sm hover:border-amber-300 transition-all"
+                      >
+                        <div className="text-[11px] text-amber-700 font-semibold uppercase tracking-wide mb-1">
+                          Podcast
+                        </div>
+                        <h4 className="text-base font-semibold text-gray-900 line-clamp-2 group-hover:text-amber-700 transition-colors">
+                          {episode.title}
+                        </h4>
+                        {episode.excerpt && (
+                          <p className="mt-2 text-sm text-gray-600 line-clamp-2">{episode.excerpt}</p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-amber-100 bg-white p-4">
+                  <p className="text-sm text-gray-700">
+                    De første keto podcast-afsnit bliver vist her. Brug slug/tag/post type med <code className="mx-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs">podcast</code>, så samles de automatisk i denne sektion.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA: Madbudget */}
       <section className="py-16 bg-gray-900 text-white">

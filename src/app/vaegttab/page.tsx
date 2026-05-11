@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Target, Leaf, Brain, Zap, Check, X, AlertCircle, Heart, Moon, Activity, ShoppingCart, BookOpen, HelpCircle } from 'lucide-react'
 import WeightLossBlogSection from '@/components/WeightLossBlogSection'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 export default function WeightLossPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -53,6 +54,11 @@ export default function WeightLossPage() {
               </Link>
             </div>
           </div>
+        </div>
+      </section>
+      <section className="py-4 bg-emerald-50/60 border-b border-emerald-100">
+        <div className="container">
+          <SuccessStoriesBar />
         </div>
       </section>
 

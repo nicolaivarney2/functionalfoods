@@ -20,10 +20,14 @@ export const metadata: Metadata = {
   title: 'Om os | Functional Foods',
   description:
     'Hvem står bag Functional Foods, og hvorfor vi bygger madplaner der følger danske tilbud, din familie og dit budget.',
+  alternates: {
+    canonical: 'https://functionalfoods.dk/bag-om-ff',
+  },
   openGraph: {
     title: 'Om Functional Foods',
     description:
       'Mission, team og løfte: sundhed i hverdagen uden unødig kompleksitet – med rod i evidens og dansk dagligvarevirkelighed.',
+    url: 'https://functionalfoods.dk/bag-om-ff',
   },
 }
 

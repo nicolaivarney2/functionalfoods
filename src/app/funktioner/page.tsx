@@ -35,10 +35,14 @@ export const metadata: Metadata = {
   title: 'Funktioner | Functional Foods',
   description:
     'Oversigt over Madbudget, madplaner ud fra tilbud, vægttabsrejse, opskrifter med makro og mikro, smart indkøbsliste på sms og vægt tracker.',
+  alternates: {
+    canonical: 'https://functionalfoods.dk/funktioner',
+  },
   openGraph: {
     title: 'Funktioner | Functional Foods',
     description:
       'Se hvad du kan på Functional Foods — madplaner, tilbud, ernæring, opskrifter og personlig støtte.',
+    url: 'https://functionalfoods.dk/funktioner',
   },
 }
 
@@ -113,7 +117,7 @@ export default function FunktionerOversigtPage() {
                 <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
                   <div className="text-center px-4">
                     <Video className="mx-auto h-10 w-10 text-slate-400" aria-hidden />
-                    <p className="mt-2 text-xs font-medium text-slate-500">Video — indsættes her</p>
+                    <p className="mt-2 text-xs font-medium text-slate-500">Video på vej.</p>
                   </div>
                 </div>
                 <div className="flex flex-1 flex-col p-5">

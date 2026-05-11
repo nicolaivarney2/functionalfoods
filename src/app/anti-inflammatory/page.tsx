@@ -13,6 +13,7 @@ import {
   Microscope,
   BookOpen,
 } from 'lucide-react'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 type InfoTab = 'grundlag' | 'naering'
 
@@ -67,6 +68,11 @@ export default function AntiInflammatoryPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+      <section className="py-4 bg-emerald-50/60 border-b border-emerald-100">
+        <div className="container">
+          <SuccessStoriesBar />
         </div>
       </section>
 

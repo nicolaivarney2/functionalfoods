@@ -27,10 +27,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: `${category.name} opskrifter | Functional Foods`,
     description: category.description,
     keywords: `${category.name}, opskrifter, vægttab, sunde opskrifter, danske opskrifter`,
+    alternates: {
+      canonical: `https://functionalfoods.dk/opskrifter/${category.slug}`,
+    },
     openGraph: {
       title: `${category.name} opskrifter`,
       description: category.description,
       type: 'website',
+      url: `https://functionalfoods.dk/opskrifter/${category.slug}`,
     },
   }
 }

@@ -141,6 +141,17 @@ const mockStores = [
   { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false }
 ]
 
+const DIETARY_APPROACH_OPTIONS = [
+  { id: 'keto', name: 'Keto', desc: 'Højt fedt, moderat protein, meget lavt kulhydrat' },
+  { id: 'sense', name: 'Sense', desc: 'Balanceret tilgang til sund mad og vægttab' },
+  { id: 'glp-1', name: 'GLP-1', desc: 'Tilpasset til GLP-1 medicin' },
+  { id: 'anti-inflammatory', name: 'Anti-inflammatorisk', desc: 'Fokuserer på anti-inflammatoriske fødevarer' },
+  { id: 'flexitarian', name: 'Fleksitarisk', desc: 'Primært plantebaseret med lejlighedsvis kød' },
+  { id: '5-2', name: '5:2 diæt', desc: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag' },
+  { id: 'proteinrig-kost', name: 'Proteinrig kost', desc: 'Proteinrige opskrifter til optimal næring' },
+  { id: 'familiemad', name: 'Kalorietælling', desc: 'Almindelig familiemad med planlagte kalorier og fuld næring — hele familien kan spise med' }
+] as const
+
 interface AdultProfile {
   id: string
   gender?: 'male' | 'female'
@@ -1441,6 +1452,34 @@ export default function MadbudgetPage() {
     }))
   }
 
+  const selectedPlanDietaryApproach = useMemo(() => {
+    const firstWithApproach = familyProfile.adultsProfiles.find((p) => Boolean(p?.dietaryApproach))
+    return firstWithApproach?.dietaryApproach || ''
+  }, [familyProfile.adultsProfiles])
+
+  const syncDietaryApproachAcrossAdults = (dietaryApproach: string) => {
+    if (!dietaryApproach) return
+    setFamilyProfile((prev) => {
+      const profiles = Array.from({ length: prev.adults }, (_, i) => {
+        const existing = prev.adultsProfiles[i]
+        if (existing) {
+          return {
+            ...existing,
+            mealsPerDay: existing.mealsPerDay?.length ? existing.mealsPerDay : ['dinner'],
+            dietaryApproach,
+          } as AdultProfile
+        }
+        return {
+          id: `adult-${Date.now()}-${i}`,
+          mealsPerDay: ['dinner'],
+          dietaryApproach,
+          isComplete: false,
+        } as AdultProfile
+      })
+      return { ...prev, adultsProfiles: profiles }
+    })
+  }
+
   const openRecipeDetail = (recipe: any) => {
     setSelectedRecipe(recipe)
     setShowRecipeDetail(true)
@@ -1509,10 +1548,15 @@ export default function MadbudgetPage() {
       ...candidate,
       isComplete: complete
     } as AdultProfile
+    const syncedProfiles = updatedProfiles.map((p, idx) =>
+      idx === editingAdultIndex
+        ? p
+        : ({ ...p, dietaryApproach: candidate.dietaryApproach || p.dietaryApproach } as AdultProfile)
+    )
     
     setFamilyProfile(prev => ({
       ...prev,
-      adultsProfiles: updatedProfiles
+      adultsProfiles: syncedProfiles
     }))
     
     // Save to database immediately
@@ -1537,7 +1581,7 @@ export default function MadbudgetPage() {
               variationLevel,
               weeklyBudgetKr: familyProfile.weeklyBudgetKr
             },
-            adultProfiles: updatedProfiles
+            adultProfiles: syncedProfiles
           })
         })
       }
@@ -2731,6 +2775,40 @@ export default function MadbudgetPage() {
                     mealsStatus.hasLunch && 'frokost',
                     mealsStatus.hasDinner && 'aftensmad'
                   ].filter(Boolean).join(' og ')
+                  const includedMealsCount = [
+                    mealsStatus.hasBreakfast,
+                    mealsStatus.hasLunch,
+                    mealsStatus.hasDinner
+                  ].filter(Boolean).length
+                  const vitaminFoodSuggestions: Record<string, string> = {
+                    A: 'gulerod, sød kartoffel, grønkål, æg eller leverpostej',
+                    B12: 'oksekød, æg, fisk eller mejeriprodukter',
+                    C: 'peberfrugt, citrusfrugter, broccoli eller bær',
+                    D: 'laks/makrel, æg, torskelever eller berigede mejeriprodukter',
+                    E: 'mandler, hasselnødder, avocado, spinat eller planteolier',
+                    K: 'spinat, broccoli, grønkål eller kål'
+                  }
+                  const remainingNutrition = [
+                    { label: 'Kalorier', remaining: Math.max(0, Math.round((targetCal - avg.calories) * 10) / 10), unit: 'kcal', target: targetCal },
+                    { label: 'Protein', remaining: Math.max(0, Math.round((targetP - avg.protein) * 10) / 10), unit: 'g', target: targetP },
+                    { label: 'Kulhydrater', remaining: Math.max(0, Math.round((targetK - avg.carbs) * 10) / 10), unit: 'g', target: targetK },
+                    { label: 'Fedt', remaining: Math.max(0, Math.round((targetF - avg.fat) * 10) / 10), unit: 'g', target: targetF },
+                    { label: 'Fiber', remaining: Math.max(0, Math.round((targetFiber - avg.fiber) * 10) / 10), unit: 'g', target: targetFiber },
+                  ].filter((row) => row.target > 0)
+                  const remainingVitamins = mergedVitamins
+                    .map((row) => ({
+                      ...row,
+                      remaining: Math.max(0, Math.round((row.rda - row.value) * 100) / 100),
+                    }))
+                    .filter((row) => row.remaining > 0.01)
+                    .sort((a, b) => a.pct - b.pct)
+                  const topVitaminSuggestions = remainingVitamins
+                    .slice(0, 3)
+                    .map((row) => {
+                      const key = String(row.display || '').toUpperCase()
+                      const foods = vitaminFoodSuggestions[key] || 'grøntsager, fisk, æg og magert kød'
+                      return `Vitamin ${row.display}: ${foods}`
+                    })
 
                   const weekHighlights: string[] = []
                   const nutritionWarnings: string[] = []
@@ -2796,7 +2874,7 @@ export default function MadbudgetPage() {
                         </div>
                       {isPartialData && (
                         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                          <strong>Valgte måltider:</strong> {includedMealsLabel || 'Ingen'}. Tallene viser ernæring fra de valgte måltider og kan bruges som pejlemærke. Tilføj flere måltider for en fuld dagsvurdering.
+                          <strong>Bemærk:</strong> Kun {includedMealsLabel || 'valgte måltider'} er inkluderet. Tallene her dækker ikke hele dagen, men viser hvad der mangler for at nå dit daglige mål.
                         </div>
                       )}
                       {!hasAnyData ? (
@@ -2813,24 +2891,18 @@ export default function MadbudgetPage() {
                             ].map(({ label, value, unit, target }) => {
                               const num = typeof value === 'number' ? Math.round(value * 10) / 10 : 0
                               const pct = target > 0 ? Math.min(100, Math.round((num / target) * 100)) : 0
-                              const showFullTargetComparison = target > 0 && !isPartialData
                               return (
                                 <div key={label}>
                                   <div className="flex justify-between text-xs mb-0.5">
                                     <span className="text-gray-600">{label}</span>
-                                    <span className="font-medium text-gray-900 text-right">
+                                    <span className="font-medium text-gray-900">
                                       {num} {unit}
-                                      {showFullTargetComparison && (
+                                      {target > 0 && (
                                         <span className="font-normal text-gray-500 ml-1">/ {target}</span>
-                                      )}
-                                      {target > 0 && isPartialData && (
-                                        <span className="block text-[11px] font-normal text-gray-500">
-                                          Dagsmål: {target} {unit}
-                                        </span>
                                       )}
                                     </span>
                                   </div>
-                                  {showFullTargetComparison && (
+                                  {target > 0 && (
                                     <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
                                       <div
                                         className="h-full bg-green-500 rounded-full transition-all"
@@ -2842,6 +2914,38 @@ export default function MadbudgetPage() {
                               )
                             })}
                           </div>
+                          {isPartialData && remainingNutrition.length > 0 && (
+                            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                              <h5 className="text-xs font-medium text-blue-900 mb-2">
+                                Til gode i dagens øvrige måltider
+                              </h5>
+                              <p className="text-[11px] leading-relaxed text-blue-800 mb-2">
+                                Du har valgt {includedMealsCount} ud af 3 måltider i Functionalfoods-systemet, så her er hvad du i gennemsnit har til overs til resten af dagen:
+                              </p>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2">
+                                {remainingNutrition.map((row) => (
+                                  <div key={row.label} className="rounded-md bg-white/70 px-2 py-1">
+                                    <div className="text-[11px] text-blue-700">{row.label}</div>
+                                    <div className="text-xs font-semibold text-blue-900">
+                                      {row.remaining} {row.unit}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              {remainingVitamins.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <p className="text-[11px] leading-relaxed text-blue-800">
+                                    Laveste vitamindækning lige nu: {remainingVitamins.slice(0, 3).map((row) => `Vitamin ${row.display} (${row.remaining} ${row.unit} til vejledende mål)`).join(', ')}.
+                                  </p>
+                                  {topVitaminSuggestions.map((tip) => (
+                                    <p key={tip} className="text-[11px] leading-relaxed text-blue-900">
+                                      <strong>Forslag:</strong> {tip}
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className="border-t border-gray-200 pt-3">
                             <button
@@ -3959,6 +4063,36 @@ export default function MadbudgetPage() {
 
                   {familyProfile.adults > 0 && (
                     <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700">
+                        Madniche for madplanen
+                      </label>
+                      <p className="mb-3 text-xs text-gray-500">
+                        Denne niche gælder hele madplanen. Vælger du den her, bruges samme niche for alle voksne.
+                      </p>
+                      <div className="mb-4 grid grid-cols-1 gap-2">
+                        {DIETARY_APPROACH_OPTIONS.map((approach) => (
+                          <label
+                            key={approach.id}
+                            className={`flex cursor-pointer items-center rounded-lg border p-3 transition-all ${
+                              selectedPlanDietaryApproach === approach.id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="familyPlanDietaryApproach"
+                              className="mr-3"
+                              checked={selectedPlanDietaryApproach === approach.id}
+                              onChange={() => syncDietaryApproachAcrossAdults(approach.id)}
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{approach.name}</div>
+                              <div className="text-xs text-gray-600">{approach.desc}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
                       <label className="mb-3 block text-sm font-medium text-gray-700">
                         Vægttabsprofiler for voksne
                       </label>
@@ -4636,17 +4770,11 @@ export default function MadbudgetPage() {
                     className="space-y-4"
                   >
                     <h4 className="text-lg font-semibold text-gray-900 mb-4">Kostretning</h4>
+                    <p className="mb-3 text-xs text-gray-500">
+                      Valg her synkroniseres med madplanens niche og bruges på tværs af alle voksne.
+                    </p>
                     <div className="grid grid-cols-1 gap-3">
-                      {[
-                        { id: 'keto', name: 'Keto', desc: 'Højt fedt, moderat protein, meget lavt kulhydrat' },
-                        { id: 'sense', name: 'Sense', desc: 'Balanceret tilgang til sund mad og vægttab' },
-                        { id: 'glp-1', name: 'GLP-1', desc: 'Tilpasset til GLP-1 medicin' },
-                        { id: 'anti-inflammatory', name: 'Anti-inflammatorisk', desc: 'Fokuserer på anti-inflammatoriske fødevarer' },
-                        { id: 'flexitarian', name: 'Fleksitarisk', desc: 'Primært plantebaseret med lejlighedsvis kød' },
-                        { id: '5-2', name: '5:2 diæt', desc: '5 dage normal spisning, 2 dage med meget lavt kalorieindtag' },
-                        { id: 'proteinrig-kost', name: 'Proteinrig kost', desc: 'Proteinrige opskrifter til optimal næring' },
-                        { id: 'familiemad', name: 'Kalorietælling', desc: 'Almindelig familiemad med planlagte kalorier og fuld næring — hele familien kan spise med' }
-                      ].map((approach) => (
+                      {DIETARY_APPROACH_OPTIONS.map((approach) => (
                         <label
                           key={approach.id}
                           className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${

@@ -17,10 +17,14 @@ export const metadata: Metadata = {
   title: 'Om Nicolai Varney | Functional Foods',
   description:
     'Hvem er nicolaivarney bag bloggen: paramediciner, stifter af Functional Foods, tidligere Ketoliv – og hvorfor sundhed skal kunne bruges i dansk hverdag.',
+  alternates: {
+    canonical: 'https://functionalfoods.dk/bag-om-ff/nicolaivarney',
+  },
   openGraph: {
     title: 'Om Nicolai Varney',
     description:
       'Paramediciner og iværksætter bag Functional Foods. Læs om baggrund, arbejde og hvad du kan forvente af indholdet.',
+    url: 'https://functionalfoods.dk/bag-om-ff/nicolaivarney',
   },
 }
 

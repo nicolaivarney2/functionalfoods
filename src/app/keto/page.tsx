@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { ArrowRight, Target, TrendingDown, Brain, Zap, Sparkles, ChevronRight, BookOpen } from 'lucide-react'
+import SuccessStoriesBar from '@/components/SuccessStoriesBar'
 
 export default function KetoPage() {
   const [isVisible, setIsVisible] = useState(false)
@@ -45,6 +46,11 @@ export default function KetoPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+      <section className="py-4 bg-emerald-50/60 border-b border-emerald-100">
+        <div className="container">
+          <SuccessStoriesBar />
         </div>
       </section>
 
@@ -110,7 +116,7 @@ export default function KetoPage() {
             </Link>
 
             <Link
-              href="/blog/keto"
+              href="/blog/keto#podcast"
               className="group bg-white border-2 border-gray-100 rounded-3xl p-8 hover:border-amber-200 hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-500 transform hover:-translate-y-2"
             >
               <div className="flex items-center gap-4 mb-6">
@@ -119,16 +125,16 @@ export default function KetoPage() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900 group-hover:text-amber-600 transition-colors">
-                    Keto på bloggen
+                    Keto blog + podcast
                   </h3>
-                  <p className="text-gray-500">Artikler og guides</p>
+                  <p className="text-gray-500">Artikler, guides og afsnit</p>
                 </div>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Nyheder, guides og dybdegående artikler om keto – samlet ét sted.
+                Nyheder, guides og keto podcast-afsnit samlet ét sted.
               </p>
               <div className="flex items-center text-amber-600 group-hover:text-amber-700 font-medium">
-                Gå til Keto-bloggen
+                Gå til keto indhold
                 <ChevronRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>

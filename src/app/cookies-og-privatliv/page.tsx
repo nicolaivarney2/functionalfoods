@@ -6,9 +6,13 @@ export const metadata: Metadata = {
   title: 'Cookies og privatliv | Functional Foods',
   description:
     'Sådan bruger vi cookies, Google Analytics og Meta Pixel — skrevet i et sprog vi selv ville gide at læse.',
+  alternates: {
+    canonical: 'https://functionalfoods.dk/cookies-og-privatliv',
+  },
   openGraph: {
     title: 'Cookies og privatliv',
     description: 'En enkel forklaring på, hvad der gemmes og hvorfor.',
+    url: 'https://functionalfoods.dk/cookies-og-privatliv',
   },
 }
 
