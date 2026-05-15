@@ -62,67 +62,6 @@ const DIETARY_OPTIONS = [
   { value: 'kalorietaelling', label: 'Kalorietælling' },
 ]
 
-const MOCK_STORIES: Story[] = [
-  {
-    id: 'mock-1',
-    headline: 'Fra aftensult til stabil energi hele dagen',
-    displayName: 'Louise, 38',
-    dietaryApproach: 'keto',
-    exercised: true,
-    storyText:
-      'Jeg startede med at fokusere på mæthed og faste måltidsrutiner. Efter 3 uger stoppede mine cravings næsten helt, og jeg kunne holde planen uden at føle afsavn.',
-    tipsText:
-      'Planlæg 2-3 “sikre” måltider du altid kan lave. Det gjorde det let at holde kursen på travle dage.',
-    beforeWeightKg: null,
-    afterWeightKg: null,
-    durationWeeks: 20,
-    reportedAt: '2026-03-12',
-    beforeImageUrl:
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=900&q=80',
-    afterImageUrl:
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80',
-    weightLossKg: 16,
-  },
-  {
-    id: 'mock-2',
-    headline: 'Sense gav ro i hverdagen og langsomt stabilt vægttab',
-    displayName: 'Mette, 46',
-    dietaryApproach: 'sense',
-    exercised: false,
-    storyText:
-      'Jeg havde brug for noget, der passede til familielivet. Med portionsstyring og faste vaner tabte jeg mig støt uden at føle mig “på kur”.',
-    tipsText: 'Tag billeder af dine tallerkener i starten. Det gav mig overblik over mine vaner.',
-    beforeWeightKg: null,
-    afterWeightKg: null,
-    durationWeeks: 28,
-    reportedAt: '2026-02-18',
-    beforeImageUrl:
-      'https://images.unsplash.com/photo-1506863530036-1efeddceb993?auto=format&fit=crop&w=900&q=80',
-    afterImageUrl:
-      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80',
-    weightLossKg: 14,
-  },
-  {
-    id: 'mock-3',
-    headline: 'GLP-1 inspireret kost hjalp mig med at holde mæthed',
-    displayName: 'Anders, 34',
-    dietaryApproach: 'glp-1',
-    exercised: true,
-    storyText:
-      'Mit fokus var protein, grønt og simple måltider. Kombinationen af daglige gåture og høj mæthed gjorde det meget lettere at holde kalorieunderskud.',
-    tipsText: 'Spis protein først i måltidet. Jeg blev hurtigere mæt og snackede mindre.',
-    beforeWeightKg: null,
-    afterWeightKg: null,
-    durationWeeks: 32,
-    reportedAt: '2026-04-01',
-    beforeImageUrl:
-      'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?auto=format&fit=crop&w=900&q=80',
-    afterImageUrl:
-      'https://images.unsplash.com/photo-1506863530036-1efeddceb993?auto=format&fit=crop&w=900&q=80',
-    weightLossKg: 21,
-  },
-]
-
 function prettifyDiet(value: string) {
   const match = DIETARY_OPTIONS.find((opt) => opt.value === value)
   return match?.label || value
@@ -206,9 +145,11 @@ export default function SuccessStoriesPage() {
         }
         if (!alive) return
         setStories(Array.isArray(json.stories) ? json.stories : [])
-        setStats(json.stats || null)
+        setStats(json.stats ?? null)
       } catch (err) {
         if (!alive) return
+        setStories([])
+        setStats(null)
         setLoadError(err instanceof Error ? err.message : 'Kunne ikke hente data')
       } finally {
         if (alive) setLoadingStories(false)
@@ -277,8 +218,7 @@ export default function SuccessStoriesPage() {
     }
   }, [turnstileSiteKey, showSubmitModal])
 
-  const visibleStories = stories.length > 0 ? stories : MOCK_STORIES
-  const visibleStats = stats || buildStats(visibleStories)
+  const displayStats = stats ?? buildStats(stories)
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -390,24 +330,24 @@ export default function SuccessStoriesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs text-slate-500">Godkendte historier</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{visibleStats.totalStories}</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{displayStats.totalStories}</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs text-slate-500">Gennemsnitligt vægttab</p>
-              <p className="mt-1 text-2xl font-bold text-slate-900">{visibleStats.averageWeightLossKg} kg</p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">{displayStats.averageWeightLossKg} kg</p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs text-slate-500">Top kostniche (gns.)</p>
               <p className="mt-1 text-lg font-semibold text-slate-900">
-                {visibleStats.topDietaryApproach
-                  ? `${prettifyDiet(visibleStats.topDietaryApproach.diet)} (${visibleStats.topDietaryApproach.avgLoss} kg)`
+                {displayStats.topDietaryApproach
+                  ? `${prettifyDiet(displayStats.topDietaryApproach.diet)} (${displayStats.topDietaryApproach.avgLoss} kg)`
                   : 'Ingen data endnu'}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <p className="text-xs text-slate-500">Motion vs. ingen motion</p>
               <p className="mt-1 text-sm text-slate-800">
-                {visibleStats.avgWithExercise} kg vs. {visibleStats.avgWithoutExercise} kg
+                {displayStats.avgWithExercise} kg vs. {displayStats.avgWithoutExercise} kg
               </p>
             </div>
           </div>
@@ -420,11 +360,21 @@ export default function SuccessStoriesPage() {
             {loadingStories && <div className="rounded-xl border border-slate-200 bg-white p-4 text-slate-600">Indlæser succeshistorier...</div>}
             {loadError && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
-                {loadError}. Viser eksempeldata indtil live-historier er klar.
+                {loadError}
               </div>
             )}
 
-            {visibleStories.map((story) => (
+            {!loadingStories && !loadError && stories.length === 0 && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-600 shadow-sm">
+                <p className="text-lg font-semibold text-slate-900">Ingen succeshistorier endnu</p>
+                <p className="mt-2 text-sm leading-relaxed">
+                  Når godkendte historier er på plads, vises de her. Har du selv en historie, kan du dele den ovenfor —
+                  den skal godkendes før den bliver synlig for alle.
+                </p>
+              </div>
+            )}
+
+            {stories.map((story) => (
               <article
                 key={story.id}
                 className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm"

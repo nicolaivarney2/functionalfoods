@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
-import ComingSoonWrapper from '@/components/ComingSoonWrapper'
+import AuthRequiredFeatureGate from '@/components/AuthRequiredFeatureGate'
 
 
 // Types
@@ -742,24 +742,9 @@ export default function DagligvarerPage() {
   }
 
   return (
-    <ComingSoonWrapper
-      modalTitle="Dagligvarer - Kommer snart!"
-      modalContent={
-        <>
-          <p>
-            Vi er ved at udvikle et dagligvarer-setup, der gør, at du kan lave automatiske madplaner ud fra ugens og næste ugens tilbud i alle dagligvarerforretninger.
-          </p>
-          <p>
-            Her på siden vil du kunne se tilbud og priser på alle dagligvarer i Danmark.
-          </p>
-          <p>
-            Både madplaner, vægttabsplaner og meget mere.
-          </p>
-          <p className="font-semibold text-blue-600 mt-4">
-            Færdigt i starten af 2026. Stay tuned!
-          </p>
-        </>
-      }
+    <AuthRequiredFeatureGate
+      featureTitle="Dagligvarer"
+      description="Tilbud og priser på tværs af butikker kræver login, så vi kan vise dig relevante data og du kan bruge funktionen fuldt ud."
     >
       <style jsx>{`
         .scrollbar-hide {
@@ -1438,6 +1423,6 @@ export default function DagligvarerPage() {
         </div>
       )}
       </div>
-    </ComingSoonWrapper>
+    </AuthRequiredFeatureGate>
   )
 }

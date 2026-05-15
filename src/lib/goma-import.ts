@@ -367,7 +367,9 @@ export async function importGomaProducts(options: ImportOptions) {
         p_source: null,
       }
 
-      const res = await fetch('https://api.goma.gg/rest/v1/rpc/search_products_advanced_v2', {
+      // Goma migrerede 2026-05 fra search_products_advanced_v2 (kræver privilegeret
+      // role) til search_products_public_v1 (offentligt anon key).
+      const res = await fetch('https://api.goma.gg/rest/v1/rpc/search_products_public_v1', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -727,7 +729,7 @@ export async function importGomaProducts(options: ImportOptions) {
         }
 
         const verifyRes = await fetch(
-          'https://api.goma.gg/rest/v1/rpc/search_products_advanced_v2',
+          'https://api.goma.gg/rest/v1/rpc/search_products_public_v1',
           {
             method: 'POST',
             headers: {

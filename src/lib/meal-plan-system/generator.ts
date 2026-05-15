@@ -509,15 +509,27 @@ export class MealPlanGenerator {
     const completedApproaches = completedAdults
       .map((p) => String(p.dietaryApproach || '').trim())
       .filter(Boolean)
+
+    // Hvis ingen voksne er "fully completed" (fx fordi UI'et kun sender
+    // dietaryApproach/mealsPerDay/weightGoal videre), så brug alle voksne
+    // der har en valgt kostretning som fallback. Dette sikrer at fx
+    // proteinrig faktisk slår igennem, også når height/weight ikke følger
+    // med i payloadet.
+    const approachesForSelection = completedApproaches.length > 0
+      ? completedApproaches
+      : familyProfile.adultsProfiles
+          .map((p) => String(p.dietaryApproach || '').trim())
+          .filter(Boolean)
+
     let primaryDietaryApproach =
-      completedApproaches[0] ||
+      approachesForSelection[0] ||
       familyProfile.adultsProfiles[0]?.dietaryApproach ||
       'sense'
 
-    if (hasChildren && completedApproaches.includes('familiemad')) {
+    if (hasChildren && approachesForSelection.includes('familiemad')) {
       primaryDietaryApproach = 'familiemad'
-    } else if (hasChildren && completedApproaches.length > 0) {
-      const allKeto = completedApproaches.every((d) => d === 'keto')
+    } else if (hasChildren && approachesForSelection.length > 0) {
+      const allKeto = approachesForSelection.every((d) => d === 'keto')
       if (allKeto) {
         primaryDietaryApproach = 'keto'
       }

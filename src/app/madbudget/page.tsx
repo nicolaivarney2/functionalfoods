@@ -12,6 +12,7 @@ import { mealPlanGenerator, getPeoplePerMealFromAdultsProfiles } from '@/lib/mea
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 import { resolveFactoryDietId } from '@/lib/diet-tag-matching'
 import { recipeMatchesDiet } from '@/lib/recipe-diet-matcher'
+import AuthRequiredFeatureGate from '@/components/AuthRequiredFeatureGate'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -1673,12 +1674,21 @@ export default function MadbudgetPage() {
           adults: familyProfile.adults,
           children: familyProfile.children,
           childrenAges: familyProfile.childrenAges || [],
+          // VIGTIGT: Send alle de felter generatorens completedAdults-check
+          // bruger (age/height/weight/activityLevel/gender), ellers vil
+          // generatoren falde tilbage til adultsProfiles[0].dietaryApproach
+          // og ignorere kostvalg på voksen 2/3/etc.
           adultsProfiles: familyProfile.adultsProfiles.map(p => ({
+            gender: p.gender,
+            age: p.age,
+            height: p.height,
+            weight: p.weight,
+            activityLevel: p.activityLevel,
             dietaryApproach: p.dietaryApproach,
             mealsPerDay: p.mealsPerDay || ['dinner'],
             weightGoal: p.weightGoal,
             excludedFoods: []
-          })),
+          })) as any,
           excludedIngredients: familyProfile.excludedIngredients,
           selectedStores: familyProfile.selectedStores,
           prioritizeOrganic: familyProfile.prioritizeOrganic,
@@ -2045,6 +2055,10 @@ export default function MadbudgetPage() {
   const weekDates = getWeekDates()
 
   return (
+    <AuthRequiredFeatureGate
+      featureTitle="Madbudget"
+      description="Din madplan, familieindstillinger og indkøbsliste gemmes på din konto. Log ind eller opret en gratis bruger for at bruge Madbudget."
+    >
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -5042,5 +5056,6 @@ export default function MadbudgetPage() {
         }}
       />
     </div>
+    </AuthRequiredFeatureGate>
   )
 }

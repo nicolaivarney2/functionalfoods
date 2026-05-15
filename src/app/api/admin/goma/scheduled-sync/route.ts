@@ -117,6 +117,14 @@ export async function POST(req: NextRequest) {
 
     const overallSuccess = !importError && !cleanupError
 
+    // Altid HTTP 200 når vi har kørt sync/cleanup-logikken færdig. Fejl ligger i
+    // `success`, `importError` og `cleanupError` — ellers får GitHub Actions
+    // `curl --fail` på 500 uden at kunne læse body, og det forveksles ofte med
+    // timeout (`--max-time`). Kun uventede exceptions nedenfor giver 500.
+    if (!overallSuccess) {
+      console.warn('⚠️ scheduled-sync afsluttet med fejl:', { importError, cleanupError, stores })
+    }
+
     return NextResponse.json(
       {
         success: overallSuccess,
@@ -124,7 +132,7 @@ export async function POST(req: NextRequest) {
           ? stores.length === 0
             ? 'Ingen butikker planlagt til sync i dag, men cleanup blev kørt'
             : 'Scheduled Goma sync + cleanup gennemført'
-          : 'Scheduled Goma sync kørt med fejl',
+          : 'Scheduled Goma sync kørt med fejl (se importError / cleanupError)',
         dayIndex,
         stores,
         imported,
@@ -138,7 +146,7 @@ export async function POST(req: NextRequest) {
           : null,
         cleanupError,
       },
-      { status: overallSuccess ? 200 : 500 }
+      { status: 200 }
     )
   } catch (error) {
     console.error('❌ Error in scheduled Goma sync:', error)
