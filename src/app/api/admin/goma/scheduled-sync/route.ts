@@ -95,8 +95,35 @@ export async function POST(req: NextRequest) {
         })
         imported = result?.totalImported ?? 0
       } catch (err) {
-        importError = err instanceof Error ? err.message : 'Ukendt importfejl'
+        // Vi har set tilfælde hvor `err` ikke er en Error-instans (fx
+        // string-throws fra Promise.all eller AggregateError). Saml så meget
+        // info som muligt så vi kan diagnosticere uden at gætte.
+        const anyErr = err as any
+        const parts: string[] = []
+        if (anyErr?.name) parts.push(`${anyErr.name}`)
+        if (anyErr?.message) parts.push(`${anyErr.message}`)
+        if (typeof err === 'string') parts.push(err)
+        if (anyErr?.cause?.message) parts.push(`cause: ${anyErr.cause.message}`)
+        if (Array.isArray(anyErr?.errors)) {
+          // AggregateError fra Promise.any/Promise.allSettled
+          parts.push(
+            'errors: ' +
+              anyErr.errors
+                .map((e: any) => e?.message || String(e))
+                .filter(Boolean)
+                .join(' | '),
+          )
+        }
+        const fallback = parts.length > 0 ? parts.join(' — ') : (() => {
+          try {
+            return JSON.stringify(err)
+          } catch {
+            return String(err)
+          }
+        })()
+        importError = fallback || 'Ukendt importfejl'
         console.error('❌ Goma import fejlede i scheduled-sync:', err)
+        if (anyErr?.stack) console.error('stack:', anyErr.stack)
       }
     }
 
