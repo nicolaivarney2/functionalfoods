@@ -611,6 +611,65 @@ export default function MadbudgetPage() {
     setShoppingChecked((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const shoppingListCoverage = useMemo(() => {
+    if (!shoppingList?.categories) return null
+
+    const excludedCategoryNames = new Set(['varer du måske allerede har', 'andre'])
+    const relevantItems = shoppingList.categories
+      .filter((category: any) => !excludedCategoryNames.has(String(category?.name || '').toLowerCase().trim()))
+      .flatMap((category: any) => category?.items || [])
+      .filter((item: any) => item?.name && !item?.isBasis)
+
+    if (relevantItems.length === 0) return null
+
+    const normalize = (value: string) => String(value || '').toLowerCase().trim()
+    const findProductForItem = (storeKey: string, itemName: string) => {
+      const storePriceMap = storePrices[storeKey]
+      if (!storePriceMap) return null
+
+      const itemNameLower = normalize(itemName)
+      const direct = storePriceMap[itemNameLower]
+      if (direct) return direct
+
+      const foundKey = Object.keys(storePriceMap).find((key) => {
+        const normalizedKey = normalize(key)
+        return normalizedKey.includes(itemNameLower) || itemNameLower.includes(normalizedKey)
+      })
+      return foundKey ? storePriceMap[foundKey] : null
+    }
+
+    const selectedStoreKeys =
+      selectedStoreTab === 'all'
+        ? familyProfile.selectedStores
+            .map((storeId: number) => {
+              const storeKey = storeId === 1 ? 'rema-1000' :
+                              storeId === 2 ? 'netto' :
+                              storeId === 3 ? 'føtex' :
+                              storeId === 4 ? 'bilka' :
+                              storeId === 5 ? 'nemlig' :
+                              storeId === 6 ? 'meny' :
+                              storeId === 7 ? 'spar' :
+                              storeId === 8 ? 'løvbjerg' : ''
+              return storeKey
+            })
+            .filter(Boolean)
+        : [selectedStoreTab]
+
+    const found = relevantItems.filter((item: any) =>
+      selectedStoreKeys.some((storeKey) => Boolean(findProductForItem(storeKey, item.name)))
+    ).length
+
+    return {
+      found,
+      total: relevantItems.length,
+      percentage: Math.round((found / relevantItems.length) * 100),
+      label:
+        selectedStoreTab === 'all'
+          ? 'fundet i valgte butikker'
+          : `fundet i ${mockStores.find((store) => store.id === storeIdFromTabKey(selectedStoreTab))?.name || 'butikken'}`,
+    }
+  }, [shoppingList, storePrices, selectedStoreTab, familyProfile.selectedStores])
+
   const openSmartShoppingFlow = async () => {
     if (!shoppingList) return
     setSmartShareError('')
@@ -3133,6 +3192,18 @@ export default function MadbudgetPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {shoppingListCoverage && (
+                    <div className="flex flex-col gap-1 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <span className="font-semibold">{shoppingListCoverage.percentage}%</span>{' '}
+                        af indkøbslisten er {shoppingListCoverage.label}.
+                      </div>
+                      <div className="text-xs text-blue-800">
+                        {shoppingListCoverage.found}/{shoppingListCoverage.total} varer matchet
+                      </div>
+                    </div>
+                  )}
+
                   {/* Store Tabs */}
                   {familyProfile.selectedStores && familyProfile.selectedStores.length > 0 && (
                     <div className="border-b border-gray-200">

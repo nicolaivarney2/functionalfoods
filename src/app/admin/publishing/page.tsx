@@ -52,6 +52,28 @@ export default function AdminPublishingPage() {
   const [qualityFilter, setQualityFilter] = useState<'all' | 'missing-image' | 'missing-description' | 'missing-categories'>('all')
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
+  const [nutritionBatchSize, setNutritionBatchSize] = useState<25 | 50>(25)
+  const [nutritionBatchOffset, setNutritionBatchOffset] = useState(0)
+  const [nutritionBatchRunning, setNutritionBatchRunning] = useState(false)
+  const [nutritionBatchResult, setNutritionBatchResult] = useState<{
+    totalRecipes: number
+    offset: number
+    limit: number
+    nextOffset: number
+    hasMore: boolean
+    processed: number
+    success: number
+    errors: number
+    details?: Array<{
+      recipeId: string
+      title: string
+      status: 'success' | 'error'
+      message: string
+      matchedIngredients?: number
+      totalIngredients?: number
+      calories?: number
+    }>
+  } | null>(null)
   const [isScheduling, setIsScheduling] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [allowedCategories, setAllowedCategories] = useState<string[]>([])
@@ -836,34 +858,32 @@ export default function AdminPublishingPage() {
     return true
   })
 
-  const handleBulkNutritionRecalculation = async () => {
-    if (!confirm('⚠️ ADVARSEL: Denne handling vil genberegne mikro og makro ernæring for ALLE opskrifter på én gang. Dette kan tage flere minutter. Er du sikker på at du vil fortsætte?')) {
-      return;
-    }
-
+  const handleBulkNutritionRecalculation = async (offset = nutritionBatchOffset) => {
     try {
-      setSaving(true);
+      setNutritionBatchRunning(true)
       const response = await fetch('/api/recalculate-nutrition-bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-      });
+        body: JSON.stringify({ limit: nutritionBatchSize, offset }),
+      })
 
       if (!response.ok) {
-        throw new Error('Kunne ikke genberegne masse ernæring');
+        throw new Error('Kunne ikke genberegne ernærings-batch')
       }
 
-      const data = await response.json();
-      alert(`✅ Masse ernæring opdateret!\n\n${data.results.success} opskrifter opdateret\n${data.results.errors} fejl\n\nSe console for detaljer.`);
-      loadRecipes(); // Refresh recipes to show updated nutrition
+      const data = await response.json()
+      setNutritionBatchResult(data.results)
+      setNutritionBatchOffset(data.results?.nextOffset ?? offset + nutritionBatchSize)
+      loadRecipes()
     } catch (error) {
-      console.error('❌ Error bulk nutrition recalculation:', error);
-      alert(`❌ Fejl ved masse ernæring opdatering: ${error instanceof Error ? error.message : 'Ukendt fejl'}`);
+      console.error('❌ Error batch nutrition recalculation:', error)
+      alert(`❌ Fejl ved ernærings-batch: ${error instanceof Error ? error.message : 'Ukendt fejl'}`)
     } finally {
-      setSaving(false);
+      setNutritionBatchRunning(false)
     }
-  };
+  }
 
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -1090,16 +1110,83 @@ export default function AdminPublishingPage() {
           
           {/* Bulk Nutrition Recalculation */}
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Masse Opdatering af Ernæring</h4>
+            <h4 className="text-sm font-medium text-yellow-900 mb-2">🧪 Batch-opdatering af ernæring</h4>
             <p className="text-xs text-yellow-700 mb-3">
-              Genberegn mikro og makro ernæring på ALLE opskrifter på én gang
+              Genberegn mikro og makro ernæring med den samme Frida-logik som enkeltknappen. Kør 25 eller 50
+              opskrifter ad gangen for at undgå timeouts.
             </p>
-            <button
-              onClick={handleBulkNutritionRecalculation}
-              className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm hover:bg-yellow-700"
-            >
-              🔄 Masse Opdater Ernæring (Alle {recipes.length} Opskrifter)
-            </button>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-xs font-medium text-yellow-900">
+                Batch-størrelse
+                <select
+                  value={nutritionBatchSize}
+                  onChange={(e) => setNutritionBatchSize(Number(e.target.value) as 25 | 50)}
+                  disabled={nutritionBatchRunning}
+                  className="mt-1 block rounded-md border border-yellow-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </label>
+              <label className="text-xs font-medium text-yellow-900">
+                Start fra offset
+                <input
+                  type="number"
+                  min={0}
+                  value={nutritionBatchOffset}
+                  onChange={(e) => setNutritionBatchOffset(Math.max(0, Number(e.target.value) || 0))}
+                  disabled={nutritionBatchRunning}
+                  className="mt-1 block w-28 rounded-md border border-yellow-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => handleBulkNutritionRecalculation(nutritionBatchOffset)}
+                disabled={nutritionBatchRunning}
+                className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm hover:bg-yellow-700 disabled:opacity-60"
+              >
+                {nutritionBatchRunning
+                  ? 'Genberegner…'
+                  : `🔄 Kør næste ${nutritionBatchSize} opskrifter`}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNutritionBatchOffset(0)
+                  setNutritionBatchResult(null)
+                }}
+                disabled={nutritionBatchRunning}
+                className="rounded-md border border-yellow-300 bg-white px-4 py-2 text-sm text-yellow-900 hover:bg-yellow-100 disabled:opacity-60"
+              >
+                Nulstil
+              </button>
+            </div>
+            {nutritionBatchResult && (
+              <div className="mt-3 rounded-md bg-white/70 p-3 text-xs text-yellow-900">
+                <p className="font-medium">
+                  Sidste batch: {nutritionBatchResult.success} ok, {nutritionBatchResult.errors} fejl,
+                  {' '}offset {nutritionBatchResult.offset} → {nutritionBatchResult.nextOffset}
+                  {' '}af {nutritionBatchResult.totalRecipes}
+                </p>
+                {nutritionBatchResult.hasMore ? (
+                  <p className="mt-1">Næste klik fortsætter fra offset {nutritionBatchResult.nextOffset}.</p>
+                ) : (
+                  <p className="mt-1 font-semibold text-green-700">Alle opskrifter er behandlet.</p>
+                )}
+                {nutritionBatchResult.details && nutritionBatchResult.details.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                    {nutritionBatchResult.details.slice(0, 10).map((detail) => (
+                      <div key={detail.recipeId} className={detail.status === 'success' ? 'text-green-800' : 'text-red-700'}>
+                        {detail.status === 'success' ? '✓' : '✗'} {detail.title}
+                        {detail.status === 'success' && detail.matchedIngredients != null
+                          ? ` (${detail.matchedIngredients}/${detail.totalIngredients}, ${detail.calories ?? '?'} kcal)`
+                          : ` — ${detail.message}`}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

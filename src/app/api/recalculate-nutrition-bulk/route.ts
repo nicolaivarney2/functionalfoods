@@ -1,194 +1,139 @@
-import { NextResponse } from 'next/server'
-import { databaseService } from '@/lib/database-service'
-import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
-import { createSupabaseClient } from '@/lib/supabase'
-import { convertToGrams } from '@/lib/recipe-frida-nutrition-recalc'
+import { NextRequest, NextResponse } from 'next/server'
+import { createSupabaseServiceClient } from '@/lib/supabase'
+import { recalculateRecipeNutritionFromFrida } from '@/lib/recipe-frida-nutrition-recalc'
 
-export async function POST() {
+export const dynamic = 'force-dynamic'
+
+type BatchDetail = {
+  recipeId: string
+  title: string
+  status: 'success' | 'error'
+  message: string
+  matchedIngredients?: number
+  totalIngredients?: number
+  calories?: number
+}
+
+function clampBatchSize(value: unknown) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 25
+  return Math.min(50, Math.max(1, Math.floor(n)))
+}
+
+function parseOffset(value: unknown) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.floor(n))
+}
+
+async function getRecipeBatch(limit: number, offset: number) {
+  const supabase = createSupabaseServiceClient()
+  const { data, error, count } = await supabase
+    .from('recipes')
+    .select('id, title', { count: 'exact' })
+    .order('id', { ascending: true })
+    .range(offset, offset + limit - 1)
+
+  if (error) throw new Error(`Could not load recipe batch: ${error.message}`)
+  return { recipes: data || [], total: count || 0 }
+}
+
+export async function GET() {
   try {
-    console.log('🔄 Starting BULK nutrition recalculation for ALL recipes...')
+    const supabase = createSupabaseServiceClient()
+    const { count, error } = await supabase
+      .from('recipes')
+      .select('id', { count: 'exact', head: true })
 
-    // Initialize services
-    const matcher = new FridaDTUMatcher()
-    const supabase = createSupabaseClient()
-    
-    // Get all recipes (including drafts)
-    const allRecipes = await databaseService.getAllRecipes()
-    console.log(`📊 Found ${allRecipes.length} recipes to process`)
-    
-    const results = {
-      totalRecipes: allRecipes.length,
-      processed: 0,
-      success: 0,
-      errors: 0,
-      details: [] as Array<{
-        recipeId: string
-        title: string
-        status: 'success' | 'error'
-        message: string
-        matchedIngredients?: number
-        totalIngredients?: number
-      }>
-    }
+    if (error) throw new Error(error.message)
+    return NextResponse.json({ success: true, totalRecipes: count || 0 })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
+    )
+  }
+}
 
-    // Process each recipe
-    for (const recipe of allRecipes) {
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => ({}))
+    const limit = clampBatchSize(body.limit)
+    const offset = parseOffset(body.offset)
+
+    console.log(`🔄 Starting nutrition batch recalculation: offset=${offset}, limit=${limit}`)
+
+    const { recipes, total } = await getRecipeBatch(limit, offset)
+    const details: BatchDetail[] = []
+    let successCount = 0
+    let errorCount = 0
+
+    for (const recipe of recipes) {
+      const title = String(recipe.title || recipe.id)
       try {
-        console.log(`🔄 Processing recipe ${results.processed + 1}/${results.totalRecipes}: ${recipe.title}`)
-        
-        if (!recipe.ingredients || recipe.ingredients.length === 0) {
-          results.details.push({
-            recipeId: recipe.id,
-            title: recipe.title,
+        const result = await recalculateRecipeNutritionFromFrida(String(recipe.id))
+        if (!result.success) {
+          errorCount += 1
+          details.push({
+            recipeId: String(recipe.id),
+            title,
             status: 'error',
-            message: 'No ingredients found'
+            message: result.error,
           })
-          results.errors++
-          results.processed++
           continue
         }
 
-        let totalCalories = 0
-        let totalProtein = 0
-        let totalCarbs = 0
-        let totalFat = 0
-        let totalFiber = 0
-        const totalVitamins: Record<string, number> = {}
-        const totalMinerals: Record<string, number> = {}
-        let matchedIngredients = 0
-        const totalIngredients = recipe.ingredients.length
-
-        // Calculate nutrition for each ingredient
-        for (const ingredient of recipe.ingredients) {
-          try {
-            const result = await matcher.matchIngredient(ingredient.name)
-            
-            if (result.nutrition) {
-              const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '')
-              const scaleFactor = grams / 100
-              
-              // Macro nutrients
-              totalCalories += result.nutrition.calories * scaleFactor
-              totalProtein += result.nutrition.protein * scaleFactor
-              totalCarbs += result.nutrition.carbs * scaleFactor
-              totalFat += result.nutrition.fat * scaleFactor
-              totalFiber += result.nutrition.fiber * scaleFactor
-              
-              // Micro nutrients
-              if (result.nutrition.vitamins) {
-                for (const [vitamin, value] of Object.entries(result.nutrition.vitamins)) {
-                  totalVitamins[vitamin] = (totalVitamins[vitamin] || 0) + value * scaleFactor
-                }
-              }
-              
-              if (result.nutrition.minerals) {
-                for (const [mineral, value] of Object.entries(result.nutrition.minerals)) {
-                  totalMinerals[mineral] = (totalMinerals[mineral] || 0) + value * scaleFactor
-                }
-              }
-              
-              matchedIngredients++
-            }
-          } catch (error) {
-            console.error(`Error processing ingredient ${ingredient.name} in ${recipe.title}:`, error)
-          }
-        }
-
-        // Calculate per portion nutrition
-        const servings = recipe.servings || 1
-        const perPortionNutrition = {
-          calories: Math.round(totalCalories / servings),
-          protein: Math.round((totalProtein / servings) * 10) / 10,
-          carbs: Math.round((totalCarbs / servings) * 10) / 10,
-          fat: Math.round((totalFat / servings) * 10) / 10,
-          fiber: Math.round((totalFiber / servings) * 10) / 10
-        }
-
-        // Calculate per portion micro nutrients
-        const perPortionVitamins: Record<string, number> = {}
-        const perPortionMinerals: Record<string, number> = {}
-        
-        for (const [vitamin, value] of Object.entries(totalVitamins)) {
-          perPortionVitamins[vitamin] = Math.round((value / servings) * 100) / 100
-        }
-        
-        for (const [mineral, value] of Object.entries(totalMinerals)) {
-          perPortionMinerals[mineral] = Math.round((value / servings) * 100) / 100
-        }
-
-        // Update recipe in database
-        const { error: updateError } = await supabase
-          .from('recipes')
-          .update({
-            calories: perPortionNutrition.calories,
-            protein: perPortionNutrition.protein,
-            carbs: perPortionNutrition.carbs,
-            fat: perPortionNutrition.fat,
-            fiber: perPortionNutrition.fiber,
-            vitamins: perPortionVitamins,
-            minerals: perPortionMinerals,
-            total_calories: Math.round(totalCalories),
-            total_protein: Math.round(totalProtein * 10) / 10,
-            total_carbs: Math.round(totalCarbs * 10) / 10,
-            total_fat: Math.round(totalFat * 10) / 10,
-            total_fiber: Math.round(totalFiber * 10) / 10,
-            updatedAt: new Date().toISOString()
-          })
-          .eq('id', recipe.id)
-
-        if (updateError) {
-          throw new Error(`Database update failed: ${updateError.message}`)
-        }
-
-        results.success++
-        results.details.push({
-          recipeId: recipe.id,
-          title: recipe.title,
+        successCount += 1
+        details.push({
+          recipeId: String(recipe.id),
+          title,
           status: 'success',
-          message: `Updated nutrition: ${matchedIngredients}/${totalIngredients} ingredients matched`,
-          matchedIngredients,
-          totalIngredients
+          message: `Updated nutrition: ${result.matchedIngredients}/${result.totalIngredients} ingredients matched`,
+          matchedIngredients: result.matchedIngredients,
+          totalIngredients: result.totalIngredients,
+          calories: Math.round(result.nutrition.calories),
         })
-
-        console.log(`✅ Successfully updated ${recipe.title}: ${matchedIngredients}/${totalIngredients} ingredients matched`)
-
-        // Small delay to avoid overwhelming the database
-        await new Promise(resolve => setTimeout(resolve, 100))
-
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-        console.error(`❌ Failed to process ${recipe.title}:`, errorMsg)
-        
-        results.errors++
-        results.details.push({
-          recipeId: recipe.id,
-          title: recipe.title,
+        errorCount += 1
+        details.push({
+          recipeId: String(recipe.id),
+          title,
           status: 'error',
-          message: errorMsg
+          message: error instanceof Error ? error.message : 'Unknown error',
         })
       }
-      
-      results.processed++
     }
 
-    console.log(`🎉 BULK nutrition recalculation completed!`)
-    console.log(`📊 Results: ${results.success} success, ${results.errors} errors, ${results.processed} processed`)
+    const processed = recipes.length
+    const nextOffset = offset + processed
 
     return NextResponse.json({
       success: true,
-      message: `Bulk nutrition recalculation completed for ${results.totalRecipes} recipes`,
-      results
-    })
-
-  } catch (error) {
-    console.error('Error in bulk nutrition recalculation API:', error)
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'Internal server error', 
-        details: error instanceof Error ? error.message : 'Unknown error'
+      message: `Nutrition batch recalculation completed for ${processed} recipes`,
+      results: {
+        totalRecipes: total,
+        offset,
+        limit,
+        nextOffset,
+        hasMore: nextOffset < total,
+        processed,
+        success: successCount,
+        errors: errorCount,
+        details,
       },
-      { status: 500 }
+    })
+  } catch (error) {
+    console.error('Error in batch nutrition recalculation API:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
     )
   }
 }

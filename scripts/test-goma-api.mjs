@@ -35,7 +35,9 @@ const body = {
   p_source: null,
 }
 
-const url = 'https://api.goma.gg/rest/v1/rpc/search_products_advanced_v2'
+// Goma migrerede 2026-05 fra search_products_advanced_v2 til
+// search_products_public_v1 (samme body/respons, ny offentlig nøgle).
+const url = 'https://api.goma.gg/rest/v1/rpc/search_products_public_v1'
 
 const res = await fetch(url, {
   method: 'POST',
