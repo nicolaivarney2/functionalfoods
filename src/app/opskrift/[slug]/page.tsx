@@ -92,13 +92,15 @@ export default async function RecipePage({ params }: PageProps) {
   return (
     <>
       {/* Structured Data for Google Rich Snippets */}
-      <script
-        id="recipe-structured-data"
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(recipeStructuredData)
-        }}
-      />
+      {recipeStructuredData && (
+        <script
+          id="recipe-structured-data"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(recipeStructuredData)
+          }}
+        />
+      )}
       <script
         id="breadcrumb-structured-data"
         type="application/ld+json"

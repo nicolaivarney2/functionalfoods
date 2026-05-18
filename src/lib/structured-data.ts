@@ -5,13 +5,40 @@ type RecipeInstructionStep = {
   groupName?: string
 }
 
-function formatIsoDuration(minutes?: number, fallback?: string) {
+type RecipeDurations = {
+  prepTime: string
+  cookTime: string
+  totalTime: string
+}
+
+function toValidMinutes(value: unknown) {
+  const minutes = Number(value)
+  if (!Number.isFinite(minutes) || minutes < 0) return undefined
+  return Math.round(minutes)
+}
+
+function formatIsoDuration(minutes: number, fallback?: string) {
   if (fallback && fallback.trim()) return fallback
 
-  const value = Number(minutes)
-  if (!Number.isFinite(value) || value < 0) return undefined
+  return `PT${minutes}M`
+}
 
-  return `PT${Math.round(value)}M`
+function getRecipeDurations(recipe: Recipe): RecipeDurations {
+  const totalFromRecipe = toValidMinutes(recipe.totalTime)
+  const prepFromRecipe = toValidMinutes(recipe.preparationTime)
+  const cookFromRecipe = toValidMinutes(recipe.cookingTime)
+  const calculatedTotal = (prepFromRecipe ?? 0) + (cookFromRecipe ?? 0)
+  const totalFallback = totalFromRecipe ?? (calculatedTotal || 1)
+
+  const prepMinutes = prepFromRecipe ?? Math.max(totalFallback - (cookFromRecipe ?? totalFallback), 0)
+  const cookMinutes = cookFromRecipe ?? Math.max(totalFallback - prepMinutes, 0)
+  const totalMinutes = Math.max(totalFallback, prepMinutes + cookMinutes, 1)
+
+  return {
+    prepTime: formatIsoDuration(prepMinutes, recipe.prepTimeISO),
+    cookTime: formatIsoDuration(cookMinutes, recipe.cookTimeISO),
+    totalTime: formatIsoDuration(totalMinutes, recipe.totalTimeISO),
+  }
 }
 
 function getRecipeInstructionSteps(recipe: Recipe): RecipeInstructionStep[] {
@@ -43,6 +70,12 @@ export function generateRecipeStructuredData(recipe: Recipe) {
   const recipeUrl = `https://functionalfoods.dk/opskrift/${recipe.slug}`
   const instructionSteps = getRecipeInstructionSteps(recipe)
   const image = recipe.imageUrl?.trim()
+  const durations = getRecipeDurations(recipe)
+
+  if (!image || instructionSteps.length === 0) {
+    return null
+  }
+
   const structuredData: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Recipe",
@@ -55,9 +88,9 @@ export function generateRecipeStructuredData(recipe: Recipe) {
     },
     "datePublished": recipe.publishedAt ? new Date(recipe.publishedAt).toISOString() : new Date().toISOString(),
     "dateModified": recipe.updatedAt ? new Date(recipe.updatedAt).toISOString() : new Date().toISOString(),
-    "prepTime": formatIsoDuration(recipe.preparationTime, recipe.prepTimeISO),
-    "cookTime": formatIsoDuration(recipe.cookingTime, recipe.cookTimeISO),
-    "totalTime": formatIsoDuration(recipe.totalTime || recipe.preparationTime + recipe.cookingTime, recipe.totalTimeISO),
+    "prepTime": durations.prepTime,
+    "cookTime": durations.cookTime,
+    "totalTime": durations.totalTime,
     "recipeYield": `${recipe.servings} servings`,
     "recipeCategory": recipe.mainCategory,
     "recipeCuisine": "Danish",
