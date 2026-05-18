@@ -200,12 +200,9 @@ export default function Home() {
               </h2>
               <ul className="mt-4 space-y-2.5 text-[15px] leading-relaxed text-emerald-50/95 sm:text-base">
                 {[
-                  'Lavet ud fra tilbud',
+                  'Rigtige tilbud i dagligebutikkerne',
+                  'Madstil (keto, sense, proteinrig, etc)',
                   'Tilpasset din krop og dit liv',
-                  'Personlig ud fra madønsker og madstil',
-                  'Vægttabsoptimeret',
-                  'Kun ingredienser du kan lide',
-                  'Fuld ernæringsberegnet',
                   'Fuld madplan og indkøbsliste',
                 ].map((line) => (
                   <li key={line} className="flex gap-3">
@@ -214,9 +211,12 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
+              <p className="mt-5 text-[15px] font-semibold leading-relaxed text-emerald-50/95 sm:text-base">
+                Opret en gratis bruger og lav ubegrænset vægttabsmadplaner!
+              </p>
               <Link
                 href="/funktioner"
-                className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-white transition hover:text-emerald-200"
+                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-white transition hover:text-emerald-200"
               >
                 Se alle funktioner
                 <ChevronRight className="h-4 w-4" />

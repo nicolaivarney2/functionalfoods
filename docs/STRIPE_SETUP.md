@@ -59,7 +59,7 @@ Når alt virker: skift til **Live mode** i Stripe, nye **live** API-nøgler, nyt
 
 ## 5. “Pay what you can” i koden
 
-Beløb vælges på `/kom-i-gang`. Checkout oprettes med dynamisk beløb (5–50.000 kr). **0 kr** = ingen Checkout, kun Supabase-signup.
+Beløb vælges på `/kom-i-gang`. Checkout oprettes med dynamisk beløb (5–50.000 kr). **0 kr** = ingen Checkout, men der oprettes stadig en Stripe Customer, og `stripe_customer_id` gemmes på `user_profiles`.
 
 ---
 

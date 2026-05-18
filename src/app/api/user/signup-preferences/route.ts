@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createClient } from '@supabase/supabase-js'
+import { ensureStripeCustomerForUser } from '@/lib/stripe-customers'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +14,9 @@ export async function POST(request: NextRequest) {
 
   if (!supabaseUrl || !serviceKey) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ error: 'Stripe er ikke konfigureret endnu.' }, { status: 503 })
   }
 
   const user = await getAuthenticatedUser(request)
@@ -58,5 +62,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true })
+  try {
+    const stripeCustomerId = await ensureStripeCustomerForUser(supabase, user)
+    return NextResponse.json({ ok: true, stripeCustomerId })
+  } catch (error) {
+    console.error('signup-preferences stripe customer', error)
+    return NextResponse.json({ error: 'Kunne ikke oprette Stripe-kunde' }, { status: 500 })
+  }
 }

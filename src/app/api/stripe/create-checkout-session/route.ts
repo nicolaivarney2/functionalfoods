@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
+import { createSupabaseServerClient } from '@/lib/supabaseServer'
+import { ensureStripeCustomerForUser } from '@/lib/stripe-customers'
 import { getStripe } from '@/lib/stripe-server'
 
 export const dynamic = 'force-dynamic'
@@ -47,11 +49,13 @@ export async function POST(request: NextRequest) {
     }
 
     const stripe = getStripe()
+    const supabase = createSupabaseServerClient()
+    const customerId = await ensureStripeCustomerForUser(supabase, user)
     const origin = siteOrigin(request)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      customer_email: user.email,
+      customer: customerId,
       client_reference_id: user.id,
       metadata: {
         supabase_user_id: user.id,

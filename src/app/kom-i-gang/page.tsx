@@ -316,14 +316,12 @@ function KomIGangInner() {
             Personlige vægttabs-madplaner – bygget omkring{' '}
             <span className="text-amber-300">aktuelle madtilbud</span> i butikkerne.
           </h1>
-          <p className="text-emerald-50 text-base sm:text-lg font-medium max-w-2xl mx-auto mb-3">
-            Nu er vægttab ikke længere en økonomisk falliterklæring.
-          </p>
           <p className="text-emerald-100 text-lg max-w-2xl mx-auto mb-3">
-            Vægttabs ugeplaner der matcher din familie, smag og tilpasset dit kaloriebehov – og som tager
-            udgangspunkt i det, der faktisk er på tilbud hos danske butikker som Netto, REMA, Bilka m.fl.
+            Vægttabs ugeplaner der er tilpasset dig + ugens tilbud!
           </p>
-          <p className="text-emerald-200/90 text-sm max-w-2xl mx-auto">Kom i gang på ca. 30 sekunder.</p>
+          <p className="text-emerald-200/90 text-sm max-w-2xl mx-auto">
+            Kom i gang på ca. 30 sekunder - Og du må MEGET gerne vælge 0,- kr, og så er din bruger gratis!😉
+          </p>
         </div>
       </div>
 
@@ -337,22 +335,22 @@ function KomIGangInner() {
                 {
                   icon: Sparkles,
                   title: 'Madbudget med ét klik',
-                  text: 'Vægttabsplan laves ud fra familieindstillinger, tilbud, alder, vægt og energibehov – og de madvarer I kan lide.',
+                  text: 'Lav en ugeplan ud fra din krop, madstil og de tilbud, du faktisk kan købe.',
                 },
                 {
                   icon: ShoppingBasket,
                   title: 'Tilbuds-drevne planer',
-                  text: 'Planerne tager udgangspunkt i aktuelle tilbud i de butikker, du har valgt – så hverdagen og indkøbet hænger sammen med virkeligheden i netop dine kæder.',
+                  text: 'Vælg dine butikker, så planen matcher tilbud hos fx Netto, REMA og Bilka.',
                 },
                 {
                   icon: Scale,
                   title: 'Vægttab i fokus',
-                  text: 'Struktur og en klar plan, der understøtter et realistisk liv – fleksibel og dynamisk tilpasset hverdagen.',
+                  text: 'Kalorier og struktur er tænkt ind fra start, så planen bliver nemmere at følge.',
                 },
                 {
                   icon: Users,
                   title: 'Hele husstanden',
-                  text: 'Indstil antal voksne og børn, allergier og butikker – én plan, I kan følge sammen, tilpasset dit vægttab.',
+                  text: 'Tilpas voksne, børn, allergier og præferencer i én samlet madplan.',
                 },
               ].map(({ icon: Icon, title, text }) => (
                 <li key={title} className="flex gap-3">
@@ -372,15 +370,14 @@ function KomIGangInner() {
               <div className="space-y-3 text-sm text-slate-600 leading-relaxed">
                 <p>
                   <span className="font-semibold text-emerald-900">1.</span> Du opretter en konto med e-mail og
-                  adgangskode – fornavn er valgfrit.
+                  adgangskode.
                 </p>
                 <p>
-                  <span className="font-semibold text-emerald-900">2.</span> Du vælger selv, hvad du vil bidrage med – beløbet
-                  er helt op til dig.
+                  <span className="font-semibold text-emerald-900">2.</span> Vælg 0 kr eller et valgfrit bidrag.
                 </p>
                 <p>
                   <span className="font-semibold text-emerald-900">3.</span> Derefter lander du på dit overblik og kan åbne
-                  Madbudget, sætte familie og butikker, og lave vægttabs-madplaner ud fra tilbud.
+                  Madbudget og lave din første plan.
                 </p>
               </div>
             </div>
