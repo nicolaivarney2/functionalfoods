@@ -3,7 +3,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { databaseService } from '@/lib/database-service'
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
-import Script from 'next/script'
 import RecipePageClient from '@/components/RecipePageClient'
 import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import { RecipeEngagementProvider } from '@/contexts/RecipeEngagementContext'
@@ -93,14 +92,14 @@ export default async function RecipePage({ params }: PageProps) {
   return (
     <>
       {/* Structured Data for Google Rich Snippets */}
-      <Script
+      <script
         id="recipe-structured-data"
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(recipeStructuredData)
         }}
       />
-      <Script
+      <script
         id="breadcrumb-structured-data"
         type="application/ld+json"
         dangerouslySetInnerHTML={{
