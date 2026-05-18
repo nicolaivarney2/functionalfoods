@@ -9,6 +9,20 @@ interface InstructionsListProps {
 
 export default function InstructionsList({ recipe }: InstructionsListProps) {
   const [checkedSteps, setCheckedSteps] = useState<Set<string>>(new Set())
+  const stepAnchorIds = new Map<string, string>()
+  let stepPosition = 0
+
+  if (recipe.instructionGroups && recipe.instructionGroups.length > 0) {
+    recipe.instructionGroups.forEach((group) => {
+      group.steps.forEach((step) => {
+        stepAnchorIds.set(step.id, `step-${++stepPosition}`)
+      })
+    })
+  } else {
+    recipe.instructions.forEach((step) => {
+      stepAnchorIds.set(step.id, `step-${++stepPosition}`)
+    })
+  }
 
   const toggleStep = (stepId: string) => {
     const newChecked = new Set(checkedSteps)
@@ -36,6 +50,7 @@ export default function InstructionsList({ recipe }: InstructionsListProps) {
                   const isChecked = checkedSteps.has(step.id)
                   return (
                     <div 
+                      id={stepAnchorIds.get(step.id)}
                       key={step.id} 
                       className={`flex space-x-4 cursor-pointer transition-colors ${
                         isChecked ? 'opacity-75' : ''
@@ -67,6 +82,7 @@ export default function InstructionsList({ recipe }: InstructionsListProps) {
             const isChecked = checkedSteps.has(step.id)
             return (
               <div 
+                id={stepAnchorIds.get(step.id)}
                 key={step.id} 
                 className={`flex space-x-4 cursor-pointer transition-colors ${
                   isChecked ? 'opacity-75' : ''

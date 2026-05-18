@@ -1,21 +1,63 @@
 import { Recipe } from '@/types/recipe'
 
+type RecipeInstructionStep = {
+  instruction: string
+  groupName?: string
+}
+
+function formatIsoDuration(minutes?: number, fallback?: string) {
+  if (fallback && fallback.trim()) return fallback
+
+  const value = Number(minutes)
+  if (!Number.isFinite(value) || value < 0) return undefined
+
+  return `PT${Math.round(value)}M`
+}
+
+function getRecipeInstructionSteps(recipe: Recipe): RecipeInstructionStep[] {
+  const groupedSteps = recipe.instructionGroups?.flatMap((group) =>
+    group.steps.map((step) => ({
+      instruction: step.instruction,
+      groupName: group.name,
+    }))
+  ) || []
+
+  const steps = groupedSteps.length > 0
+    ? groupedSteps
+    : recipe.instructions?.map((step) => ({ instruction: step.instruction })) || []
+
+  return steps.filter((step) => step.instruction?.trim())
+}
+
+function getRecipeIngredients(recipe: Recipe) {
+  const ingredients = recipe.ingredientGroups?.flatMap((group) => group.ingredients) ||
+    recipe.ingredients ||
+    []
+
+  return ingredients.map((ingredient) =>
+    `${ingredient.amount} ${ingredient.unit} ${ingredient.name}`.trim()
+  )
+}
+
 export function generateRecipeStructuredData(recipe: Recipe) {
-  const structuredData: any = {
+  const recipeUrl = `https://functionalfoods.dk/opskrift/${recipe.slug}`
+  const instructionSteps = getRecipeInstructionSteps(recipe)
+  const image = recipe.imageUrl?.trim()
+  const structuredData: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Recipe",
     "name": recipe.title,
     "description": recipe.description,
-    "image": recipe.imageUrl,
+    ...(image ? { "image": [image] } : {}),
     "author": {
       "@type": "Person",
       "name": recipe.author
     },
     "datePublished": recipe.publishedAt ? new Date(recipe.publishedAt).toISOString() : new Date().toISOString(),
     "dateModified": recipe.updatedAt ? new Date(recipe.updatedAt).toISOString() : new Date().toISOString(),
-    "prepTime": recipe.prepTimeISO,
-    "cookTime": recipe.cookTimeISO,
-    "totalTime": recipe.totalTimeISO,
+    "prepTime": formatIsoDuration(recipe.preparationTime, recipe.prepTimeISO),
+    "cookTime": formatIsoDuration(recipe.cookingTime, recipe.cookTimeISO),
+    "totalTime": formatIsoDuration(recipe.totalTime || recipe.preparationTime + recipe.cookingTime, recipe.totalTimeISO),
     "recipeYield": `${recipe.servings} servings`,
     "recipeCategory": recipe.mainCategory,
     "recipeCuisine": "Danish",
@@ -35,14 +77,15 @@ export function generateRecipeStructuredData(recipe: Recipe) {
     }) : [],
     "keywords": recipe.keywords ? 
       (Array.isArray(recipe.keywords) ? recipe.keywords.join(', ') : recipe.keywords) : '',
-    "recipeIngredient": recipe.ingredients ? recipe.ingredients.map(ingredient => 
-      `${ingredient.amount} ${ingredient.unit} ${ingredient.name}`
-    ) : [],
-    "recipeInstructions": recipe.instructions ? recipe.instructions.map(step => ({
+    "recipeIngredient": getRecipeIngredients(recipe),
+    "recipeInstructions": instructionSteps.map((step, index) => ({
       "@type": "HowToStep",
-      "position": step.stepNumber,
-      "text": step.instruction
-    })) : [],
+      "position": index + 1,
+      "name": step.groupName ? `${step.groupName}: Trin ${index + 1}` : `Trin ${index + 1}`,
+      "text": step.instruction,
+      "url": `${recipeUrl}#step-${index + 1}`,
+      ...(image ? { "image": image } : {})
+    })),
     "nutrition": {
       "@type": "NutritionInformation",
       "calories": `${recipe.calories} calories`,
