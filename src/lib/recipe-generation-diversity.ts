@@ -371,7 +371,15 @@ export function buildRecipeVariationPrompt({
   preferredProtein,
   preferredStyle,
   inspiration,
-}: DiversityContext): string {
+  skipForSourceRecipe = false,
+}: DiversityContext & { skipForSourceRecipe?: boolean }): string {
+  if (
+    skipForSourceRecipe ||
+    (inspiration && inspiration.includes('OPSKRIFTSLINK:'))
+  ) {
+    return ''
+  }
+
   const recurringSignals = getRecurringSignals(existingRecipes)
   const baseAvoids: string[] =
     niche === 'keto'

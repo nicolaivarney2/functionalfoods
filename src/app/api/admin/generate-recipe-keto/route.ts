@@ -5,6 +5,11 @@ import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 import { buildRecipeVariationPrompt } from '@/lib/recipe-generation-diversity'
+import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
 
 interface ExistingRecipe {
   id: string
@@ -30,11 +35,13 @@ interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
   parameters?: KetoParameters
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes, parameters }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
     
     if (!categoryName) {
       return NextResponse.json(
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
     })
     
     // Build parameter instructions
-    const parameterInstructions = buildParameterInstructions(params)
+    const parameterInstructions = buildParameterInstructions(params, Boolean(sourceRecipe))
     const variationPrompt = buildRecipeVariationPrompt({
       niche: 'keto',
       existingRecipes,
@@ -85,9 +92,19 @@ export async function POST(request: NextRequest) {
       requestedRecipeType: params.recipeType,
       preferredProtein: params.hovedingrediens,
       inspiration: params.inspiration,
+      skipForSourceRecipe: isSourceRecipe(sourceRecipe),
     })
     
-    const baseUserPrompt = `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter keto-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
+    const baseUserPrompt = isSourceRecipe(sourceRecipe)
+      ? `${buildSourceRecipeUserPrompt(
+          sourceRecipe,
+          'Keto',
+          `- Behold keto-profilen: maks. ca. 20 g netto kulhydrater pr. portion.
+- Chaffles/waffles fra kilden skal stadig være chaffles/waffles — ikke en helt anden ret.`
+        )}
+
+${parameterInstructions}`
+      : `Generer en ny Keto opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter keto-reglerne. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
 
 ${parameterInstructions}
 ${variationPrompt}`
@@ -120,7 +137,7 @@ ${variationPrompt}`
               content: `${baseUserPrompt}${retryInstruction}`
             }
           ],
-          temperature: attempt === 0 ? 1.2 : 0.7,
+          temperature: isSourceRecipe(sourceRecipe) ? 0.35 : attempt === 0 ? 1.2 : 0.7,
           top_p: 0.95,
           max_tokens: 2500
         })
@@ -205,7 +222,7 @@ ${variationPrompt}`
   }
 }
 
-function buildParameterInstructions(params: KetoParameters): string {
+function buildParameterInstructions(params: KetoParameters, fromSourceRecipe = false): string {
   const instructions: string[] = []
   
   // Protein-fokus instructions
@@ -287,7 +304,7 @@ function buildParameterInstructions(params: KetoParameters): string {
   }
   
   // Inspiration instructions
-  if (params.inspiration && params.inspiration.trim() !== '') {
+  if (!fromSourceRecipe && params.inspiration && params.inspiration.trim() !== '') {
     instructions.push(`INSPIRATION: Brugeren ønsker en opskrift inspireret af: "${params.inspiration}". Lav en KETO version af denne inspiration. Opskriften skal være keto-venlig, lav-kulhydrat, høj-fedt.`)
   }
   

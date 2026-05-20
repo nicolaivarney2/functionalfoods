@@ -5,6 +5,11 @@ import { generateMidjourneyPromptWithMeta } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 import { buildRecipeVariationPrompt } from '@/lib/recipe-generation-diversity'
 import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
+import {
   normalizeAiRecipeIngredients,
   type AiIngredientInput,
 } from '@/lib/ai-recipe-ingredient-normalize'
@@ -40,11 +45,13 @@ interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
   parameters?: SenseParameters
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes, parameters }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
 
     if (!categoryName) {
       return NextResponse.json({ success: false, error: 'categoryName is required' }, { status: 400 })
@@ -80,7 +87,19 @@ export async function POST(request: NextRequest) {
       mealType: params.maaltid,
       requestedRecipeType: params.recipeType,
       inspiration: params.inspiration,
+      skipForSourceRecipe: isSourceRecipe(sourceRecipe),
     })
+
+    const userPrompt = isSourceRecipe(sourceRecipe)
+      ? `${buildSourceRecipeUserPrompt(sourceRecipe, 'Sense')}
+
+${parameterInstructions}`
+      : `Generer én ny Sense-opskrift til hverdagsbrug. Den skal være unik, realistisk og følge Sense-spisekassen (håndfulde — ikke kalorietælling). Krydderier og køkkenstil må frit hente inspiration fra hele verden, så længe Sense-balancen overholdes.
+
+${senseMealCarbBlock(resolvedMaaltid)}
+
+${parameterInstructions}
+${variationPrompt}`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -94,15 +113,10 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: systemPrompt },
           {
             role: 'user',
-            content: `Generer én ny Sense-opskrift til hverdagsbrug. Den skal være unik, realistisk og følge Sense-spisekassen (håndfulde — ikke kalorietælling). Krydderier og køkkenstil må frit hente inspiration fra hele verden, så længe Sense-balancen overholdes.
-
-${senseMealCarbBlock(resolvedMaaltid)}
-
-${parameterInstructions}
-${variationPrompt}`,
+            content: userPrompt,
           },
         ],
-        temperature: 0.88,
+        temperature: isSourceRecipe(sourceRecipe) ? 0.35 : 0.88,
         max_tokens: 2500,
       }),
     })

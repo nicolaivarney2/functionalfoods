@@ -3,6 +3,11 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
+import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
 
 interface ExistingRecipe {
   id: string
@@ -14,11 +19,16 @@ interface ExistingRecipe {
 interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
+  parameters?: {
+    inspiration?: string
+  }
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
     
     if (!categoryName) {
       return NextResponse.json(
@@ -65,10 +75,14 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter antiinflammatoriske principper. Krydderier og køkkenstil må frit hente inspiration fra hele verden.`
+            content: isSourceRecipe(sourceRecipe)
+              ? buildSourceRecipeUserPrompt(sourceRecipe, 'Antiinflammatorisk')
+              : `Generer en ny Antiinflammatorisk opskrift der er unik og ikke ligner eksisterende opskrifter. Respekter antiinflammatoriske principper. Krydderier og køkkenstil må frit hente inspiration fra hele verden.
+
+${parameters?.inspiration ? `INSPIRATION:\n${parameters.inspiration}` : ''}`
           }
         ],
-        temperature: 0.8,
+        temperature: isSourceRecipe(sourceRecipe) ? 0.35 : 0.8,
         max_tokens: 2000
       })
     })

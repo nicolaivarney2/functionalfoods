@@ -3,6 +3,11 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
+import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
 
 interface ExistingRecipe {
   id: string
@@ -25,11 +30,13 @@ interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
   parameters?: FamiliemadParameters
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes, parameters }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
     
     // Default parameters if not provided
     const params: FamiliemadParameters = parameters || {
@@ -98,8 +105,53 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Found ${familiemadRecipes.length} existing Familiemad recipes, showing ${existingRecipeInfo.length} to ChatGPT`)
     
     // Build parameter-specific instructions
-    const parameterInstructions = buildParameterInstructions(params)
+    const parameterInstructions = buildParameterInstructions(params, Boolean(sourceRecipe))
     
+    const sourceUserPrompt = isSourceRecipe(sourceRecipe)
+      ? `${buildSourceRecipeUserPrompt(sourceRecipe, 'Kalorietælling / familiemad')}
+
+${parameterInstructions}
+
+Returnér kun valid JSON i det nøjagtige format herunder. Ingen ekstra tekst, ingen markdown.
+Brug HTML i felterne summary, instructions_flat[].text og notes (enkle <p> eller <ul>/<ol> er nok).
+
+Enheder: Brug gram, ml (IKKE dl - konverter dl til ml: 1 dl = 100 ml), tsk, spsk, stk, bundt.
+Alle ingredienser i ingredients_flat skal have name, type, amount, unit, og notes (tom streng hvis ikke relevant).
+VIKTIGT: amount skal være et positivt tal (f.eks. "2", "150", "0.5") - IKKE tom eller 0.
+Brug grupper i både ingredienser og instruktioner, når det giver mening (fx "Kød", "Sauce", "Topping").
+
+JSON-struktur (obligatorisk):
+{
+  "name": "string (opskriftens titel)",
+  "summary": "string (HTML formateret beskrivelse)",
+  "servings": "string (antal portioner)",
+  "prep_time": "string (forberedelsestid i minutter)",
+  "cook_time": "string (tilberedningstid i minutter)", 
+  "total_time": "string (total tid i minutter)",
+  "tags": {
+    "course": ["string array (f.eks. 'Aftensmad')"],
+    "cuisine": ["string array (f.eks. 'Familiemad')"]
+  },
+  "ingredients_flat": [
+    {
+      "name": "string (ingrediens navn eller gruppe navn)",
+      "type": "string ('ingredient' eller 'group')",
+      "amount": "string (mængde, kun for ingredienser)",
+      "unit": "string (enhed, kun for ingredienser)", 
+      "notes": "string (noter, kun for ingredienser)"
+    }
+  ],
+  "instructions_flat": [
+    {
+      "name": "string (instruktion gruppe navn eller tom)",
+      "text": "string (HTML formateret instruktion)",
+      "type": "string ('instruction' eller 'group')"
+    }
+  ],
+  "notes": "string (HTML formateret noter - SKAL inkludere 'Voksen-twist (valgfrit)' sektion)"
+}`
+      : null
+
     const baseMessages = [
       {
         role: "system",
@@ -204,7 +256,7 @@ Format: "<p><strong>Voksen-twist (valgfrit):</strong></p><ul><li>Forslag 1</li><
       },
       {
         role: "user",
-        content: `Generer en NY og UNIK Familiemad opskrift der er FULDSTÆNDIG forskellig fra eksisterende opskrifter.
+        content: sourceUserPrompt || `Generer en NY og UNIK Familiemad opskrift der er FULDSTÆNDIG forskellig fra eksisterende opskrifter.
 
 KRITISK: Denne opskrift skal være UNIK - ikke bare en lille variation af en eksisterende opskrift.
 - Vælg en HELT ANDEN ret-type end eksisterende opskrifter
@@ -330,7 +382,7 @@ JSON-struktur (obligatorisk):
         body: JSON.stringify({
           model: "gpt-4o",
           messages: retryHint ? [...baseMessages, retryHint] : baseMessages,
-          temperature: 1.2, // Increased to 1.2 for maximum variation and creativity
+          temperature: isSourceRecipe(sourceRecipe) ? 0.35 : 1.2,
           max_tokens: 2500
         })
       })
@@ -434,7 +486,7 @@ JSON-struktur (obligatorisk):
 
 // Removed local generateMidjourneyPrompt and translateTitleForMidjourney functions - now using centralized version
 
-function buildParameterInstructions(params: FamiliemadParameters): string {
+function buildParameterInstructions(params: FamiliemadParameters, fromSourceRecipe = false): string {
   const instructions: string[] = []
   
   // One-pot instructions (NB: Pasta-retter er ofte one-pot retter!)
@@ -519,7 +571,7 @@ function buildParameterInstructions(params: FamiliemadParameters): string {
   }
   
   // Inspiration instructions
-  if (params.inspiration && params.inspiration.trim() !== '') {
+  if (!fromSourceRecipe && params.inspiration && params.inspiration.trim() !== '') {
     instructions.push(`INSPIRATION: Brugeren ønsker en opskrift inspireret af: "${params.inspiration}". Lav en BØRNEVENLIG version af denne inspiration. Opskriften skal være familievenlig, nem at lave, og med ingredienser børn kan lide.`)
   }
   

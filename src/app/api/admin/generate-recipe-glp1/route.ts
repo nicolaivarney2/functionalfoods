@@ -5,6 +5,11 @@ import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 import { buildRecipeVariationPrompt } from '@/lib/recipe-generation-diversity'
+import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
 
 interface ExistingRecipe {
   id: string
@@ -27,11 +32,13 @@ interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
   parameters?: GLP1Parameters
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes, parameters }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
     
     if (!categoryName) {
       return NextResponse.json(
@@ -81,7 +88,27 @@ export async function POST(request: NextRequest) {
       requestedRecipeType: params.recipeType,
       preferredProtein: params.proteinKilde,
       inspiration: params.inspiration,
+      skipForSourceRecipe: isSourceRecipe(sourceRecipe),
     })
+
+    const userPrompt = isSourceRecipe(sourceRecipe)
+      ? `${buildSourceRecipeUserPrompt(sourceRecipe, 'GLP-1 kost')}
+
+${parameterInstructions}`
+      : `Generer en ny GLP-1 opskrift der er unik og ikke ligner eksisterende opskrifter. Krydderier og køkkenstil må frit hente inspiration fra hele verden inden for GLP-1-principperne.
+
+Opskriften skal afspejle GLP-1 kost som mæthedskost:
+- højt på protein
+- god mængde fibre
+- moderate sunde fedtstoffer
+- solidt, rigtigt måltid
+- velegnet til vægttab og stabil mæthed
+${glpCarbInstructionForUser(resolvedMaaltid)}
+
+Undgå at gøre den keto-agtig, snack-agtig eller dessert-agtig.
+
+${parameterInstructions}
+${variationPrompt}`
     
     // Generate recipe with OpenAI using existing config
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -99,23 +126,10 @@ export async function POST(request: NextRequest) {
           },
           {
             role: "user",
-            content: `Generer en ny GLP-1 opskrift der er unik og ikke ligner eksisterende opskrifter. Krydderier og køkkenstil må frit hente inspiration fra hele verden inden for GLP-1-principperne.
-
-Opskriften skal afspejle GLP-1 kost som mæthedskost:
-- højt på protein
-- god mængde fibre
-- moderate sunde fedtstoffer
-- solidt, rigtigt måltid
-- velegnet til vægttab og stabil mæthed
-${glpCarbInstructionForUser(resolvedMaaltid)}
-
-Undgå at gøre den keto-agtig, snack-agtig eller dessert-agtig.
-
-${parameterInstructions}
-${variationPrompt}`
+            content: userPrompt
           }
         ],
-        temperature: 0.8,
+        temperature: isSourceRecipe(sourceRecipe) ? 0.35 : 0.8,
         max_tokens: 2000
       })
     })

@@ -189,6 +189,9 @@ export default function CreateRecipePage() {
   const [aiTips, setAiTips] = useState<string>('')
   const [ingredientAmountDrafts, setIngredientAmountDrafts] = useState<Record<number, string>>({})
   const [isDragging, setIsDragging] = useState(false)
+  const [showRecipeSourceModal, setShowRecipeSourceModal] = useState(false)
+  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
+  const [recipeSourceUrl, setRecipeSourceUrl] = useState('')
   
   // Familiemad parameter state
   const [showFamiliemadModal, setShowFamiliemadModal] = useState(false)
@@ -327,8 +330,49 @@ export default function CreateRecipePage() {
     handleGenerateRecipe()
   }
 
-  const handleGenerateRecipe = async () => {
-    if (!selectedCategory) return
+  const openRecipeSourceModal = (categoryId: string) => {
+    setPendingCategoryId(categoryId)
+    setSelectedCategory(categoryId)
+    setGeneratedRecipe(null)
+    setError(null)
+    setShowRecipeSourceModal(true)
+  }
+
+  const continueFromRecipeSourceModal = () => {
+    if (!pendingCategoryId) return
+    setShowRecipeSourceModal(false)
+    handleCategorySelect(pendingCategoryId)
+    setPendingCategoryId(null)
+  }
+
+  const fetchSourceRecipe = async () => {
+    const url = recipeSourceUrl.trim()
+    if (!url) return null
+
+    setProgress('Henter opskrift fra link...')
+    const response = await fetch('/api/admin/extract-recipe-source', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || 'Kunne ikke hente opskriftslink')
+    }
+
+    return {
+      url: data.url || url,
+      title: data.title || undefined,
+      summary: data.summary || undefined,
+      ingredientsText: data.ingredientsText || undefined,
+      instructionsText: data.instructionsText || undefined,
+      formattedSource: data.formattedSource || data.sourceText || undefined,
+    }
+  }
+
+  const handleGenerateRecipe = async (categoryOverride?: string) => {
+    const activeCategory = categoryOverride || selectedCategory
+    if (!activeCategory) return
 
     setIsGenerating(true)
     setError(null)
@@ -338,7 +382,7 @@ export default function CreateRecipePage() {
     setMidjourneyPromptError('')
 
     try {
-      const category = RECIPE_CATEGORIES.find(c => c.id === selectedCategory)
+      const category = RECIPE_CATEGORIES.find(c => c.id === activeCategory)
       if (!category) throw new Error('Kategori ikke fundet')
 
       setProgress('Tjekker eksisterende opskrifter...')
@@ -353,35 +397,40 @@ export default function CreateRecipePage() {
         categoryName: category.name,
         existingRecipes: existingRecipes
       }
+
+      const sourceRecipe = await fetchSourceRecipe()
+      if (sourceRecipe) {
+        requestBody.sourceRecipe = sourceRecipe
+      }
       
       // Add parameters for familiemad
-      if (selectedCategory === 'familiemad') {
+      if (activeCategory === 'familiemad') {
         requestBody.parameters = familiemadParams
       }
       
       // Add parameters for keto
-      if (selectedCategory === 'keto') {
+      if (activeCategory === 'keto') {
         requestBody.parameters = ketoParams
       }
 
-      if (selectedCategory === '5-2') {
+      if (activeCategory === '5-2') {
         requestBody.parameters = fiveTwoParams
       }
 
-      if (selectedCategory === 'proteinrig-kost') {
+      if (activeCategory === 'proteinrig-kost') {
         requestBody.parameters = proteinrigParams
       }
 
-      if (selectedCategory === 'glp1') {
+      if (activeCategory === 'glp1') {
         requestBody.parameters = glp1Params
       }
 
-      if (selectedCategory === 'sense') {
+      if (activeCategory === 'sense') {
         requestBody.parameters = senseParams
       }
       
       // Generate new recipe using category-specific ChatGPT assistant
-      const generateResponse = await fetch(`/api/admin/generate-recipe-${selectedCategory}`, {
+      const generateResponse = await fetch(`/api/admin/generate-recipe-${activeCategory}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -814,6 +863,66 @@ export default function CreateRecipePage() {
 
   return (
     <>
+      {/* Recipe Source Link Modal */}
+      {showRecipeSourceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start gap-4 mb-5">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Opskriftslink som inspiration</h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Indsæt et link, hvis AI skal lave en Functional Foods-version af en eksisterende opskrift.
+                    Lad feltet være tomt for normal generering.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowRecipeSourceModal(false)
+                    setPendingCategoryId(null)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Link til opskrift (valgfrit)
+              </label>
+              <input
+                type="url"
+                value={recipeSourceUrl}
+                onChange={(e) => setRecipeSourceUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Vi henter teksten fra linket server-side og sender den med til AI som udgangspunkt.
+              </p>
+
+              <div className="flex space-x-3 mt-8 pt-5 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowRecipeSourceModal(false)
+                    setPendingCategoryId(null)
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  onClick={continueFromRecipeSourceModal}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Fortsæt
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Familiemad Parameter Modal */}
       {showFamiliemadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1888,24 +1997,7 @@ export default function CreateRecipePage() {
                     </div>
                     
                     <button
-                      onClick={() => {
-                        if (category.id === 'familiemad') {
-                          handleCategorySelect(category.id)
-                        } else if (category.id === 'keto') {
-                          handleCategorySelect(category.id)
-                        } else if (category.id === '5-2') {
-                          handleCategorySelect(category.id)
-                        } else if (category.id === 'proteinrig-kost') {
-                          handleCategorySelect(category.id)
-                        } else if (category.id === 'glp1') {
-                          handleCategorySelect(category.id)
-                        } else if (category.id === 'sense') {
-                          handleCategorySelect(category.id)
-                        } else {
-                          setSelectedCategory(category.id)
-                          handleGenerateRecipe()
-                        }
-                      }}
+                      onClick={() => openRecipeSourceModal(category.id)}
                       disabled={isGenerating}
                       className={`w-full py-2 px-3 rounded-lg transition-colors text-sm font-medium ${
                         selectedCategory === category.id

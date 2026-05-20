@@ -3,6 +3,11 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
 import { generateMidjourneyPromptWithMeta } from '@/lib/midjourney-generator'
+import {
+  buildSourceRecipeUserPrompt,
+  isSourceRecipe,
+  type SourceRecipePayload,
+} from '@/lib/recipe-source-adaptation'
 
 interface ExistingRecipe {
   id: string
@@ -14,17 +19,20 @@ interface ExistingRecipe {
 /** dayType: '2' = fastedage (~500 kcal), '5' = spisedage (normal kost) */
 interface FiveTwoParameters {
   dayType: '5' | '2'
+  inspiration?: string
 }
 
 interface GenerateRecipeRequest {
   categoryName: string
   existingRecipes: ExistingRecipe[]
   parameters?: FiveTwoParameters
+  sourceRecipe?: SourceRecipePayload | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { categoryName, existingRecipes, parameters }: GenerateRecipeRequest = await request.json()
+    const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
+      await request.json()
 
     if (!categoryName) {
       return NextResponse.json({ success: false, error: 'categoryName is required' }, { status: 400 })
@@ -49,7 +57,9 @@ export async function POST(request: NextRequest) {
 
     const existingTitles = existingRecipes.map((r) => r.title.toLowerCase())
     const systemPrompt = create5_2SystemPrompt(existingTitles, dayType)
-    const userMessage = create5_2UserMessage(dayType)
+    const userMessage = isSourceRecipe(sourceRecipe)
+      ? buildSourceRecipeUserPrompt(sourceRecipe, '5:2 Faste')
+      : create5_2UserMessage(dayType, parameters?.inspiration)
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -63,7 +73,7 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        temperature: 0.75,
+        temperature: isSourceRecipe(sourceRecipe) ? 0.35 : 0.75,
         max_tokens: 2800,
       }),
     })
@@ -131,18 +141,19 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function create5_2UserMessage(dayType: '5' | '2'): string {
+function create5_2UserMessage(dayType: '5' | '2', inspiration?: string): string {
+  const inspirationBlock = inspiration ? `\n\nINSPIRATION:\n${inspiration}` : ''
   if (dayType === '2') {
     return `Generer én ny 5:2-opskrift til en FASTEDAG (2'er). Den skal være unik og ikke ligne eksisterende liste.
 
 Krav: ét sammenhængende måltid (hovedret) med høj mæthed pr. kalorie. Tænk at dette måltid skal give plads til et lille morgenmåltid eller en lille snack på samme fastedag, så nutritionalInfo.calories per portion skal som udgangspunkt ligge ca. 250-380 kcal og helst aldrig over 400 kcal.
 
-Skriv tydeligt i beskrivelsen at retten er til 5:2 fastedag.`
+Skriv tydeligt i beskrivelsen at retten er til 5:2 fastedag.${inspirationBlock}`
   }
 
   return `Generer én ny 5:2-opskrift til en SPISEDAG (5'er) — de dage hvor man ikke faster og spiser normalt/varieret sund kost.
 
-Den skal være unik og ikke ligne eksisterende liste. Ingen kaloriecap som på fastedagen; fokus på balanceret, realistisk hverdagsmad med tilfredsstillende portion. Nævn i beskrivelsen at retten passer til 5:2-spisedage.`
+Den skal være unik og ikke ligne eksisterende liste. Ingen kaloriecap som på fastedagen; fokus på balanceret, realistisk hverdagsmad med tilfredsstillende portion. Nævn i beskrivelsen at retten passer til 5:2-spisedage.${inspirationBlock}`
 }
 
 function create5_2SystemPrompt(existingTitles: string[], dayType: '5' | '2'): string {
