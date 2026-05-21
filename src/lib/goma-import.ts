@@ -57,6 +57,67 @@ type GomaSearchResponse = {
   total_on_sale_count: number
 }
 
+type PostgrestError = { code?: string; message?: string }
+
+function isDeadlockError(error: PostgrestError | null | undefined): boolean {
+  if (!error) return false
+  return error.code === '40P01' || (error.message?.toLowerCase().includes('deadlock') ?? false)
+}
+
+async function withDeadlockRetry<T>(
+  label: string,
+  fn: () => Promise<T>,
+  maxAttempts = 5,
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      const code = (err as { code?: string })?.code
+      const isDeadlock = code === '40P01' || message.toLowerCase().includes('deadlock')
+      if (!isDeadlock || attempt === maxAttempts) throw err
+      const delayMs = 150 * attempt + Math.floor(Math.random() * 100)
+      console.warn(`⚠️ Deadlock during ${label}, retry ${attempt}/${maxAttempts - 1} in ${delayMs}ms`)
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+  throw new Error(`Unreachable: ${label}`)
+}
+
+function throwOnSupabaseError(error: PostgrestError | null, context: string): void {
+  if (!error) return
+  if (isDeadlockError(error)) {
+    const err = new Error(error.message || 'deadlock detected')
+    ;(err as Error & { code?: string }).code = error.code
+    throw err
+  }
+  console.error(`❌ ${context}:`, error)
+  throw error
+}
+
+/** Deterministic product ID from brand + name + amount + unit (see import header comment). */
+function generateProductId(p: GomaProduct): string {
+  const brand = (p.brand || '').trim().toLowerCase()
+  const name = (p.product_name || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  const amount = p.amount != null ? String(p.amount) : ''
+  const unit = (p.unit || '').trim().toLowerCase()
+  const key = `${brand}|${name}|${amount}|${unit}`
+
+  try {
+    const hash = createHash('sha256').update(key).digest('hex').substring(0, 32)
+    const isValidHash =
+      hash && hash.length === 32 && !hash.includes('-') && /^[a-f0-9]{32}$/.test(hash)
+    if (isValidHash) return hash
+
+    console.warn(`⚠️ Invalid crypto hash, using fallback for: ${p.product_name}`)
+    return simpleHash(key)
+  } catch (error) {
+    console.warn(`⚠️ Crypto hash failed, using fallback for: ${p.product_name}`, error)
+    return simpleHash(key)
+  }
+}
+
 function getSupabaseAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -314,11 +375,9 @@ export async function importGomaProducts(options: ImportOptions) {
   const limit = options.limit ?? 100
   const pages = options.pages ?? 1
 
-  // How many Goma pages to fetch+upsert in parallel per store.
-  // Goma calls dominate runtime (~1-2s each). Without parallelism, syncing
-  // a 30k-product store like Nemlig would exceed Vercel's 300s limit.
-  // 6 is a conservative balance: well below Goma rate-limits and below
-  // PostgREST connection pool limits, but gives ~6x speedup.
+  // How many Goma pages to fetch in parallel per store. Goma calls dominate
+  // runtime (~1-2s each). DB writes run sequentially after each batch to avoid
+  // Postgres deadlocks from concurrent upserts to products/product_offers.
   const PAGE_CONCURRENCY = 6
 
   let totalImported = 0
@@ -339,15 +398,15 @@ export async function importGomaProducts(options: ImportOptions) {
         { onConflict: 'id' },
       )
 
-    /**
-     * Process a single page of products from Goma for this store.
-     * Returns metadata so the outer batch loop knows when to stop.
-     */
-    const processPage = async (
-      page: number,
-    ): Promise<{ page: number; imported: number; isLastPage: boolean }> => {
-      const offset = page * limit
+    type FetchedPage = {
+      page: number
+      products: GomaProduct[]
+      totalCount: number
+      isLastPage: boolean
+    }
 
+    const fetchGomaPage = async (page: number): Promise<FetchedPage> => {
+      const offset = page * limit
       const body = {
         p_search_term: '',
         p_on_sale_only: false,
@@ -367,8 +426,6 @@ export async function importGomaProducts(options: ImportOptions) {
         p_source: null,
       }
 
-      // Goma migrerede 2026-05 fra search_products_advanced_v2 (kræver privilegeret
-      // role) til search_products_public_v1 (offentligt anon key).
       const res = await fetch('https://api.goma.gg/rest/v1/rpc/search_products_public_v1', {
         method: 'POST',
         headers: {
@@ -391,285 +448,193 @@ export async function importGomaProducts(options: ImportOptions) {
 
       if (products.length === 0) {
         console.log(`⚠️ No products returned for ${storeName} page ${page}, stopping`)
-        return { page, imported: 0, isLastPage: true }
+        return { page, products: [], totalCount: data.total_count, isLastPage: true }
       }
 
-      // Generate unique product IDs based on brand + normalized name + amount + unit
-      // This prevents different products (different brands/sizes) from being grouped together
-      const generateProductId = (p: GomaProduct): string => {
-        // Normalize brand (handle null/empty)
-        const brand = (p.brand || '').trim().toLowerCase()
-        
-        // Normalize product name (remove extra whitespace, lowercase)
-        const name = (p.product_name || '').trim().toLowerCase().replace(/\s+/g, ' ')
-        
-        // Get amount and unit (handle null)
-        const amount = p.amount != null ? String(p.amount) : ''
-        const unit = (p.unit || '').trim().toLowerCase()
-        
-        // Create a unique key: brand + name + amount + unit
-        // This ensures Libresse 58 stk ≠ generic 8 stk, and 600g ≠ 500g
-        const key = `${brand}|${name}|${amount}|${unit}`
-        
-        // Use SHA-256 hash to create a deterministic, fixed-length ID
-        // Take first 32 characters for a reasonable length
-        try {
-          // Try Node.js crypto module first (should work in Next.js API routes)
-          const hash = createHash('sha256').update(key).digest('hex').substring(0, 32)
-          
-          // Validate hash format (should be 32 hex characters, no dashes, lowercase)
-          const isValidHash = hash && 
-            hash.length === 32 && 
-            !hash.includes('-') && 
-            /^[a-f0-9]{32}$/.test(hash)
-          
-          if (isValidHash) {
-            return hash
-          }
-          
-          // If hash is invalid, try fallback
-          console.warn(`⚠️ Invalid crypto hash, using fallback for: ${p.product_name}`)
-          const fallbackHash = simpleHash(key)
-          console.log(`✅ Fallback hash generated: ${fallbackHash.substring(0, 8)}... for ${p.product_name}`)
-          return fallbackHash
-        } catch (error) {
-          // If crypto fails completely, use fallback hash
-          console.warn(`⚠️ Crypto hash failed, using fallback for: ${p.product_name}`, error)
-          const fallbackHash = simpleHash(key)
-          console.log(`✅ Fallback hash generated: ${fallbackHash.substring(0, 8)}... for ${p.product_name}`)
-          return fallbackHash
-        }
+      return {
+        page,
+        products,
+        totalCount: data.total_count,
+        isLastPage: products.length < limit,
       }
+    }
 
-      // Upsert global products (dedupe by our generated product ID)
-      const productMap = new Map<string, { productId: string; product: GomaProduct }>()
-      let hashErrors = 0
-      for (const p of products) {
-        try {
-          const productId = generateProductId(p)
-          if (!productId || productId.length === 0) {
-            console.error(`❌ Generated empty productId for: ${p.product_name}`)
-            hashErrors++
-            continue
-          }
-          if (!productMap.has(productId)) {
-            productMap.set(productId, { productId, product: p })
-          } else {
-            // If we already have this product, prefer the one with an image if current doesn't have one
-            const existing = productMap.get(productId)!
-            if (!existing.product.image_url && p.image_url) {
+    const persistGomaPage = async (
+      fetched: FetchedPage,
+    ): Promise<{ page: number; imported: number; isLastPage: boolean }> => {
+      const { page, products, totalCount, isLastPage } = fetched
+
+      return withDeadlockRetry(`Goma persist ${storeName} page ${page}`, async () => {
+        const productMap = new Map<string, { productId: string; product: GomaProduct }>()
+        let hashErrors = 0
+        for (const p of products) {
+          try {
+            const productId = generateProductId(p)
+            if (!productId || productId.length === 0) {
+              console.error(`❌ Generated empty productId for: ${p.product_name}`)
+              hashErrors++
+              continue
+            }
+            if (!productMap.has(productId)) {
               productMap.set(productId, { productId, product: p })
+            } else {
+              const existing = productMap.get(productId)!
+              if (!existing.product.image_url && p.image_url) {
+                productMap.set(productId, { productId, product: p })
+              }
+            }
+          } catch (error) {
+            console.error(`❌ Error generating productId for ${p.product_name}:`, error)
+            hashErrors++
+          }
+        }
+
+        if (hashErrors > 0) {
+          console.error(`❌ Failed to generate productId for ${hashErrors} products`)
+        }
+
+        const nowIso = new Date().toISOString()
+
+        console.log(`🔄 Processing ${productMap.size} unique products for ${storeName} page ${page}`)
+
+        const productRows = Array.from(productMap.values()).map(({ productId, product: p }) => ({
+          id: productId,
+          name_generic: p.product_name,
+          brand: p.brand,
+          category: p.category,
+          subcategory: p.s_category,
+          department: p.department_name,
+          unit: p.unit,
+          amount: p.amount,
+          image_url: p.image_url,
+          metadata: {
+            goma_base_product_id: p.base_product_id,
+            goma_store_product_id: p.product_id,
+          } as unknown as Record<string, unknown>,
+          updated_at: nowIso,
+        }))
+
+        if (productRows.length === 0) {
+          console.log(`⚠️ No product rows to insert for ${storeName} page ${page}`)
+        } else {
+          console.log(`💾 Attempting to upsert ${productRows.length} products for ${storeName} page ${page}`)
+
+          const productIdsForBatch = productRows.map((r) => r.id)
+          const existingIdsBefore = new Set<string>()
+          for (let i = 0; i < productIdsForBatch.length; i += 150) {
+            const chunk = productIdsForBatch.slice(i, i + 150)
+            const { data: existingRows } = await supabase.from('products').select('id').in('id', chunk)
+            existingRows?.forEach((r: { id: string }) => existingIdsBefore.add(r.id))
+          }
+          const newProductIdsForQueue = productIdsForBatch.filter((id) => !existingIdsBefore.has(id))
+
+          const { error: productError, data: productData } = await supabase
+            .from('products')
+            .upsert(productRows, { onConflict: 'id' })
+            .select('id')
+
+          throwOnSupabaseError(
+            productError,
+            `Error upserting products for ${storeName} page ${page}`,
+          )
+
+          console.log(`✅ Upserted ${productRows.length} products for ${storeName} page ${page}`)
+          if (productData) {
+            console.log(`✅ Upsert returned ${productData.length} products`)
+          }
+
+          await enqueueNewProductsForIngredientMatching(
+            supabase,
+            storeId,
+            newProductIdsForQueue,
+            productMap,
+          )
+        }
+
+        const offerMap = new Map<string, { productId: string; product: GomaProduct }>()
+        for (const p of products) {
+          const productId = generateProductId(p)
+          const key = `${storeId}:${p.product_id}`
+          if (!offerMap.has(key)) {
+            offerMap.set(key, { productId, product: p })
+          }
+        }
+
+        const offerRows = Array.from(offerMap.values()).map(({ productId, product: p }) => {
+          let isOnSale = p.is_on_sale
+
+          if (p.normal_price && p.current_price && p.normal_price > p.current_price) {
+            isOnSale = true
+          } else if (p.normal_price && p.current_price && p.normal_price <= p.current_price) {
+            isOnSale = false
+          }
+
+          if (isOnSale && p.sale_valid_to) {
+            const saleEndDate = new Date(p.sale_valid_to)
+            if (saleEndDate < new Date()) {
+              isOnSale = false
             }
           }
-        } catch (error) {
-          console.error(`❌ Error generating productId for ${p.product_name}:`, error)
-          hashErrors++
-          // Continue with next product instead of failing entire import
-        }
-      }
-      
-      if (hashErrors > 0) {
-        console.error(`❌ Failed to generate productId for ${hashErrors} products`)
-      }
 
-      const nowIso = new Date().toISOString()
+          const nowDate = new Date()
+          const isOfferDateValid = !p.sale_valid_to || new Date(p.sale_valid_to) >= nowDate
+          const isOfferActive = isOnSale && isOfferDateValid
 
-      console.log(`🔄 Processing ${productMap.size} unique products for ${storeName} page ${page}`)
-
-      const productRows = Array.from(productMap.values()).map(({ productId, product: p }) => ({
-        id: productId,
-        name_generic: p.product_name,
-        brand: p.brand,
-        category: p.category,
-        subcategory: p.s_category,
-        department: p.department_name,
-        unit: p.unit,
-        amount: p.amount,
-        image_url: p.image_url,
-        metadata: {
-          goma_base_product_id: p.base_product_id, // Store original for reference
-          goma_store_product_id: p.product_id,
-        } as unknown as Record<string, unknown>,
-        updated_at: nowIso,
-      }))
-
-      if (productRows.length === 0) {
-        console.log(`⚠️ No product rows to insert for ${storeName} page ${page}`)
-      } else {
-        console.log(`💾 Attempting to upsert ${productRows.length} products for ${storeName} page ${page}`)
-        console.log(`💾 Sample product ID: ${productRows[0].id} (length: ${productRows[0].id.length}, is UUID: ${productRows[0].id.includes('-')})`)
-
-        const productIdsForBatch = productRows.map((r) => r.id)
-        const existingIdsBefore = new Set<string>()
-        for (let i = 0; i < productIdsForBatch.length; i += 150) {
-          const chunk = productIdsForBatch.slice(i, i + 150)
-          const { data: existingRows } = await supabase.from('products').select('id').in('id', chunk)
-          existingRows?.forEach((r: { id: string }) => existingIdsBefore.add(r.id))
-        }
-        const newProductIdsForQueue = productIdsForBatch.filter((id) => !existingIdsBefore.has(id))
-
-        const { error: productError, data: productData } = await supabase
-          .from('products')
-          .upsert(productRows, {
-            onConflict: 'id',
-          })
-          .select('id')
-
-        if (productError) {
-          console.error(`❌ Error upserting products for ${storeName} page ${page}:`, productError)
-          console.error(`❌ Product error details:`, JSON.stringify(productError, null, 2))
-          console.error(`❌ Sample product row:`, JSON.stringify(productRows[0], null, 2))
-          throw productError
-        }
-
-        console.log(`✅ Upserted ${productRows.length} products for ${storeName} page ${page}`)
-        if (productData) {
-          console.log(`✅ Upsert returned ${productData.length} products`)
-        }
-        
-        // Verify products were actually inserted
-        if (productRows.length > 0) {
-          const sampleIds = productRows.slice(0, 5).map(r => r.id)
-          const { data: verifyData, error: verifyError, count: verifyCount } = await supabase
-            .from('products')
-            .select('id', { count: 'exact' })
-            .in('id', sampleIds)
-          
-          if (verifyError) {
-            console.error(`⚠️ Error verifying products:`, verifyError)
-          } else {
-            console.log(`✅ Verified: ${verifyData?.length || 0}/${sampleIds.length} sample products exist in database (count: ${verifyCount})`)
+          let discountPercentage = null
+          if (isOnSale && p.normal_price && p.current_price && p.normal_price > p.current_price) {
+            discountPercentage = Math.round(
+              ((p.normal_price - p.current_price) / p.normal_price) * 100,
+            )
           }
-        }
 
-        await enqueueNewProductsForIngredientMatching(
-          supabase,
-          storeId,
-          newProductIdsForQueue,
-          productMap,
-        )
-      }
-
-      // Upsert offers (dedupe by store_id + store_product_id within this batch)
-      const offerMap = new Map<string, { productId: string; product: GomaProduct }>()
-      for (const p of products) {
-        const productId = generateProductId(p)
-        const key = `${storeId}:${p.product_id}`
-        if (!offerMap.has(key)) {
-          offerMap.set(key, { productId, product: p })
-        }
-      }
-
-      const offerRows = Array.from(offerMap.values()).map(({ productId, product: p }) => {
-        // Log if we're using fallback (UUID format indicates old base_product_id)
-        if (productId.length === 36 && productId.includes('-')) {
-          console.warn(`⚠️ Using fallback base_product_id for offer: ${p.product_name} (productId: ${productId})`)
-        }
-        
-        // Check if offer has expired - if sale_valid_to is in the past, mark as not on sale
-        let isOnSale = p.is_on_sale
-        
-        // IMPORTANT: Also check if current_price < normal_price to determine if on sale
-        // Goma's is_on_sale flag might not always be accurate
-        if (p.normal_price && p.current_price && p.normal_price > p.current_price) {
-          // Price difference indicates it's on sale
-          isOnSale = true
-        } else if (p.normal_price && p.current_price && p.normal_price <= p.current_price) {
-          // No price difference - not on sale
-          isOnSale = false
-        }
-        
-        // Check if sale has expired
-        if (isOnSale && p.sale_valid_to) {
-          const saleEndDate = new Date(p.sale_valid_to)
-          const now = new Date()
-          if (saleEndDate < now) {
-            // Offer has expired - mark as not on sale
-            isOnSale = false
-            console.log(`⏰ Offer expired for ${p.product_name}: sale_valid_to was ${p.sale_valid_to}`)
+          return {
+            product_id: productId,
+            store_id: storeId,
+            store_product_id: p.product_id,
+            name_store: p.product_name,
+            product_url: p.product_url,
+            current_price: p.current_price,
+            normal_price: p.normal_price,
+            is_on_sale: isOnSale,
+            is_offer_active: isOfferActive,
+            discount_percentage: discountPercentage || (isOnSale ? p.discount_percentage : null),
+            price_per_unit: p.price_per_unit,
+            price_per_kilogram: p.price_per_kilogram,
+            amount: p.amount,
+            unit: p.unit,
+            is_available: p.is_available,
+            sale_valid_from: p.sale_valid_from,
+            sale_valid_to: p.sale_valid_to,
+            source: 'goma',
+            last_seen_at: nowIso,
+            updated_at: nowIso,
           }
-        }
-
-        const nowDate = new Date()
-        const isOfferDateValid = !p.sale_valid_to || new Date(p.sale_valid_to) >= nowDate
-        const isOfferActive = isOnSale && isOfferDateValid
-        
-        // Calculate discount percentage if on sale
-        let discountPercentage = null
-        if (isOnSale && p.normal_price && p.current_price && p.normal_price > p.current_price) {
-          discountPercentage = Math.round(((p.normal_price - p.current_price) / p.normal_price) * 100)
-        }
-        
-        return {
-          product_id: productId, // Use our generated product ID, not base_product_id
-          store_id: storeId,
-          store_product_id: p.product_id,
-          name_store: p.product_name,
-          product_url: p.product_url,
-          current_price: p.current_price,
-          normal_price: p.normal_price,
-          is_on_sale: isOnSale, // Use calculated value based on price difference
-          is_offer_active: isOfferActive, // Active offer flag for fast filtering
-          discount_percentage: discountPercentage || (isOnSale ? p.discount_percentage : null), // Use calculated or Goma's value
-          price_per_unit: p.price_per_unit,
-          price_per_kilogram: p.price_per_kilogram,
-          amount: p.amount,
-          unit: p.unit,
-          is_available: p.is_available,
-          sale_valid_from: p.sale_valid_from,
-          sale_valid_to: p.sale_valid_to,
-          source: 'goma',
-          last_seen_at: nowIso,
-          updated_at: nowIso,
-        }
-      })
-
-      console.log(`🔄 Processing ${offerRows.length} offers for ${storeName} page ${page}`)
-
-      const { error: offerError } = await supabase.from('product_offers').upsert(offerRows, {
-        onConflict: 'store_id,store_product_id',
-      })
-
-      if (offerError) {
-        console.error(`❌ Error upserting offers for ${storeName} page ${page}:`, offerError)
-        console.error(`❌ Offer error details:`, JSON.stringify(offerError, null, 2))
-        throw offerError
-      }
-
-      console.log(`✅ Upserted ${offerRows.length} offers for ${storeName} page ${page}`)
-      
-      // Verify that products were actually inserted
-      if (productRows.length > 0) {
-        const { count: productCount, error: countError } = await supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true })
-          .in('id', productRows.map(r => r.id))
-        
-        if (countError) {
-          console.error(`⚠️ Error counting products:`, countError)
-        } else {
-          console.log(`✅ Verified: ${productCount} products exist in database (expected ${productRows.length})`)
-        }
-      }
-
-      if (options.onProgress) {
-        options.onProgress({
-          store: storeName,
-          page,
-          imported: products.length,
-          total: data.total_count,
         })
-      }
 
-      // products.length < limit means Goma has no more rows after this page.
-      const isLastPage = products.length < limit
-      return { page, imported: products.length, isLastPage }
-    } // end processPage
+        console.log(`🔄 Processing ${offerRows.length} offers for ${storeName} page ${page}`)
 
-    // Run pages in parallel batches. Stop dispatching new batches once any
-    // page in a batch reports isLastPage. Wasted-fetch ceiling per store is
-    // PAGE_CONCURRENCY-1 pages (e.g. 5 extra Goma calls), well worth the
-    // overall speedup.
+        const { error: offerError } = await supabase.from('product_offers').upsert(offerRows, {
+          onConflict: 'store_id,store_product_id',
+        })
+
+        throwOnSupabaseError(offerError, `Error upserting offers for ${storeName} page ${page}`)
+
+        console.log(`✅ Upserted ${offerRows.length} offers for ${storeName} page ${page}`)
+
+        if (options.onProgress) {
+          options.onProgress({
+            store: storeName,
+            page,
+            imported: products.length,
+            total: totalCount,
+          })
+        }
+
+        return { page, imported: products.length, isLastPage }
+      })
+    }
+
+    // Fetch pages in parallel batches; persist sequentially to avoid deadlocks.
     let stopAfterCurrentBatch = false
     for (
       let batchStart = 0;
@@ -679,9 +644,16 @@ export async function importGomaProducts(options: ImportOptions) {
       const batchSize = Math.min(PAGE_CONCURRENCY, pages - batchStart)
       const batchPages = Array.from({ length: batchSize }, (_, i) => batchStart + i)
 
-      const batchResults = await Promise.all(batchPages.map((p) => processPage(p)))
+      const fetchedPages = await Promise.all(batchPages.map((p) => fetchGomaPage(p)))
 
-      for (const result of batchResults) {
+      for (const fetched of fetchedPages.sort((a, b) => a.page - b.page)) {
+        if (fetched.products.length === 0) {
+          fullyScannedStore = true
+          stopAfterCurrentBatch = true
+          continue
+        }
+
+        const result = await persistGomaPage(fetched)
         totalImported += result.imported
         if (result.isLastPage) {
           fullyScannedStore = true
