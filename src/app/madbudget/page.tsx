@@ -443,7 +443,7 @@ export default function MadbudgetPage() {
   const [variationLevel, setVariationLevel] = useState(2) // Default: medium variation
 
   // View mode: week grid vs day view (Skift visning)
-  const [viewMode, setViewMode] = useState<'week' | 'day'>('week')
+  const [viewMode, setViewMode] = useState<'week' | 'day'>('day')
   // Selected day in day view (0 = Monday, 6 = Sunday)
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
     const d = new Date()
@@ -2641,41 +2641,43 @@ export default function MadbudgetPage() {
                   const pctF = totalCalFromMacros > 0 ? Math.round((calFromF / totalCalFromMacros) * 100) : 0
                   const hasAny = nut.calories > 0 || nut.protein > 0 || nut.carbs > 0 || nut.fat > 0
                   return (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Dagens ernæring</h3>
+                    <div className="rounded-2xl border border-gray-200/80 bg-white p-5 sm:p-6 shadow-sm">
+                      <div className="flex items-center justify-between mb-5">
+                        <h3 className="text-sm font-semibold text-gray-900 tracking-tight">Dagens ernæring</h3>
+                        {hasAny && (
+                          <span className="text-[11px] uppercase tracking-wider text-gray-400 tabular-nums">{Math.round(nut.calories)} kcal</span>
+                        )}
+                      </div>
                       {hasAny ? (
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          <div className="flex items-center justify-center sm:justify-start">
-                            <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-white border-4 border-green-500 flex items-center justify-center">
-                              <span className="text-lg sm:text-xl font-bold text-gray-900">{Math.round(nut.calories)}</span>
-                              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-xs text-gray-500">kcal</span>
+                        <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-5 sm:gap-6">
+                          <div className="relative shrink-0">
+                            <div className="relative h-28 w-28 sm:h-32 sm:w-32 rounded-full bg-gradient-to-br from-emerald-50 via-white to-white border-[3px] border-emerald-500/90 flex flex-col items-center justify-center">
+                              <span className="text-2xl sm:text-[1.625rem] font-bold text-gray-900 tabular-nums leading-none">{Math.round(nut.calories)}</span>
+                              <span className="text-[10px] uppercase tracking-[0.12em] text-gray-500 mt-1.5">kcal</span>
                             </div>
                           </div>
-                          <div className="flex-1 space-y-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-600 w-20">Protein</span>
-                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${Math.min(100, pctP)}%` }} />
+                          <div className="flex-1 flex flex-col justify-center gap-3.5 w-full">
+                            {[
+                              { label: 'Protein', value: nut.protein, pct: pctP, bar: 'bg-blue-500', dot: 'bg-blue-500' },
+                              { label: 'Kulhydrat', value: nut.carbs, pct: pctK, bar: 'bg-amber-500', dot: 'bg-amber-500' },
+                              { label: 'Fedt', value: nut.fat, pct: pctF, bar: 'bg-orange-500', dot: 'bg-orange-500' },
+                            ].map((m) => (
+                              <div key={m.label}>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`h-1.5 w-1.5 rounded-full ${m.dot}`} />
+                                    <span className="text-xs font-medium text-gray-700">{m.label}</span>
+                                  </div>
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-sm font-semibold text-gray-900 tabular-nums">{Math.round(m.value)}g</span>
+                                    <span className="text-[11px] text-gray-400 tabular-nums w-8 text-right">{m.pct}%</span>
+                                  </div>
+                                </div>
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(100, m.pct)}%` }} />
+                                </div>
                               </div>
-                              <span className="text-xs font-medium text-gray-900 tabular-nums w-14">{Math.round(nut.protein)}g</span>
-                              <span className="text-xs text-gray-500 w-8">{pctP}%</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-600 w-20">Kulhydrat</span>
-                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-amber-500 rounded-full transition-all" style={{ width: `${Math.min(100, pctK)}%` }} />
-                              </div>
-                              <span className="text-xs font-medium text-gray-900 tabular-nums w-14">{Math.round(nut.carbs)}g</span>
-                              <span className="text-xs text-gray-500 w-8">{pctK}%</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-600 w-20">Fedt</span>
-                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${Math.min(100, pctF)}%` }} />
-                              </div>
-                              <span className="text-xs font-medium text-gray-900 tabular-nums w-14">{Math.round(nut.fat)}g</span>
-                              <span className="text-xs text-gray-500 w-8">{pctF}%</span>
-                            </div>
+                            ))}
                           </div>
                         </div>
                       ) : (
@@ -2702,7 +2704,7 @@ export default function MadbudgetPage() {
                         <div
                           key={mealType.key}
                           onClick={() => handleMealCellClick(dayKey, mealKey)}
-                          className={`relative rounded-xl border-2 cursor-pointer transition-colors overflow-hidden ${
+                          className={`relative rounded-xl border-2 cursor-pointer transition-colors overflow-hidden flex flex-row sm:flex-col ${
                             lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
                           } ${
                             currentMeal ? 'border-green-500 bg-green-50/50' : 'border-dashed border-gray-200 hover:border-green-300 hover:bg-gray-50'
@@ -2713,8 +2715,8 @@ export default function MadbudgetPage() {
                               <Lock size={14} aria-hidden />
                             </span>
                           )}
-                          <div className="aspect-square w-full bg-gray-100 relative">
-                            <span className={`absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shadow-sm z-10 ${mealType.color}`}>
+                          <div className="relative w-28 sm:w-full aspect-square shrink-0 bg-gray-100">
+                            <span className={`absolute top-2 left-2 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shadow-sm z-10 ${mealType.color}`}>
                               <mealType.icon size={14} />
                               {mealType.label}
                             </span>
@@ -2722,7 +2724,8 @@ export default function MadbudgetPage() {
                               <img src={currentMeal.image || currentMeal.imageUrl} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                <mealType.icon size={40} />
+                                <mealType.icon size={32} className="sm:hidden" />
+                                <mealType.icon size={40} className="hidden sm:block" />
                               </div>
                             )}
                             {currentMeal && (
@@ -2736,19 +2739,19 @@ export default function MadbudgetPage() {
                                     setRecipeViewSlot({ dayKey, mealKey })
                                   }
                                 }}
-                                className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
+                                className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
                                 aria-label="Se opskrift"
                               >
-                                <Eye size={18} />
+                                <Eye size={16} />
                               </button>
                             )}
                           </div>
-                          <div className="p-3">
+                          <div className="p-3 flex-1 min-w-0 flex flex-col justify-center sm:justify-start">
                             <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                               <mealType.icon size={14} />
                               <span>{mealType.label}</span>
                             </div>
-                            <div className="font-medium text-gray-900 text-sm min-h-[2.5rem]">
+                            <div className="font-medium text-gray-900 text-sm sm:min-h-[2.5rem] line-clamp-2">
                               {currentMeal ? currentMeal.title : `Vælg ${mealType.label.toLowerCase()}`}
                             </div>
                             {currentMeal && (typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number') && (
