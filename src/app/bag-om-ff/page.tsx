@@ -42,17 +42,44 @@ export default function BagOmFFPage() {
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
-        <div className="container mx-auto px-4 py-16 sm:py-24 max-w-4xl relative">
-          <p className="text-emerald-300/90 text-sm font-medium tracking-wide uppercase mb-4">
-            Functional Foods
-          </p>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
-            Sundhed skal ikke være et fuldtidsjob – det skal være en{' '}
-            <span className="text-amber-300">funktion af din hverdag</span>
-          </h1>
-          <p className="mt-6 text-lg sm:text-xl text-emerald-100/95 leading-relaxed max-w-2xl">
-            Vi bygger værktøjer, der tager udgangspunkt i danske butikker, rigtige priser og den virkelighed du faktisk lever i – ikke i perfekte slides.
-          </p>
+        <div className="container mx-auto px-4 py-16 sm:py-24 max-w-6xl relative">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
+            <div>
+              <p className="text-emerald-300/90 text-sm font-medium tracking-wide uppercase mb-4">
+                Functional Foods
+              </p>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight tracking-tight">
+                Sundhed skal ikke være et fuldtidsjob – det skal være en{' '}
+                <span className="text-amber-300">funktion af din hverdag</span>
+              </h1>
+              <p className="mt-6 text-lg sm:text-xl text-emerald-100/95 leading-relaxed max-w-2xl">
+                Vi bygger værktøjer, der tager udgangspunkt i danske butikker, rigtige priser og den virkelighed du faktisk lever i – ikke i perfekte slides.
+              </p>
+
+              <div className="mt-8 rounded-2xl border border-amber-200/60 bg-white/95 p-5 text-slate-900 shadow-xl backdrop-blur-sm">
+                <p className="text-base sm:text-lg leading-relaxed">
+                  Hej 👋 Hvis du kommer fra <strong>Ketoliv</strong>, er du stadig det rette sted. Functionalfoods er udvidet, og kan nu tilbyde vægttabsløsninger inden for Keto, der både lige nu er gratis, og super effektive. Har du kommentar eller spørgsmål så skriv til{' '}
+                  <a href="mailto:hej@functionalfoods.dk" className="font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-950">
+                    hej@functionalfoods.dk
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <div className="relative mx-auto w-full max-w-sm lg:max-w-md">
+              <div className="absolute -inset-4 rounded-[2rem] bg-emerald-300/20 blur-2xl" />
+              <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 shadow-2xl">
+                <Image
+                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/blog-sections/nicolai-om-os-founder-1775638836185.png"
+                  alt="Nicolai Varney, stifter af Functional Foods"
+                  width={620}
+                  height={620}
+                  priority
+                  className="aspect-square w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

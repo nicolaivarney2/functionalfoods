@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 
@@ -55,22 +54,15 @@ export default function SoftLaunchBanner() {
         </button>
         <div className="text-sm sm:text-[15px] leading-relaxed text-gray-800 text-center sm:text-left">
           <p>
-            <span className="font-semibold text-gray-900">Soft launch:</span> vi retter stadig småting. Fejl eller
-            spørgsmål? Skriv til{' '}
+            <span className="font-semibold text-gray-900">Soft launch:</span> vi retter stadig småting. Har du spottet
+            fejl eller er du i et aktivt vægttab og savner hjælp, så skriv til{' '}
             <a
-              href="mailto:w@nicolaivarney.dk"
+              href="mailto:hej@functionalfoods.dk"
               className="font-medium text-emerald-800 underline decoration-emerald-600/50 underline-offset-2 hover:text-emerald-950"
             >
-              w@nicolaivarney.dk
+              hej@functionalfoods.dk
             </a>
-            . Opret gratis profil på{' '}
-            <Link
-              href="/kom-i-gang"
-              className="font-medium text-emerald-800 underline decoration-emerald-600/50 underline-offset-2 hover:text-emerald-950"
-            >
-              Kom i gang
-            </Link>
-            .
+            {' - '}det er gratis. - // Nicolai
           </p>
         </div>
       </div>
