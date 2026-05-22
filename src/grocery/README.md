@@ -1,0 +1,163 @@
+# Grocery Service
+
+**Isolated grocery data service.** Lives inside the `functionalfoods` repo for
+convenience but is fully decoupled — it has its own Supabase project, its own
+env vars, and never touches the main `functionalfoods` Supabase, types, or
+business logic.
+
+It powers both:
+- `functionalfoods` (recipe price comparison, shopping lists)
+- `planomo` (Goma-style meal planning for families) — future
+
+## Architecture
+
+```
+src/grocery/
+├── db/
+│   ├── client.ts                       Supabase clients (secret + publishable)
+│   ├── migrate.ts                      Migrations runner (ledger-tracked)
+│   └── migrations/
+│       ├── 001_initial_schema.sql      Idempotent: tables, indexes, RLS, seed
+│       └── 002_truncate_helpers.sql    truncate_chain() RPC
+├── adapters/
+│   ├── salling-algolia/                Netto, Bilka, Føtex (shared Algolia index)
+│   ├── rema1000/                       REMA 1000 (direct public API)
+│   └── nemlig/TODO.md                  Nemlig.com (deferred — stateful API)
+├── api/
+│   ├── auth.ts                         Bearer token auth
+│   ├── mappers.ts                      DB row → DTO
+│   ├── responses.ts                    Standard envelopes
+│   └── shapes.ts                       Public DTO types
+├── types/index.ts                      Shared DB row types
+└── README.md
+
+src/app/api/grocery/                    Consumer-facing HTTP endpoints
+├── products/route.ts                   GET    list with filters
+├── products/[id]/route.ts              GET    single by uuid or GTIN
+├── search/route.ts                     GET    name/GTIN search
+├── offers/route.ts                     GET    only on-sale items
+├── categories/route.ts                 GET    3-level category tree
+└── sync/salling/route.ts               POST   trigger sync
+
+src/lib/grocery-client.ts               Type-safe client for app code
+scripts/grocery-*.ts                    CLI utilities
+```
+
+## Quick start
+
+```bash
+# 1. Run pending DB migrations (idempotent — safe to re-run)
+npx tsx scripts/grocery-migrate.ts
+
+# 2. Initial population — Salling (Netto/Bilka/Føtex) + REMA
+npx tsx scripts/grocery-sync-netto.ts --chain=netto
+npx tsx scripts/grocery-sync-netto.ts --chain=foetex
+npx tsx scripts/grocery-sync-netto.ts --chain=bilka
+npx tsx scripts/grocery-sync-rema.ts
+
+# 3. Verify with the consumer client
+npx tsx scripts/test-grocery-client.ts
+```
+
+## Environment variables
+
+Add to `.env.local`:
+
+```bash
+# Supabase (required)
+GROCERY_SUPABASE_URL=https://kuwqzodesppknbjtrsgs.supabase.co
+GROCERY_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+GROCERY_SUPABASE_SECRET_KEY=sb_secret_...         # server only — never expose
+
+# API security
+GROCERY_SYNC_SECRET=...                            # auth for /api/grocery/sync/*
+GROCERY_INTERNAL_API_KEY=...                       # auth for read endpoints
+
+# Migrations (for `npx tsx scripts/grocery-migrate.ts`)
+# Find the DB password in: Supabase Dashboard → Project Settings → Database → Database password
+GROCERY_SUPABASE_DB_PASSWORD=...                   # used to build pooler conn string
+# Optional override if you prefer a full connection string:
+# GROCERY_DATABASE_URL=postgresql://postgres.[ref]:[pw]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+# Optional region override (default: eu-central-1):
+# GROCERY_SUPABASE_REGION=eu-central-1
+
+# Optional override (defaults to public frontend key)
+# SALLING_ALGOLIA_SEARCH_KEY=...
+```
+
+The `GROCERY_*` prefix is intentional: makes it impossible to accidentally
+reach for the wrong Supabase project from main `functionalfoods` code.
+
+## Data model
+
+| Table | Purpose |
+|---|---|
+| `stores` | Chains (`netto`, `bilka`, `rema-1000`, …) and physical stores |
+| `products` | Canonical product, unique on `(source_chain, source_id)` |
+| `product_offers` | Current price/offer per `(product_id, store_id)` |
+| `price_history` | Daily snapshots for "price chart" feature |
+| `sync_logs` | Audit trail per sync run |
+| `api_keys` | Future external API-key auth |
+| `_grocery_migrations` | Ledger for the migrations runner |
+
+RLS is enabled on every table with **no policies**, so all access must go
+through the server-side secret key. Public/anon traffic must go through our
+`/api/grocery/*` endpoints.
+
+## Data sources
+
+| Source | Chains | How | Products |
+|---|---|---|---|
+| **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Direct queries to the public search index. Includes prices + campaign offers. | ~61k combined |
+| **REMA 1000 API** (`api.digital.rema1000.dk/api/v3`) | REMA 1000 | Public REST API, paginated by department. No GTIN (name-based cross-match only). | ~3.9k |
+| **Apify** (deferred) | Nemlig.com | Stateful API — see `adapters/nemlig/TODO.md` | 0 |
+| **Tjek (eTilbudsavis) API** (planned) | All offers, all chains | Officially licensed | — |
+
+## Consumer client
+
+From any server-side code (App Router server components, route handlers,
+scripts):
+
+```ts
+import { getGroceryClient } from '@/lib/grocery-client'
+
+const client = getGroceryClient()
+
+// Search across all chains
+const { data } = await client.search({ q: 'banan' })
+
+// Compare prices for one product across stores via GTIN
+const banana = await client.getProduct('5712873461653')
+
+// Get only items currently on sale
+const offers = await client.listOffers({ chain: 'rema-1000' })
+
+// Category navigation
+const tree = await client.getCategoryTree({ chain: 'netto' })
+```
+
+The client throws `GroceryClientError` (with `.status` and `.endpoint`) on
+non-2xx responses and returns `null` for `getProduct` 404s.
+
+## How to add a new chain
+
+1. Add the chain to the `stores` seed (already done for common DK chains).
+2. Create `adapters/<chain>/` with the standard four files
+   (`types.ts`, `client.ts`, `mapper.ts`, `sync.ts`, `index.ts`).
+3. Map every product to `ProductInsert` (use `source_chain` matching the
+   `stores.id`).
+4. Add a runner script in `scripts/grocery-sync-<chain>.ts`.
+5. (Optional) Add to the cron orchestrator (see `src/app/api/grocery/sync/cron`).
+
+## How to add a migration
+
+1. Drop a new `.sql` file in `db/migrations/` with a higher numeric prefix
+   (`003_...`, `004_...`).
+2. Make it idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE
+   FUNCTION`, `INSERT ... ON CONFLICT DO NOTHING`).
+3. Run `npx tsx scripts/grocery-migrate.ts --status` to confirm it shows up
+   as pending, then run without `--status` to apply.
+
+The runner uses a `_grocery_migrations` ledger table — applied migrations are
+recorded so they don't re-run. If you ever edit a previously-applied file,
+the runner will warn about a checksum mismatch and skip it.

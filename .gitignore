@@ -69,3 +69,6 @@ Frida_Dataset_May2025.*
 frida-data.zip
 public/images/recipes/
 public/images/categories/
+
+# Supabase CLI temp files
+supabase/.temp/

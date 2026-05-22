@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/api/', '/admin/'],
+      disallow: ['/api/', '/admin/', '/dev/'],
     },
     sitemap: 'https://functionalfoods.dk/sitemap.xml',
   }
