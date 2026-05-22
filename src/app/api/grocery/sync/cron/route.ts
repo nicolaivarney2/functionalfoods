@@ -11,9 +11,10 @@
  *      "price chart" feature has daily granularity.
  *   3. Return a summary of every step.
  *
- * Timeouts: a full run is ~150-180s (Netto + Føtex + Bilka + REMA). We set
- * maxDuration to 800 (Vercel Pro = up to 800s for Node functions). If you
- * are on Hobby (10s limit), trigger this from an external cron instead.
+ * Timeouts: a full run is ~150-180s (Netto + Føtex + Bilka + REMA). We cap
+ * maxDuration at 300s — Vercel's current ceiling for non-Enterprise plans.
+ * If a future run consistently flirts with the limit, split the chains into
+ * separate cron entries (vercel.json) instead of bumping the timeout.
  */
 
 import { NextResponse } from 'next/server'
@@ -24,7 +25,7 @@ import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 800
+export const maxDuration = 300
 
 type StepResult =
   | (SyncResult & { step: string })
