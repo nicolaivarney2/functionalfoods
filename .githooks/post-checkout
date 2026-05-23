@@ -1,0 +1,26 @@
+#!/bin/sh
+# Efter branch checkout: samme beskyttelse som post-merge (kun ved fil-skift, ikke ved fil checkout).
+# $3 = 1 betyder branch checkout; 0 betyder fil checkout.
+if [ "$3" != "1" ]; then
+  exit 0
+fi
+
+if [ -f .env.local ]; then
+  exit 0
+fi
+
+echo ""
+echo "⚠️  .env.local mangler efter branch-skift — gendanner automatisk..."
+echo ""
+
+if command -v npx >/dev/null 2>&1; then
+  if npx vercel env pull .env.local --environment=production --yes 2>/dev/null; then
+    chmod 600 .env.local 2>/dev/null || true
+    echo "✅ .env.local gendannet fra Vercel production."
+    echo ""
+    exit 0
+  fi
+fi
+
+echo "❌ Kunne ikke auto-gendanne. Kør: npm run env:pull"
+echo ""

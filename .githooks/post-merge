@@ -1,0 +1,23 @@
+#!/bin/sh
+# Efter merge: gendan .env.local hvis git har slettet den (tracked file removal).
+if [ -f .env.local ]; then
+  exit 0
+fi
+
+echo ""
+echo "⚠️  .env.local mangler efter git merge — gendanner automatisk..."
+echo ""
+
+if command -v npx >/dev/null 2>&1; then
+  if npx vercel env pull .env.local --environment=production --yes 2>/dev/null; then
+    chmod 600 .env.local 2>/dev/null || true
+    echo "✅ .env.local gendannet fra Vercel production."
+    echo "   Tilføj evt. lokale GROCERY_* variabler manuelt."
+    echo ""
+    exit 0
+  fi
+fi
+
+echo "❌ Kunne ikke auto-gendanne .env.local."
+echo "   Kør manuelt: npm run env:pull"
+echo ""

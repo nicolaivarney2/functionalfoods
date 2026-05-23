@@ -1,0 +1,21 @@
+#!/bin/sh
+# Bloker commits af filer med secrets (.env.local, backups, openai-config).
+set -e
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+BLOCKED=$(printf '%s\n' "$STAGED" | grep -E \
+  '^\.env(\.local|\.production|\.development)?$|^\.env\.local\.|^\.openai-config\.json$' \
+  | grep -v '^\.env\.example$' || true)
+
+if [ -n "$BLOCKED" ]; then
+  echo ""
+  echo "❌ COMMIT BLOKERET: Secret env-filer må aldrig committes:"
+  echo "$BLOCKED" | sed 's/^/   /'
+  echo ""
+  echo "   .env.local skal kun leve lokalt. Gendan med: npm run env:pull"
+  echo ""
+  exit 1
+fi
+
+exit 0
