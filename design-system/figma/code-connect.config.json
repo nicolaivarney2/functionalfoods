@@ -1,0 +1,13 @@
+{
+  "codeConnect": {
+    "include": ["design-system/figma/**/*.figma.{ts,tsx}"],
+    "exclude": ["design-system/figma/**/*.template"],
+    "parser": "react",
+    "label": "React",
+    "documentUrlSubstitutions": {},
+    "importPaths": {
+      "src/components/*": "@/components/*",
+      "design-system/*": "@/../design-system/*"
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import { FOUNDER_PORTRAIT_ALT, FOUNDER_PORTRAIT_URL } from '@/lib/founder-image'
 import {
   ArrowRight,
   BookOpen,
@@ -70,8 +71,8 @@ export default function BagOmFFPage() {
               <div className="absolute -inset-4 rounded-[2rem] bg-emerald-300/20 blur-2xl" />
               <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 shadow-2xl">
                 <Image
-                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/blog-sections/nicolai-om-os-founder-1775638836185.png"
-                  alt="Nicolai Varney, stifter af Functional Foods"
+                  src={FOUNDER_PORTRAIT_URL}
+                  alt={FOUNDER_PORTRAIT_ALT}
                   width={620}
                   height={620}
                   priority
@@ -185,7 +186,7 @@ export default function BagOmFFPage() {
             <div className="lg:col-span-2 bg-gradient-to-br from-emerald-700 to-emerald-900 p-10 lg:p-12 text-white flex flex-col justify-center min-h-[280px]">
               <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-white/25 shadow-lg mb-6">
                 <Image
-                  src="https://najaxycfjgultwdwffhv.supabase.co/storage/v1/object/public/recipe-images/blog-sections/nicolai-om-os-founder-1775638836185.png"
+                  src={FOUNDER_PORTRAIT_URL}
                   alt="Nicolai Varney"
                   fill
                   sizes="80px"

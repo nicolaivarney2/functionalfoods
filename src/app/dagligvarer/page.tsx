@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
-import AuthRequiredFeatureGate from '@/components/AuthRequiredFeatureGate'
+import GuestExperienceBanner from '@/components/GuestExperienceBanner'
 
 
 // Types
@@ -742,10 +742,7 @@ export default function DagligvarerPage() {
   }
 
   return (
-    <AuthRequiredFeatureGate
-      featureTitle="Dagligvarer"
-      description="Tilbud og priser på tværs af butikker kræver login, så vi kan vise dig relevante data og du kan bruge funktionen fuldt ud."
-    >
+    <>
       <style jsx>{`
         .scrollbar-hide {
           -ms-overflow-style: none;
@@ -756,6 +753,7 @@ export default function DagligvarerPage() {
         }
       `}</style>
       <div className="min-h-screen bg-gray-50">
+      <GuestExperienceBanner featureLabel="dagligvarer og tilbud" />
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
@@ -1423,6 +1421,6 @@ export default function DagligvarerPage() {
         </div>
       )}
       </div>
-    </AuthRequiredFeatureGate>
+    </>
   )
 }

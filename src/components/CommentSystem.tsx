@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { MessageCircle, Reply, Heart, Flag, Send, User } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import CommentCTA from './CommentCTA'
@@ -9,6 +9,7 @@ import LoginModal from './LoginModal'
 interface Comment {
   id: string
   author: string
+  authorId: string
   content: string
   timestamp: string
   likes: number
@@ -21,78 +22,194 @@ interface CommentSystemProps {
   onCommentUpdate?: (count: number) => void
 }
 
-export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate }: CommentSystemProps) {
-  const { user } = useAuth()
+export default function CommentSystem({ recipeSlug, onCommentUpdate }: CommentSystemProps) {
+  const { user, session } = useAuth()
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState('')
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const onCommentUpdateRef = useRef(onCommentUpdate)
 
-  // Update comment count when comments change
   useEffect(() => {
-    const totalComments = comments.length + comments.reduce((total, comment) => total + comment.replies.length, 0)
-    onCommentUpdate?.(totalComments)
-  }, [comments, onCommentUpdate])
+    onCommentUpdateRef.current = onCommentUpdate
+  }, [onCommentUpdate])
 
-  const handleLike = (commentId: string) => {
-    setComments(prev => 
-      prev.map(comment => {
-        if (comment.id === commentId) {
-          return {
-            ...comment,
-            likes: comment.isLiked ? comment.likes - 1 : comment.likes + 1,
-            isLiked: !comment.isLiked
+  // Hold optællingen synkroniseret uden at trigge ekstra renders fra parent.
+  useEffect(() => {
+    const totalComments =
+      comments.length + comments.reduce((total, c) => total + c.replies.length, 0)
+    onCommentUpdateRef.current?.(totalComments)
+  }, [comments])
+
+  const buildAuthHeaders = useCallback((): HeadersInit => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`
+    }
+    return headers
+  }, [session?.access_token])
+
+  // Hent kommentarer ved load (og igen når brugeren logger ind/ud, så isLiked er korrekt).
+  useEffect(() => {
+    let cancelled = false
+    const fetchComments = async () => {
+      setIsLoading(true)
+      try {
+        const res = await fetch(
+          `/api/recipes/${encodeURIComponent(recipeSlug)}/comments`,
+          {
+            headers: session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : undefined,
+            cache: 'no-store',
           }
+        )
+        if (!res.ok) throw new Error('Kunne ikke hente kommentarer')
+        const data = (await res.json()) as { comments: Comment[] }
+        if (!cancelled) {
+          setComments(data.comments ?? [])
+          setError(null)
         }
-        return comment
-      })
-    )
-  }
+      } catch (e) {
+        if (!cancelled) {
+          console.error('fetch comments failed', e)
+          setError('Kunne ikke indlæse kommentarer')
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    fetchComments()
+    return () => {
+      cancelled = true
+    }
+  }, [recipeSlug, session?.access_token])
 
-  const handleSubmitComment = (e: React.FormEvent) => {
+  const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newComment.trim()) return
-
-    const comment: Comment = {
-      id: Date.now().toString(),
-      author: user?.user_metadata?.name || 'Anonym',
-      content: newComment,
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      replies: []
+    if (!newComment.trim() || isSubmitting) return
+    if (!user) {
+      setIsLoginModalOpen(true)
+      return
     }
 
-    setComments(prev => [comment, ...prev])
-    setNewComment('')
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/recipes/${encodeURIComponent(recipeSlug)}/comments`,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ content: newComment.trim() }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Kunne ikke gemme kommentar')
+      }
+      const created = data.comment as Comment
+      setComments((prev) => [created, ...prev])
+      setNewComment('')
+    } catch (e) {
+      console.error('submit comment failed', e)
+      setError(e instanceof Error ? e.message : 'Kunne ikke gemme kommentar')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const handleSubmitReply = (parentId: string) => {
-    if (!replyContent.trim()) return
-
-    const reply: Comment = {
-      id: `${parentId}.${Date.now()}`,
-      author: user?.user_metadata?.name || 'Anonym',
-      content: replyContent,
-      timestamp: new Date().toISOString(),
-      likes: 0,
-      replies: []
+  const handleSubmitReply = async (parentId: string) => {
+    if (!replyContent.trim() || isSubmitting) return
+    if (!user) {
+      setIsLoginModalOpen(true)
+      return
     }
 
-    setComments(prev => 
-      prev.map(comment => {
-        if (comment.id === parentId) {
-          return {
-            ...comment,
-            replies: [...comment.replies, reply]
-          }
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        `/api/recipes/${encodeURIComponent(recipeSlug)}/comments`,
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ content: replyContent.trim(), parentId }),
         }
-        return comment
-      })
-    )
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Kunne ikke gemme svar')
+      }
+      const created = data.comment as Comment
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentId ? { ...c, replies: [...c.replies, created] } : c
+        )
+      )
+      setReplyContent('')
+      setReplyingTo(null)
+    } catch (e) {
+      console.error('submit reply failed', e)
+      setError(e instanceof Error ? e.message : 'Kunne ikke gemme svar')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
-    setReplyContent('')
-    setReplyingTo(null)
+  const handleLike = async (commentId: string) => {
+    if (!user) {
+      setIsLoginModalOpen(true)
+      return
+    }
+
+    // Optimistisk opdatering i både topniveau og replies.
+    const applyToggle = (c: Comment): Comment => {
+      if (c.id === commentId) {
+        const wasLiked = !!c.isLiked
+        return {
+          ...c,
+          isLiked: !wasLiked,
+          likes: Math.max(0, c.likes + (wasLiked ? -1 : 1)),
+        }
+      }
+      if (c.replies.length > 0) {
+        return { ...c, replies: c.replies.map(applyToggle) }
+      }
+      return c
+    }
+    setComments((prev) => prev.map(applyToggle))
+
+    try {
+      const res = await fetch(
+        `/api/recipes/${encodeURIComponent(recipeSlug)}/comments/${commentId}/like`,
+        { method: 'POST', headers: buildAuthHeaders() }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Like fejlede')
+      }
+      // Synk korrekt antal fra serveren (i tilfælde af samtidige likes).
+      const applyServer = (c: Comment): Comment => {
+        if (c.id === commentId) {
+          return { ...c, isLiked: !!data.liked, likes: typeof data.likes === 'number' ? data.likes : c.likes }
+        }
+        if (c.replies.length > 0) {
+          return { ...c, replies: c.replies.map(applyServer) }
+        }
+        return c
+      }
+      setComments((prev) => prev.map(applyServer))
+    } catch (e) {
+      console.error('like failed', e)
+      // Rul den optimistiske ændring tilbage.
+      setComments((prev) => prev.map(applyToggle))
+      setError(e instanceof Error ? e.message : 'Like fejlede')
+    }
   }
 
   const renderComment = (comment: Comment) => (
@@ -108,7 +225,7 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
               {new Date(comment.timestamp).toLocaleDateString('da-DK')}
             </span>
           </div>
-          <p className="text-gray-700 mb-3">{comment.content}</p>
+          <p className="text-gray-700 mb-3 whitespace-pre-wrap">{comment.content}</p>
           
           <div className="flex items-center space-x-4">
             <button
@@ -122,7 +239,13 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
             </button>
             
             <button
-              onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
+              onClick={() => {
+                if (!user) {
+                  setIsLoginModalOpen(true)
+                  return
+                }
+                setReplyingTo(replyingTo === comment.id ? null : comment.id)
+              }}
               className="flex items-center space-x-1 text-sm text-gray-500 hover:text-blue-500 transition-colors"
             >
               <Reply size={16} />
@@ -146,16 +269,20 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
               />
               <div className="flex justify-end space-x-2 mt-2">
                 <button
-                  onClick={() => setReplyingTo(null)}
+                  onClick={() => {
+                    setReplyingTo(null)
+                    setReplyContent('')
+                  }}
                   className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
                 >
                   Annuller
                 </button>
                 <button
                   onClick={() => handleSubmitReply(comment.id)}
-                  className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  disabled={isSubmitting || !replyContent.trim()}
+                  className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Svar
+                  {isSubmitting ? 'Sender…' : 'Svar'}
                 </button>
               </div>
             </div>
@@ -176,7 +303,7 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
                           {new Date(reply.timestamp).toLocaleDateString('da-DK')}
                         </span>
                       </div>
-                      <p className="text-gray-700 text-sm mb-2">{reply.content}</p>
+                      <p className="text-gray-700 text-sm mb-2 whitespace-pre-wrap">{reply.content}</p>
                       
                       <div className="flex items-center space-x-3">
                         <button
@@ -212,14 +339,12 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
         <p className="text-gray-600">Del dine erfaringer og tips med andre madentusiaster</p>
       </div>
 
-      {/* Show CTA if user is not logged in */}
       {!user && (
         <div className="mb-8">
           <CommentCTA onLoginClick={() => setIsLoginModalOpen(true)} />
         </div>
       )}
 
-      {/* Comment Form - Only show if user is logged in */}
       {user && (
         <div className="bg-white rounded-lg p-6 mb-8 shadow-sm border border-gray-100">
           <form onSubmit={handleSubmitComment} className="space-y-4">
@@ -234,24 +359,34 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
                 className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 rows={4}
                 required
+                maxLength={5000}
               />
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              {error ? (
+                <p className="text-sm text-red-600">{error}</p>
+              ) : (
+                <span />
+              )}
               <button
                 type="submit"
-                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                disabled={isSubmitting || !newComment.trim()}
+                className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Send size={16} />
-                <span>Send kommentar</span>
+                <span>{isSubmitting ? 'Sender…' : 'Send kommentar'}</span>
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Comments List */}
       <div className="space-y-4">
-        {comments.length > 0 ? (
+        {isLoading ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>Indlæser kommentarer…</p>
+          </div>
+        ) : comments.length > 0 ? (
           comments.map(comment => renderComment(comment))
         ) : (
           <div className="text-center py-8 text-gray-500">
@@ -261,7 +396,6 @@ export default function CommentSystem({ recipeSlug: _recipeSlug, onCommentUpdate
         )}
       </div>
 
-      {/* Login Modal */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}

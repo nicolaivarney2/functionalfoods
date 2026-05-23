@@ -1,5 +1,6 @@
 'use client'
 
+import { FOUNDER_PORTRAIT_ALT, FOUNDER_PORTRAIT_URL } from '@/lib/founder-image'
 import Image from 'next/image'
 import Link from 'next/link'
 import { BookOpen, Sparkles, Store } from 'lucide-react'
@@ -12,10 +13,10 @@ export default function AboutFunctionalFoods() {
           <div className="relative">
             <div className="aspect-square relative rounded-lg overflow-hidden border border-emerald-100 shadow-sm bg-white">
               <Image
-                src="/billeder/andet/nicolai-om-os-founder.png"
-                alt="Stifter af Functional Foods"
+                src={FOUNDER_PORTRAIT_URL}
+                alt={FOUNDER_PORTRAIT_ALT}
                 fill
-                className="object-cover object-top"
+                className="object-cover object-center"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
             </div>

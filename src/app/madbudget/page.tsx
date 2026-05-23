@@ -12,7 +12,7 @@ import { mealPlanGenerator, getPeoplePerMealFromAdultsProfiles } from '@/lib/mea
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 import { resolveFactoryDietId } from '@/lib/diet-tag-matching'
 import { recipeMatchesDiet } from '@/lib/recipe-diet-matcher'
-import AuthRequiredFeatureGate from '@/components/AuthRequiredFeatureGate'
+import GuestExperienceBanner from '@/components/GuestExperienceBanner'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -2114,11 +2114,8 @@ export default function MadbudgetPage() {
   const weekDates = getWeekDates()
 
   return (
-    <AuthRequiredFeatureGate
-      featureTitle="Madbudget"
-      description="Din madplan, familieindstillinger og indkøbsliste gemmes på din konto. Log ind eller opret en gratis bruger for at bruge Madbudget."
-    >
     <div className="min-h-screen bg-gray-50">
+      <GuestExperienceBanner featureLabel="madplanen" />
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-6">
@@ -5130,6 +5127,5 @@ export default function MadbudgetPage() {
         }}
       />
     </div>
-    </AuthRequiredFeatureGate>
   )
 }

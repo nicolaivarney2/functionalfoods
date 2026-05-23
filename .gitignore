@@ -72,3 +72,4 @@ public/images/categories/
 
 # Supabase CLI temp files
 supabase/.temp/
+.env*

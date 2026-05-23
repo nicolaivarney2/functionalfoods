@@ -1,0 +1,45 @@
+/**
+ * RecipeCard.figma.ts.template
+ *
+ * Eksempel-binding mellem Figma's RecipeCard-komponent og den faktiske
+ * React-komponent. Når dit Figma-bibliotek er publiceret:
+ *
+ *   1. Kopier RecipeCard-komponentens Figma-URL (Right-click -> Copy link to selection)
+ *   2. Indsæt URL'en i `figma.connect()`-kaldet nedenfor
+ *   3. Omdøb denne fil til `RecipeCard.figma.ts` (drop .template-suffixet)
+ *   4. Kør: npx figma connect publish
+ *
+ * Bemærk: Dette er bare en template. Den importeres ikke af appen.
+ * Kun .figma.ts-filer (uden .template) bliver published til Figma.
+ */
+
+import figma from '@figma/code-connect'
+import RecipeCard from '@/components/RecipeCard'
+
+figma.connect(
+  RecipeCard,
+  'INDSAET_FIGMA_URL_HER',
+  {
+    props: {
+      // Mapper Figma component properties til React props
+      // Eksempel:
+      // recipe: figma.children('Recipe'),  // hvis du har en nested component
+      // priority: figma.boolean('Priority'),
+    },
+    example: ({ priority }) => (
+      <RecipeCard
+        recipe={{
+          id: '1',
+          slug: 'eksempel-opskrift',
+          title: 'Eksempel opskrift',
+          shortDescription: 'En lækker opskrift fra vores katalog',
+          imageUrl: '/placeholder.jpg',
+          totalTime: 30,
+          servings: 4,
+          dietaryCategories: ['keto'],
+        } as never}
+        priority={priority}
+      />
+    ),
+  }
+)

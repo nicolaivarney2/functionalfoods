@@ -6,7 +6,7 @@
   .animate-slide-up {
     animation: slideUp 0.3s ease-out;
   }
-  
+
   @keyframes slideUp {
     from {
       transform: translateY(100%);
@@ -17,58 +17,148 @@
       opacity: 1;
     }
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer base {
   html {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
     overflow-x: clip;
   }
-  
+
   body {
-    @apply text-gray-900 bg-white overflow-x-hidden;
+    @apply bg-neutral-0 text-neutral-900 overflow-x-hidden;
     max-width: 100%;
   }
 }
 
 @layer components {
+  /* -----------------------------------------------------------------------
+     Buttons - app-native blød radius, generøs touch target
+     ----------------------------------------------------------------------- */
+
   .btn-primary {
-    @apply bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 px-6 rounded-none transition-colors duration-200;
+    @apply inline-flex items-center justify-center font-medium
+           bg-neutral-900 text-neutral-0
+           hover:bg-neutral-800 active:bg-neutral-700
+           py-3 px-5 rounded-lg
+           transition-colors duration-fast
+           min-h-[44px]
+           disabled:opacity-40 disabled:pointer-events-none;
   }
-  
+
   .btn-secondary {
-    @apply bg-white hover:bg-gray-50 text-gray-900 font-medium py-3 px-6 border border-gray-300 rounded-none transition-colors duration-200;
+    @apply inline-flex items-center justify-center font-medium
+           bg-neutral-0 text-neutral-900
+           hover:bg-neutral-50 active:bg-neutral-100
+           py-3 px-5 rounded-lg border border-neutral-200
+           transition-colors duration-fast
+           min-h-[44px]
+           disabled:opacity-40 disabled:pointer-events-none;
   }
-  
+
+  .btn-tertiary {
+    @apply inline-flex items-center justify-center font-medium
+           text-neutral-700 bg-transparent
+           hover:bg-neutral-100 active:bg-neutral-200
+           py-3 px-4 rounded-lg
+           transition-colors duration-fast
+           min-h-[44px]
+           disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center font-medium
+           bg-danger-600 text-neutral-0
+           hover:bg-danger-700 active:bg-danger-900
+           py-3 px-5 rounded-lg
+           transition-colors duration-fast
+           min-h-[44px]
+           disabled:opacity-40 disabled:pointer-events-none;
+  }
+
+  /* -----------------------------------------------------------------------
+     Cards
+     ----------------------------------------------------------------------- */
+
   .card {
-    @apply bg-white border border-gray-200 p-6;
+    @apply bg-neutral-0 border border-neutral-200 rounded-2xl p-6;
   }
-  
+
   .recipe-card {
-    @apply bg-white border border-gray-200 hover:border-gray-300 transition-colors duration-200;
+    @apply bg-neutral-0 border border-neutral-200 rounded-2xl overflow-hidden
+           hover:border-neutral-300 transition-colors duration-fast;
   }
-  
+
+  /* -----------------------------------------------------------------------
+     Inputs
+     ----------------------------------------------------------------------- */
+
+  .input {
+    @apply w-full bg-neutral-0 text-neutral-900 placeholder:text-neutral-400
+           border border-neutral-200 rounded-md
+           px-4 py-3 min-h-[44px]
+           focus:outline-none focus:border-neutral-900
+           transition-colors duration-fast
+           disabled:bg-neutral-50 disabled:text-neutral-400;
+  }
+
+  .input-error {
+    @apply border-danger-500 focus:border-danger-600;
+  }
+
+  /* -----------------------------------------------------------------------
+     Chips / Badges
+     ----------------------------------------------------------------------- */
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1
+           rounded-full text-bodySm font-medium
+           bg-neutral-100 text-neutral-800;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5
+           rounded-sm text-micro font-medium uppercase tracking-wider
+           bg-neutral-900 text-neutral-0;
+  }
+
+  /* -----------------------------------------------------------------------
+     Container
+     ----------------------------------------------------------------------- */
+
   .container {
     @apply max-w-6xl mx-auto px-4 w-full;
   }
-  
-  /* Subtle pulse animation for scroll indicators */
+
+  /* -----------------------------------------------------------------------
+     Scroll indicator pulse
+     ----------------------------------------------------------------------- */
+
   @keyframes subtle-pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 0.6; }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 0.6;
+    }
   }
-  
+
   .scroll-indicator {
     animation: subtle-pulse 3s ease-in-out infinite;
   }
-
-  /* Hide scrollbar but keep functionality */
-  .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
-  }
-} 
+}

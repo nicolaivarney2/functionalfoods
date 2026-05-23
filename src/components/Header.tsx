@@ -12,7 +12,7 @@ import RecipeSearchModal from './RecipeSearchModal'
 const mainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
-  { name: 'MADBUDGET', href: '/madbudget' },
+  { name: 'MADPLAN', href: '/madbudget' },
   { name: 'FUNKTIONER', href: '/funktioner' },
   { name: 'VÆGTTAB', href: '/vaegttab' },
   { name: 'OM OS', href: '/bag-om-ff' },

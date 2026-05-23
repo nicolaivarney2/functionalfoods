@@ -23,7 +23,7 @@ export default function RecipeCard({ recipe, showRating: _showRating = true, pri
   }
 
   return (
-    <article className="recipe-card h-full flex flex-col rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+    <article className="recipe-card h-full flex flex-col rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
       <Link
         href={`/opskrift/${recipe.slug}`}
         className="group flex h-full flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"

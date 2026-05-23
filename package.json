@@ -42,6 +42,7 @@
     "xlsx": "npm:@e965/xlsx@0.20.3"
   },
   "devDependencies": {
+    "@figma/code-connect": "^1.4.5",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
