@@ -29,6 +29,7 @@ yarn-error.log*
 .env*.backup
 .env.local.backup
 .env.local.bak
+.env.local.override
 # .env.example er bevidst tracked (skabelon uden secrets)
 
 # OpenAI config (contains API keys)
@@ -75,3 +76,4 @@ supabase/.temp/
 
 # Database backups (kan indeholde sensitiv data)
 backups/
+.env*
