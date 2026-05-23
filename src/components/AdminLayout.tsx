@@ -19,7 +19,8 @@ import {
   Menu,
   Loader2,
   FileText,
-  MessageSquare
+  MessageSquare,
+  Trophy
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -100,6 +101,13 @@ const adminNavItems = [
     description: 'Administrer blog indlæg og kernesider'
   },
   {
+    name: 'Succeshistorier',
+    href: '/admin/succeshistorier',
+    icon: Trophy,
+    description: 'Godkend og rediger succeshistorier',
+    badgeKey: 'successStories' as const
+  },
+  {
     name: 'Reddit Communities',
     href: '/admin/reddit-communities',
     icon: MessageSquare,
@@ -115,14 +123,77 @@ const adminNavItems = [
 
 const BRAND_LOGO_URL = '/billeder/favicon/ff-logo favicon white logo.jpg.png'
 
+function NavLink({
+  item,
+  isActive,
+  badgeCount,
+  onNavigate,
+}: {
+  item: (typeof adminNavItems)[number]
+  isActive: boolean
+  badgeCount?: number
+  onNavigate?: () => void
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={`group flex items-center justify-between px-2 py-2 text-sm font-medium rounded-md ${
+        isActive
+          ? 'bg-blue-100 text-blue-900'
+          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+      }`}
+    >
+      <span className="flex items-center min-w-0">
+        <item.icon className="mr-3 h-5 w-5 shrink-0" />
+        <span className="truncate">{item.name}</span>
+      </span>
+      {badgeCount && badgeCount > 0 ? (
+        <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+          {badgeCount > 99 ? '99+' : badgeCount}
+        </span>
+      ) : null}
+    </Link>
+  )
+}
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingStoryCount, setPendingStoryCount] = useState(0)
   const pathname = usePathname()
   const { isAdmin, checking } = useAdminAuth()
   const router = useRouter()
   
   // Automatic image migration hook
   const { isMigrating, migrationResult } = useImageMigration()
+
+  useEffect(() => {
+    if (!isAdmin) return
+
+    let alive = true
+
+    async function loadPendingCount() {
+      try {
+        const res = await fetch('/api/admin/success-stories/pending-count', { cache: 'no-store' })
+        if (!res.ok || !alive) return
+        const json = await res.json()
+        if (alive) setPendingStoryCount(typeof json.count === 'number' ? json.count : 0)
+      } catch {
+        // ignore
+      }
+    }
+
+    loadPendingCount()
+    const interval = setInterval(loadPendingCount, 60_000)
+    const onUpdated = () => loadPendingCount()
+    window.addEventListener('success-stories-updated', onUpdated)
+
+    return () => {
+      alive = false
+      clearInterval(interval)
+      window.removeEventListener('success-stories-updated', onUpdated)
+    }
+  }, [isAdmin])
 
   // Centralized auth check for all admin pages
   useEffect(() => {
@@ -172,20 +243,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <nav className="flex-1 space-y-1 px-2 py-4">
             {adminNavItems.map((item) => {
               const isActive = pathname === item.href
+              const badgeCount = item.badgeKey === 'successStories' ? pendingStoryCount : undefined
               return (
-                <Link
+                <NavLink
                   key={item.name}
-                  href={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
+                  item={item}
+                  isActive={isActive}
+                  badgeCount={badgeCount}
+                  onNavigate={() => setSidebarOpen(false)}
+                />
               )
             })}
           </nav>
@@ -204,19 +270,14 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           <nav className="flex-1 space-y-1 px-2 py-4">
             {adminNavItems.map((item) => {
               const isActive = pathname === item.href
+              const badgeCount = item.badgeKey === 'successStories' ? pendingStoryCount : undefined
               return (
-                <Link
+                <NavLink
                   key={item.name}
-                  href={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md ${
-                    isActive
-                      ? 'bg-blue-100 text-blue-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <item.icon className="mr-3 h-5 w-5" />
-                  {item.name}
-                </Link>
+                  item={item}
+                  isActive={isActive}
+                  badgeCount={badgeCount}
+                />
               )
             })}
           </nav>
