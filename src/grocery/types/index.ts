@@ -24,6 +24,55 @@ export type SourceChain =
   | 'abc-lavpris'
   | 'min-koebmand'
 
+/**
+ * How complete is our data for each chain?
+ *
+ *   - `full`        Direct primary-source API: full product catalog with both
+ *                   regular shelf prices and current offers. (Salling Algolia,
+ *                   REMA 1000 API.)
+ *   - `offers-only` Only current weekly tilbud via Tjek/Squid. No regular
+ *                   shelf prices, no out-of-campaign products. Treat the data
+ *                   as "this week's offers" — the frontend should label these
+ *                   chains so users understand the difference.
+ *   - `none`        No working adapter yet. The chain is seeded in `stores`
+ *                   for forward-compatibility but produces zero rows.
+ *
+ * Single source of truth for both the sync layer and any UI that surfaces
+ * chain-level coverage badges.
+ */
+export type CatalogCoverage = 'full' | 'offers-only' | 'none'
+
+export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
+  // Direct primary-source adapters
+  netto: 'full',
+  foetex: 'full',
+  bilka: 'full',
+  'rema-1000': 'full',
+
+  // Tjek-only (no full catalog adapter yet)
+  lidl: 'offers-only',
+  meny: 'offers-only',
+  spar: 'offers-only',
+  'min-koebmand': 'offers-only',
+  loevbjerg: 'offers-only',
+  kvickly: 'offers-only',
+  superbrugsen: 'offers-only',
+  brugsen: 'offers-only',
+  '365discount': 'offers-only',
+  'abc-lavpris': 'offers-only',
+
+  // Tjek has 0 offers for Nemlig (online-only chain, no tilbudsavis) and
+  // we haven't built the stateful Nemlig adapter — see adapters/nemlig/TODO.md.
+  nemlig: 'none',
+}
+
+/** Human-readable Danish label for the coverage status. */
+export const COVERAGE_LABEL: Record<CatalogCoverage, string> = {
+  full: 'Fuldt katalog',
+  'offers-only': 'Kun aktuelle tilbud',
+  none: 'Ingen data',
+}
+
 export type SyncSource =
   | `salling-algolia:${'netto' | 'foetex' | 'bilka'}`
   | `apify-rema`
@@ -31,6 +80,7 @@ export type SyncSource =
   | `rema-1000-api`
   | `nemlig-api`
   | `tjek-offers`
+  | `tjek:offers`
 
 export interface StoreRow {
   id: string

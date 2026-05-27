@@ -22,7 +22,8 @@ src/grocery/
 ├── adapters/
 │   ├── salling-algolia/                Netto, Bilka, Føtex (shared Algolia index)
 │   ├── rema1000/                       REMA 1000 (direct public API)
-│   └── nemlig/TODO.md                  Nemlig.com (deferred — stateful API)
+│   ├── tjek/                           Tilbud (offers) for ALL DK chains via squid-api.tjek.com
+│   └── nemlig/TODO.md                  Nemlig.com full catalog (deferred — stateful API)
 ├── api/
 │   ├── auth.ts                         Bearer token auth
 │   ├── mappers.ts                      DB row → DTO
@@ -55,7 +56,11 @@ npx tsx scripts/grocery-sync-netto.ts --chain=foetex
 npx tsx scripts/grocery-sync-netto.ts --chain=bilka
 npx tsx scripts/grocery-sync-rema.ts
 
-# 3. Verify with the consumer client
+# 3. Pull weekly offers for the remaining DK chains via Tjek
+npx tsx scripts/grocery-sync-tjek.ts --dry-run --max=10   # preview
+npx tsx scripts/grocery-sync-tjek.ts                       # real run
+
+# 4. Verify with the consumer client
 npx tsx scripts/test-grocery-client.ts
 ```
 
@@ -110,8 +115,43 @@ through the server-side secret key. Public/anon traffic must go through our
 |---|---|---|---|
 | **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Direct queries to the public search index. Includes prices + campaign offers. | ~61k combined |
 | **REMA 1000 API** (`api.digital.rema1000.dk/api/v3`) | REMA 1000 | Public REST API, paginated by department. No GTIN (name-based cross-match only). | ~3.9k |
-| **Apify** (deferred) | Nemlig.com | Stateful API — see `adapters/nemlig/TODO.md` | 0 |
-| **Tjek (eTilbudsavis) API** (planned) | All offers, all chains | Officially licensed | — |
+| **Tjek/Squid API** (`squid-api.tjek.com/v2`) | Lidl, MENY, SPAR, Min Købmand, Løvbjerg, ABC Lavpris, Kvickly, SuperBrugsen, Brugsen, 365discount, Nemlig | Weekly leaflet offers (no full catalog, no GTIN). Skips Salling + REMA by default since we have their canonical sources. | ~3.4k offers across 11 chains |
+| **Nemlig (deferred)** | Nemlig.com full catalog | Stateful API — see `adapters/nemlig/TODO.md` | 0 |
+
+### Tjek adapter operational guardrails
+
+The Tjek adapter ships with operational safeguards because the `squid-api.tjek.com`
+endpoint is unauthenticated but **not officially licensed** for our use-case.
+The adapter is deliberately quiet:
+
+- Browser-realistic headers (`User-Agent`, `Accept-Language`, `Origin`/`Referer` mimic the eTilbudsavis web app).
+- 600-1400ms jitter sleep between requests (configurable).
+- Auto-pause after 3 consecutive 4xx/5xx responses (`TjekAutoPausedError`).
+- Hard kill-switch: set `GROCERY_TJEK_DISABLED=true` in Vercel env to abort all outbound requests immediately.
+- Image URLs are **not** populated on product rows (left in `raw_data` only) to prevent accidental hotlinking from public UI.
+
+Sample size of a full nightly run (verified 27. May 2026): 11 dealers, 3,420 offers, ~43 seconds total, ~50-100 HTTP requests.
+
+Live preview / verification: `/dev/grocery-tjek-explorer?chain=lidl` (server-rendered, no DB writes).
+
+### Chain coverage (single source of truth)
+
+Different chains have different data quality. The truth lives in
+`src/grocery/types/index.ts` as the `CHAIN_COVERAGE` map and `CatalogCoverage`
+type. Both the sync layer and any consumer UI should import it instead of
+hard-coding lists.
+
+| Coverage | Meaning | Chains |
+|---|---|---|
+| `full` | Direct primary-source API. Normal shelf prices **and** offers. | Netto, Bilka, Føtex, REMA 1000 |
+| `offers-only` | Tjek/Squid only — this week's tilbudsavis, no regular prices, no out-of-campaign products. | Lidl, MENY, SPAR, Min Købmand, Løvbjerg, Kvickly, SuperBrugsen, Brugsen, 365discount, ABC Lavpris |
+| `none` | No working adapter yet (chain is seeded for forward-compat). | Nemlig |
+
+All Tjek offers are persisted with `is_on_sale = true` and `source = 'tjek:offers'`,
+so consumer queries can distinguish them from canonical catalog rows. Frontends
+that mix chains should surface the `offers-only` status to users (e.g. a "Kun
+ugens tilbud"-badge on those chains' product cards or store-filter chips) so it's
+clear why the result set looks thin compared to chains with a full catalog.
 
 ## Consumer client
 
