@@ -13,6 +13,7 @@ import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 import { resolveFactoryDietId } from '@/lib/diet-tag-matching'
 import { recipeMatchesDiet } from '@/lib/recipe-diet-matcher'
 import GuestExperienceBanner from '@/components/GuestExperienceBanner'
+import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -85,6 +86,26 @@ const STORE_KEY_BY_ID: Record<number, string> = {
 function storeIdFromTabKey(tab: string): number | null {
   const found = Object.entries(STORE_KEY_BY_ID).find(([, k]) => k === tab)
   return found ? Number(found[0]) : null
+}
+
+/**
+ * Madbudget tab-keys bruger danske bogstaver ('føtex', 'løvbjerg') hvorimod
+ * grocery-service'ens SourceChain er ASCII ('foetex', 'loevbjerg'). Denne
+ * mapping er nødvendig for at slå CHAIN_COVERAGE op pr. valgt butiks-tab.
+ */
+const TAB_KEY_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
+  'rema-1000': 'rema-1000',
+  netto: 'netto',
+  føtex: 'foetex',
+  bilka: 'bilka',
+  nemlig: 'nemlig',
+  meny: 'meny',
+  spar: 'spar',
+  løvbjerg: 'loevbjerg',
+}
+
+function sourceChainFromTabKey(tab: string): SourceChain | null {
+  return TAB_KEY_TO_SOURCE_CHAIN[tab] ?? null
 }
 
 type DayKeyPlanner = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
@@ -3292,6 +3313,57 @@ export default function MadbudgetPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Tilbud-only coverage notice — vises når en kæde uden fuldt katalog er valgt */}
+                  {(() => {
+                    if (selectedStoreTab === 'all') {
+                      const offerOnlyChains = familyProfile.selectedStores
+                        ?.map((id: number) => STORE_KEY_BY_ID[id])
+                        .filter(Boolean)
+                        .map((tab: string) => ({
+                          tab,
+                          chain: sourceChainFromTabKey(tab),
+                        }))
+                        .filter(
+                          (x: { tab: string; chain: SourceChain | null }) =>
+                            x.chain != null && CHAIN_COVERAGE[x.chain] === 'offers-only',
+                        )
+                        .map((x: { tab: string; chain: SourceChain | null }) =>
+                          mockStores.find(
+                            (s) => storeIdFromTabKey(x.tab) === s.id,
+                          )?.name,
+                        )
+                        .filter(Boolean) as string[]
+
+                      if (offerOnlyChains.length === 0) return null
+                      return (
+                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          <span className="font-semibold">Bemærk:</span> For{' '}
+                          {offerOnlyChains.join(', ')} har vi i øjeblikket kun
+                          ugens tilbudsavis — varer udenfor tilbud vises ikke.
+                          Vælg butikkens fane for at se hvad der er på tilbud.
+                        </div>
+                      )
+                    }
+
+                    const chain = sourceChainFromTabKey(selectedStoreTab)
+                    if (!chain) return null
+                    const coverage = CHAIN_COVERAGE[chain]
+                    if (coverage !== 'offers-only') return null
+                    const storeName =
+                      mockStores.find(
+                        (s) => s.id === storeIdFromTabKey(selectedStoreTab),
+                      )?.name ?? selectedStoreTab
+                    return (
+                      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        <span className="font-semibold">Kun aktuelle tilbud:</span>{' '}
+                        For {storeName} viser vi udelukkende varer fra ugens
+                        tilbudsavis, ikke det fulde sortiment. Det betyder at
+                        nogle ingredienser fra din indkøbsliste muligvis ikke
+                        vises selvom {storeName} fører dem.
+                      </div>
+                    )
+                  })()}
 
                   {/* Shopping list content */}
                   {loadingPrices ? (

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
 import GuestExperienceBanner from '@/components/GuestExperienceBanner'
+import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 
 
 // Types
@@ -380,6 +381,29 @@ const CATEGORIES = [
   { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
   { id: 'Dyr', name: 'Dyr', icon: '🐾' }
 ]
+
+/**
+ * Maps the Goma-style store IDs used on this page to the grocery service's
+ * SourceChain enum, so we can look up coverage status (`full` vs `offers-only`).
+ *
+ * The /dagligvarer page still queries Goma today, but this map is forward-
+ * compatible with the planned migration to `getGroceryClient()`.
+ */
+const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
+  Netto: 'netto',
+  'REMA 1000': 'rema-1000',
+  '365discount': '365discount',
+  Lidl: 'lidl',
+  Bilka: 'bilka',
+  Nemlig: 'nemlig',
+  MENY: 'meny',
+  Spar: 'spar',
+  Kvickly: 'kvickly',
+  superbrugsen: 'superbrugsen',
+  Brugsen: 'brugsen',
+  Løvbjerg: 'loevbjerg',
+  'ABC Lavpris': 'abc-lavpris',
+}
 
 // Available stores - using Goma's exact store names for API calls
 const STORES = [
@@ -1166,6 +1190,37 @@ export default function DagligvarerPage() {
                 )}
               </p>
             </div>
+
+            {/* Offers-only coverage notice — vises når kun kæder uden fuldt katalog er valgt */}
+            {(() => {
+              if (selectedStores.length === 0) return null
+              const offerOnlyStores = selectedStores
+                .map((id) => {
+                  const chain = GOMA_STORE_TO_SOURCE_CHAIN[id]
+                  return chain && CHAIN_COVERAGE[chain] === 'offers-only'
+                    ? STORES.find((s) => s.id === id)?.name
+                    : null
+                })
+                .filter(Boolean) as string[]
+              if (offerOnlyStores.length === 0) return null
+
+              const isSingle = offerOnlyStores.length === 1
+              const allOfferOnly = offerOnlyStores.length === selectedStores.length
+
+              return (
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+                  <Clock size={16} className="mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="font-semibold">Kun aktuelle tilbud:</span>{' '}
+                    {allOfferOnly && isSingle
+                      ? `For ${offerOnlyStores[0]} viser vi udelukkende varer fra ugens tilbudsavis — ikke det fulde sortiment.`
+                      : allOfferOnly
+                        ? `For ${offerOnlyStores.join(', ')} viser vi udelukkende varer fra ugens tilbudsavis — ikke det fulde sortiment.`
+                        : `For ${offerOnlyStores.join(', ')} viser vi kun ugens tilbudsavis. Øvrige valgte butikker har deres fulde sortiment.`}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Product Grid */}
             {loading && products.length === 0 ? (
