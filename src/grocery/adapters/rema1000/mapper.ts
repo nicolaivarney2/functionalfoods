@@ -103,10 +103,20 @@ export function mapRemaOffer(
   if (!current) return null
 
   const regular = pickRegularPrice(product.prices)
-  const isOnSale = current.is_campaign || current.is_advertised
-
   const priceCents = toCents(current.price)
-  const beforePriceCents = isOnSale && regular ? toCents(regular.price) : null
+
+  // Compute "before price" eagerly so we can also detect implicit sales
+  // (i.e. the price has dropped below the regular price even though REMA's
+  // API doesn't formally flag the item as a campaign/advertised).
+  const regularPriceCents = regular ? toCents(regular.price) : null
+  const hasPriceDrop = Boolean(
+    regularPriceCents && priceCents && regularPriceCents > priceCents,
+  )
+
+  const isOnSale =
+    current.is_campaign || current.is_advertised || hasPriceDrop
+
+  const beforePriceCents = isOnSale ? regularPriceCents : null
 
   let discountPct: number | null = null
   if (beforePriceCents && priceCents && beforePriceCents > priceCents) {

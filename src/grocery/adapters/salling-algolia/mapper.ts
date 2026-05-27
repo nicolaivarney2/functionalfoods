@@ -127,10 +127,31 @@ export function mapHitToChainOffer(
   // We tolerate price=0 here because Algolia sometimes returns products
   // without per-store pricing (e.g. campaign-only items). Persist as
   // null-price offer so consumers can see availability.
-  const isOnSale = Boolean(hit.cpOffer) || hit.isInCurrentLeaflet
   const beforePrice = hit.cpOriginalPrice && hit.cpOriginalPrice > 0
     ? hit.cpOriginalPrice
     : null
+
+  // Treat any price below the "original" as effectively on sale, even if
+  // Salling didn't tag it as a campaign or include it in the current leaflet.
+  // This catches permanent price drops and silent discounts the customer
+  // would still perceive as a deal.
+  const hasPriceDrop = Boolean(beforePrice && price > 0 && price < beforePrice)
+
+  // Detect "silent" offers where Salling doesn't set cpOffer or
+  // isInCurrentLeaflet but the displayed unit price is below the regular unit
+  // price (i.e. unitsOfMeasureShowPrice < unitsOfMeasurePrice). This is the
+  // customer's perceived experience: "the unit price I see is lower than
+  // normal". Goma misses these. Verified Nov 2026: closes most of the
+  // is_on_sale gap vs Goma on Netto, Føtex, and Bilka.
+  const showUom = rep?.data.unitsOfMeasureShowPrice ?? 0
+  const regUom = rep?.data.unitsOfMeasurePrice ?? 0
+  const hasUomPriceDrop = showUom > 0 && regUom > 0 && showUom < regUom
+
+  const isOnSale =
+    Boolean(hit.cpOffer) ||
+    hit.isInCurrentLeaflet ||
+    hasPriceDrop ||
+    hasUomPriceDrop
 
   let discountPct: number | null = null
   if (hit.cpPercentDiscount && hit.cpPercentDiscount > 0) {
@@ -139,6 +160,11 @@ export function mapHitToChainOffer(
     discountPct = Number(
       (((beforePrice - price) / beforePrice) * 100).toFixed(2),
     )
+  } else if (hasUomPriceDrop) {
+    // Fall back to the unit-price differential when no explicit before-price
+    // is set. This is approximate (the package size could have changed) but
+    // it's the only signal Salling exposes for these silent offers.
+    discountPct = Number((((regUom - showUom) / regUom) * 100).toFixed(2))
   }
 
   return {
