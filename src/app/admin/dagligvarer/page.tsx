@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Store, RefreshCw } from 'lucide-react'
+import { Store, RefreshCw, BarChart3 } from 'lucide-react'
 
 export default function AdminDagligvarerPage() {
   return (
@@ -36,6 +36,25 @@ export default function AdminDagligvarerPage() {
                 Gå til GOMA‑dashboardet hvor du kan synce alle butikker (Netto, REMA 1000, Bilka,
                 Lidl, osv.) og rydde op i udløbne tilbud. Dette er den eneste dagligvare‑sync vi
                 bruger nu.
+              </p>
+            </Link>
+
+            <Link
+              href="/admin/grocery/compare-goma"
+              className="block border border-emerald-200 rounded-lg p-5 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-300 transition-colors"
+            >
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-emerald-700" />
+                  <span className="text-base font-semibold text-emerald-900">
+                    Goma vs grocery-service
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-emerald-900">
+                Live sammenligning af aktive tilbud pr. kæde. Brug denne side i dagene op til Goma
+                sunset for at verificere at vores nye grocery-service matcher eller overgår Gomas
+                dækning.
               </p>
             </Link>
           </div>
