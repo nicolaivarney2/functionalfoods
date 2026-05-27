@@ -23,6 +23,7 @@ import { syncSallingChain } from '@/grocery/adapters/salling-algolia'
 import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
+import { syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -30,6 +31,7 @@ export const maxDuration = 300
 type StepResult =
   | (SyncResult & { step: string })
   | (RemaSyncResult & { step: string })
+  | (TjekSyncResult & { step: string })
   | { step: string; status: 'failed'; errorMessage: string; durationMs: number }
   | { step: string; status: 'success'; rowsAffected: number; durationMs: number }
 
@@ -129,6 +131,18 @@ async function handle(request: Request) {
       await runStep('rema-1000', async () => ({
         ...(await syncRema1000()),
         step: 'rema-1000',
+      })),
+    )
+  }
+
+  // Tjek (squid-api) — weekly leaflet offers for all DK chains that we don't
+  // have a primary-source adapter for. Skips Salling + REMA by default since
+  // we already pulled their canonical catalogs above. Takes ~45-60s.
+  if (shouldRun('tjek')) {
+    steps.push(
+      await runStep('tjek', async () => ({
+        ...(await syncTjek()),
+        step: 'tjek',
       })),
     )
   }

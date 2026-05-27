@@ -134,6 +134,11 @@ Sample size of a full nightly run (verified 27. May 2026): 11 dealers, 3,420 off
 
 Live preview / verification: `/dev/grocery-tjek-explorer?chain=lidl` (server-rendered, no DB writes).
 
+Tjek is part of the nightly cron orchestrator at `/api/grocery/sync/cron`
+(Vercel cron schedule `0 4 * * *` — 04:00 UTC daily). The orchestrator runs
+Salling chains → REMA → Tjek → price snapshot sequentially, with isolated
+try/catch per step so a Tjek failure cannot block REMA or vice versa.
+
 ### Chain coverage (single source of truth)
 
 Different chains have different data quality. The truth lives in
