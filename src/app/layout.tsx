@@ -15,9 +15,11 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://functionalfoods.dk'),
-  title: 'Functional Foods - Sunde opskrifter til vægttab og en sund livsstil',
-  description: 'Opskrifter til vægttab og en sund livsstil. Keto, LCHF og sunde opskrifter til hverdagen.',
-  keywords: 'keto opskrifter, vægttab, sunde opskrifter, LCHF, danske opskrifter, funktionelle fødevarer',
+  title: 'Vægttabsplan ud fra tilbud i butikkerne | Functional Foods',
+  description:
+    'Tab dig med smarte madplaner tilpasset ugens tilbud (og meget mere). Personlig ugeplan, indkøbsliste og kalorier til dit mål. Gratis at starte.',
+  keywords:
+    'vægttab, madplan tilbud, vægttabsplan, dagligvarer tilbud, keto opskrifter, madbudget, danske opskrifter',
   alternates: {
     canonical: '/',
   },
@@ -32,8 +34,9 @@ export const metadata: Metadata = {
     apple: '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png',
   },
   openGraph: {
-    title: 'Functional Foods - Sunde opskrifter til vægttab',
-    description: 'Opskrifter til vægttab og en sund livsstil. Keto, LCHF og sunde opskrifter til hverdagen.',
+    title: 'Vægttabsplan ud fra tilbud | Functional Foods',
+    description:
+      'Tab dig med smarte madplaner tilpasset ugens tilbud (og meget mere). Personlig plan, indkøbsliste og 30+ andre parametre. Gratis at starte.',
     type: 'website',
     locale: 'da_DK',
     siteName: 'Functional Foods',

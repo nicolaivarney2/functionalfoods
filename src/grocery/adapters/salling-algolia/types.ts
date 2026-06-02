@@ -23,6 +23,8 @@ export interface AlgoliaStoreData {
   multipromo: number
   offerDescription: string
   price: number
+  /** Regular shelf price in øre before discount. Often missing on Netto. */
+  beforePrice?: number
   multiPromoPrice: number
   unitsOfMeasurePrice: number
   unitsOfMeasurePriceUnit: string

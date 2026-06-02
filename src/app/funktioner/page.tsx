@@ -10,7 +10,6 @@ import {
   Scale,
   Sparkles,
   Users,
-  Video,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -41,25 +40,10 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Funktioner | Functional Foods',
     description:
-      'Se hvad du kan på Functional Foods — madplaner, tilbud, ernæring, opskrifter og personlig støtte.',
+      'Se hvad du kan på Functional Foods - madplaner, tilbud, ernæring, opskrifter og personlig støtte.',
     url: 'https://functionalfoods.dk/funktioner',
   },
 }
-
-const VIDEO_SLOTS = [
-  {
-    title: 'Sådan bruger du Madbudget',
-    text: 'Kort gennemgang af ugeplan, indkøb og tilpasning — perfekt til nye brugere.',
-  },
-  {
-    title: 'Fra tilbud til tallerken',
-    text: 'Hvordan madplaner kobles til rigtige tilbud og din hverdag.',
-  },
-  {
-    title: 'Vægttab der holder i praksis',
-    text: 'Profil, sparring og værktøjer der arbejder sammen om dit mål.',
-  },
-]
 
 export default function FunktionerOversigtPage() {
   return (
@@ -76,7 +60,7 @@ export default function FunktionerOversigtPage() {
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">Funktioner</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-emerald-50/95 sm:text-lg">
             Én platform til madplaner ud fra tilbud, tusindvis af ernæringsberegnede opskrifter, personlig vægttabsrejse og
-            praktiske værktøjer som sms-indkøbsliste og vægt tracker. Her får du overblikket — med dybdegående sider for hver
+            praktiske værktøjer som sms-indkøbsliste og vægt tracker. Her får du overblikket - med dybdegående sider for hver
             del.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
@@ -97,43 +81,10 @@ export default function FunktionerOversigtPage() {
         </div>
       </section>
 
-      <section className="border-b border-slate-100 bg-slate-50/80">
-        <div className="container mx-auto max-w-6xl px-4 py-14 sm:py-16">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-              <Video className="h-6 w-6" aria-hidden />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Videoer om funktionerne</h2>
-            <p className="mt-3 text-slate-600 leading-relaxed">
-              Videoer er på vej - imens kan du se funktionerne herunder beskrevet
-            </p>
-          </div>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {VIDEO_SLOTS.map((slot) => (
-              <div
-                key={slot.title}
-                className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-emerald-200 hover:shadow-md"
-              >
-                <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-                  <div className="text-center px-4">
-                    <Video className="mx-auto h-10 w-10 text-slate-400" aria-hidden />
-                    <p className="mt-2 text-xs font-medium text-slate-500">Video på vej.</p>
-                  </div>
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="font-bold text-slate-900">{slot.title}</h3>
-                  <p className="mt-2 flex-1 text-sm text-slate-600 leading-relaxed">{slot.text}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="container mx-auto max-w-6xl px-4 py-14 sm:py-16">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">Alle funktioner</h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
-          Klik ind for forklaring, fordele og konkrete eksempler — hver side er skrevet til at matche den rigtige oplevelse i
+          Klik ind for forklaring, fordele og konkrete eksempler - hver side er skrevet til at matche den rigtige oplevelse i
           appen.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

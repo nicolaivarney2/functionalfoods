@@ -21,6 +21,7 @@ import {
 } from './types';
 
 import { getPeoplePerMealFromAdultsProfiles } from './people-per-meal';
+import { computeChildPersonEquivalent } from '../madbudget/person-equivalent';
 
 import { RecipeCategory } from '../ingredient-system';
 
@@ -562,6 +563,9 @@ export class MealPlanGenerator {
       familyProfile.adultsProfiles,
       familyProfile.adults
     )
+    const childPersonEquivalent = computeChildPersonEquivalent(
+      familyProfile.childrenAges || []
+    )
     
     // Create meal structure that includes all selected meals
     const mealStructure = this.createMealStructure(dietaryApproach)
@@ -593,6 +597,7 @@ export class MealPlanGenerator {
         mealsPerDay: Array.from(mealsToGenerate)
       },
       peoplePerMeal,
+      childPersonEquivalent,
       varietyPreferences: {
         maxRepeatDays: Math.max(1, 3 - variationLevel), // Higher variation = fewer repeat days
         preferredCuisines: [],
@@ -629,15 +634,111 @@ export class MealPlanGenerator {
   }
 
   /**
+   * Antal personer (PE) der spiser et måltid – bruges til indkøbsliste, ikke ernærings-servings.
+   */
+  public resolvePeopleEatingForPlannerCell(
+    cell: Record<string, unknown>,
+    mealType: 'breakfast' | 'lunch' | 'dinner',
+    family: {
+      adults: number
+      childrenAges?: string[]
+      adultsProfiles: { mealsPerDay?: string[] }[]
+    }
+  ): number {
+    const peoplePerMeal = getPeoplePerMealFromAdultsProfiles(
+      family.adultsProfiles,
+      family.adults
+    )
+    const adultsEating = Math.max(1, peoplePerMeal[mealType] ?? 1)
+    const childPe = computeChildPersonEquivalent(family.childrenAges)
+    return Math.round((adultsEating + childPe) * 10) / 10
+  }
+
+  /** @deprecated Brug resolvePeopleEatingForPlannerCell – beholdt som alias til grid-feltet householdServings */
+  public resolveHouseholdServingsForPlannerCell(
+    cell: Record<string, unknown>,
+    mealType: 'breakfast' | 'lunch' | 'dinner',
+    family: {
+      adults: number
+      childrenAges?: string[]
+      adultsProfiles: { mealsPerDay?: string[] }[]
+    }
+  ): number {
+    return this.resolvePeopleEatingForPlannerCell(cell, mealType, family)
+  }
+
+  /**
+   * Skaler ingrediensmængder: opskriftens liste er for recipe.servings personer,
+   * vi skal købe til peopleEating (voksne + børn som PE).
+   */
+  private getShoppingIngredientScale(meal: MealAssignment): number {
+    const recipeServings = Math.max(1, meal.recipe.servings || 4)
+    let peopleEating = meal.peopleEating
+    if (peopleEating == null || peopleEating <= 0) {
+      // Legacy: meal.servings = kalorier×personer (fx 4 ved 2 voksne + opskrift til 2) – brug opskriftens målgruppe
+      peopleEating =
+        meal.servings > recipeServings * 1.25 ? recipeServings : meal.servings
+    }
+    return Math.min(3, Math.max(0.25, peopleEating / recipeServings))
+  }
+
+  /** Opdater householdServings på alle celler så genberegning ikke oppuster igen. */
+  public applyHouseholdServingsToGrid(
+    grid: Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined>,
+    family: {
+      adults: number
+      childrenAges?: string[]
+      adultsProfiles: { mealsPerDay?: string[] }[]
+      snapshot?: {
+        adults: number
+        childrenAges?: string[]
+        adultsProfiles: { mealsPerDay?: string[] }[]
+      }
+    }
+  ): Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined> {
+    const mealTypes = ['breakfast', 'lunch', 'dinner'] as const
+    const next: typeof grid = {}
+    for (const [dayKey, row] of Object.entries(grid)) {
+      if (!row || typeof row !== 'object') {
+        next[dayKey] = row
+        continue
+      }
+      const dayRow = { ...row } as Record<string, unknown>
+      for (const mt of mealTypes) {
+        const cell = dayRow[mt]
+        if (cell == null || typeof cell !== 'object') continue
+        const c = { ...(cell as Record<string, unknown>) }
+        const pe = this.resolvePeopleEatingForPlannerCell(c, mt, family)
+        c.householdServings = pe
+        if (!c.recipeServings && Number(c.servings) > 0) {
+          c.recipeServings = c.servings
+        }
+        dayRow[mt] = c
+      }
+      next[dayKey] = dayRow
+    }
+    return next
+  }
+
+  /**
    * Byg indkøbsliste ud fra den nuværende madplans-grid (fx efter manuelle ændringer).
    * Bruger samme logik som ugen-generering.
    */
   public async buildShoppingListFromMadbudgetGrid(
     grid: Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined>,
-    weekNumber: number = 1
+    weekNumber: number = 1,
+    family?: {
+      adults: number
+      childrenAges?: string[]
+      adultsProfiles: { mealsPerDay?: string[] }[]
+      /** Husstand da madplanen/indkøbslisten sidst blev bygget – til korrekt omskaler ved ændring af børn. */
+      snapshot?: {
+        adults: number
+        childrenAges?: string[]
+        adultsProfiles: { mealsPerDay?: string[] }[]
+      }
+    }
   ): Promise<ShoppingList> {
-    await this.recipesLoadPromise;
-
     const dayKeys = [
       'monday',
       'tuesday',
@@ -665,10 +766,16 @@ export class MealPlanGenerator {
         const cell = row[mt];
         if (cell == null || typeof cell !== 'object') continue;
         const c = cell as Record<string, unknown>;
+        const peopleEating = family
+          ? this.resolvePeopleEatingForPlannerCell(c, mt, family)
+          : Number(c.householdServings) > 0
+            ? Number(c.householdServings)
+            : Math.max(1, family?.adults ?? 1);
         meals.push({
           mealType: mt as MealType,
           recipe: this.normalizePlannerCellToRecipe(c),
-          servings: Number(c.servings) > 0 ? Number(c.servings) : 4,
+          servings: Number(c.nutritionServings) > 0 ? Number(c.nutritionServings) : peopleEating,
+          peopleEating,
           adjustedCalories: 0,
           adjustedProtein: 0,
           adjustedCarbs: 0,
@@ -686,7 +793,7 @@ export class MealPlanGenerator {
       };
     });
 
-    return this.generateShoppingList(weekNumber, days);
+    return this.generateShoppingList(weekNumber, days, { light: true });
   }
 
   /** Map UI madplan-celle til Recipe til brug i indkøbsliste-aggregation */
@@ -696,7 +803,7 @@ export class MealPlanGenerator {
       const x = ing as Record<string, unknown>;
       const base = {
         ingredientId: String(x.ingredientId ?? x.ingredient_id ?? x.id ?? `temp-${i}`),
-        amount: Number(x.amount) || 0,
+        amount: Number(String(x.amount ?? '').replace(',', '.')) || 0,
         unit: String(x.unit ?? 'stk'),
       };
       return typeof x.name === 'string' ? { ...base, name: x.name } : base;
@@ -716,7 +823,10 @@ export class MealPlanGenerator {
       instructions: [],
       prepTime: 0,
       cookTime: 0,
-      servings: Number(cell.servings) > 0 ? Number(cell.servings) : 4,
+      servings:
+        Number(cell.recipeServings ?? cell.servings) > 0
+          ? Number(cell.recipeServings ?? cell.servings)
+          : 4,
       categories: [],
       dietaryApproaches,
       nutritionalInfo: {
@@ -853,8 +963,10 @@ export class MealPlanGenerator {
     
     // Calculate servings to meet macro targets (for 1 person)
     const baseServings = this.calculateServings(selectedRecipe, mealDistribution);
-    // Skaler med antal personer der spiser dette måltid
-    const peopleEatingThisMeal = Math.max(1, config.peoplePerMeal?.[mealDistribution.mealType] ?? 1);
+    // Skaler med antal personer der spiser dette måltid (voksne + børn som PE)
+    const adultsEating = Math.max(1, config.peoplePerMeal?.[mealDistribution.mealType] ?? 1);
+    const childPe = config.childPersonEquivalent ?? 0;
+    const peopleEatingThisMeal = adultsEating + childPe;
     const servings = Math.round(baseServings * peopleEatingThisMeal * 10) / 10;
 
     // Calculate adjusted nutritional values
@@ -864,6 +976,7 @@ export class MealPlanGenerator {
       mealType: mealDistribution.mealType,
       recipe: selectedRecipe,
       servings,
+      peopleEating: peopleEatingThisMeal,
       adjustedCalories: adjustedValues.calories,
       adjustedProtein: adjustedValues.protein,
       adjustedCarbs: adjustedValues.carbs,
@@ -1352,7 +1465,11 @@ export class MealPlanGenerator {
   /**
    * Generate shopping list for a week
    */
-  private async generateShoppingList(weekNumber: number, days: DayPlan[]): Promise<ShoppingList> {
+  private async generateShoppingList(
+    weekNumber: number,
+    days: DayPlan[],
+    options?: { light?: boolean }
+  ): Promise<ShoppingList> {
     const ingredientMap = new Map<string, { amount: number; unit: string; name: string; ingredientId?: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
     const normalizeUnit = (unit?: string | null) => {
@@ -1403,9 +1520,7 @@ export class MealPlanGenerator {
           const ingredientId = ingredient.ingredientId
           
           const current = ingredientMap.get(key) || { amount: 0, unit: normalizedUnit || 'stk', name: ingredientName, ingredientId };
-          // Opskriftens ingredienser er for recipe.servings portioner – skalér med meal.servings/recipe.servings
-          const recipeServings = meal.recipe.servings || 4;
-          const scale = meal.servings / recipeServings;
+          const scale = this.getShoppingIngredientScale(meal);
           
           ingredientMap.set(key, {
             amount: current.amount + (ingredient.amount * scale),
@@ -1421,7 +1536,10 @@ export class MealPlanGenerator {
           if (kombiTag) {
             const supplements = getKombiSupplements(kombiTag);
             supplements.forEach(supplement => {
-              const calculated = calculateSupplementAmount(supplement, meal.servings);
+              const calculated = calculateSupplementAmount(
+                supplement,
+                meal.peopleEating ?? meal.servings
+              );
               const key = calculated.ingredientName.toLowerCase();
               const current = supplementMap.get(key) || { 
                 amount: 0, 
@@ -1502,25 +1620,45 @@ export class MealPlanGenerator {
         }
       }
 
-      // 3) Fuzzy fallback: e.g. "EKS. JOMFRU OLIVENOLIE" -> "olivenolie"
-      const stillUnresolved = namesUsed.filter((n) => !nameToResolvedId.has(n.toLowerCase().trim()))
-      if (stillUnresolved.length > 0) {
-        const { data: allIngredients, error: allError } = await supabase.from('ingredients').select('id, name, category, is_basis').limit(5000)
-        if (!allError && allIngredients?.length) {
-          const normalize = (name: string) =>
-            name.toLowerCase().replace(/^eks\.\s*/i, '').split(',')[0].replace(/\s+kan\s+undlades/gi, '').trim()
-          const normalizedDb = allIngredients.map((ing: { id: string; name: string | null; category: string | null; is_basis?: boolean | null }) => ({
-            id: ing.id,
-            normalized: normalize(ing.name || ''),
-            raw: ing,
-          }))
-          for (const originalName of stillUnresolved) {
-            const norm = normalize(originalName)
-            if (!norm) continue
-            const match =
-              normalizedDb.find((r: { normalized: string }) => r.normalized === norm) ||
-              normalizedDb.find((r: { normalized: string }) => r.normalized && (r.normalized.includes(norm) || norm.includes(r.normalized)))
-            if (match) addToMaps(match.raw)
+      // 3) Fuzzy fallback (tung — springes over ved genberegning fra madplan-grid)
+      if (!options?.light) {
+        const stillUnresolved = namesUsed.filter((n) => !nameToResolvedId.has(n.toLowerCase().trim()))
+        if (stillUnresolved.length > 0) {
+          const { data: allIngredients, error: allError } = await supabase
+            .from('ingredients')
+            .select('id, name, category, is_basis')
+            .limit(5000)
+          if (!allError && allIngredients?.length) {
+            const normalize = (name: string) =>
+              name
+                .toLowerCase()
+                .replace(/^eks\.\s*/i, '')
+                .split(',')[0]
+                .replace(/\s+kan\s+undlades/gi, '')
+                .trim()
+            const normalizedDb = allIngredients.map(
+              (ing: {
+                id: string
+                name: string | null
+                category: string | null
+                is_basis?: boolean | null
+              }) => ({
+                id: ing.id,
+                normalized: normalize(ing.name || ''),
+                raw: ing,
+              })
+            )
+            for (const originalName of stillUnresolved) {
+              const norm = normalize(originalName)
+              if (!norm) continue
+              const match =
+                normalizedDb.find((r: { normalized: string }) => r.normalized === norm) ||
+                normalizedDb.find(
+                  (r: { normalized: string }) =>
+                    r.normalized && (r.normalized.includes(norm) || norm.includes(r.normalized))
+                )
+              if (match) addToMaps(match.raw)
+            }
           }
         }
       }
@@ -1541,7 +1679,7 @@ export class MealPlanGenerator {
 
     const ingredientIds = Array.from(ingredientDbMap.keys())
 
-    if (ingredientIds.length > 0) {
+    if (ingredientIds.length > 0 && !options?.light) {
       try {
         const { createSupabaseClient } = await import('../supabase');
         const supabase = createSupabaseClient();

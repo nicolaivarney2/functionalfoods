@@ -51,18 +51,8 @@ interface Recipe {
   author: string
 }
 
-// Extended dietary categories with images and 8th option - REORGANIZED
+// Extended dietary categories — Keto først (mest populær)
 const extendedDietaryCategories = [
-  {
-    id: 'Familiemad',
-    name: 'Kalorietælling',
-    slug: 'familie',
-    description: 'Normal familiemad med planlagte kalorier og fuld næring',
-    color: 'bg-blue-500',
-    icon: '👨‍👩‍👧‍👦',
-    imageUrl: '/images/categories/familie.webp',
-    imageAlt: 'Familievenlige retter til hverdagen'
-  },
   {
     id: 'Keto',
     name: 'Keto',
@@ -72,6 +62,16 @@ const extendedDietaryCategories = [
     icon: '🥑',
     imageUrl: '/images/categories/keto.webp',
     imageAlt: 'Keto mad med bacon, æg og grønne grøntsager'
+  },
+  {
+    id: 'Familiemad',
+    name: 'Kalorietælling',
+    slug: 'familie',
+    description: 'Normal familiemad med planlagte kalorier og fuld næring',
+    color: 'bg-blue-500',
+    icon: '👨‍👩‍👧‍👦',
+    imageUrl: '/images/categories/familie.webp',
+    imageAlt: 'Familievenlige retter til hverdagen'
   },
   {
     id: 'Sense',
@@ -269,84 +269,88 @@ export default function RecipeOverviewPage() {
 
   return (
     <main className="min-h-screen bg-white overflow-hidden">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-white via-green-50/30 to-blue-50/20 py-24 lg:py-32">
+      {/* Hero — kompakt så opskrifter kommer hurtigere i syne */}
+      <section className="relative bg-gradient-to-br from-white via-green-50/30 to-blue-50/20 py-8 md:py-10">
         <div className="absolute inset-0 opacity-40">
           <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-blue-500/5"></div>
         </div>
-        
+
         <div className="container relative">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium mb-6 animate-pulse">
-              <Sparkles className="w-4 h-4" />
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
               Danmarks mest intelligente opskrifter
             </div>
-            
-            <h1 className="text-5xl md:text-7xl font-bold mb-8 text-gray-900 leading-tight">
-              Alle opskrifter til<br />
+
+            <h1 className="text-3xl md:text-4xl font-bold mb-3 text-gray-900 leading-tight">
+              Alle opskrifter til{' '}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
                 din sundere livsstil
               </span>
             </h1>
-            
-            <p className="text-xl md:text-2xl mb-8 text-gray-600 max-w-4xl mx-auto leading-relaxed">
+
+            <p className="text-base md:text-lg text-gray-600 leading-snug mb-2">
               Udforsk{' '}
               <strong>{allRecipes.length.toLocaleString('da-DK')} gratis opskrifter</strong> beregnet på vitaminer og næring.
-              <br />
-              Vælg din mad-ideologi eller udforsk alle opskrifter.
             </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <div className="text-sm text-gray-500 flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                100% gratis • Alle beregnet på næring
-              </div>
-            </div>
+            <p className="text-sm text-gray-500">
+              100% gratis · Listen nedenfor er blandet fra alle mad-ideologier — vælg din retning først, hvis du kun vil have fx. keto eller Sense.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Dietary Categories Section */}
-      <section className="py-20 bg-white">
+      {/* Vælg mad-ideologi — små bokse på mobil, større på desktop */}
+      <section className="py-5 md:py-10 bg-white border-b border-gray-100">
         <div className="container">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
+          <div className="text-center mb-4 md:mb-7 max-w-2xl mx-auto">
+            <h2 className="text-xl md:text-3xl font-bold mb-1 md:mb-2 text-gray-900">
               Vælg din vej
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Udforsk opskrifter, der passer til din livsstil – alle beregnet på vitaminer, mineraler og energi.
+            <p className="text-xs md:text-base text-gray-600 px-1">
+              Gå ind på din mad-ideologi for kun de opskrifter — eller scroll ned og filtrér i den blandede oversigt.
             </p>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {extendedDietaryCategories && Array.isArray(extendedDietaryCategories) ? extendedDietaryCategories.map((category, index) => (
-              <Link
-                key={category.id}
-                href={`/${category.slug}/opskrifter`}
-                className="group bg-white border-2 border-gray-100 rounded-2xl p-6 text-center hover:border-green-200 hover:shadow-xl hover:shadow-green-500/10 transition-all duration-500 transform hover:-translate-y-2"
-                style={{ transitionDelay: `${index * 100}ms` }}
-              >
-                <div className="text-4xl mb-4 group-hover:scale-110 transition-transform duration-300" aria-hidden>
-                  {category.icon}
-                </div>
-                <h3 className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors mb-2">
-                  {category.name}
-                </h3>
-                <p className="text-sm text-gray-500 mb-2">
-                  {(categoryRecipeCounts[category.id] ?? 0).toLocaleString('da-DK')} opskrifter
-                </p>
-                <div className="text-xs text-gray-400 group-hover:text-green-500 transition-colors">
-                  Klik for at udforske →
-                </div>
-              </Link>
-            )) : null}
+
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 md:grid-cols-4 md:gap-4">
+            {extendedDietaryCategories.map((category) => {
+              const count = categoryRecipeCounts[category.id] ?? 0
+              return (
+                <Link
+                  key={category.id}
+                  href={`/${category.slug}/opskrifter`}
+                  aria-label={`${category.name}, ${count.toLocaleString('da-DK')} opskrifter — kun denne mad-ideologi`}
+                  className="group flex flex-col items-center justify-center bg-white border border-gray-100 md:border-2 rounded-lg md:rounded-xl p-2 md:p-5 text-center min-h-0 hover:border-green-200 hover:shadow-md md:hover:shadow-lg md:hover:shadow-green-500/10 transition-all duration-200"
+                >
+                  <span
+                    className="text-xl md:text-3xl leading-none mb-1 md:mb-2 group-hover:scale-105 transition-transform duration-200"
+                    aria-hidden
+                  >
+                    {category.icon}
+                  </span>
+                  <h3 className="text-[10px] sm:text-[11px] md:text-base font-semibold text-gray-900 group-hover:text-green-600 transition-colors leading-tight line-clamp-2 w-full">
+                    {category.name}
+                  </h3>
+                  <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 mt-0.5 md:mt-1 tabular-nums">
+                    {count.toLocaleString('da-DK')}
+                    <span className="md:hidden"> opskr.</span>
+                    <span className="hidden md:inline"> opskrifter</span>
+                  </p>
+                  <span className="hidden md:inline text-xs text-gray-400 group-hover:text-green-600 transition-colors mt-1">
+                    Kun {category.name.toLowerCase()} →
+                  </span>
+                  <span className="md:hidden text-[9px] text-gray-400 group-hover:text-green-600 mt-0.5" aria-hidden>
+                    →
+                  </span>
+                </Link>
+              )
+            })}
           </div>
-          
         </div>
       </section>
 
       {/* Search and Filters Section */}
-      <section id="filters-section" className="py-8 bg-white border-b border-gray-100">
+      <section id="filters-section" className="py-4 md:py-5 bg-white border-b border-gray-100 sticky top-0 z-20 shadow-sm">
         <div className="container">
           <div className="flex flex-col gap-4">
             {/* Search Bar */}
@@ -391,8 +395,8 @@ export default function RecipeOverviewPage() {
             {/* Desktop/tablet: nicher som primære filtre (ikke skjult i dropdown) */}
             <div className="hidden md:block rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Vælg niche</p>
-                <span className="text-xs text-slate-400">Det vigtigste filter — resten under &quot;Flere filtre&quot;</span>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Filtrér i den blandede liste</p>
+                <span className="text-xs text-slate-500">Eller vælg en kategori ovenfor for kun den mad-ideologi</span>
               </div>
               <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
                 <button
@@ -535,10 +539,33 @@ export default function RecipeOverviewPage() {
       </section>
 
       {/* Recipes Grid */}
-      <section id="recipes-section" className="py-20 pb-24 md:pb-20 bg-gradient-to-br from-gray-50 to-green-50/30">
+      <section id="recipes-section" className="py-6 md:py-8 pb-24 md:pb-16 bg-gradient-to-br from-gray-50 to-green-50/30">
         <div className="container">
+          {selectedDietary === 'all' && (
+            <div className="mb-5 rounded-xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-center text-sm text-amber-950">
+              <strong>Blandet oversigt:</strong> Opskrifterne herunder kommer fra alle mad-ideologier.
+              Vil du kun have keto, Sense, GLP-1 eller andet?{' '}
+              <span className="text-amber-900">Vælg en kategori ovenfor</span> eller brug filtrene.
+            </div>
+          )}
+          {selectedDietary !== 'all' && (
+            <div className="mb-5 rounded-xl border border-emerald-200/80 bg-emerald-50/90 px-4 py-3 text-center text-sm text-emerald-950">
+              Viser opskrifter til{' '}
+              <strong>
+                {extendedDietaryCategories.find((c) => c.id === selectedDietary)?.name ?? selectedDietary}
+              </strong>
+              .{' '}
+              <button
+                type="button"
+                onClick={() => setSelectedDietary('all')}
+                className="font-medium text-emerald-700 underline-offset-2 hover:underline"
+              >
+                Vis alle mad-ideologier
+              </button>
+            </div>
+          )}
           {filteredRecipes.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
               {buildRecipeSlotsWithMidCta(filteredRecipes, 30).map((slot) =>
                 slot.type === 'cta' ? (
                   <RecipeSignupMidGridCta key="recipe-grid-signup-cta" />
@@ -579,13 +606,13 @@ export default function RecipeOverviewPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-green-50 via-white to-blue-50">
+      <section className="py-12 md:py-14 bg-gradient-to-br from-green-50 via-white to-blue-50">
         <div className="container">
-          <div className="max-w-4xl mx-auto text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-900">
+          <div className="max-w-4xl mx-auto text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold mb-3 text-gray-900">
               Klar til at komme i gang?
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto">
               Udforsk vores opskrifter, lær om vægttab, eller få din personlige AI-madplan
             </p>
           </div>

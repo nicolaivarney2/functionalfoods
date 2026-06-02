@@ -21,7 +21,6 @@ function parseUnderline(underline: string): {
     if (match) {
       amount = Number.parseFloat(match[1].replace(',', '.'))
       unit = match[2].toLowerCase().replace(/\.$/, '')
-      // Normalize common Danish unit spellings
       const unitMap: Record<string, string> = {
         gr: 'g',
         gram: 'g',
@@ -50,16 +49,82 @@ function toCents(decimal: number | null | undefined): number | null {
   return Math.round(decimal * 100)
 }
 
-function pickCurrentPrice(prices: RemaPrice[] | undefined): RemaPrice | null {
+export function pickCurrentPrice(
+  prices: RemaPrice[] | undefined,
+): RemaPrice | null {
   if (!prices || prices.length === 0) return null
-  // Prefer campaign if active, otherwise the first listed price.
-  const campaign = prices.find((p) => p.is_campaign)
-  return campaign ?? prices[0]
+
+  const campaigns = prices.filter((p) => p.is_campaign)
+  if (campaigns.length > 0) {
+    return campaigns.reduce((lowest, p) =>
+      p.price < lowest.price ? p : lowest,
+    )
+  }
+
+  return prices[0]
 }
 
-function pickRegularPrice(prices: RemaPrice[] | undefined): RemaPrice | null {
+export function pickRegularPrice(
+  prices: RemaPrice[] | undefined,
+  current: RemaPrice,
+): RemaPrice | null {
   if (!prices || prices.length === 0) return null
-  return prices.find((p) => !p.is_campaign) ?? null
+
+  const nonCampaign = prices.filter((p) => !p.is_campaign)
+  if (nonCampaign.length > 0) {
+    return nonCampaign.reduce((highest, p) =>
+      p.price > highest.price ? p : highest,
+    )
+  }
+
+  const higherThanCurrent = prices.filter(
+    (p) => p.price > current.price + 0.01,
+  )
+  if (higherThanCurrent.length > 0) {
+    return higherThanCurrent.reduce((highest, p) =>
+      p.price > highest.price ? p : highest,
+    )
+  }
+
+  return null
+}
+
+export interface RemaOfferPricing {
+  current: RemaPrice
+  priceCents: number | null
+  beforePriceCents: number | null
+  isOnSale: boolean
+  discountPct: number | null
+}
+
+export function resolveRemaOfferPricing(
+  prices: RemaPrice[] | undefined,
+): RemaOfferPricing | null {
+  const current = pickCurrentPrice(prices)
+  if (!current) return null
+
+  const priceCents = toCents(current.price)
+  const regular = pickRegularPrice(prices, current)
+  const beforePriceCents =
+    regular && regular.price > current.price + 0.01
+      ? toCents(regular.price)
+      : null
+  const isOnSale = beforePriceCents !== null
+
+  let discountPct: number | null = null
+  if (beforePriceCents && priceCents && beforePriceCents > priceCents) {
+    discountPct = Number(
+      (((beforePriceCents - priceCents) / beforePriceCents) * 100).toFixed(2),
+    )
+  }
+
+  return {
+    current,
+    priceCents,
+    beforePriceCents,
+    isOnSale,
+    discountPct,
+  }
 }
 
 export function mapRemaProduct(
@@ -70,7 +135,7 @@ export function mapRemaProduct(
   const sourceId = String(product.id)
 
   return {
-    gtin: null, // REMA API doesn't expose EAN
+    gtin: null,
     name: product.name,
     brand: parsed.brand,
     manufacturer: null,
@@ -99,31 +164,11 @@ export function mapRemaOffer(
   product: RemaProduct,
   productId: string,
 ): ProductOfferInsert | null {
-  const current = pickCurrentPrice(product.prices)
-  if (!current) return null
+  const pricing = resolveRemaOfferPricing(product.prices)
+  if (!pricing) return null
 
-  const regular = pickRegularPrice(product.prices)
-  const priceCents = toCents(current.price)
-
-  // Compute "before price" eagerly so we can also detect implicit sales
-  // (i.e. the price has dropped below the regular price even though REMA's
-  // API doesn't formally flag the item as a campaign/advertised).
-  const regularPriceCents = regular ? toCents(regular.price) : null
-  const hasPriceDrop = Boolean(
-    regularPriceCents && priceCents && regularPriceCents > priceCents,
-  )
-
-  const isOnSale =
-    current.is_campaign || current.is_advertised || hasPriceDrop
-
-  const beforePriceCents = isOnSale ? regularPriceCents : null
-
-  let discountPct: number | null = null
-  if (beforePriceCents && priceCents && beforePriceCents > priceCents) {
-    discountPct = Number(
-      (((beforePriceCents - priceCents) / beforePriceCents) * 100).toFixed(2),
-    )
-  }
+  const { current, priceCents, beforePriceCents, isOnSale, discountPct } =
+    pricing
 
   return {
     product_id: productId,
@@ -141,7 +186,7 @@ export function mapRemaOffer(
         ? `Maks ${current.max_quantity} stk pr. kunde — derover ${(current.price_over_max_quantity).toFixed(2)} kr`
         : null,
     discount_percentage: discountPct,
-    in_stock: true, // REMA API doesn't expose stock state
+    in_stock: true,
     source: 'rema-1000-api',
     source_synced_at: new Date().toISOString(),
     raw_data: {

@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -13,12 +14,71 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAnalytics } from '@/components/AnalyticsProvider'
 
 const PRESETS = [
   { kr: 0, label: '0 kr' },
   { kr: 60, label: '60 kr' },
   { kr: 100, label: '100 kr' },
   { kr: 200, label: '200 kr' },
+] as const
+
+/** Skærmbilleder fra funktionerne – samme assets som på /funktioner */
+const FEM_GRUNDE = [
+  {
+    focus: 'Fokus 1 · Vægttab',
+    title: 'Vægttab uden gætteri',
+    text: 'Struktur og kalorier, der matcher dit liv. Du ved, hvad du skal spise - ikke bare hvad der er "sundt".',
+    image: '/billeder/funktioner/functionalfoods-vaegttabsrejse.png',
+    alt: 'Vægttabsrejse og personlig plan i Functional Foods',
+    imageFirst: false,
+    highlight: false,
+  },
+  {
+    focus: 'Fokus 2 · Tilbud',
+    title: 'Tilbud der betyder noget på tallerkenen',
+    text: 'Planerne bygger på aktuelle tilbud hos Netto, REMA, Bilka m.fl. Mindre budget-stress. Mere madplan.',
+    image: '/billeder/funktioner/functionalfoods-madplaner-ud-fra-tilbud.png',
+    alt: 'Madplaner ud fra tilbud i dagligvarebutikkerne',
+    imageFirst: true,
+    highlight: false,
+  },
+  {
+    focus: 'Fokus 3 · Personlig plan',
+    title: 'Din familie. Din smag. Én plan.',
+    text: 'Alder, vægt, energibehov og favoritter samlet ét sted. Ikke tre apps. Ikke tre lister.',
+    image: '/billeder/funktioner/functionalfoods-madbudget-1.png',
+    alt: 'Madbudget med personlig ugeplan',
+    imageFirst: false,
+    highlight: false,
+  },
+  {
+    focus: 'Fokus 4 · Fleksibilitet',
+    title: 'Ny uge? Ny plan. Få klik.',
+    text: 'Tilbud skifter. Behov skifter. Lav en ny madplan uden at starte fra nul hver gang.',
+    image: '/billeder/funktioner/functionalfoods-madbudget-2.png',
+    alt: 'Dynamisk madbudget og ugeplan',
+    imageFirst: true,
+    highlight: false,
+  },
+  {
+    focus: 'Fokus 5 · Tryghed',
+    title: 'Bygget i Danmark – til dansk hverdag',
+    text: 'Ikke et callcenter i udlandet. Vi bygger til familier, indkøb og vægttab i den virkelige verden.',
+    image: '/billeder/andet/nicolai-founder-ff.png',
+    alt: 'Nicolai Varney, stifter af Functional Foods',
+    imageFirst: false,
+    highlight: true,
+    extra: (
+      <p className="text-sm text-slate-600 mt-3">
+        Læs mere{' '}
+        <Link href="/bag-om-ff" className="text-emerald-700 underline hover:text-emerald-800">
+          om os
+        </Link>
+        .
+      </p>
+    ),
+  },
 ] as const
 
 declare global {
@@ -45,6 +105,7 @@ function KomIGangInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signUp, user, session } = useAuth()
+  const { trackEvent } = useAnalytics()
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const turnstileElRef = useRef<HTMLDivElement | null>(null)
   const turnstileWidgetIdRef = useRef<string | null>(null)
@@ -228,6 +289,8 @@ function KomIGangInner() {
         setSubmitting(false)
         return
       }
+
+      trackEvent('sign_up', { method: 'direkte', paid: payKr > 0 })
 
       if (payKr > 0) {
         const payRes = await fetch('/api/stripe/create-checkout-session', {
@@ -552,83 +615,54 @@ function KomIGangInner() {
               Fem grunde til at prøve
             </h2>
             <p className="text-slate-600 text-center mt-3 max-w-3xl mx-auto">
-              Vægttab, tilbud, personlig plan – og et hold i Danmark. Kort sagt: mindre snak, mere handling.
+              Vægttab, tilbud, personlig plan - og et hold i Danmark. Kort sagt: mindre snak, mere handling.
             </p>
           </div>
 
           <div className="max-w-5xl mx-auto space-y-6">
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-              <div>
-                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 1 · Vægttab</p>
-                <h3 className="text-xl font-semibold text-slate-900 mt-1">Vægttab uden gætteri</h3>
-                <p className="text-slate-600 mt-3">
-                  Struktur og kalorier, der matcher dit liv. Du ved, hvad du skal spise – ikke bare hvad der er
-                  &quot;sundt&quot;.
-                </p>
-              </div>
-              <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
-                Illustration: Vægttab med plan
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-              <div className="order-2 lg:order-1 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
-                Illustration: Tilbud + madbudget
-              </div>
-              <div className="order-1 lg:order-2">
-                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 2 · Tilbud</p>
-                <h3 className="text-xl font-semibold text-slate-900 mt-1">Tilbud der betyder noget på tallerkenen</h3>
-                <p className="text-slate-600 mt-3">
-                  Planerne bygger på aktuelle tilbud hos Netto, REMA, Bilka m.fl. Mindre budget-stress. Mere madplan.
-                </p>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-              <div>
-                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 3 · Personlig plan</p>
-                <h3 className="text-xl font-semibold text-slate-900 mt-1">Din familie. Din smag. Én plan.</h3>
-                <p className="text-slate-600 mt-3">
-                  Alder, vægt, energibehov og favoritter samlet ét sted. Ikke tre apps. Ikke tre lister.
-                </p>
-              </div>
-              <div className="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
-                Illustration: Familie + personlig tilpasning
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-              <div className="order-2 lg:order-1 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
-                Illustration: Dynamisk ugeplan
-              </div>
-              <div className="order-1 lg:order-2">
-                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 4 · Fleksibilitet</p>
-                <h3 className="text-xl font-semibold text-slate-900 mt-1">Ny uge? Ny plan. Få klik.</h3>
-                <p className="text-slate-600 mt-3">
-                  Tilbud skifter. Behov skifter. Lav en ny madplan uden at starte fra nul hver gang.
-                </p>
-              </div>
-            </article>
-
-            <article className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center">
-              <div>
-                <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">Fokus 5 · Tryghed</p>
-                <h3 className="text-xl font-semibold text-slate-900 mt-1">Bygget i Danmark – til dansk hverdag</h3>
-                <p className="text-slate-700 mt-3">
-                  Ikke et callcenter i udlandet. Vi bygger til familier, indkøb og vægttab i den virkelige verden.
-                </p>
-                <p className="text-sm text-slate-600 mt-3">
-                  Læs mere{' '}
-                  <Link href="/bag-om-ff" className="text-emerald-700 underline hover:text-emerald-800">
-                    om os
-                  </Link>
-                  .
-                </p>
-              </div>
-              <div className="rounded-xl border-2 border-dashed border-emerald-200 bg-white/70 min-h-[170px] flex items-center justify-center text-sm text-slate-500">
-                Illustration: Team / troværdighed
-              </div>
-            </article>
+            {FEM_GRUNDE.map((item) => {
+              const imageBlock = (
+                <div className="relative aspect-[4/3] min-h-[170px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  <Image
+                    src={item.image}
+                    alt={item.alt}
+                    fill
+                    className="object-contain object-center p-2"
+                    sizes="(min-width: 1024px) 480px, 100vw"
+                  />
+                </div>
+              )
+              const textBlock = (
+                <div>
+                  <p className="text-xs font-semibold tracking-wide uppercase text-emerald-700">{item.focus}</p>
+                  <h3 className="text-xl font-semibold text-slate-900 mt-1">{item.title}</h3>
+                  <p className={`mt-3 ${item.highlight ? 'text-slate-700' : 'text-slate-600'}`}>{item.text}</p>
+                  {'extra' in item && item.extra}
+                </div>
+              )
+              return (
+                <article
+                  key={item.focus}
+                  className={`rounded-2xl border p-6 shadow-sm grid lg:grid-cols-2 gap-6 items-center ${
+                    item.highlight
+                      ? 'border-emerald-100 bg-emerald-50/60'
+                      : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  {item.imageFirst ? (
+                    <>
+                      {imageBlock}
+                      {textBlock}
+                    </>
+                  ) : (
+                    <>
+                      {textBlock}
+                      {imageBlock}
+                    </>
+                  )}
+                </article>
+              )
+            })}
           </div>
 
           <div className="max-w-5xl mx-auto">

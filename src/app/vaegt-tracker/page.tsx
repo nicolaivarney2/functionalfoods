@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  LineChart,
   Plus,
   Trash2,
   User,
@@ -22,6 +21,11 @@ import {
   WeightGoal,
   type UserProfile,
 } from '@/lib/dietary-system'
+import {
+  GUEST_WEIGHT_DEMO_ADULT,
+  GUEST_WEIGHT_DEMO_ENTRIES,
+  GUEST_WEIGHT_DEMO_SUMMARY,
+} from '@/lib/weight-tracker/guest-demo-data'
 
 type AdultRow = {
   id?: string
@@ -155,7 +159,8 @@ function WeightChart({ entries }: { entries: LogEntry[] }) {
 }
 
 export default function VaegtTrackerPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const isGuest = !authLoading && !user
   const [loading, setLoading] = useState(true)
   const [adultCount, setAdultCount] = useState(1)
   const [activeIndex, setActiveIndex] = useState(0)
@@ -163,6 +168,7 @@ export default function VaegtTrackerPage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [photos, setPhotos] = useState<PhotoRow[]>([])
   const [chartRange, setChartRange] = useState<'30' | '90' | '180' | 'all'>('90')
+  const [guestDemoReady, setGuestDemoReady] = useState(false)
   const [infoOpen, setInfoOpen] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -264,14 +270,31 @@ export default function VaegtTrackerPage() {
     if (rPho.ok) setPhotos(jPho.data ?? [])
   }, [activeIndex, authHeader])
 
+  const applyGuestWeightDemo = useCallback(() => {
+    const adult = GUEST_WEIGHT_DEMO_ADULT
+    setAdultCount(1)
+    setActiveIndex(0)
+    setAdults(new Map([[0, adult]]))
+    setEntries(GUEST_WEIGHT_DEMO_ENTRIES)
+    setPhotos([])
+    setEditName(adult.display_name ?? '')
+    setEditTarget(adult.target_weight_kg != null ? String(adult.target_weight_kg) : '')
+    setEditTargetDate(adult.weight_goal_target_date ?? '')
+    setTrackerSetupError(null)
+    setGuestDemoReady(true)
+  }, [])
+
   useEffect(() => {
-    if (!user) {
+    if (authLoading) return
+    if (isGuest) {
+      applyGuestWeightDemo()
       setLoading(false)
       return
     }
     let c = false
     ;(async () => {
       setLoading(true)
+      setGuestDemoReady(false)
       await loadFamily()
       if (c) return
       setLoading(false)
@@ -279,12 +302,12 @@ export default function VaegtTrackerPage() {
     return () => {
       c = true
     }
-  }, [user, loadFamily])
+  }, [authLoading, isGuest, user, loadFamily, applyGuestWeightDemo])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || isGuest) return
     refreshTrackerData()
-  }, [user, refreshTrackerData])
+  }, [user, isGuest, refreshTrackerData])
 
   const current = adults.get(activeIndex)
 
@@ -317,6 +340,7 @@ export default function VaegtTrackerPage() {
     latest && baseline ? Math.round((latest.weight_kg - baseline.weight_kg) * 10) / 10 : null
 
   const savePersonMeta = async () => {
+    if (isGuest) return
     const h = await authHeader()
     if (!h) return
     setSavingPerson(true)
@@ -339,6 +363,7 @@ export default function VaegtTrackerPage() {
 
   const submitLog = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isGuest) return
     const w = parseFloat(logWeight.replace(',', '.'))
     if (Number.isNaN(w)) return
     const h = await authHeader()
@@ -375,6 +400,7 @@ export default function VaegtTrackerPage() {
   }
 
   const deleteEntry = async (id: string) => {
+    if (isGuest) return
     if (!confirm('Slet denne måling?')) return
     const h = await authHeader()
     if (!h) return
@@ -386,6 +412,7 @@ export default function VaegtTrackerPage() {
   }
 
   const uploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isGuest) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -410,6 +437,7 @@ export default function VaegtTrackerPage() {
   }
 
   const deletePhoto = async (id: string) => {
+    if (isGuest) return
     if (!confirm('Slet dette billede?')) return
     const h = await authHeader()
     if (!h) return
@@ -417,25 +445,7 @@ export default function VaegtTrackerPage() {
     await refreshTrackerData()
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow border border-gray-100 p-8 max-w-md text-center">
-          <LineChart className="w-12 h-12 text-green-600 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Vægt tracker</h1>
-          <p className="text-gray-600 text-sm mb-6">Log ind for at bruge din personlige vægt- og progress-tracker.</p>
-          <Link
-            href="/madbudget"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-green-600 text-white font-medium text-sm hover:bg-green-700"
-          >
-            Tilbage til Madbudget
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
+  if (authLoading || (isGuest && !guestDemoReady) || (!isGuest && loading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-500 text-sm">Henter data…</p>
@@ -445,6 +455,30 @@ export default function VaegtTrackerPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
+      {isGuest && (
+        <div
+          className="border-b border-green-200 bg-gradient-to-r from-green-50 via-white to-emerald-50"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="container mx-auto flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between max-w-4xl">
+            <div className="flex min-w-0 items-start gap-2.5 text-sm text-green-950">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden />
+              <p className="leading-relaxed">
+                <strong className="font-semibold">Demo:</strong> Ca. {GUEST_WEIGHT_DEMO_SUMMARY.spanDays} dages støt
+                vægttab ({GUEST_WEIGHT_DEMO_SUMMARY.startKg} → {GUEST_WEIGHT_DEMO_SUMMARY.endKg} kg, −
+                {GUEST_WEIGHT_DEMO_SUMMARY.totalLossKg} kg). Samme profil som Madbudget-demoen.
+              </p>
+            </div>
+            <Link
+              href="/kom-i-gang"
+              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-green-700"
+            >
+              Opret gratis bruger
+            </Link>
+          </div>
+        </div>
+      )}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -476,8 +510,9 @@ export default function VaegtTrackerPage() {
             {infoOpen && (
               <div className="px-4 py-3 text-sm text-gray-600 space-y-2 border-t border-gray-100 bg-white">
                 <p>
-                  Startdata (vægt og krop) er de samme som under Madbudget (ligevægtsindtag). Du kan give hver voksen et
-                  fornavn og dit eget mål — uafhængigt af om du bruger madplanen hver uge.
+                  {isGuest
+                    ? 'Demoen bruger samme startdata som Madbudget (kvinde 38 år, 168 cm, vægttab/Keto). Log ind for at gemme dine egne målinger.'
+                    : 'Startdata (vægt og krop) er de samme som under Madbudget (ligevægtsindtag). Du kan give hver voksen et fornavn og dit eget mål — uafhængigt af om du bruger madplanen hver uge.'}
                 </p>
                 <p>
                   Her kan du logge vægt over tid, se tendenser i grafen (ikke kun enkeltstående dage) og uploade
@@ -546,6 +581,13 @@ export default function VaegtTrackerPage() {
                     {delta} kg
                   </p>
                 )}
+                {isGuest && (
+                  <p className="text-xs text-gray-500">
+                    Demo over ~{Math.round(GUEST_WEIGHT_DEMO_SUMMARY.spanDays / 30)} måneder: −
+                    {GUEST_WEIGHT_DEMO_SUMMARY.totalLossKg} kg i alt ({GUEST_WEIGHT_DEMO_SUMMARY.startKg} →{' '}
+                    {GUEST_WEIGHT_DEMO_SUMMARY.endKg} kg).
+                  </p>
+                )}
                 {current?.target_weight_kg != null && (
                   <p className="text-sm text-gray-700">
                     Vægtmål: <span className="font-semibold">{current.target_weight_kg} kg</span>
@@ -597,27 +639,40 @@ export default function VaegtTrackerPage() {
             </span>
             {profileOpen ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
           </button>
-          {profileOpen && (
-            <ProfileInlineForm
-              activeIndex={activeIndex}
-              adult={current}
-              onSaved={loadFamily}
-              authHeader={authHeader}
-            />
-          )}
+          {profileOpen &&
+            (isGuest ? (
+              <div className="px-5 py-4 text-sm text-gray-600 border-t border-gray-100 space-y-1">
+                <p>
+                  <span className="text-gray-500">Køn:</span> Kvinde · <span className="text-gray-500">Alder:</span>{' '}
+                  {GUEST_WEIGHT_DEMO_ADULT.age} · <span className="text-gray-500">Højde:</span>{' '}
+                  {GUEST_WEIGHT_DEMO_ADULT.height} cm · <span className="text-gray-500">Vægt:</span>{' '}
+                  {GUEST_WEIGHT_DEMO_ADULT.weight} kg
+                </p>
+                <p className="text-gray-500 text-xs">Rediger under Madbudget når du er logget ind.</p>
+              </div>
+            ) : (
+              <ProfileInlineForm
+                activeIndex={activeIndex}
+                adult={current}
+                onSaved={loadFamily}
+                authHeader={authHeader}
+              />
+            ))}
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <h2 className="text-sm font-semibold text-gray-900">Fornavn &amp; mål</h2>
-            <button
-              type="button"
-              onClick={savePersonMeta}
-              disabled={savingPerson}
-              className="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
-            >
-              {savingPerson ? 'Gemmer…' : 'Gem'}
-            </button>
+            {!isGuest && (
+              <button
+                type="button"
+                onClick={savePersonMeta}
+                disabled={savingPerson}
+                className="text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
+              >
+                {savingPerson ? 'Gemmer…' : 'Gem'}
+              </button>
+            )}
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             <div>
@@ -625,7 +680,8 @@ export default function VaegtTrackerPage() {
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                readOnly={isGuest}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50"
                 placeholder="fx dit fornavn"
               />
             </div>
@@ -636,7 +692,8 @@ export default function VaegtTrackerPage() {
                 step="0.1"
                 value={editTarget}
                 onChange={(e) => setEditTarget(e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                readOnly={isGuest}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50"
                 placeholder="fx 75 kg"
               />
             </div>
@@ -646,7 +703,8 @@ export default function VaegtTrackerPage() {
                 type="date"
                 value={editTargetDate}
                 onChange={(e) => setEditTargetDate(e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                readOnly={isGuest}
+                className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm disabled:bg-gray-50"
               />
             </div>
           </div>
@@ -682,6 +740,12 @@ export default function VaegtTrackerPage() {
               <Plus size={18} className="text-green-600" />
               Log vægt
             </h2>
+            {isGuest ? (
+              <p className="text-sm text-gray-500">
+                Log ind for at logge nye vægtmålinger. Demoen viser {GUEST_WEIGHT_DEMO_ENTRIES.length} målinger over ca.{' '}
+                {GUEST_WEIGHT_DEMO_SUMMARY.spanDays} dage.
+              </p>
+            ) : (
             <form onSubmit={submitLog} className="space-y-3">
               <div>
                 <label className="text-xs text-gray-500">Vægt (kg)</label>
@@ -724,6 +788,7 @@ export default function VaegtTrackerPage() {
                 </p>
               )}
             </form>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
@@ -731,6 +796,12 @@ export default function VaegtTrackerPage() {
               <Camera size={18} className="text-green-600" />
               Progress-billeder
             </h2>
+            {isGuest ? (
+              <p className="text-sm text-gray-500">
+                Progress-fotos er kun tilgængelige for logget ind brugere. Brug grafen og historikken i demoen.
+              </p>
+            ) : (
+            <>
             <p className="text-xs text-gray-500 mb-3">
               Upload et billede (max 8 MB). På serveren konverteres det til komprimeret WebP (max ca. 1080 px), som ved
               opskriftsbilleder — så du bruger mindre lager uden at det ødelægger før/efter-sammenligning på skærm.
@@ -870,6 +941,8 @@ export default function VaegtTrackerPage() {
                 </div>
               ))}
             </div>
+            </>
+            )}
           </div>
         </div>
 
@@ -883,14 +956,16 @@ export default function VaegtTrackerPage() {
                   <span className="text-gray-500 ml-2">{new Date(e.logged_at).toLocaleString('da-DK')}</span>
                   {e.notes ? <p className="text-xs text-gray-500">{e.notes}</p> : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteEntry(e.id)}
-                  className="p-2 text-gray-400 hover:text-red-600"
-                  aria-label="Slet"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {!isGuest && (
+                  <button
+                    type="button"
+                    onClick={() => deleteEntry(e.id)}
+                    className="p-2 text-gray-400 hover:text-red-600"
+                    aria-label="Slet"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </li>
             ))}
             {entries.length === 0 && <li className="py-4 text-sm text-gray-500">Ingen målinger endnu.</li>}

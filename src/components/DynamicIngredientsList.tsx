@@ -4,7 +4,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Recipe, type Ingredient, type IngredientGroup } from '@/types/recipe'
 import ServingSizeAdjuster from './ServingSizeAdjuster'
-import { recipeHasSenseSpisekasse } from '@/lib/sense-spisekasse'
+import {
+  recipeHasSenseSpisekasse,
+  recipeHasSenseWithOtherDietCategory,
+} from '@/lib/sense-spisekasse'
 
 interface DynamicIngredientsListProps {
   recipe: Recipe
@@ -100,6 +103,18 @@ export default function DynamicIngredientsList({ recipe, servings, onServingsCha
   const [checkedIngredients, setCheckedIngredients] = useState<Set<string>>(new Set())
   const isSenseRecipe = (recipe.dietaryCategories || []).some((c) => String(c).toLowerCase() === 'sense')
   const hasSenseSpisekasseLayout = recipeHasSenseSpisekasse(recipe)
+  const hasMultiDietWithSense = recipeHasSenseWithOtherDietCategory(recipe)
+  const [senseSpisekasseActivated, setSenseSpisekasseActivated] = useState(false)
+  // Når en opskrift er taggat med sense + en anden diætkategori, skal spisekassen
+  // ikke være aktiv fra start. Brugeren aktiverer den via en knap.
+  const showSenseSpisekasse =
+    hasSenseSpisekasseLayout && (!hasMultiDietWithSense || senseSpisekasseActivated)
+  const canActivateSenseSpisekasse =
+    hasSenseSpisekasseLayout && hasMultiDietWithSense && !senseSpisekasseActivated
+  // Når Sense-spisekassen ikke er aktiveret på en multi-diæt opskrift, skjul
+  // Sense-gruppenavnene (fx «Håndfuld 1+2») og vis en flad ingrediensliste i stedet.
+  const hideSenseGroupsForMultiDiet =
+    hasSenseSpisekasseLayout && hasMultiDietWithSense && !senseSpisekasseActivated
 
   // Calculate the multiplier based on current servings vs original servings
   const multiplier = servings / recipe.servings
@@ -123,7 +138,11 @@ export default function DynamicIngredientsList({ recipe, servings, onServingsCha
         return `${Math.round(adjustedAmount)} ${unit}`
       }
     } else if (unit === 'tsk' || unit === 'spsk') {
-      return `${adjustedAmount.toFixed(1)} ${unit}`
+      // Vis hele tal uden decimal (2 spsk, ikke 2,0 spsk), ellers én decimal.
+      const formatted = Number.isInteger(adjustedAmount)
+        ? `${adjustedAmount}`
+        : adjustedAmount.toFixed(1)
+      return `${formatted} ${unit}`
     } else {
       return `${adjustedAmount.toFixed(1)} ${unit}`
     }
@@ -159,16 +178,59 @@ export default function DynamicIngredientsList({ recipe, servings, onServingsCha
       )}
       
       {/* Serving Size Adjustment */}
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <ServingSizeAdjuster
           initialServings={recipe.servings}
           onServingsChange={onServingsChange}
         />
+        {canActivateSenseSpisekasse && (
+          <button
+            type="button"
+            onClick={() => setSenseSpisekasseActivated(true)}
+            className="flex w-full items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50/80 px-4 py-3 text-left transition-colors hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+          >
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold text-emerald-950">
+                Aktivér Sense-spisekasse
+              </span>
+              <span className="text-xs leading-snug text-emerald-900/80">
+                Vis ingredienserne fordelt på håndfulde i stedet.
+              </span>
+            </span>
+            <span
+              aria-hidden
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white"
+            >
+              {/* arrow icon */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </span>
+          </button>
+        )}
+        {hasSenseSpisekasseLayout && hasMultiDietWithSense && senseSpisekasseActivated && (
+          <button
+            type="button"
+            onClick={() => setSenseSpisekasseActivated(false)}
+            className="text-xs font-medium text-emerald-800 underline decoration-emerald-400 underline-offset-2 hover:text-emerald-950"
+          >
+            Skjul Sense-spisekasse
+          </button>
+        )}
       </div>
       
       <div className="space-y-2">
-        {recipe.ingredientGroups && recipe.ingredientGroups.length > 0 ? (
-          hasSenseSpisekasseLayout ? (
+        {recipe.ingredientGroups && recipe.ingredientGroups.length > 0 && !hideSenseGroupsForMultiDiet ? (
+          showSenseSpisekasse ? (
             <SenseSpisekasseTable
               groups={recipe.ingredientGroups}
               calculateIngredientAmount={calculateIngredientAmount}

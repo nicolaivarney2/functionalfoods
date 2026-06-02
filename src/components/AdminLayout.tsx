@@ -20,7 +20,8 @@ import {
   Loader2,
   FileText,
   MessageSquare,
-  Trophy
+  Trophy,
+  Tag
 } from 'lucide-react'
 
 interface AdminLayoutProps {
@@ -59,6 +60,12 @@ const adminNavItems = [
     description: 'Administrer alle opskrifter'
   },
   {
+    name: 'Tags',
+    href: '/admin/tags',
+    icon: Tag,
+    description: 'Filtrer og redigér tags på opskrifter'
+  },
+  {
     name: 'Ingredient Matching',
     href: '/admin/ingredient-matching',
     icon: Database,
@@ -93,6 +100,12 @@ const adminNavItems = [
     href: '/admin/product-ingredient-matching',
     icon: List,
     description: 'Match produkter med ingredienser'
+  },
+  {
+    name: 'Goma-kø (nye varer)',
+    href: '/admin/product-match-queue',
+    icon: List,
+    description: 'Nye dagligvarevarer fra Goma der venter på ingrediensmatch'
   },
   {
     name: 'Blogs',

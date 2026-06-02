@@ -37,7 +37,7 @@ export default function HeroVideo() {
     return (
       <div className="relative w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 aspect-video bg-black">
         <iframe
-          title="Functional Foods — introduktion"
+          title="Functional Foods - introduktion"
           src={`https://www.youtube-nocookie.com/embed/${yt}?rel=0`}
           className="absolute inset-0 h-full w-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"

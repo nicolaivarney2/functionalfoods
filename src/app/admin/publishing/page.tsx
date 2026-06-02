@@ -903,34 +903,47 @@ export default function AdminPublishingPage() {
         body: formData,
       })
 
-      if (!response.ok) {
-        throw new Error('Kunne ikke uploade billede')
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok || data?.success === false) {
+        const message =
+          (data && (data.error || data.details)) || 'Kunne ikke uploade billede'
+        throw new Error(message)
       }
 
-      const data = await response.json()
-      
-      // Update the selected recipe with new image URL
+      if (!data?.recipeUpdated) {
+        // Backend persists imageUrl when recipeId is real. If we got back a URL
+        // but no DB update happened, tell the user instead of silently lying.
+        throw new Error('Billede uploadet, men opskriften blev ikke opdateret')
+      }
+
       const updatedRecipe = {
         ...selectedRecipe,
         imageUrl: data.imageUrl,
-        imageAlt: `${selectedRecipe.title} - Functional Foods`
+        imageAlt: `${selectedRecipe.title} - Functional Foods`,
       }
-      
+
       setSelectedRecipe(updatedRecipe)
-      
-      // Update the recipes list
-      const updatedRecipes = recipes.map(recipe => 
-        recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+      setRecipes((prev) =>
+        prev.map((recipe) =>
+          recipe.id === selectedRecipe.id ? updatedRecipe : recipe
+        )
       )
-      setRecipes(updatedRecipes)
-      
-      alert('✅ Billede opdateret!')
-      
+
+      alert('✅ Billede opdateret og gemt på opskriften!')
+
+      // Reload from DB to confirm the persisted state matches what we show
+      void loadRecipes()
+
     } catch (error) {
       console.error('Error uploading image:', error)
-      alert('❌ Kunne ikke uploade billede. Prøv igen.')
+      const message = error instanceof Error ? error.message : 'Ukendt fejl'
+      alert(`❌ ${message}. Prøv igen.`)
     } finally {
       setSaving(false)
+      // Reset the file input so the same filename can be uploaded again if needed
+      const input = document.getElementById('image-upload') as HTMLInputElement | null
+      if (input) input.value = ''
     }
   }
 

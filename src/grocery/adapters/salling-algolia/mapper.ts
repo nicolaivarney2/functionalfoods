@@ -1,5 +1,6 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
-import type { AlgoliaStoreData, SallingAlgoliaHit, SallingChain } from './types'
+import { pickRepresentativeStore } from './pricing'
+import type { SallingAlgoliaHit, SallingChain } from './types'
 
 /**
  * A product is considered "real" (and thus active) only if Algolia returned
@@ -7,10 +8,12 @@ import type { AlgoliaStoreData, SallingAlgoliaHit, SallingChain } from './types'
  * category + no image) are kept in the DB for diffing but marked inactive.
  */
 function isRealProduct(hit: SallingAlgoliaHit): boolean {
-  const hasName = Boolean(hit.name && hit.name.trim())
+  const hasName = Boolean(
+    (hit.name && hit.name.trim()) || (hit.article && hit.article.trim()),
+  )
   const hasCategory =
-    Boolean(hit.categories?.lvl0?.length) ||
-    Boolean(hit.consumerFacingHierarchy?.lvl0?.length)
+    Boolean(hit.consumerFacingHierarchy?.lvl0?.length) ||
+    Boolean(hit.categories?.lvl0?.length)
   const hasImage = Boolean(hit.images?.[0])
   return hasName && (hasCategory || hasImage)
 }
@@ -21,6 +24,27 @@ const CHAIN_TO_SOURCE: Record<SallingChain, SourceChain> = {
   foetex: 'foetex',
 }
 
+const DEPARTMENT_LABEL_MAP: Record<string, string> = {
+  'frugt & grønt': 'Frugt og grønt',
+  'frugt og grønt': 'Frugt og grønt',
+  'brød & kager': 'Brød og kager',
+  'brød og kager': 'Brød og kager',
+  'drikkevarer': 'Drikkevarer',
+  'kød, fisk & fjerkræ': 'Kød og fisk',
+  'kød og fisk': 'Kød og fisk',
+  'kolonial': 'Kolonial',
+  'mejeri': 'Mejeri og køl',
+  'mejeri & køl': 'Mejeri og køl',
+  'mejeri og køl': 'Mejeri og køl',
+  'ost & mejeri': 'Mejeri og køl',
+  'nemt & hurtigt': 'Nemt og hurtigt',
+  'nemt og hurtigt': 'Nemt og hurtigt',
+  'snacks & slik': 'Slik og snacks',
+  'slik og snacks': 'Slik og snacks',
+  'frost': 'Frost',
+  'køl': 'Køl',
+}
+
 function firstNonEmpty(arr?: string[]): string | null {
   if (!arr || arr.length === 0) return null
   const first = arr[0]
@@ -29,39 +53,62 @@ function firstNonEmpty(arr?: string[]): string | null {
 
 function pickCategoryLabel(path: string | null): string | null {
   if (!path) return null
-  // category strings come like "Frugt & grønt > Frugt > Bananer" — extract leaf
   const parts = path.split('>').map((s) => s.trim())
   return parts[parts.length - 1] || path
+}
+
+function normalizeDepartmentLabel(label: string | null): string | null {
+  if (!label) return null
+  const trimmed = label.trim()
+  return DEPARTMENT_LABEL_MAP[trimmed.toLowerCase()] ?? trimmed
 }
 
 function pickCategoryLevel(
   hit: SallingAlgoliaHit,
   level: 'lvl0' | 'lvl1' | 'lvl2',
 ): string | null {
-  const fromCategories = firstNonEmpty(hit.categories?.[level])
-  if (fromCategories) return pickCategoryLabel(fromCategories)
   const fromCfh = firstNonEmpty(hit.consumerFacingHierarchy?.[level])
-  return pickCategoryLabel(fromCfh)
+  if (fromCfh) {
+    const label = pickCategoryLabel(fromCfh)
+    return level === 'lvl0' ? normalizeDepartmentLabel(label) : label
+  }
+  const fromCategories = firstNonEmpty(hit.categories?.[level])
+  if (fromCategories) {
+    const label = pickCategoryLabel(fromCategories)
+    return level === 'lvl0' ? normalizeDepartmentLabel(label) : label
+  }
+  return null
+}
+
+function pickCategoryPath(hit: SallingAlgoliaHit): string | null {
+  return (
+    firstNonEmpty(hit.consumerFacingHierarchy?.lvl2) ??
+    firstNonEmpty(hit.consumerFacingHierarchy?.lvl1) ??
+    firstNonEmpty(hit.consumerFacingHierarchy?.lvl0) ??
+    firstNonEmpty(hit.categories?.lvl2) ??
+    firstNonEmpty(hit.categories?.lvl1) ??
+    firstNonEmpty(hit.categories?.lvl0) ??
+    null
+  )
 }
 
 export function mapHitToProduct(
   chain: SallingChain,
   hit: SallingAlgoliaHit,
 ): ProductInsert {
-  const categoryPath = firstNonEmpty(hit.categories?.lvl2) ??
-    firstNonEmpty(hit.categories?.lvl1) ??
-    firstNonEmpty(hit.categories?.lvl0) ?? null
+  const name =
+    hit.name?.trim() || hit.article?.trim() || `Vare ${hit.objectID}`
 
   return {
     gtin: hit.gtin || null,
-    name: hit.name,
-    brand: null, // Salling doesn't expose a separate brand field
+    name,
+    brand: null,
     manufacturer: hit.manufacturer?.trim() || null,
     description: hit.description?.trim() || null,
     amount: typeof hit.units === 'number' ? hit.units : null,
     unit: hit.unitsOfMeasure || null,
     image_url: hit.images?.[0] ?? null,
-    category_path: categoryPath,
+    category_path: pickCategoryPath(hit),
     category_lvl0: pickCategoryLevel(hit, 'lvl0'),
     category_lvl1: pickCategoryLevel(hit, 'lvl1'),
     category_lvl2: pickCategoryLevel(hit, 'lvl2'),
@@ -69,8 +116,6 @@ export function mapHitToProduct(
     source_id: hit.objectID,
     active: isRealProduct(hit),
     last_seen_at: new Date().toISOString(),
-    // Slim raw_data: keep only fields we don't already extract.
-    // Drop the huge _highlightResult, properties, and infos blocks.
     raw_data: {
       productType: hit.productType,
       article: hit.article,
@@ -88,31 +133,6 @@ export function mapHitToProduct(
 }
 
 /**
- * Selects a representative storeData entry from the per-store map.
- * Salling returns pricing for many physical stores; we pick the first
- * available with a non-zero price as the chain's representative.
- *
- * Returns null if no usable storeData exists.
- */
-function pickRepresentativeStore(
-  storeData: Record<string, AlgoliaStoreData> | null,
-): { storeId: string; data: AlgoliaStoreData } | null {
-  if (!storeData) return null
-  const entries = Object.entries(storeData)
-  if (entries.length === 0) return null
-
-  // Prefer in-stock with a price > 0
-  for (const [storeId, data] of entries) {
-    if (data?.inStock && data.price > 0) return { storeId, data }
-  }
-  // Fallback: any entry with a price
-  for (const [storeId, data] of entries) {
-    if (data?.price > 0) return { storeId, data }
-  }
-  return { storeId: entries[0][0], data: entries[0][1] }
-}
-
-/**
  * Returns the chain-level offer for a product (one per chain for MVP).
  * Returns null if the product has no pricing data we can use.
  */
@@ -121,75 +141,48 @@ export function mapHitToChainOffer(
   hit: SallingAlgoliaHit,
   productId: string,
 ): ProductOfferInsert | null {
-  const rep = pickRepresentativeStore(hit.storeData)
+  const rep = pickRepresentativeStore(hit.storeData, hit)
   const price = rep?.data.price ?? 0
-
-  // We tolerate price=0 here because Algolia sometimes returns products
-  // without per-store pricing (e.g. campaign-only items). Persist as
-  // null-price offer so consumers can see availability.
-  const beforePrice = hit.cpOriginalPrice && hit.cpOriginalPrice > 0
-    ? hit.cpOriginalPrice
-    : null
-
-  // Treat any price below the "original" as effectively on sale, even if
-  // Salling didn't tag it as a campaign or include it in the current leaflet.
-  // This catches permanent price drops and silent discounts the customer
-  // would still perceive as a deal.
-  const hasPriceDrop = Boolean(beforePrice && price > 0 && price < beforePrice)
-
-  // Detect "silent" offers where Salling doesn't set cpOffer or
-  // isInCurrentLeaflet but the displayed unit price is below the regular unit
-  // price (i.e. unitsOfMeasureShowPrice < unitsOfMeasurePrice). This is the
-  // customer's perceived experience: "the unit price I see is lower than
-  // normal". Goma misses these. Verified Nov 2026: closes most of the
-  // is_on_sale gap vs Goma on Netto, Føtex, and Bilka.
-  const showUom = rep?.data.unitsOfMeasureShowPrice ?? 0
-  const regUom = rep?.data.unitsOfMeasurePrice ?? 0
-  const hasUomPriceDrop = showUom > 0 && regUom > 0 && showUom < regUom
-
-  const isOnSale =
-    Boolean(hit.cpOffer) ||
-    hit.isInCurrentLeaflet ||
-    hasPriceDrop ||
-    hasUomPriceDrop
+  const beforePriceCents = rep?.beforePriceCents ?? null
+  const isOnSale = beforePriceCents !== null
 
   let discountPct: number | null = null
-  if (hit.cpPercentDiscount && hit.cpPercentDiscount > 0) {
-    discountPct = hit.cpPercentDiscount
-  } else if (beforePrice && price && price < beforePrice) {
+  if (beforePriceCents && price > 0 && beforePriceCents > price) {
     discountPct = Number(
-      (((beforePrice - price) / beforePrice) * 100).toFixed(2),
+      (((beforePriceCents - price) / beforePriceCents) * 100).toFixed(2),
     )
-  } else if (hasUomPriceDrop) {
-    // Fall back to the unit-price differential when no explicit before-price
-    // is set. This is approximate (the package size could have changed) but
-    // it's the only signal Salling exposes for these silent offers.
-    discountPct = Number((((regUom - showUom) / regUom) * 100).toFixed(2))
   }
 
   return {
     product_id: productId,
     store_id: CHAIN_TO_SOURCE[chain],
     price_cents: price > 0 ? Math.round(price) : null,
-    before_price_cents: beforePrice !== null ? Math.round(beforePrice) : null,
+    before_price_cents: beforePriceCents,
     unit_price_cents:
       rep?.data.unitsOfMeasurePrice && rep.data.unitsOfMeasurePrice > 0
         ? Math.round(rep.data.unitsOfMeasurePrice)
         : null,
-    unit_price_unit: rep?.data.unitsOfMeasurePriceUnit || hit.unitOfMeasurePriceUnits || null,
+    unit_price_unit:
+      rep?.data.unitsOfMeasurePriceUnit || hit.unitOfMeasurePriceUnits || null,
     is_on_sale: isOnSale,
     offer_from: hit.cpOfferFromDate ? toIsoOrNull(hit.cpOfferFromDate) : null,
     offer_until: hit.cpOfferToDate ? toIsoOrNull(hit.cpOfferToDate) : null,
     offer_description: hit.cpOfferTitle || rep?.data.offerDescription || null,
-    multibuy: rep?.data.multipromo && rep.data.multipromo > 0
-      ? `${rep.data.multipromo} for ${(Math.round(rep.data.multiPromoPrice) / 100).toFixed(2)} kr`
-      : null,
+    multibuy:
+      rep?.data.multipromo && rep.data.multipromo > 0
+        ? `${rep.data.multipromo} for ${(Math.round(rep.data.multiPromoPrice) / 100).toFixed(2)} kr`
+        : null,
     discount_percentage: discountPct,
     in_stock: rep?.data.inStock ?? true,
     source: `salling-algolia:${chain}`,
     source_synced_at: new Date().toISOString(),
     raw_data: rep
-      ? ({ storeId: rep.storeId, storeData: rep.data } as Record<string, unknown>)
+      ? ({
+          storeId: rep.storeId,
+          storeData: rep.data,
+          isInCurrentLeaflet: hit.isInCurrentLeaflet,
+          cpOriginalPrice: hit.cpOriginalPrice,
+        } as Record<string, unknown>)
       : null,
   }
 }

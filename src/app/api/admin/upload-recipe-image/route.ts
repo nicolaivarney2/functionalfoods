@@ -2,17 +2,24 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { createHash } from 'crypto'
+import { revalidatePath } from 'next/cache'
+import { databaseService } from '@/lib/database-service'
+import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('image') as File
     const recipeId = formData.get('recipeId') as string
+    const recipeTitle = (formData.get('recipeTitle') as string | null) || ''
 
     if (!file) {
       return NextResponse.json({ 
@@ -27,6 +34,11 @@ export async function POST(request: NextRequest) {
         error: 'Recipe ID er påkrævet' 
       }, { status: 400 })
     }
+
+    // Detect "temp" recipeId from create-flow (recipe not yet persisted in DB).
+    // For temp uploads we skip the DB update — the create-flow saves imageUrl
+    // when the new recipe row is created.
+    const isTempRecipe = recipeId.startsWith('temp-')
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
@@ -97,10 +109,50 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Image uploaded and optimized successfully: ${imageUrl}`)
 
+    // Persist new imageUrl on the recipe row so the change survives page reloads
+    // and shows up on public pages. Skip for temp uploads from create-flow.
+    let recipeUpdated = false
+    if (!isTempRecipe) {
+      const altText = recipeTitle
+        ? `${recipeTitle} - Functional Foods`
+        : 'Functional Foods opskrift'
+
+      const { data: updateData, error: updateError } = await supabase
+        .from('recipes')
+        .update({
+          imageUrl,
+          imageAlt: altText,
+          updatedAt: new Date().toISOString(),
+        })
+        .eq('id', recipeId)
+        .select('slug, mainCategory, dietaryCategories')
+        .single()
+
+      if (updateError) {
+        console.error('❌ Failed to update recipe.imageUrl in DB:', updateError)
+        return NextResponse.json({
+          success: false,
+          error: 'Billede uploadet, men kunne ikke gemmes på opskriften',
+          details: updateError.message,
+          imageUrl,
+        }, { status: 500 })
+      }
+
+      recipeUpdated = true
+
+      // Invalidate caches so the new image is visible on public pages
+      databaseService.clearRecipeCaches()
+      if (updateData?.slug) {
+        revalidatePath(`/opskrift/${updateData.slug}`)
+      }
+      revalidateRecipeCollectionPaths(updateData || {})
+    }
+
     return NextResponse.json({
       success: true,
       imageUrl: imageUrl,
       fileName: fileName,
+      recipeUpdated,
       originalSize: `${(imageBuffer.byteLength / 1024).toFixed(1)}KB`,
       optimizedSize: `${(optimizedBuffer.length / 1024).toFixed(1)}KB`,
       compressionRatio: `${((1 - optimizedBuffer.length / imageBuffer.byteLength) * 100).toFixed(1)}%`,

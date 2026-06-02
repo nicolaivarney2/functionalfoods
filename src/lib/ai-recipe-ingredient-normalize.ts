@@ -43,6 +43,10 @@ const GRAMS_PER_LEMON = 50
 const GRAMS_PER_GARLIC_CLOVE = 3
 /** Typisk vægt for et lille bundt friske krydderurter. */
 const GRAMS_PER_HERB_BUNDLE = 50
+/** ~5 g pr. tsk salt. */
+const GRAMS_PER_TSK_SALT = 5
+/** ~2,5 g pr. tsk peber. */
+const GRAMS_PER_TSK_PEPPER = 2.5
 
 const TYPO_FIXES: [RegExp, string][] = [
   [/olivenolei/gi, 'olivenolie'],
@@ -173,6 +177,15 @@ function isGarlicName(name: string): boolean {
   return /\b(hvidløg|hvidløgsfed|hvidløgsfedd?)\b/i.test(name)
 }
 
+function isSaltName(name: string): boolean {
+  return /\b(salt|havsalt|flagesalt|bordsalt)\b/i.test(name)
+}
+
+function isPepperName(name: string): boolean {
+  // Undgå at matche peberfrugt / peberrod (bell pepper / horseradish) via ordgrænse.
+  return /\b(peber|peberkorn)\b/i.test(name)
+}
+
 function getFreshHerbBaseName(name: string): 'persille' | 'basilikum' | 'timian' | 'mynte' | null {
   const n = name.toLowerCase()
   if (/\bpersille\b/.test(n)) return 'persille'
@@ -195,10 +208,32 @@ function adjustUnitsAndAmounts(name: string, amount: number, unit: string): { na
     return { name: n, amount: pieces, unit: 'stk' }
   }
 
-  // Olivenolie: gram → spsk
+  // Salt og peber: altid i tsk (aldrig gram/stk)
+  if (isSaltName(n) || isPepperName(n)) {
+    const gramsPerTsk = isSaltName(n) ? GRAMS_PER_TSK_SALT : GRAMS_PER_TSK_PEPPER
+    let tsk: number
+    if (u === 'g' || u === 'gram') {
+      tsk = a / gramsPerTsk
+    } else if (u === 'spsk') {
+      tsk = a * 3
+    } else {
+      // allerede tsk eller ukendt enhed (fx stk/knivspids) → behandl tallet som tsk
+      tsk = a
+    }
+    const rounded = Math.max(0.5, Math.round(tsk * 2) / 2)
+    return { name: n.toLowerCase(), amount: rounded, unit: 'tsk' }
+  }
+
+  // Olivenolie: gram → spsk (hele tal, fx 1 eller 2 — ikke 1,1/2,2)
   if (isOliveOilName(n) && (u === 'g' || u === 'gram')) {
-    const spsk = Math.round((a / GRAMS_PER_SPSK_OIL) * 10) / 10
-    const rounded = spsk < 0.25 ? 0.5 : Math.max(0.5, spsk)
+    const spsk = a / GRAMS_PER_SPSK_OIL
+    const rounded = spsk < 0.75 ? 0.5 : Math.round(spsk)
+    return { name: n, amount: rounded, unit: 'spsk' }
+  }
+
+  // Olivenolie allerede i spsk: rund til hele tal (min. 0,5)
+  if (isOliveOilName(n) && u === 'spsk') {
+    const rounded = a < 0.75 ? 0.5 : Math.round(a)
     return { name: n, amount: rounded, unit: 'spsk' }
   }
 

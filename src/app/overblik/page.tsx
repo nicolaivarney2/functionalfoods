@@ -20,6 +20,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { FF_OPEN_MESSENGER_GUIDANCE } from '@/lib/messenger-guidance-events'
 
 type Tool =
@@ -119,6 +120,8 @@ function OverblikContent() {
 
   const ny = searchParams.get('ny') === '1'
   const betalingOk = searchParams.get('betaling') === 'ok'
+
+  useApplyPendingOnboarding(false)
 
   useEffect(() => {
     if (!loading && !user) {

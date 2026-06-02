@@ -44,6 +44,24 @@ export function recipeHasSenseSpisekasse(recipe: {
 }
 
 /**
+ * Tjekker om opskriften har "sense" + mindst én anden diætkategori.
+ * I så fald skal Sense-spisekassen være "slået fra" som default — brugeren
+ * skal selv aktivere visningen via en knap ved antal personer.
+ */
+export function recipeHasSenseWithOtherDietCategory(recipe: {
+  dietaryCategories?: string[]
+}): boolean {
+  const tags = (recipe.dietaryCategories || []).filter(
+    (t): t is string => typeof t === 'string' && t.trim() !== ''
+  )
+  if (tags.length < 2) return false
+  const normalized = tags.map((t) => t.toLowerCase().trim())
+  const hasSense = normalized.includes('sense')
+  if (!hasSense) return false
+  return normalized.some((t) => t !== 'sense')
+}
+
+/**
  * Efter normalisering af hele den flade ingrediensliste: fordel samme rækkefølge i grupper
  * ud fra antal ingredienser pr. gruppe (tæl fra AI / kladde).
  */

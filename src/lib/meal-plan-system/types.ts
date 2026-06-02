@@ -47,7 +47,10 @@ export interface DayPlan {
 export interface MealAssignment {
   mealType: MealType;
   recipe: Recipe;
+  /** Ernærings-/kalorietarget (kan afvige fra opskriftens portioner). */
   servings: number;
+  /** Antal personer der spiser måltidet – bruges til indkøbsmængder (vs. recipe.servings). */
+  peopleEating?: number;
   adjustedCalories: number;
   adjustedProtein: number;
   adjustedCarbs: number;
@@ -170,6 +173,8 @@ export interface MealPlanConfig {
   timeConstraints: TimeConstraints;
   /** Antal personer der spiser hvert måltid (fx { breakfast: 1, lunch: 1, dinner: 2 }) – bruges til portionsstørrelse og indkøbsliste */
   peoplePerMeal?: Record<string, number>;
+  /** Samlet PE for børn (aldersbånd) – lægges oven i voksne pr. måltid ved portionsberegning. */
+  childPersonEquivalent?: number;
   /** Valgfrit budgetloft pr. uge (kr). Når sat, vægtes opskrifter med aktuelle tilbud højere (lavere loft → stærkere prioritering). */
   weeklyBudgetKr?: number | null;
 }
