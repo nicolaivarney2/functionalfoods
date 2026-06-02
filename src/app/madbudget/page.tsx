@@ -17,8 +17,9 @@ import { resolveFactoryDietId } from '@/lib/diet-tag-matching'
 import { recipeMatchesDiet } from '@/lib/recipe-diet-matcher'
 import { useAuth } from '@/contexts/AuthContext'
 import GuestDemoBanner from '@/components/madbudget/GuestDemoBanner'
-import GuestPageTour from '@/components/madbudget/GuestPageTour'
+import GuestPageTour, { type GuestPageTourStep } from '@/components/madbudget/GuestPageTour'
 import GuestGuidedTour, { type GuestTourFamilyState } from '@/components/madbudget/GuestGuidedTour'
+import GuestSignupPromptModal from '@/components/madbudget/GuestSignupPromptModal'
 import {
   GUEST_DEMO_ADULT_PROFILES,
   GUEST_DEMO_BASISVARER,
@@ -297,15 +298,7 @@ export default function MadbudgetPage() {
   const [showGuestBanner, setShowGuestBanner] = useState(true)
   const [showGuidedTour, setShowGuidedTour] = useState(false)
   const [showGuidedFamilyTour, setShowGuidedFamilyTour] = useState(false)
-  /** Familie-wizard er lukket eller allerede set — spotlight må først derefter. */
-  const [guidedFamilyTourDismissed, setGuidedFamilyTourDismissed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    try {
-      return window.localStorage.getItem('functionalfoods-guest-guided-tour-seen') === '1'
-    } catch {
-      return false
-    }
-  })
+  const [guestSignupPrompt, setGuestSignupPrompt] = useState<string | null>(null)
 
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   useApplyPendingOnboarding(isGuest, () => setProfileReloadKey((k) => k + 1))
@@ -365,6 +358,31 @@ export default function MadbudgetPage() {
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
+
+  const guestPageTourSteps = useMemo((): GuestPageTourStep[] => {
+    const focusWeekMealPlan = () => setViewMode('week')
+    const focusSwapMealExample = () => {
+      setViewMode('week')
+      setCurrentDayOffset(1)
+      setSelectedDayIndex(2)
+    }
+    return FF_GUEST_TOUR_STEPS.map((step) => {
+      if (step.selector === '[data-tour="swap-meal-example"]') {
+        return { ...step, onEnter: focusSwapMealExample }
+      }
+      if (step.selector === '[data-tour="meal-plan-grid"]') {
+        const prevOnEnter = step.onEnter
+        return {
+          ...step,
+          onEnter: () => {
+            focusWeekMealPlan()
+            prevOnEnter?.()
+          },
+        }
+      }
+      return step
+    })
+  }, [])
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [availableRecipes, setAvailableRecipes] = useState<PlannerRecipe[]>([])
@@ -1168,6 +1186,7 @@ export default function MadbudgetPage() {
   const openFamilySettingsPanel = () => {
     if (isGuest) {
       setViewMode('week')
+      setShowGuidedTour(false)
       setShowGuidedFamilyTour(true)
       return
     }
@@ -1176,7 +1195,6 @@ export default function MadbudgetPage() {
 
   const finishGuestFamilyWizard = () => {
     setShowGuidedFamilyTour(false)
-    setGuidedFamilyTourDismissed(true)
     markGuidedFamilyTourSeen()
     setViewMode('day')
   }
@@ -1228,22 +1246,18 @@ export default function MadbudgetPage() {
   useEffect(() => {
     if (!isGuest || guestDataApplied) return
     applyGuestDemoFamily(GUEST_DEMO_DEFAULT_FAMILY)
-    setViewMode(guidedFamilyTourDismissed ? 'day' : 'week')
+    setViewMode('week')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGuest, guestDataApplied])
 
-  // Familie-wizard (4 trin): første besøg, 5 sek. efter landing — ikke samtidig med spotlight
   useEffect(() => {
-    if (!isGuest || guidedFamilyTourDismissed) return
-    const timer = window.setTimeout(() => {
-      setShowGuidedFamilyTour(true)
-    }, 5000)
-    return () => window.clearTimeout(timer)
-  }, [isGuest, guidedFamilyTourDismissed])
+    if (!isGuest || !showGuidedTour) return
+    setViewMode('week')
+  }, [isGuest, showGuidedTour])
 
-  // Spotlight-tour: kun efter familie-wizard er lukket/set, og 5 sek. pause
+  // Spotlight-tour på siden ved landing (familie-wizard kun via "Tilpas demo-familie")
   useEffect(() => {
-    if (!isGuest || !guestDataApplied || showGuidedFamilyTour || !guidedFamilyTourDismissed) return
+    if (!isGuest || !guestDataApplied || showGuidedFamilyTour) return
     try {
       if (window.localStorage.getItem(FF_GUEST_TOUR_STORAGE_KEY) === '1') return
     } catch {
@@ -1251,9 +1265,9 @@ export default function MadbudgetPage() {
     }
     const timer = window.setTimeout(() => {
       setShowGuidedTour(true)
-    }, 5000)
+    }, 1200)
     return () => window.clearTimeout(timer)
-  }, [isGuest, guestDataApplied, showGuidedFamilyTour, guidedFamilyTourDismissed])
+  }, [isGuest, guestDataApplied, showGuidedFamilyTour])
 
   useEffect(() => {
     if (!isGuest || !guestDataApplied) return
@@ -1493,7 +1507,9 @@ export default function MadbudgetPage() {
 
   const recalculateShoppingList = async () => {
     if (isGuest) {
-      alert('Opret en gratis bruger på /kom-i-gang for at genberegne indkøbslisten med ugens tilbud.')
+      setGuestSignupPrompt(
+        'For at genberegne indkøbslisten med ugens tilbud skal du oprette en gratis bruger.',
+      )
       return
     }
     setRecalculatingShoppingList(true)
@@ -1899,7 +1915,9 @@ export default function MadbudgetPage() {
 
   const setPlannerMealIncluded = (meal: 'breakfast' | 'lunch', checked: boolean) => {
     if (isGuest) {
-      alert('Opret en gratis bruger på /kom-i-gang for at ændre hvilke måltider din madplan dækker.')
+      setGuestSignupPrompt(
+        'For at vælge hvilke måltider din madplan skal dække skal du oprette en gratis bruger.',
+      )
       return
     }
     setFamilyProfile((prev) => ({
@@ -2100,7 +2118,9 @@ export default function MadbudgetPage() {
 
   const generateMealPlan = async () => {
     if (isGuest) {
-      alert('Opret en gratis bruger på /kom-i-gang for at lave din egen madplan.')
+      setGuestSignupPrompt(
+        'For at generere din egen madplan med ugens tilbud skal du oprette en gratis bruger.',
+      )
       return
     }
     // Validate before generating
@@ -2575,7 +2595,8 @@ export default function MadbudgetPage() {
       {isGuest && showGuestBanner && (
         <GuestDemoBanner
           onStartTour={() => {
-            if (!showGuidedFamilyTour) setShowGuidedTour(true)
+            setShowGuidedFamilyTour(false)
+            setShowGuidedTour(true)
           }}
           onDismiss={() => setShowGuestBanner(false)}
         />
@@ -2583,7 +2604,7 @@ export default function MadbudgetPage() {
       {isGuest && (
         <GuestPageTour
           open={showGuidedTour && !showGuidedFamilyTour}
-          steps={FF_GUEST_TOUR_STEPS}
+          steps={guestPageTourSteps}
           onClose={() => {
             setShowGuidedTour(false)
             markGuestTourSeen()
@@ -3099,7 +3120,7 @@ export default function MadbudgetPage() {
               )}
 
               {viewMode === 'day' && (
-              <div className="space-y-6">
+              <div data-tour="meal-plan-grid" className="space-y-6">
                 {/* Kalender: ugens dage med dato — fylder hele bredden; på mobil kan man slide */}
                 <div className="w-full grid grid-cols-7 gap-2 max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:snap-x max-sm:snap-mandatory max-sm:pb-2 max-sm:-mx-1 max-sm:px-1">
                   {weekDates.map(({ dayKey, date }, i) => {
@@ -3285,6 +3306,7 @@ export default function MadbudgetPage() {
                       return (
                         <div
                           key={mealType.key}
+                          data-tour={dayKey === 'wednesday' && mealKey === 'dinner' ? 'swap-meal-example' : undefined}
                           onClick={() => handleMealCellClick(dayKey, mealKey)}
                           className={`relative rounded-xl border-2 cursor-pointer transition-colors overflow-hidden flex flex-row sm:flex-col ${
                             lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
@@ -5799,6 +5821,12 @@ export default function MadbudgetPage() {
           </div>
         </div>
       )}
+
+      <GuestSignupPromptModal
+        open={guestSignupPrompt !== null}
+        message={guestSignupPrompt ?? ''}
+        onClose={() => setGuestSignupPrompt(null)}
+      />
 
       <MadbudgetShopSurveyModal
         open={shopSurveyOpen}

@@ -22,8 +22,8 @@ export default function GuestDemoBanner({ onStartTour, onDismiss }: GuestDemoBan
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-green-600" aria-hidden />
           <p className="leading-relaxed">
             <strong className="font-semibold">Demo til vægttab:</strong> Fiktiv madplan med morgenmad,
-            frokost og aftensmad fra ugens tilbud. Først en kort intro til jeres familie — derefter en
-            guidet tour på siden.
+            frokost og aftensmad fra ugens tilbud. En kort guidet tour viser dig rundt — tilpas
+            demo-familien når du vil undervejs.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">

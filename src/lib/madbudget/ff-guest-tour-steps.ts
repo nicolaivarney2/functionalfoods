@@ -26,7 +26,7 @@ export const FF_GUEST_TOUR_STEPS: GuestPageTourStep[] = [
     selector: '[data-tour="family-settings"]',
     title: 'Tilpas demo-familien',
     description:
-      'Genåbn introen: familie, mad-niche (Keto i demo), vægttabsprofiler og butikker — samme som Familieindstillinger når du er bruger.',
+      'Klik her når du vil ændre familie, mad-niche (Keto i demo), vægttabsprofiler og butikker — samme som Familieindstillinger når du er bruger.',
   },
   {
     selector: '[data-tour="basisvarer"]',

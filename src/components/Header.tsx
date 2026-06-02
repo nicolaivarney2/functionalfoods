@@ -3,20 +3,25 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid } from 'lucide-react'
+import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
 import RecipeSearchModal from './RecipeSearchModal'
 
-const mainMenuItems = [
+const desktopMainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
-  { name: 'DAGLIGVARER', href: '/dagligvarer' },
   { name: 'MADPLAN', href: '/madbudget' },
-  { name: 'FUNKTIONER', href: '/funktioner' },
   { name: 'VÆGTTAB', href: '/vaegttab' },
+]
+
+const moreMenuItems = [
+  { name: 'DAGLIGVARER', href: '/dagligvarer' },
+  { name: 'FUNKTIONER', href: '/funktioner' },
   { name: 'OM OS', href: '/bag-om-ff' },
 ]
+
+const mobileMainMenuItems = [...desktopMainMenuItems, ...moreMenuItems]
 
 const dietaryCategories = [
   { name: 'KETO', href: '/keto' },
@@ -34,17 +39,22 @@ const BRAND_LOGO_URL = '/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.p
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isRecipeSearchOpen, setIsRecipeSearchOpen] = useState(false)
   const { user, signOut } = useAuth()
   const { isAdmin } = useAdminCheck()
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false)
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false)
       }
     }
 
@@ -80,7 +90,7 @@ export default function Header() {
 
               {/* Desktop Main Menu */}
               <nav className="hidden md:flex items-center justify-center flex-1 gap-6 lg:gap-8 px-3">
-                {mainMenuItems.map((item) => (
+                {desktopMainMenuItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
@@ -89,6 +99,40 @@ export default function Header() {
                     {item.name}
                   </Link>
                 ))}
+                <div className="relative" ref={moreMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsMoreMenuOpen((open) => !open)}
+                    className="inline-flex items-center gap-1 text-white hover:text-gray-300 transition-colors text-[13px] font-medium tracking-wide whitespace-nowrap"
+                    aria-expanded={isMoreMenuOpen}
+                    aria-haspopup="menu"
+                  >
+                    MERE
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform ${isMoreMenuOpen ? 'rotate-180' : ''}`}
+                      aria-hidden
+                    />
+                  </button>
+                  {isMoreMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute left-1/2 top-full z-50 mt-2 w-52 -translate-x-1/2 rounded-lg border border-gray-200 bg-white py-2 shadow-lg"
+                    >
+                      {moreMenuItems.map((item) => (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          role="menuitem"
+                          className="block px-4 py-2.5 text-[13px] font-medium tracking-wide text-gray-900 transition-colors hover:bg-gray-50"
+                          onClick={() => setIsMoreMenuOpen(false)}
+                        >
+                          {item.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </nav>
 
               {/* Search and User Menu */}
@@ -269,7 +313,7 @@ export default function Header() {
           <div className="md:hidden bg-white border-t border-gray-200">
             <div className="container py-4">
               <nav className="flex flex-col space-y-4">
-                {mainMenuItems.map((item) => (
+                {mobileMainMenuItems.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}

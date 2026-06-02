@@ -40,7 +40,6 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
 
   useEffect(() => {
     if (!open) return
-    currentStep?.onEnter?.()
     return () => {
       currentStep?.onLeave?.()
     }
@@ -48,16 +47,24 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
 
   useLayoutEffect(() => {
     if (!open || !currentStep) return
+    currentStep.onEnter?.()
     let cancelled = false
     let rafId = 0
 
     const findVisible = (): HTMLElement | null => {
       const all = document.querySelectorAll<HTMLElement>(currentStep.selector)
+      let best: HTMLElement | null = null
+      let bestArea = 0
       for (const el of all) {
         const r = el.getBoundingClientRect()
-        if (r.width > 0 && r.height > 0) return el
+        if (r.width <= 0 || r.height <= 0) continue
+        const area = r.width * r.height
+        if (area > bestArea) {
+          bestArea = area
+          best = el
+        }
       }
-      return all[0] ?? null
+      return best
     }
 
     const updateRect = () => {
@@ -71,17 +78,27 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
       setViewport({ w: window.innerWidth, h: window.innerHeight })
     }
 
-    const initialEl = findVisible()
-    if (initialEl) {
-      try {
-        initialEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      } catch {
-        initialEl.scrollIntoView()
+    const measureAfterLayout = () => {
+      const el = findVisible()
+      if (el) {
+        try {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        } catch {
+          el.scrollIntoView()
+        }
       }
+      updateRect()
     }
 
-    updateRect()
-    const timer = window.setTimeout(updateRect, 450)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) measureAfterLayout()
+      })
+    })
+
+    const retryTimers = [80, 200, 450, 900].map((ms) =>
+      window.setTimeout(updateRect, ms),
+    )
     const loop = () => {
       updateRect()
       rafId = window.requestAnimationFrame(loop)
@@ -90,14 +107,14 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
 
     const stopLoop = window.setTimeout(() => {
       window.cancelAnimationFrame(rafId)
-    }, 600)
+    }, 1200)
 
     window.addEventListener('resize', updateRect)
     window.addEventListener('scroll', updateRect, true)
 
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
+      retryTimers.forEach((id) => window.clearTimeout(id))
       window.clearTimeout(stopLoop)
       window.cancelAnimationFrame(rafId)
       window.removeEventListener('resize', updateRect)

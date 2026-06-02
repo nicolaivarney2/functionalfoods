@@ -11,7 +11,13 @@ export default function SoftLaunchBanner() {
   const pathname = usePathname()
   const [visible, setVisible] = useState(false)
 
+  const isHomePage = pathname === '/'
+
   useEffect(() => {
+    if (!isHomePage) {
+      setVisible(false)
+      return
+    }
     let timer: ReturnType<typeof setTimeout> | null = null
     try {
       if (localStorage.getItem(STORAGE_KEY) === '1') return
@@ -22,7 +28,7 @@ export default function SoftLaunchBanner() {
     return () => {
       if (timer) clearTimeout(timer)
     }
-  }, [])
+  }, [isHomePage])
 
   const dismiss = () => {
     setVisible(false)
@@ -33,7 +39,7 @@ export default function SoftLaunchBanner() {
     }
   }
 
-  if (!visible || (pathname ?? '').startsWith('/admin')) {
+  if (!visible || !isHomePage) {
     return null
   }
 
