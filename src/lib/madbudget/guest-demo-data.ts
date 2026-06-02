@@ -370,6 +370,8 @@ const WEEKLY_PRICE_BY_NAME: Record<string, number> = {
   'smør': 14,
   'pasta (penne)': 9,
   'pasta (fusilli)': 9,
+  pasta: 18,
+  ris: 16,
   'basmati ris': 16,
   'rasp': 8,
   'karrypasta': 18,
@@ -600,7 +602,6 @@ export function buildGuestMealPlanInsights(weekAvg: {
     'Keto-opskrifter med gentagne, nemme morgenmadsvalg (spinat-omelet 3 dage, græsk yoghurt 2 dage)',
     'Frokost: salater med kylling, tun eller bacon — hurtige og mættende',
     `${frokostKylling} frokostsalater med kylling og ${aftensKylling} aftensmad med kylling; ${okseKoedAftensmad} aftensretter med okse eller svinekød`,
-    'Varieret aftensmad: oopsie-burger, taco-salat, frikadeller, keto-pizza, spareribs og thaisuppe',
   ]
 
   if (salatFrokost >= 3) {

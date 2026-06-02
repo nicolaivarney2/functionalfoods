@@ -72,6 +72,12 @@ export async function POST(request: NextRequest) {
       adultsProfiles: family.adultsProfiles,
     })
 
+    const dietaryApproachId =
+      body?.dietaryApproachId ||
+      family?.planDietaryApproach ||
+      family.adultsProfiles?.find((p: { dietaryApproach?: string }) => p.dietaryApproach)
+        ?.dietaryApproach
+
     const shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
       syncedGrid,
       1,
@@ -79,6 +85,7 @@ export async function POST(request: NextRequest) {
         adults: Number(family.adults) || 1,
         childrenAges: family.childrenAges || [],
         adultsProfiles: family.adultsProfiles,
+        planDietaryApproach: dietaryApproachId,
       }
     )
 

@@ -48,6 +48,7 @@ import {
   hasKombiTag,
   calculateSupplementAmount
 } from './kombi-supplements';
+import { applyKetoShoppingListRules, isKetoDietaryApproach } from './keto-shopping-list';
 
 import { buildAcceptableDietKeys, recipeDietTagMatches, resolveFactoryDietId } from '../diet-tag-matching';
 
@@ -642,7 +643,8 @@ export class MealPlanGenerator {
     family: {
       adults: number
       childrenAges?: string[]
-      adultsProfiles: { mealsPerDay?: string[] }[]
+      adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
     }
   ): number {
     const peoplePerMeal = getPeoplePerMealFromAdultsProfiles(
@@ -661,7 +663,8 @@ export class MealPlanGenerator {
     family: {
       adults: number
       childrenAges?: string[]
-      adultsProfiles: { mealsPerDay?: string[] }[]
+      adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
     }
   ): number {
     return this.resolvePeopleEatingForPlannerCell(cell, mealType, family)
@@ -688,11 +691,13 @@ export class MealPlanGenerator {
     family: {
       adults: number
       childrenAges?: string[]
-      adultsProfiles: { mealsPerDay?: string[] }[]
+      adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
       snapshot?: {
         adults: number
         childrenAges?: string[]
-        adultsProfiles: { mealsPerDay?: string[] }[]
+        adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
       }
     }
   ): Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined> {
@@ -730,12 +735,14 @@ export class MealPlanGenerator {
     family?: {
       adults: number
       childrenAges?: string[]
-      adultsProfiles: { mealsPerDay?: string[] }[]
+      adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
       /** Husstand da madplanen/indkøbslisten sidst blev bygget – til korrekt omskaler ved ændring af børn. */
       snapshot?: {
         adults: number
         childrenAges?: string[]
-        adultsProfiles: { mealsPerDay?: string[] }[]
+        adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
+      planDietaryApproach?: string
       }
     }
   ): Promise<ShoppingList> {
@@ -793,7 +800,17 @@ export class MealPlanGenerator {
       };
     });
 
-    return this.generateShoppingList(weekNumber, days, { light: true });
+    const dietaryApproachId =
+      family?.planDietaryApproach ||
+      family?.adultsProfiles
+        ?.map((p) => String(p.dietaryApproach || '').trim())
+        .find(Boolean) ||
+      undefined;
+
+    return this.generateShoppingList(weekNumber, days, {
+      light: true,
+      dietaryApproachId,
+    });
   }
 
   /** Map UI madplan-celle til Recipe til brug i indkøbsliste-aggregation */
@@ -866,7 +883,9 @@ export class MealPlanGenerator {
     }
 
     // Generate shopping list for the week
-    const shoppingList = await this.generateShoppingList(weekNumber, days);
+    const shoppingList = await this.generateShoppingList(weekNumber, days, {
+      dietaryApproachId: config.dietaryApproach.id,
+    });
 
     // Calculate weekly nutrition
     const weeklyNutrition = this.calculateWeeklyNutrition(days, config);
@@ -1468,7 +1487,7 @@ export class MealPlanGenerator {
   private async generateShoppingList(
     weekNumber: number,
     days: DayPlan[],
-    options?: { light?: boolean }
+    options?: { light?: boolean; dietaryApproachId?: string }
   ): Promise<ShoppingList> {
     const ingredientMap = new Map<string, { amount: number; unit: string; name: string; ingredientId?: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
@@ -1935,10 +1954,16 @@ export class MealPlanGenerator {
       })),
     })));
 
-    return {
+    const list: ShoppingList = {
       weekNumber,
-      categories
+      categories,
     };
+
+    if (isKetoDietaryApproach(options?.dietaryApproachId)) {
+      return applyKetoShoppingListRules(list);
+    }
+
+    return list;
   }
 
   /**

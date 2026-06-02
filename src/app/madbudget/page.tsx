@@ -4,11 +4,11 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
-import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } from '@/lib/meal-plan-system'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
@@ -557,6 +557,21 @@ export default function MadbudgetPage() {
     const ids = familyProfile.selectedStores || []
     return [...ids].sort((a, b) => a - b).join(',')
   }, [familyProfile.selectedStores])
+
+  const shoppingListDietId = useMemo(() => {
+    if (isGuest) return GUEST_DEMO_PLAN_DIETARY_APPROACH
+    const approaches = familyProfile.adultsProfiles
+      .map((p) => p.dietaryApproach)
+      .filter(Boolean) as string[]
+    if (approaches.length > 0 && approaches.every((a) => a === 'keto')) return 'keto'
+    return approaches[0] || ''
+  }, [isGuest, familyProfile.adultsProfiles])
+
+  const displayShoppingList = useMemo(() => {
+    if (!shoppingList?.categories) return shoppingList
+    if (!isKetoDietaryApproach(shoppingListDietId)) return shoppingList
+    return applyKetoShoppingListRules(shoppingList)
+  }, [shoppingList, shoppingListDietId])
   const [recalculatingShoppingList, setRecalculatingShoppingList] = useState(false)
   const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
@@ -614,7 +629,7 @@ export default function MadbudgetPage() {
 
   // Fetch prices for shopping list items per store
   const fetchStorePrices = async () => {
-    if (!shoppingList || !familyProfile.selectedStores || familyProfile.selectedStores.length === 0) {
+    if (!displayShoppingList || !familyProfile.selectedStores || familyProfile.selectedStores.length === 0) {
       console.log('⚠️ Cannot fetch prices: missing shoppingList or selectedStores')
       return
     }
@@ -624,7 +639,7 @@ export default function MadbudgetPage() {
       // Flatten shopping list items - include ingredientId if available
       const items: any[] = []
       let itemsWithId = 0
-        shoppingList.categories?.forEach((category: any) => {
+        displayShoppingList.categories?.forEach((category: any) => {
           category.items?.forEach((item: any) => {
             if (item.ingredientId) itemsWithId++
             items.push({
@@ -686,11 +701,11 @@ export default function MadbudgetPage() {
   // Fetch prices when shopping list OR selected stores change (gæster bruger demo-priser)
   useEffect(() => {
     if (isGuest) return
-    if (shoppingList && familyProfile.selectedStores && familyProfile.selectedStores.length > 0) {
+    if (displayShoppingList && familyProfile.selectedStores && familyProfile.selectedStores.length > 0) {
       fetchStorePrices()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shoppingList, selectedStoreIdsKey, isGuest])
+  }, [displayShoppingList, selectedStoreIdsKey, isGuest])
 
   // Debug: log what frontend received for shopping list (categories + ingredientId/isBasis per item)
   useEffect(() => {
@@ -710,10 +725,10 @@ export default function MadbudgetPage() {
   }
 
   const shoppingListCoverage = useMemo(() => {
-    if (!shoppingList?.categories) return null
+    if (!displayShoppingList?.categories) return null
 
     const excludedCategoryNames = new Set(['varer du måske allerede har', 'andre'])
-    const relevantItems = shoppingList.categories
+    const relevantItems = displayShoppingList.categories
       .filter((category: any) => !excludedCategoryNames.has(String(category?.name || '').toLowerCase().trim()))
       .flatMap((category: any) => category?.items || [])
       .filter((item: any) => item?.name && !item?.isBasis)
@@ -766,10 +781,10 @@ export default function MadbudgetPage() {
           ? 'fundet i valgte butikker'
           : `fundet i ${mockStores.find((store) => store.id === storeIdFromTabKey(selectedStoreTab))?.name || 'butikken'}`,
     }
-  }, [shoppingList, storePrices, selectedStoreTab, familyProfile.selectedStores])
+  }, [displayShoppingList, storePrices, selectedStoreTab, familyProfile.selectedStores])
 
   const openSmartShoppingFlow = async () => {
-    if (!shoppingList) return
+    if (!displayShoppingList) return
     setSmartShareError('')
     if (selectedStoreTab === 'all') {
       setSmartShareError('Vælg en butik-fane (fx Netto eller REMA) først – så ved vi hvilken butik du handler i.')
@@ -805,7 +820,7 @@ export default function MadbudgetPage() {
           storeId: sid,
           storeKey: selectedStoreTab,
           storeName: store.name,
-          shoppingList,
+          shoppingList: displayShoppingList,
           shoppingListPrices: pricesSlice,
           mealSummary: {
             title: `Madplan uge ${selectedWeekNumber ?? currentWeekNumber}`,
@@ -1056,9 +1071,12 @@ export default function MadbudgetPage() {
         })),
       })),
     }
-    setShoppingList(scaledList)
+    const listForDisplay = isKetoDietaryApproach(GUEST_DEMO_PLAN_DIETARY_APPROACH)
+      ? applyKetoShoppingListRules(scaledList)
+      : scaledList
+    setShoppingList(listForDisplay)
     setShoppingListStale(false)
-    setStorePrices(buildGuestDemoStorePrices(GUEST_DEMO_SHOPPING_LIST, pe))
+    setStorePrices(buildGuestDemoStorePrices(listForDisplay as typeof GUEST_DEMO_SHOPPING_LIST, pe))
 
     setBasisvarer(
       GUEST_DEMO_BASISVARER.map((b) => ({
@@ -1233,6 +1251,12 @@ export default function MadbudgetPage() {
     } catch {
       /* ignore */
     }
+  }
+
+  const finishGuestPageTour = () => {
+    setShowGuidedTour(false)
+    markGuestTourSeen()
+    setViewMode('day')
   }
 
   const guestTourInitial: GuestTourFamilyState = {
@@ -1541,6 +1565,7 @@ export default function MadbudgetPage() {
         body: JSON.stringify({
           mealPlanGrid: mealPlan,
           family: familyPayload,
+          dietaryApproachId: shoppingListDietId || undefined,
         }),
         signal: controller.signal,
       })
@@ -1888,6 +1913,25 @@ export default function MadbudgetPage() {
   }
 
   const slotKey = (d: DayKey, m: MealType) => `${d}_${m}`
+
+  const clearMealSlot = (dayKey: DayKey, mealKey: MealType) => {
+    const lk = slotKey(dayKey, mealKey)
+    setMealPlan((prev) => {
+      const next = { ...prev }
+      next[dayKey] = { ...prev[dayKey], [mealKey]: null }
+      return next
+    })
+    setShoppingListStale(true)
+    setSlotLocks((prev) => {
+      const n = { ...prev }
+      delete n[lk]
+      return n
+    })
+    if (recipeViewSlot?.dayKey === dayKey && recipeViewSlot?.mealKey === mealKey) {
+      setRecipeViewSlugOrId(null)
+      setRecipeViewSlot(null)
+    }
+  }
 
   const openRecipeSelector = (day: DayKey, meal: MealType) => {
     setSelectedMealSlot(`${day}-${meal}`)
@@ -2607,13 +2651,10 @@ export default function MadbudgetPage() {
         <GuestPageTour
           open={showGuidedTour && !showGuidedFamilyTour}
           steps={guestPageTourSteps}
-          onClose={() => {
-            setShowGuidedTour(false)
-            markGuestTourSeen()
-          }}
+          onClose={finishGuestPageTour}
           onDone={() => {
             setShowGuestBanner(false)
-            markGuestTourSeen()
+            finishGuestPageTour()
           }}
         />
       )}
@@ -2643,10 +2684,12 @@ export default function MadbudgetPage() {
                 <button
                   onClick={() => setViewMode(v => v === 'week' ? 'day' : 'week')}
                   className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
-                  title={viewMode === 'week' ? 'Skift til dagvisning' : 'Skift til ugevisning'}
+                  title={viewMode === 'week' ? 'Skift til dagsvisning' : 'Skift til ugevisning'}
                 >
                   {viewMode === 'week' ? <LayoutGrid size={18} /> : <Calendar size={18} />}
-                  <span className="hidden sm:inline">Skift visning</span>
+                  <span className="hidden sm:inline">
+                    {viewMode === 'week' ? 'Skift til dagsvisning' : 'Skift til ugevisning'}
+                  </span>
                 </button>
                 <button
                   data-tour="basisvarer"
@@ -2883,21 +2926,34 @@ export default function MadbudgetPage() {
                                           <mealType.icon size={28} />
                                         </div>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
-                                          if (slugOrId) {
-                                            setRecipeViewSlugOrId(String(slugOrId))
-                                            setRecipeViewSlot({ dayKey, mealKey })
-                                          }
-                                        }}
-                                        className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
-                                        aria-label="Se opskrift"
-                                      >
-                                        <Eye size={18} />
-                                      </button>
+                                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
+                                            if (slugOrId) {
+                                              setRecipeViewSlugOrId(String(slugOrId))
+                                              setRecipeViewSlot({ dayKey, mealKey })
+                                            }
+                                          }}
+                                          className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
+                                          aria-label="Se opskrift"
+                                        >
+                                          <Eye size={22} />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            clearMealSlot(dayKey, mealKey)
+                                          }}
+                                          className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
+                                          aria-label="Fjern ret"
+                                        >
+                                          <Trash2 size={18} />
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="px-3 pt-1.5 pb-0 flex flex-col gap-0.5 min-w-0 h-[5.75rem] flex-shrink-0">
                                       <div className="text-[11px] sm:text-xs font-medium text-gray-900 line-clamp-3 leading-tight">
@@ -3036,21 +3092,34 @@ export default function MadbudgetPage() {
                                           <mealType.icon size={22} className="sm:w-6 sm:h-6" />
                                         </div>
                                       )}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
-                                          if (slugOrId) {
-                                            setRecipeViewSlugOrId(String(slugOrId))
-                                            setRecipeViewSlot({ dayKey, mealKey })
-                                          }
-                                        }}
-                                        className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
-                                        aria-label="Se opskrift"
-                                      >
-                                        <Eye size={16} className="sm:w-[18px] sm:h-[18px]" />
-                                      </button>
+                                      <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 flex items-center gap-1 sm:gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
+                                            if (slugOrId) {
+                                              setRecipeViewSlugOrId(String(slugOrId))
+                                              setRecipeViewSlot({ dayKey, mealKey })
+                                            }
+                                          }}
+                                          className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
+                                          aria-label="Se opskrift"
+                                        >
+                                          <Eye size={20} className="sm:w-[22px] sm:h-[22px]" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            clearMealSlot(dayKey, mealKey)
+                                          }}
+                                          className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
+                                          aria-label="Fjern ret"
+                                        >
+                                          <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="px-2 sm:px-3 pt-1 sm:pt-1.5 pb-0 flex flex-col gap-0.5 min-w-0 h-[5.5rem] sm:h-[5.75rem] flex-shrink-0">
                                       <div className="text-[10px] sm:text-xs font-medium text-gray-900 line-clamp-3 leading-tight">
@@ -3335,21 +3404,34 @@ export default function MadbudgetPage() {
                               </div>
                             )}
                             {currentMeal && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
-                                  if (slugOrId) {
-                                    setRecipeViewSlugOrId(String(slugOrId))
-                                    setRecipeViewSlot({ dayKey, mealKey })
-                                  }
-                                }}
-                                className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 p-1.5 sm:p-2 rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
-                                aria-label="Se opskrift"
-                              >
-                                <Eye size={16} />
-                              </button>
+                              <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 z-10 flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
+                                    if (slugOrId) {
+                                      setRecipeViewSlugOrId(String(slugOrId))
+                                      setRecipeViewSlot({ dayKey, mealKey })
+                                    }
+                                  }}
+                                  className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
+                                  aria-label="Se opskrift"
+                                >
+                                  <Eye size={22} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    clearMealSlot(dayKey, mealKey)
+                                  }}
+                                  className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
+                                  aria-label="Fjern ret"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
                             )}
                           </div>
                           <div className="p-3 flex-1 min-w-0 flex flex-col justify-center sm:justify-start">
@@ -3889,7 +3971,7 @@ export default function MadbudgetPage() {
                           if (storePrices[storeKey]) {
                             // Find which items are basis by checking shopping list
                             const basisItemNames = new Set<string>()
-                            shoppingList.categories?.forEach((cat: any) => {
+                            displayShoppingList.categories?.forEach((cat: any) => {
                               cat.items?.forEach((item: any) => {
                                 if (item.isBasis) {
                                   basisItemNames.add(item.name?.toLowerCase().trim() || '')
@@ -4000,7 +4082,7 @@ export default function MadbudgetPage() {
                     <>
                       {/* Shopping list categories */}
                       {(() => {
-                        const mainCats = shoppingList.categories?.filter((c: any) => c.name !== 'Varer du måske allerede har') || []
+                        const mainCats = displayShoppingList.categories?.filter((c: any) => c.name !== 'Varer du måske allerede har') || []
                         return mainCats.map((category: any, catIndex: number) => (
                           <div key={catIndex} className={`border-b border-gray-200 pb-4 ${catIndex === mainCats.length - 1 ? 'border-b-0' : ''}`}>
                           <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
@@ -4040,6 +4122,11 @@ export default function MadbudgetPage() {
                                     )}
                                     {item.isOptional && (
                                       <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">Kombi</span>
+                                    )}
+                                    {item.notes === 'Til børn' && (
+                                      <span className="text-xs font-medium text-amber-900 bg-amber-50 px-2 py-0.5 rounded shrink-0">
+                                        Til børn
+                                      </span>
                                     )}
                                     <div className="flex-1 min-w-0">
                                       {productInfo ? (
@@ -4112,11 +4199,11 @@ export default function MadbudgetPage() {
                       })()}
                       
                       {/* Basis ingredients section - shown separately */}
-                      {shoppingList.categories?.find((cat: any) => cat.name === 'Varer du måske allerede har') && (
+                      {displayShoppingList.categories?.find((cat: any) => cat.name === 'Varer du måske allerede har') && (
                         <div className="border-t border-gray-200 pt-4 mt-6">
                           <h4 className="font-semibold text-gray-900 mb-3 text-lg">Varer du måske allerede har</h4>
                           <ul className="space-y-2">
-                            {shoppingList.categories
+                            {displayShoppingList.categories
                               ?.find((cat: any) => cat.name === 'Varer du måske allerede har')
                               ?.items?.map((item: any, itemIndex: number) => {
                                 const rowKey = `maybe-${itemIndex}-${item.name}`
@@ -4154,7 +4241,7 @@ export default function MadbudgetPage() {
                             <span className="text-blue-600">
                               {(() => {
                                 const basisItemNames = new Set<string>()
-                                shoppingList.categories?.forEach((cat: any) => {
+                                displayShoppingList.categories?.forEach((cat: any) => {
                                   cat.items?.forEach((item: any) => {
                                     if (item.isBasis) {
                                       basisItemNames.add(item.name?.toLowerCase().trim() || '')
@@ -4613,20 +4700,7 @@ export default function MadbudgetPage() {
                   type="button"
                   onClick={() => {
                     const { dayKey, mealKey } = recipeViewSlot
-                    const lk = slotKey(dayKey, mealKey)
-                    setMealPlan((prev) => {
-                      const next = { ...prev }
-                      next[dayKey] = { ...prev[dayKey], [mealKey]: null }
-                      return next
-                    })
-                    setShoppingListStale(true)
-                    setSlotLocks((prev) => {
-                      const n = { ...prev }
-                      delete n[lk]
-                      return n
-                    })
-                    setRecipeViewSlugOrId(null)
-                    setRecipeViewSlot(null)
+                    clearMealSlot(dayKey, mealKey)
                   }}
                   className="w-full py-2.5 px-4 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                 >

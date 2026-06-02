@@ -1,6 +1,7 @@
 // Export all meal plan system components
 export * from './types';
 export * from './people-per-meal';
+export * from './keto-shopping-list';
 export * from './generator';
 
 // Create a singleton instance of the generator
