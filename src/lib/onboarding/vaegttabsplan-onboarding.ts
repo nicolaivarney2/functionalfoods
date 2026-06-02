@@ -113,16 +113,18 @@ export function loadOnboardingData(): VaegttabsplanOnboardingData | null {
   try {
     const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as VaegttabsplanOnboardingData & { version?: number }
-    if (!parsed || (parsed.version !== 1 && parsed.version !== 2)) return null
-    const merged = {
+    type StoredOnboarding = Omit<Partial<VaegttabsplanOnboardingData>, 'version'> & { version?: number }
+    const parsed = JSON.parse(raw) as StoredOnboarding
+    const savedVersion = parsed.version
+    if (savedVersion != null && savedVersion !== 1 && savedVersion !== 2) return null
+    const merged: VaegttabsplanOnboardingData = {
       ...defaultOnboardingData(),
       ...parsed,
-      version: 2 as const,
+      version: 2,
       selectedStores: parsed.selectedStores ?? [1, 2],
       excludedFoods: parsed.excludedFoods ?? [],
     }
-    if (parsed.version === 1) {
+    if (savedVersion === 1) {
       merged.currentStep = migrateOnboardingStep(parsed.currentStep ?? 0, merged)
     }
     return merged

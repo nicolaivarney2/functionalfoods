@@ -76,14 +76,11 @@ async function main(): Promise<void> {
     // Need a where clause to delete; use a tautology
     query = query.gte('queued_at', '1970-01-01')
   }
-  const { error: delErr, count: deletedCount } = await query.select('*', {
-    count: 'exact',
-    head: true,
-  })
+  const { error: delErr } = await query
 
   if (delErr) throw new Error(delErr.message)
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
-  console.log(`✓ Deleted ${(deletedCount ?? targetCount).toLocaleString('da-DK')} rows in ${elapsed}s`)
+  console.log(`✓ Deleted ${targetCount.toLocaleString('da-DK')} rows in ${elapsed}s`)
 }
 
 main().catch((err) => {

@@ -637,7 +637,7 @@ export class MealPlanGenerator {
    * Antal personer (PE) der spiser et måltid – bruges til indkøbsliste, ikke ernærings-servings.
    */
   public resolvePeopleEatingForPlannerCell(
-    cell: Record<string, unknown>,
+    _cell: Record<string, unknown>,
     mealType: 'breakfast' | 'lunch' | 'dinner',
     family: {
       adults: number
@@ -770,7 +770,7 @@ export class MealPlanGenerator {
           ? this.resolvePeopleEatingForPlannerCell(c, mt, family)
           : Number(c.householdServings) > 0
             ? Number(c.householdServings)
-            : Math.max(1, family?.adults ?? 1);
+            : Math.max(1, Number(c.servings) || 1);
         meals.push({
           mealType: mt as MealType,
           recipe: this.normalizePlannerCellToRecipe(c),

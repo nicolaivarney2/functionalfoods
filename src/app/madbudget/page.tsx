@@ -99,6 +99,8 @@ interface PlannerRecipe {
   mealType?: 'breakfast' | 'lunch' | 'dinner'
   prepTime: string
   servings: number
+  /** Portioner i opskriften – bruges til indkøbsskalering. */
+  recipeServings?: number
   /** Antal der spiser måltidet (PE) – bruges til indkøbsliste, ikke opskriftens portioner. */
   householdServings?: number
   /** Ernærings-servings fra generatoren (kalorier) – må ikke bruges til indkøb. */
