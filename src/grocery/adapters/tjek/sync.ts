@@ -14,6 +14,7 @@
  */
 
 import { getGroceryServiceClient } from '../../db/client'
+import { sleepStaleOffersForChain } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
 import { TjekClient, TjekAutoPausedError, TjekDisabledError } from './client'
 import { mapTjekOfferToOffer, mapTjekOfferToProduct, resolveChain } from './mapper'
@@ -83,9 +84,12 @@ export interface TjekSyncResult {
 
 export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncResult> {
   const startedAt = Date.now()
+  const syncStartedAt = new Date(startedAt).toISOString()
   const dryRun = options.dryRun ?? false
   const includePrimary = options.includePrimary ?? false
   const collectPreview = options.collectPreview ?? false
+  const runRetention =
+    !dryRun && !options.maxOffers && !options.maxOffersPerDealer
 
   // Resolve target chains → dealer IDs.
   const requestedChains =
@@ -267,6 +271,25 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
       }
       // Per-chain flush so rows land grouped by chain.
       await flush(chain)
+      if (runRetention) {
+        try {
+          await sleepStaleOffersForChain(chain, syncStartedAt)
+        } catch (retentionErr) {
+          errorsCount++
+          const msg =
+            retentionErr instanceof Error
+              ? retentionErr.message
+              : String(retentionErr)
+          if (supabase && syncLogId) {
+            await supabase
+              .from('sync_logs')
+              .update({
+                error_message: `Retention(${chain}): ${msg}`.slice(0, 1000),
+              })
+              .eq('id', syncLogId)
+          }
+        }
+      }
       if (options.maxOffers && offersProcessed >= options.maxOffers) break
     }
   } catch (err) {

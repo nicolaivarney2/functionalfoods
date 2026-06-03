@@ -134,10 +134,36 @@ Sample size of a full nightly run (verified 27. May 2026): 11 dealers, 3,420 off
 
 Live preview / verification: `/dev/grocery-tjek-explorer?chain=lidl` (server-rendered, no DB writes).
 
-Tjek is part of the nightly cron orchestrator at `/api/grocery/sync/cron`
-(Vercel cron schedule `0 4 * * *` — 04:00 UTC daily). The orchestrator runs
-Salling chains → REMA → Tjek → price snapshot sequentially, with isolated
-try/catch per step so a Tjek failure cannot block REMA or vice versa.
+The nightly cron at `/api/grocery/sync/cron` runs on Vercel at `0 4 * * *`
+(04:00 UTC ≈ 05:00 Danish time). **Default = light scheduled sync** — only
+chains whose stores published new offers the **previous calendar day** (same
+weekly rhythm as Goma, but we sync the **morning after** so evening updates
+are included). Schedule lives in `src/lib/grocery/sync-schedule.ts`.
+
+| Cron day (DK) | Catches releases from | What runs |
+|---|---|---|
+| Wednesday | Tuesday | Tjek: ABC Lavpris |
+| Thursday | Wednesday | Tjek: 365discount |
+| Friday | Thursday | Føtex (Salling) + Tjek: MENY, SPAR, Kvickly, SuperBrugsen, Løvbjerg |
+| Saturday | Friday | Netto + Bilka (Salling) + Tjek: Brugsen |
+| Sunday | Saturday | REMA 1000 + Tjek: Lidl |
+| Monday | Sunday | Tjek: Nemlig |
+| Tuesday | — | Skipped (no HTTP work) |
+
+Manual overrides: `?full=true` (all chains, like the old nightly job),
+`?only=netto,rema-1000` (explicit subset). Price snapshot runs only on days
+that actually synced at least one chain.
+
+### Catalog retention (Planomo sticky matches)
+
+Sync is **upsert-only** — rows are never deleted because a tilbud ended.
+See `docs/FF_HANDOFF_FOODDATA_INGREDIENT_MATCHING.md` §11 and
+`src/grocery/sync/catalog-retention.ts`:
+
+- Udløbet tilbud → `in_stock=false`, `is_on_sale=false`, pris bevares
+- Efter fuld REMA/Salling-sync: varer der forsvandt fra API → `products.active=false`
+- Efter Tjek-sync per kæde: tilbud ikke rørt i run → `in_stock=false`
+- `/dagligvarer` (main Supabase) er uændret
 
 ### Chain coverage (single source of truth)
 

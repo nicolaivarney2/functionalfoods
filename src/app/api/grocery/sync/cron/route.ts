@@ -1,8 +1,9 @@
 /**
  * Daily orchestrator for the grocery service.
  *
- * Hit by Vercel Cron (see vercel.json) once per day. Can also be triggered
- * manually with the GROCERY_SYNC_SECRET for ad-hoc runs.
+ * Hit by Vercel Cron (see vercel.json) at 04:00 UTC (~05:00 DK). Default:
+ * kun de kæder der fik nye tilbud **dagen før** (se sync-schedule.ts).
+ * Manuel fuld sync: `?full=true`. Eksplicit subset: `?only=netto,rema-1000`.
  *
  * Behavior:
  *   1. Sync each chain sequentially with isolated try/catch (a failure in
@@ -11,10 +12,8 @@
  *      "price chart" feature has daily granularity.
  *   3. Return a summary of every step.
  *
- * Timeouts: a full run is ~150-180s (Netto + Føtex + Bilka + REMA). We cap
+ * Timeouts: a scheduled day is typically ~30-90s; full run ~150-180s. We cap
  * maxDuration at 300s — Vercel's current ceiling for non-Enterprise plans.
- * If a future run consistently flirts with the limit, split the chains into
- * separate cron entries (vercel.json) instead of bumping the timeout.
  */
 
 import { NextResponse } from 'next/server'
@@ -24,6 +23,12 @@ import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 import { syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
+import type { SourceChain } from '@/grocery/types'
+import {
+  getScheduledSyncForNow,
+  scheduledStepIds,
+  type ScheduledGrocerySync,
+} from '@/lib/grocery/sync-schedule'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -41,6 +46,15 @@ interface CronSummary {
   totalDurationMs: number
   totalErrors: number
   steps: StepResult[]
+  mode: 'scheduled' | 'full' | 'manual-only'
+  schedule?: {
+    labelDa: string
+    releaseNoteDa: string
+    plannedSteps: string[]
+    tjekChains?: SourceChain[]
+  }
+  skipped?: boolean
+  skipReason?: string
 }
 
 function isAuthorized(request: Request): boolean {
@@ -99,8 +113,47 @@ async function handle(request: Request) {
   const url = new URL(request.url)
   const skipSnapshot = url.searchParams.get('skipSnapshot') === 'true'
   const onlyParam = url.searchParams.get('only') // e.g. "netto,rema-1000"
-  const only = onlyParam ? new Set(onlyParam.split(',').map((s) => s.trim())) : null
+  const fullSync = url.searchParams.get('full') === 'true'
+
+  let mode: CronSummary['mode'] = 'scheduled'
+  let schedule: ScheduledGrocerySync | null = null
+
+  if (onlyParam) {
+    mode = 'manual-only'
+  } else if (fullSync) {
+    mode = 'full'
+  } else {
+    schedule = getScheduledSyncForNow()
+    if (!schedule) {
+      const completedAt = new Date()
+      const summary: CronSummary = {
+        startedAt: startedAt.toISOString(),
+        completedAt: completedAt.toISOString(),
+        totalDurationMs: completedAt.getTime() - startedAt.getTime(),
+        totalErrors: 0,
+        steps: [],
+        mode: 'scheduled',
+        skipped: true,
+        skipReason:
+          'Ingen kæder planlagt i dag (tirsdag er hviledag — sync kører ons–man).',
+      }
+      return NextResponse.json(summary, { status: 200 })
+    }
+  }
+
+  const only = onlyParam
+    ? new Set(onlyParam.split(',').map((s) => s.trim()))
+    : mode === 'full'
+      ? null
+      : schedule
+        ? new Set(scheduledStepIds(schedule))
+        : null
+
   const shouldRun = (id: string) => !only || only.has(id)
+  const tjekChains =
+    mode === 'scheduled' && schedule && schedule.tjekChains.length > 0
+      ? schedule.tjekChains
+      : undefined
 
   if (shouldRun('netto')) {
     steps.push(
@@ -141,13 +194,17 @@ async function handle(request: Request) {
   if (shouldRun('tjek')) {
     steps.push(
       await runStep('tjek', async () => ({
-        ...(await syncTjek()),
+        ...(await syncTjek(
+          tjekChains ? { chains: tjekChains } : undefined,
+        )),
         step: 'tjek',
       })),
     )
   }
 
-  if (!skipSnapshot) {
+  const ranProductSync = steps.some((s) => s.step !== 'snapshot')
+
+  if (!skipSnapshot && ranProductSync) {
     steps.push(
       await runStep('snapshot', async () => {
         const t0 = Date.now()
@@ -173,6 +230,19 @@ async function handle(request: Request) {
     totalDurationMs: completedAt.getTime() - startedAt.getTime(),
     totalErrors,
     steps,
+    mode,
+    ...(schedule
+      ? {
+          schedule: {
+            labelDa: schedule.labelDa,
+            releaseNoteDa: schedule.releaseNoteDa,
+            plannedSteps: scheduledStepIds(schedule),
+            ...(schedule.tjekChains.length > 0
+              ? { tjekChains: schedule.tjekChains }
+              : {}),
+          },
+        }
+      : {}),
   }
 
   return NextResponse.json(summary, {

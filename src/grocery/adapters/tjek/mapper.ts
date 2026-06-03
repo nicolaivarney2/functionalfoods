@@ -7,8 +7,7 @@
  * a "product" in Tjek's world is really an "offer event"; the same physical
  * item across two weeks appears as two rows with two source_ids. That keeps
  * upsert semantics simple — when the offer expires (run_till < now), the
- * is_on_sale flag flips false on the offer row but the product stays around
- * until cleaned up.
+ * offer row is kept with in_stock=false (price preserved for Planomo).
  *
  * Image policy: we deliberately do NOT populate `image_url` on the product
  * row. Tjek's image-transformer-api.tjek.com URLs would otherwise be
@@ -19,6 +18,7 @@
  */
 
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
+import { isPromoOfferExpired } from '../../sync/catalog-retention'
 import { TJEK_DEALER_TO_CHAIN, type TjekOffer } from './types'
 
 const SYNC_SOURCE = 'tjek:offers' as const
@@ -116,7 +116,10 @@ export function mapTjekOfferToProduct(offer: TjekOffer): ProductInsert | null {
 /**
  * Map a Tjek offer to an offer row. Returns null when:
  *   - dealer isn't whitelisted (defensive — caller usually skipped already)
- *   - the offer has expired (run_till < now)
+ *   - no usable price
+ *
+ * Expired offers (run_till < now) are still upserted with in_stock=false so
+ * Planomo can keep last_known_price without re-matching every week.
  *
  * Tjek doesn't give us "regular price" explicitly: `pricing.pre_price` is the
  * leaflet's striked-through price. If absent, we treat the offer as
@@ -131,13 +134,10 @@ export function mapTjekOfferToOffer(
   const chain = resolveChain(offer.dealer_id)
   if (!chain) return null
 
-  const now = Date.now()
-  const until = Date.parse(offer.run_till)
-  if (Number.isFinite(until) && until < now) return null
-
   const priceCents = toCents(offer.pricing.price)
   if (priceCents == null) return null
 
+  const expired = isPromoOfferExpired(offer.run_till)
   const beforeCents = toCents(offer.pricing.pre_price)
   const pct = discountPct(priceCents, beforeCents)
 
@@ -148,13 +148,13 @@ export function mapTjekOfferToOffer(
     before_price_cents: beforeCents,
     unit_price_cents: null, // Tjek puts kg/liter price in description text, not structured
     unit_price_unit: null,
-    is_on_sale: true,
+    is_on_sale: !expired,
     offer_from: offer.run_from,
     offer_until: offer.run_till,
     offer_description: offer.description?.trim() || null,
     multibuy: null,
     discount_percentage: pct,
-    in_stock: true, // Tjek doesn't expose stock; assume in-stock during run window
+    in_stock: !expired,
     source: SYNC_SOURCE,
     source_synced_at: new Date().toISOString(),
     raw_data: {

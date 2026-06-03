@@ -1,8 +1,15 @@
 import { getGroceryServiceClient } from '../../db/client'
-import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
+import { applyCatalogRetentionAfterFullSync } from '../../sync/catalog-retention'
+import type { ProductInsert, ProductOfferInsert, SyncLogInsert, SourceChain } from '../../types'
 import { iterateAllProducts } from './client'
 import { mapHitToChainOffer, mapHitToProduct } from './mapper'
 import type { SallingAlgoliaHit, SallingChain } from './types'
+
+const CHAIN_TO_SOURCE: Record<SallingChain, SourceChain> = {
+  netto: 'netto',
+  bilka: 'bilka',
+  foetex: 'foetex',
+}
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
@@ -38,7 +45,9 @@ export async function syncSallingChain(
 ): Promise<SyncResult> {
   const source = `salling-algolia:${chain}` as const
   const startedAt = Date.now()
+  const syncStartedAt = new Date(startedAt).toISOString()
   const supabase = options.dryRun ? null : getGroceryServiceClient()
+  const runRetention = !options.dryRun && !options.maxProducts
 
   let syncLogId: string | undefined
   if (supabase) {
@@ -188,6 +197,26 @@ export async function syncSallingChain(
   }
 
   const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
+
+  if (runRetention && status !== 'failed') {
+    try {
+      await applyCatalogRetentionAfterFullSync(CHAIN_TO_SOURCE[chain], syncStartedAt, {
+        deactivateMissingProducts: true,
+      })
+    } catch (retentionErr) {
+      errorsCount++
+      const msg =
+        retentionErr instanceof Error ? retentionErr.message : String(retentionErr)
+      if (supabase && syncLogId) {
+        await supabase
+          .from('sync_logs')
+          .update({
+            error_message: `Retention: ${msg}`.slice(0, 1000),
+          })
+          .eq('id', syncLogId)
+      }
+    }
+  }
 
   if (supabase && syncLogId) {
     await supabase

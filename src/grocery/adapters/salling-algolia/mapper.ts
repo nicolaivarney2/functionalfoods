@@ -1,4 +1,5 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
+import { isPromoOfferExpired } from '../../sync/catalog-retention'
 import { pickRepresentativeStore } from './pricing'
 import type { SallingAlgoliaHit, SallingChain } from './types'
 
@@ -153,6 +154,11 @@ export function mapHitToChainOffer(
     )
   }
 
+  const offerUntil = hit.cpOfferToDate ? toIsoOrNull(hit.cpOfferToDate) : null
+  const promoExpired = isOnSale && isPromoOfferExpired(offerUntil)
+  const catalogAvailable =
+    price > 0 && (rep?.data.inStock ?? true) !== false
+
   return {
     product_id: productId,
     store_id: CHAIN_TO_SOURCE[chain],
@@ -164,16 +170,16 @@ export function mapHitToChainOffer(
         : null,
     unit_price_unit:
       rep?.data.unitsOfMeasurePriceUnit || hit.unitOfMeasurePriceUnits || null,
-    is_on_sale: isOnSale,
+    is_on_sale: isOnSale && !promoExpired,
     offer_from: hit.cpOfferFromDate ? toIsoOrNull(hit.cpOfferFromDate) : null,
-    offer_until: hit.cpOfferToDate ? toIsoOrNull(hit.cpOfferToDate) : null,
+    offer_until: offerUntil,
     offer_description: hit.cpOfferTitle || rep?.data.offerDescription || null,
     multibuy:
       rep?.data.multipromo && rep.data.multipromo > 0
         ? `${rep.data.multipromo} for ${(Math.round(rep.data.multiPromoPrice) / 100).toFixed(2)} kr`
         : null,
     discount_percentage: discountPct,
-    in_stock: rep?.data.inStock ?? true,
+    in_stock: catalogAvailable && !promoExpired,
     source: `salling-algolia:${chain}`,
     source_synced_at: new Date().toISOString(),
     raw_data: rep

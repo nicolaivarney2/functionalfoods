@@ -1,4 +1,5 @@
 import type { ProductInsert, ProductOfferInsert } from '../../types'
+import { isPromoOfferExpired } from '../../sync/catalog-retention'
 import type { RemaDepartment, RemaPrice, RemaProduct } from './types'
 
 const SOURCE = 'rema-1000' as const
@@ -189,6 +190,9 @@ export function mapRemaOffer(
   const { current, priceCents, beforePriceCents, isOnSale, discountPct } =
     pricing
 
+  const offerUntil = isOnSale ? current.ending_at : null
+  const promoExpired = isOnSale && isPromoOfferExpired(offerUntil)
+
   return {
     product_id: productId,
     store_id: SOURCE,
@@ -196,16 +200,16 @@ export function mapRemaOffer(
     before_price_cents: beforePriceCents,
     unit_price_cents: toCents(current.compare_unit_price),
     unit_price_unit: current.compare_unit ?? null,
-    is_on_sale: isOnSale,
+    is_on_sale: isOnSale && !promoExpired,
     offer_from: isOnSale ? current.starting_at : null,
-    offer_until: isOnSale ? current.ending_at : null,
+    offer_until: offerUntil,
     offer_description: null,
     multibuy:
       current.max_quantity && current.price_over_max_quantity
         ? `Maks ${current.max_quantity} stk pr. kunde — derover ${(current.price_over_max_quantity).toFixed(2)} kr`
         : null,
     discount_percentage: discountPct,
-    in_stock: isRemaProductInStock(product),
+    in_stock: isRemaProductInStock(product) && !promoExpired,
     source: 'rema-1000-api',
     source_synced_at: new Date().toISOString(),
     raw_data: {

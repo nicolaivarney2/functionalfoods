@@ -1,4 +1,5 @@
 import { getGroceryServiceClient } from '../../db/client'
+import { applyCatalogRetentionAfterFullSync } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
 import { iterateAllRemaProducts } from './client'
 import { mapRemaOffer, mapRemaProduct } from './mapper'
@@ -30,7 +31,9 @@ export async function syncRema1000(
   options: RemaSyncOptions = {},
 ): Promise<RemaSyncResult> {
   const startedAt = Date.now()
+  const syncStartedAt = new Date(startedAt).toISOString()
   const supabase = options.dryRun ? null : getGroceryServiceClient()
+  const runRetention = !options.dryRun && !options.maxProducts
 
   let syncLogId: string | undefined
   if (supabase) {
@@ -165,11 +168,32 @@ export async function syncRema1000(
   }
 
   const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
+
+  if (runRetention && status !== 'failed') {
+    try {
+      await applyCatalogRetentionAfterFullSync('rema-1000', syncStartedAt, {
+        deactivateMissingProducts: true,
+      })
+    } catch (retentionErr) {
+      errorsCount++
+      const msg =
+        retentionErr instanceof Error ? retentionErr.message : String(retentionErr)
+      if (supabase && syncLogId) {
+        await supabase
+          .from('sync_logs')
+          .update({
+            error_message: `Retention: ${msg}`.slice(0, 1000),
+          })
+          .eq('id', syncLogId)
+      }
+    }
+  }
+
   if (supabase && syncLogId) {
     await supabase
       .from('sync_logs')
       .update({
-        status,
+        status: errorsCount === 0 ? status : 'partial',
         completed_at: new Date().toISOString(),
         duration_ms: Date.now() - startedAt,
         products_processed: productsProcessed,
