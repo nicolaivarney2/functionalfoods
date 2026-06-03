@@ -97,6 +97,20 @@ export interface RemaOfferPricing {
   discountPct: number | null
 }
 
+/**
+ * Katalog: varen findes i REMA API med navn + pris.
+ * Adskilt fra butiks-dækning (is_available_in_all_stores).
+ */
+export function isRemaProductCatalogActive(product: RemaProduct): boolean {
+  if (!product.name?.trim()) return false
+  return resolveRemaOfferPricing(product.prices) !== null
+}
+
+/** Kan købes i alle butikker ifølge REMA — bruges kun til in_stock på tilbud. */
+export function isRemaProductInStock(product: RemaProduct): boolean {
+  return product.is_available_in_all_stores !== false
+}
+
 export function resolveRemaOfferPricing(
   prices: RemaPrice[] | undefined,
 ): RemaOfferPricing | null {
@@ -149,13 +163,14 @@ export function mapRemaProduct(
     category_lvl2: null,
     source_chain: SOURCE,
     source_id: sourceId,
-    active: Boolean(product.name && product.is_available_in_all_stores !== false),
+    active: isRemaProductCatalogActive(product),
     last_seen_at: new Date().toISOString(),
     raw_data: {
       underline: product.underline,
       temperature_zone: product.temperature_zone,
       is_weight_item: product.is_weight_item,
       labels: product.labels,
+      is_available_in_all_stores: product.is_available_in_all_stores,
     } satisfies Record<string, unknown>,
   }
 }
@@ -186,11 +201,12 @@ export function mapRemaOffer(
         ? `Maks ${current.max_quantity} stk pr. kunde — derover ${(current.price_over_max_quantity).toFixed(2)} kr`
         : null,
     discount_percentage: discountPct,
-    in_stock: true,
+    in_stock: isRemaProductInStock(product),
     source: 'rema-1000-api',
     source_synced_at: new Date().toISOString(),
     raw_data: {
       prices: product.prices,
+      is_available_in_all_stores: product.is_available_in_all_stores,
     } satisfies Record<string, unknown>,
   }
 }
