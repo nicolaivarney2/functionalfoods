@@ -106,9 +106,13 @@ export function isRemaProductCatalogActive(product: RemaProduct): boolean {
   return resolveRemaOfferPricing(product.prices) !== null
 }
 
-/** Kan købes i alle butikker ifølge REMA — bruges kun til in_stock på tilbud. */
+/**
+ * Tilgængelig i katalog/søgning (→ Planomo is_available).
+ * REMA's is_available_in_all_stores betyder "ikke i alle butikker", ikke "udgået" —
+ * gemmes kun i raw_data.
+ */
 export function isRemaProductInStock(product: RemaProduct): boolean {
-  return product.is_available_in_all_stores !== false
+  return isRemaProductCatalogActive(product)
 }
 
 export function resolveRemaOfferPricing(
