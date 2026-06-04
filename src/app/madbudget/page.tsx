@@ -1061,6 +1061,7 @@ export default function MadbudgetPage() {
     const pe = computeFamilyPersonEquivalent(family.adults, family.childrenAges)
 
     const scaledList = {
+      weekNumber: 1,
       categories: GUEST_DEMO_SHOPPING_LIST.categories.map((cat) => ({
         name: cat.name,
         items: cat.items.map((it) => ({

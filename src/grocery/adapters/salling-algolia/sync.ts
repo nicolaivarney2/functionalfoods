@@ -198,7 +198,7 @@ export async function syncSallingChain(
 
   const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
 
-  if (runRetention && status !== 'failed') {
+  if (runRetention) {
     try {
       await applyCatalogRetentionAfterFullSync(CHAIN_TO_SOURCE[chain], syncStartedAt, {
         deactivateMissingProducts: true,

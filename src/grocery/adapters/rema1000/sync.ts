@@ -169,7 +169,7 @@ export async function syncRema1000(
 
   const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
 
-  if (runRetention && status !== 'failed') {
+  if (runRetention) {
     try {
       await applyCatalogRetentionAfterFullSync('rema-1000', syncStartedAt, {
         deactivateMissingProducts: true,
