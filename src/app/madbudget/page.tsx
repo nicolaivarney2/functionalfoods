@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -454,6 +454,7 @@ export default function MadbudgetPage() {
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
   const [showFamilySettings, setShowFamilySettings] = useState(false)
+  const [savingFamilySettings, setSavingFamilySettings] = useState(false)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
 
   const guestPageTourSteps = useMemo((): GuestPageTourStep[] => {
@@ -2176,6 +2177,49 @@ export default function MadbudgetPage() {
     }
     setWeightLossProfileStep(0)
     setShowWeightLossProfileModal(true)
+  }
+
+  const saveFamilySettings = async () => {
+    if (savingFamilySettings) return
+    setSavingFamilySettings(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setShowFamilySettings(false)
+        return
+      }
+      const response = await fetch('/api/madbudget/family-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          familyProfile: {
+            adults: familyProfile.adults,
+            children: familyProfile.children,
+            childrenAges: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
+            prioritizeOrganic: familyProfile.prioritizeOrganic,
+            prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+            excludedIngredients: familyProfile.excludedIngredients,
+            selectedStores: familyProfile.selectedStores,
+            variationLevel,
+          },
+          adultProfiles: familyProfile.adultsProfiles,
+        }),
+      })
+      if (response.ok) {
+        setShowFamilySettings(false)
+        if (shoppingList) setShoppingListStale(true)
+      } else {
+        alert('Der opstod en fejl ved gemning. Prøv igen.')
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Der opstod en fejl ved gemning. Prøv igen.')
+    } finally {
+      setSavingFamilySettings(false)
+    }
   }
 
   // Save weight loss profile
@@ -4957,16 +5001,26 @@ export default function MadbudgetPage() {
       {showFamilySettings && !isGuest && (
         <div
           className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-          onClick={() => setShowFamilySettings(false)}
+          onClick={() => { if (!savingFamilySettings) setShowFamilySettings(false) }}
           role="presentation"
         >
           <div
-            className="flex max-h-[min(92vh,900px)] w-full max-w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl"
+            className="relative flex max-h-[min(92vh,900px)] w-full max-w-full flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:max-w-2xl sm:rounded-2xl lg:max-w-3xl"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="family-settings-title"
+            aria-busy={savingFamilySettings}
           >
+            {savingFamilySettings && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/85 backdrop-blur-[2px]">
+                <div className="mx-4 max-w-xs rounded-xl border border-gray-200 bg-white px-6 py-5 text-center shadow-lg">
+                  <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" aria-hidden />
+                  <p className="mt-3 text-sm font-medium text-gray-900">Vi gemmer indstillingerne</p>
+                  <p className="mt-1 text-xs text-gray-500">Tager et øjeblik…</p>
+                </div>
+              </div>
+            )}
             <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-gray-100 bg-white px-4 py-3 sm:px-6 sm:py-4">
               <h3 id="family-settings-title" className="pr-2 text-lg font-semibold text-gray-900">
                 Familieindstillinger
@@ -4974,8 +5028,9 @@ export default function MadbudgetPage() {
               <button
                 type="button"
                 aria-label="Luk"
+                disabled={savingFamilySettings}
                 onClick={() => setShowFamilySettings(false)}
-                className="touch-manipulation -m-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                className="touch-manipulation -m-2 flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <X size={24} strokeWidth={2} />
               </button>
@@ -5314,39 +5369,18 @@ export default function MadbudgetPage() {
             <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:bg-white sm:px-6">
               <button
                 type="button"
-                onClick={async () => {
-                  try {
-                    const { data: { session } } = await supabase.auth.getSession()
-                    if (!session) { setShowFamilySettings(false); return }
-                    const response = await fetch('/api/madbudget/family-profile', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                      body: JSON.stringify({
-                        familyProfile: {
-                          adults: familyProfile.adults,
-                          children: familyProfile.children,
-                          childrenAges: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
-                          prioritizeOrganic: familyProfile.prioritizeOrganic,
-                          prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
-                          excludedIngredients: familyProfile.excludedIngredients,
-                          selectedStores: familyProfile.selectedStores,
-                          variationLevel,
-                        },
-                        adultProfiles: familyProfile.adultsProfiles
-                      })
-                    })
-                    if (response.ok) {
-                      setShowFamilySettings(false)
-                      if (shoppingList) setShoppingListStale(true)
-                    } else alert('Der opstod en fejl ved gemning. Prøv igen.')
-                  } catch (e) {
-                    console.error(e)
-                    alert('Der opstod en fejl ved gemning. Prøv igen.')
-                  }
-                }}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors"
+                disabled={savingFamilySettings}
+                onClick={saveFamilySettings}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 px-4 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Gem indstillinger
+                {savingFamilySettings ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Gemmer…
+                  </>
+                ) : (
+                  'Gem indstillinger'
+                )}
               </button>
             </div>
           </div>
