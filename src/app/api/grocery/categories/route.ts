@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
  * product counts per node. Cached for 10 minutes.
  */
 export async function GET(request: NextRequest) {
-  const unauthorized = requireApiKey(request)
+  const unauthorized = await requireApiKey(request)
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)

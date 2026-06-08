@@ -17,7 +17,7 @@ const DEFAULT_LIMIT = 50
  * Same filter shape as /products but the on-sale predicate is mandatory.
  */
 export async function GET(request: NextRequest) {
-  const unauthorized = requireApiKey(request)
+  const unauthorized = await requireApiKey(request)
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)

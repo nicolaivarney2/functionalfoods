@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
 import RecipeSearchModal from './RecipeSearchModal'
+import { FUNKTIONER, FUNKTION_OVERVIEW_ORDER } from '@/content/funktioner-landing'
 
 const desktopMainMenuItems = [
   { name: 'OPSKRIFTER', href: '/opskriftsoversigt' },
@@ -17,11 +18,20 @@ const desktopMainMenuItems = [
 
 const moreMenuItems = [
   { name: 'DAGLIGVARER', href: '/dagligvarer' },
-  { name: 'FUNKTIONER', href: '/funktioner' },
   { name: 'OM OS', href: '/bag-om-ff' },
 ]
 
-const mobileMainMenuItems = [...desktopMainMenuItems, ...moreMenuItems]
+const funktionMenuItems = FUNKTION_OVERVIEW_ORDER.map((slug) => ({
+  name: FUNKTIONER[slug].shortTitle,
+  href: `/funktioner/${slug}`,
+}))
+
+const mobileMainMenuItems = [
+  ...desktopMainMenuItems,
+  ...moreMenuItems,
+  { name: 'ALLE FUNKTIONER', href: '/funktioner' },
+  ...funktionMenuItems.map((item) => ({ name: item.name.toUpperCase(), href: item.href })),
+]
 
 const dietaryCategories = [
   { name: 'KETO', href: '/keto' },
@@ -117,9 +127,44 @@ export default function Header() {
                   {isMoreMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute left-1/2 top-full z-50 mt-2 w-52 -translate-x-1/2 rounded-lg border border-gray-200 bg-white py-2 shadow-lg"
+                      className="absolute left-1/2 top-full z-50 mt-2 w-64 -translate-x-1/2 rounded-lg border border-gray-200 bg-white py-2 shadow-lg max-h-[min(70vh,28rem)] overflow-y-auto"
                     >
-                      {moreMenuItems.map((item) => (
+                      {moreMenuItems.slice(0, 1).map((item) => (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          role="menuitem"
+                          className="block px-4 py-2.5 text-[13px] font-medium tracking-wide text-gray-900 transition-colors hover:bg-gray-50"
+                          onClick={() => setIsMoreMenuOpen(false)}
+                        >
+                          {item.name}
+                        </Link>
+                      ))}
+                      <div className="my-1 border-t border-gray-100" role="separator" />
+                      <p className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                        Funktioner
+                      </p>
+                      <Link
+                        href="/funktioner"
+                        role="menuitem"
+                        className="block px-4 py-2 text-[13px] font-medium text-emerald-700 transition-colors hover:bg-gray-50"
+                        onClick={() => setIsMoreMenuOpen(false)}
+                      >
+                        Alle funktioner
+                      </Link>
+                      {funktionMenuItems.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          role="menuitem"
+                          className="block px-4 py-2 text-[13px] text-gray-700 transition-colors hover:bg-gray-50"
+                          onClick={() => setIsMoreMenuOpen(false)}
+                        >
+                          {item.name}
+                        </Link>
+                      ))}
+                      <div className="my-1 border-t border-gray-100" role="separator" />
+                      {moreMenuItems.slice(1).map((item) => (
                         <Link
                           key={item.name}
                           href={item.href}

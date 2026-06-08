@@ -25,7 +25,7 @@ const ALLOWED_ORDER = new Set(['name', 'price_asc', 'price_desc', 'recent'])
  *   orderBy       — name | price_asc | price_desc | recent
  */
 export async function GET(request: NextRequest) {
-  const unauthorized = requireApiKey(request)
+  const unauthorized = await requireApiKey(request)
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)

@@ -50,3 +50,54 @@ export interface GroceryCategoryNode {
   productCount: number
   children?: GroceryCategoryNode[]
 }
+
+export interface GroceryStoreDto {
+  id: string
+  name: string
+  type: string
+  coverage: 'full' | 'offers-only' | 'none'
+  coverageLabel: string
+}
+
+export type CurationSource = 'planomo' | 'ff'
+
+export interface CurationMatchDto {
+  productExternalId: string
+  ingredientId: string
+  confidence: number
+  isManual: boolean
+  matchType: string
+  productNameSnapshot: string | null
+  productStoreSnapshot: string | null
+  lastKnownPrice: number | null
+  source: CurationSource
+  syncedAt: string
+}
+
+export interface CurationQueueItemDto {
+  productId: string
+  storeProductId: string
+  storeId: string
+  productNameSnapshot: string | null
+  status: 'pending' | 'matched' | 'dismissed'
+  queuedAt: string
+  resolvedAt: string | null
+  source: CurationSource
+  syncedAt: string
+}
+
+export interface CurationIngredientTagsDto {
+  ingredientId: string
+  foodExclusions: string[]
+  source: CurationSource
+  syncedAt: string
+  updatedAt: string
+}
+
+export interface CurationOrganicTagsDto {
+  productExternalId: string
+  organicTags: string[]
+  source: CurationSource
+  syncedAt: string
+  updatedAt: string
+}

@@ -32,13 +32,21 @@ src/grocery/
 ├── types/index.ts                      Shared DB row types
 └── README.md
 
-src/app/api/grocery/                    Consumer-facing HTTP endpoints
+src/app/api/grocery/                    Consumer-facing HTTP endpoints (Fooddata API)
+├── route.ts                            GET    API discovery
+├── stores/route.ts                     GET    chains + coverage
 ├── products/route.ts                   GET    list with filters
 ├── products/[id]/route.ts              GET    single by uuid or GTIN
 ├── search/route.ts                     GET    name/GTIN search
 ├── offers/route.ts                     GET    only on-sale items
 ├── categories/route.ts                 GET    3-level category tree
+├── curation/matches/route.ts           GET    ingredient↔product matches
+├── curation/queue/route.ts             GET    match queue
+├── curation/ingredient-tags/route.ts   GET    dietary exclusion tags
+├── curation/organic-tags/route.ts      GET    organic product tags
 └── sync/salling/route.ts               POST   trigger sync
+
+docs/FOODDATA_API.md                    External API documentation
 
 src/lib/grocery-client.ts               Type-safe client for app code
 scripts/grocery-*.ts                    CLI utilities

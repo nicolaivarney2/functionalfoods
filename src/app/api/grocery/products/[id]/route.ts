@@ -17,7 +17,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const unauthorized = requireApiKey(request)
+  const unauthorized = await requireApiKey(request)
   if (unauthorized) return unauthorized
 
   const { id } = await context.params

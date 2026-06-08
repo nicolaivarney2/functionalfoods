@@ -20,7 +20,7 @@ const MAX_LIMIT = 100
  * Uses pg_trgm GIN index on `products.name` for fast partial matching.
  */
 export async function GET(request: NextRequest) {
-  const unauthorized = requireApiKey(request)
+  const unauthorized = await requireApiKey(request)
   if (unauthorized) return unauthorized
 
   const { searchParams } = new URL(request.url)
