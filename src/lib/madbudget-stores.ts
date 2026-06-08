@@ -1,3 +1,6 @@
+/** Tilbuds-only kæder uden fuldt katalog — får vejledende priser fra reference-butikker. */
+export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set(['meny', 'spar', 'løvbjerg'])
+
 /** Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores) */
 export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 1, name: 'REMA 1000' },

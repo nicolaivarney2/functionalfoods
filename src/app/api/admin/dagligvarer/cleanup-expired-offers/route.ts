@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
+import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function POST() {
+  if (!isGomaImportEnabled()) {
+    return NextResponse.json(
+      { success: false, sunset: true, error: GOMA_SUNSET_MESSAGE },
+      { status: 410 },
+    )
+  }
+
   try {
     const result = await cleanupExpiredOffers()
 

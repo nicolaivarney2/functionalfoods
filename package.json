@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "prepare": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit .githooks/post-merge .githooks/post-checkout 2>/dev/null || true",
-    "env:pull": "npx vercel env pull .env.local --environment=production --yes && node scripts/merge-env-override.js && chmod 600 .env.local",
+    "env:pull": "node scripts/env-pull-safe.js",
     "env:check": "node scripts/check-env-local.js",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
@@ -15,7 +15,16 @@
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch",
-    "fooddata:create-api-key": "npx tsx scripts/grocery-create-api-key.ts"
+    "fooddata:verify-uuid": "npx tsx scripts/verify-ingredient-uuid-overlap.ts",
+    "fooddata:pull-curation": "npx tsx scripts/sync-fooddata-curation-to-ff.ts --pull-queue",
+    "fooddata:sync-publish": "npx tsx scripts/sync-ff-to-fooddata.ts",
+    "fooddata:sync-publish:dry-run": "npx tsx scripts/sync-ff-to-fooddata.ts --dry-run",
+    "fooddata:import": "npx tsx scripts/import-fooddata-to-ff.ts",
+    "fooddata:import:curation-only": "npx tsx scripts/import-fooddata-to-ff.ts --curation-only",
+    "fooddata:weekly-curation": "npx tsx scripts/fooddata-weekly-curation.ts --app=ff",
+    "fooddata:create-api-key": "npx tsx scripts/grocery-create-api-key.ts",
+    "oko:scan-products": "npx tsx scripts/oko-scan-products.ts",
+    "oko:scan-products:execute": "npx tsx scripts/oko-scan-products.ts --execute"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",

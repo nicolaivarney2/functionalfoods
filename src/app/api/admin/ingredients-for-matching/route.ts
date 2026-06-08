@@ -20,6 +20,8 @@ export async function GET(request: NextRequest) {
       id,
       name,
       category,
+      description,
+      exclusions,
       is_basis,
       grams_per_unit
     `

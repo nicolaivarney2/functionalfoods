@@ -41,6 +41,12 @@ import {
 import { FF_GUEST_TOUR_STEPS, FF_GUEST_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-guest-tour-steps'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
+import {
+  GUIDE_PRICES_STORAGE_KEY,
+  resolveProductForDisplay,
+  storeNeedsGuidePrices,
+  stripGuidePricesFromStoreMap,
+} from '@/lib/madbudget/guide-prices'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -131,6 +137,97 @@ const STORE_KEY_BY_ID: Record<number, string> = {
 function storeIdFromTabKey(tab: string): number | null {
   const found = Object.entries(STORE_KEY_BY_ID).find(([, k]) => k === tab)
   return found ? Number(found[0]) : null
+}
+
+/** Samme kategori som generator + indkøbsliste-UI — tæller ikke med i dækningsprocent. */
+const BASIS_CATEGORY_NAME = 'Varer du måske allerede har'
+
+function normalizeShoppingItemName(value: string): string {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function isBasisCategory(categoryName: string): boolean {
+  const name = String(categoryName || '').trim()
+  if (name === BASIS_CATEGORY_NAME) return true
+  const norm = normalizeShoppingItemName(name)
+  return norm.includes('maske allerede') || norm.includes('maybe already')
+}
+
+function buildBasisExcludedNames(
+  categories: Array<{ name?: string; items?: Array<{ name?: string; isBasis?: boolean }> }> | undefined,
+  extraExcludedNames: Iterable<string> = []
+): Set<string> {
+  const excludedNames = new Set<string>()
+  for (const cat of categories || []) {
+    for (const item of cat?.items || []) {
+      if (!item?.name) continue
+      if (item.isBasis || isBasisCategory(String(cat?.name || ''))) {
+        excludedNames.add(normalizeShoppingItemName(item.name))
+      }
+    }
+  }
+  for (const name of extraExcludedNames) {
+    excludedNames.add(normalizeShoppingItemName(name))
+  }
+  return excludedNames
+}
+
+/** Én kilde til sandhed for hovedlisten + dækningsprocent (uden basis). */
+function buildMainShoppingListView(
+  categories: Array<{ name?: string; items?: Array<{ name?: string; isBasis?: boolean; [key: string]: unknown }> }> | undefined,
+  extraExcludedNames: Iterable<string> = []
+): {
+  mainCategories: Array<{ name: string; items: Array<{ name: string; isBasis?: boolean; [key: string]: unknown }> }>
+  allItems: Array<{ name: string; isBasis?: boolean; [key: string]: unknown }>
+} {
+  const excludedNames = buildBasisExcludedNames(categories, extraExcludedNames)
+
+  const mainCategories = (categories || [])
+    .filter((cat) => !isBasisCategory(String(cat?.name || '')))
+    .map((cat) => ({
+      name: String(cat?.name || ''),
+      items: (cat?.items || []).filter((item) => {
+        if (!item?.name || item.isBasis) return false
+        return !excludedNames.has(normalizeShoppingItemName(item.name))
+      }),
+    }))
+    .filter((cat) => cat.items.length > 0)
+
+  return {
+    mainCategories,
+    allItems: mainCategories.flatMap((cat) => cat.items),
+  }
+}
+
+/** Samme produkt-opslag som indkøbsliste-rækkerne (lowercase + fuzzy key). */
+function findProductInfoForStoreTab(
+  itemName: string,
+  storeKey: string,
+  storePrices: Record<string, Record<string, any>>,
+  useGuidePrices: boolean
+): Record<string, unknown> | null {
+  if (!storeKey || storeKey === 'all' || !storePrices[storeKey]) return null
+
+  const itemNameLower = itemName?.toLowerCase().trim() || ''
+  if (!itemNameLower) return null
+
+  let productInfo = resolveProductForDisplay(
+    storePrices[storeKey][itemNameLower],
+    useGuidePrices
+  )
+  if (!productInfo) {
+    const foundKey = Object.keys(storePrices[storeKey]).find(
+      (key) => key.includes(itemNameLower) || itemNameLower.includes(key)
+    )
+    if (foundKey) {
+      productInfo = resolveProductForDisplay(storePrices[storeKey][foundKey], useGuidePrices)
+    }
+  }
+  return productInfo
 }
 
 /**
@@ -314,8 +411,6 @@ export default function MadbudgetPage() {
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
     selectedStores: [1, 2, 8], // REMA 1000, Netto, Løvbjerg
     adultsProfiles: [] as AdultProfile[], // New: profiles for each adult
-    /** Valgfrit max-indkøb pr. uge (kr); null = intet loft */
-    weeklyBudgetKr: null as number | null
   })
   
   type MealType = 'breakfast' | 'lunch' | 'dinner'
@@ -573,9 +668,40 @@ export default function MadbudgetPage() {
     return applyKetoShoppingListRules(shoppingList)
   }, [shoppingList, shoppingListDietId])
   const [recalculatingShoppingList, setRecalculatingShoppingList] = useState(false)
+  const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
   const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
   const [loadingPrices, setLoadingPrices] = useState(false)
+  const [useGuidePrices, setUseGuidePrices] = useState(true)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(GUIDE_PRICES_STORAGE_KEY)
+      if (stored === '0') setUseGuidePrices(false)
+      else if (stored === '1') setUseGuidePrices(true)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const toggleGuidePrices = () => {
+    setUseGuidePrices((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(GUIDE_PRICES_STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+
+  const guideCount = useMemo(() => {
+    if (selectedStoreTab === 'all' || !storeNeedsGuidePrices(selectedStoreTab)) return 0
+    const store = storePrices[selectedStoreTab]
+    if (!store) return 0
+    return Object.values(store).filter((p) => p?.isGuidePrice).length
+  }, [storePrices, selectedStoreTab])
 
   const [shoppingMode, setShoppingMode] = useState(false)
   const [shoppingChecked, setShoppingChecked] = useState<Record<string, boolean>>({})
@@ -662,7 +788,11 @@ export default function MadbudgetPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shoppingListItems: items,
-          selectedStoreIds: familyProfile.selectedStores
+          selectedStoreIds: familyProfile.selectedStores,
+          organicPreferences: {
+            prioritizeOrganic: familyProfile.prioritizeOrganic,
+            prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+          },
         })
       })
 
@@ -705,7 +835,13 @@ export default function MadbudgetPage() {
       fetchStorePrices()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayShoppingList, selectedStoreIdsKey, isGuest])
+  }, [
+    displayShoppingList,
+    selectedStoreIdsKey,
+    familyProfile.prioritizeOrganic,
+    familyProfile.prioritizeAnimalOrganic,
+    isGuest,
+  ])
 
   // Debug: log what frontend received for shopping list (categories + ingredientId/isBasis per item)
   useEffect(() => {
@@ -724,32 +860,18 @@ export default function MadbudgetPage() {
     setShoppingChecked((prev) => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const mainShoppingListView = useMemo(
+    () =>
+      buildMainShoppingListView(
+        displayShoppingList?.categories,
+        basisvarer.map((b) => b.ingredient_name)
+      ),
+    [displayShoppingList, basisvarer]
+  )
+
   const shoppingListCoverage = useMemo(() => {
-    if (!displayShoppingList?.categories) return null
-
-    const excludedCategoryNames = new Set(['varer du måske allerede har', 'andre'])
-    const relevantItems = displayShoppingList.categories
-      .filter((category: any) => !excludedCategoryNames.has(String(category?.name || '').toLowerCase().trim()))
-      .flatMap((category: any) => category?.items || [])
-      .filter((item: any) => item?.name && !item?.isBasis)
-
+    const relevantItems = mainShoppingListView.allItems
     if (relevantItems.length === 0) return null
-
-    const normalize = (value: string) => String(value || '').toLowerCase().trim()
-    const findProductForItem = (storeKey: string, itemName: string) => {
-      const storePriceMap = storePrices[storeKey]
-      if (!storePriceMap) return null
-
-      const itemNameLower = normalize(itemName)
-      const direct = storePriceMap[itemNameLower]
-      if (direct) return direct
-
-      const foundKey = Object.keys(storePriceMap).find((key) => {
-        const normalizedKey = normalize(key)
-        return normalizedKey.includes(itemNameLower) || itemNameLower.includes(normalizedKey)
-      })
-      return foundKey ? storePriceMap[foundKey] : null
-    }
 
     const selectedStoreKeys =
       selectedStoreTab === 'all'
@@ -768,8 +890,10 @@ export default function MadbudgetPage() {
             .filter(Boolean)
         : [selectedStoreTab]
 
-    const found = relevantItems.filter((item: any) =>
-      selectedStoreKeys.some((storeKey) => Boolean(findProductForItem(storeKey, item.name)))
+    const found = relevantItems.filter((item) =>
+      selectedStoreKeys.some((storeKey) =>
+        Boolean(findProductInfoForStoreTab(item.name, storeKey, storePrices, useGuidePrices))
+      )
     ).length
 
     return {
@@ -781,7 +905,7 @@ export default function MadbudgetPage() {
           ? 'fundet i valgte butikker'
           : `fundet i ${mockStores.find((store) => store.id === storeIdFromTabKey(selectedStoreTab))?.name || 'butikken'}`,
     }
-  }, [displayShoppingList, storePrices, selectedStoreTab, familyProfile.selectedStores])
+  }, [mainShoppingListView, storePrices, selectedStoreTab, familyProfile.selectedStores, useGuidePrices])
 
   const openSmartShoppingFlow = async () => {
     if (!displayShoppingList) return
@@ -807,7 +931,10 @@ export default function MadbudgetPage() {
         return
       }
       const pricesSlice = storePrices[selectedStoreTab]
-        ? { [selectedStoreTab]: storePrices[selectedStoreTab], _fetchedAt: new Date().toISOString() }
+        ? {
+            [selectedStoreTab]: stripGuidePricesFromStoreMap(storePrices[selectedStoreTab]),
+            _fetchedAt: new Date().toISOString(),
+          }
         : null
       const res = await fetch('/api/smart-shopping/create', {
         method: 'POST',
@@ -925,8 +1052,7 @@ export default function MadbudgetPage() {
     }
   }
 
-  // Basisvarer state
-  const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
+  // Basisvarer modal / søgning
   const [showBasisvarerModal, setShowBasisvarerModal] = useState(false)
   const [productSearchQuery, setProductSearchQuery] = useState('') // generisk ingrediensnavn
   const [basisTab, setBasisTab] = useState<'ingredient' | 'product'>('ingredient')
@@ -967,8 +1093,6 @@ export default function MadbudgetPage() {
                 prioritizeAnimalOrganic: fp.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
                 excludedIngredients: fp.excluded_ingredients || prev.excludedIngredients,
                 selectedStores: fp.selected_stores || prev.selectedStores,
-                weeklyBudgetKr:
-                  fp.weekly_budget_kr != null ? fp.weekly_budget_kr : prev.weeklyBudgetKr,
                 adultsProfiles: buildAdultsProfilesForFamily(adults, adultRows),
               }))
               setVariationLevel(fp.variation_level || 2)
@@ -1025,7 +1149,6 @@ export default function MadbudgetPage() {
               excludedIngredients: familyProfile.excludedIngredients,
               selectedStores: familyProfile.selectedStores,
               variationLevel,
-              weeklyBudgetKr: familyProfile.weeklyBudgetKr
             },
             adultProfiles: familyProfile.adultsProfiles
           })
@@ -2106,7 +2229,6 @@ export default function MadbudgetPage() {
               excludedIngredients: familyProfile.excludedIngredients,
               selectedStores: familyProfile.selectedStores,
               variationLevel,
-              weeklyBudgetKr: familyProfile.weeklyBudgetKr
             },
             adultProfiles: syncedProfiles
           })
@@ -2224,7 +2346,7 @@ export default function MadbudgetPage() {
           excludedIngredients: familyProfile.excludedIngredients,
           selectedStores: familyProfile.selectedStores,
           prioritizeOrganic: familyProfile.prioritizeOrganic,
-          weeklyBudgetKr: familyProfile.weeklyBudgetKr
+          prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
         },
         variationLevel
       )
@@ -2363,7 +2485,6 @@ export default function MadbudgetPage() {
                 children_ages: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
                 adultsProfiles: familyProfile.adultsProfiles,
                 selectedStores: familyProfile.selectedStores,
-                weeklyBudgetKr: familyProfile.weeklyBudgetKr
               },
               mealPlanData: wrapMealPlanForSave(mergedMealPlan, slotLocks), // grid + låse
               shoppingList: weekPlan.shoppingList,
@@ -3929,7 +4050,7 @@ export default function MadbudgetPage() {
                         af indkøbslisten er {shoppingListCoverage.label}.
                       </div>
                       <div className="text-xs text-blue-800">
-                        {shoppingListCoverage.found}/{shoppingListCoverage.total} varer matchet
+                        {shoppingListCoverage.found}/{shoppingListCoverage.total} varer i indkøbslisten (ekskl. basis)
                       </div>
                     </div>
                   )}
@@ -3985,12 +4106,15 @@ export default function MadbudgetPage() {
                               if (basisItemNames.has(itemName.toLowerCase().trim())) {
                                 return
                               }
+
+                              const displayProduct = resolveProductForDisplay(product, useGuidePrices)
+                              if (!displayProduct) return
                               
-                              if (product.totalPrice) {
-                                storeTotal += product.totalPrice
-                              } else if (product.price) {
+                              if (displayProduct.totalPrice) {
+                                storeTotal += displayProduct.totalPrice
+                              } else if (displayProduct.price) {
                                 // Fallback for old format
-                                storeTotal += product.price
+                                storeTotal += displayProduct.price
                               }
                             })
                           }
@@ -4023,53 +4147,58 @@ export default function MadbudgetPage() {
                     </div>
                   )}
 
-                  {/* Tilbud-only coverage notice — vises når en kæde uden fuldt katalog er valgt */}
-                  {(() => {
-                    if (selectedStoreTab === 'all') {
-                      const offerOnlyChains = familyProfile.selectedStores
-                        ?.map((id: number) => STORE_KEY_BY_ID[id])
-                        .filter(Boolean)
-                        .map((tab: string) => ({
-                          tab,
-                          chain: sourceChainFromTabKey(tab),
-                        }))
-                        .filter(
-                          (x: { tab: string; chain: SourceChain | null }) =>
-                            x.chain != null && CHAIN_COVERAGE[x.chain] === 'offers-only',
-                        )
-                        .map((x: { tab: string; chain: SourceChain | null }) =>
-                          mockStores.find(
-                            (s) => storeIdFromTabKey(x.tab) === s.id,
-                          )?.name,
-                        )
-                        .filter(Boolean) as string[]
+                  {/* Vejledende priser — tilbuds-butikker med manglende katalogpriser */}
+                  {guideCount > 0 && storeNeedsGuidePrices(selectedStoreTab) && (
+                    <div className="mt-3 flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        {useGuidePrices ? (
+                          <>
+                            <span className="font-semibold">Vejledende priser</span> udfylder{' '}
+                            {guideCount} {guideCount === 1 ? 'vare' : 'varer'} uden tilbudspris.
+                          </>
+                        ) : (
+                          <>
+                            Vejledende priser er slået fra — {guideCount}{' '}
+                            {guideCount === 1 ? 'vare vises' : 'varer vises'} uden pris.
+                          </>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={toggleGuidePrices}
+                        className="text-left text-sm font-medium text-amber-900 underline underline-offset-2 hover:text-amber-950 sm:text-right"
+                      >
+                        {useGuidePrices ? 'Slå vejledende priser fra' : 'Slå vejledende priser til'}
+                      </button>
+                    </div>
+                  )}
 
-                      if (offerOnlyChains.length === 0) return null
-                      return (
-                        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                          <span className="font-semibold">Bemærk:</span> For{' '}
-                          {offerOnlyChains.join(', ')} har vi i øjeblikket kun
-                          ugens tilbudsavis — varer udenfor tilbud vises ikke.
-                          Vælg butikkens fane for at se hvad der er på tilbud.
-                        </div>
+                  {/* Tilbud-only notice på "Alle butikker"-fanen */}
+                  {selectedStoreTab === 'all' && (() => {
+                    const offerOnlyChains = familyProfile.selectedStores
+                      ?.map((id: number) => STORE_KEY_BY_ID[id])
+                      .filter(Boolean)
+                      .map((tab: string) => ({
+                        tab,
+                        chain: sourceChainFromTabKey(tab),
+                      }))
+                      .filter(
+                        (x: { tab: string; chain: SourceChain | null }) =>
+                          x.chain != null && CHAIN_COVERAGE[x.chain] === 'offers-only',
                       )
-                    }
+                      .map((x: { tab: string; chain: SourceChain | null }) =>
+                        mockStores.find(
+                          (s) => storeIdFromTabKey(x.tab) === s.id,
+                        )?.name,
+                      )
+                      .filter(Boolean) as string[]
 
-                    const chain = sourceChainFromTabKey(selectedStoreTab)
-                    if (!chain) return null
-                    const coverage = CHAIN_COVERAGE[chain]
-                    if (coverage !== 'offers-only') return null
-                    const storeName =
-                      mockStores.find(
-                        (s) => s.id === storeIdFromTabKey(selectedStoreTab),
-                      )?.name ?? selectedStoreTab
+                    if (offerOnlyChains.length === 0) return null
                     return (
                       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        <span className="font-semibold">Kun aktuelle tilbud:</span>{' '}
-                        For {storeName} viser vi udelukkende varer fra ugens
-                        tilbudsavis, ikke det fulde sortiment. Det betyder at
-                        nogle ingredienser fra din indkøbsliste muligvis ikke
-                        vises selvom {storeName} fører dem.
+                        <span className="font-semibold">Bemærk:</span> For{' '}
+                        {offerOnlyChains.join(', ')} har vi kun ugens tilbudsavis.
+                        Vælg butikkens fane — manglende varer kan udfyldes med vejledende priser.
                       </div>
                     )
                   })()}
@@ -4082,32 +4211,23 @@ export default function MadbudgetPage() {
                   ) : (
                     <>
                       {/* Shopping list categories */}
-                      {(() => {
-                        const mainCats = displayShoppingList.categories?.filter((c: any) => c.name !== 'Varer du måske allerede har') || []
-                        return mainCats.map((category: any, catIndex: number) => (
-                          <div key={catIndex} className={`border-b border-gray-200 pb-4 ${catIndex === mainCats.length - 1 ? 'border-b-0' : ''}`}>
+                      {mainShoppingListView.mainCategories.map((category, catIndex) => (
+                          <div key={catIndex} className={`border-b border-gray-200 pb-4 ${catIndex === mainShoppingListView.mainCategories.length - 1 ? 'border-b-0' : ''}`}>
                           <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
                           <ul className="space-y-2">
-                            {category.items?.map((item: any, itemIndex: number) => {
+                            {category.items.map((item, itemIndex) => {
                               const itemNameLower = item.name?.toLowerCase().trim() || ''
                               const rowKey = `m-${catIndex}-${itemIndex}-${category.name}`
                               const rowDone = shoppingMode && !!shoppingChecked[rowKey]
-                              let productInfo: any = null
-                              
-                              // Get product info for selected store
-                              if (selectedStoreTab !== 'all' && storePrices[selectedStoreTab]) {
-                                productInfo = storePrices[selectedStoreTab][itemNameLower]
-                                if (!productInfo) {
-                                  // Try to find with different name variations
-                                  const keys = Object.keys(storePrices[selectedStoreTab])
-                                  const found = keys.find(key => 
-                                    key.includes(itemNameLower) || itemNameLower.includes(key)
-                                  )
-                                  if (found) {
-                                    productInfo = storePrices[selectedStoreTab][found]
-                                  }
-                                }
-                              }
+                              const productInfo =
+                                selectedStoreTab !== 'all'
+                                  ? findProductInfoForStoreTab(
+                                      item.name,
+                                      selectedStoreTab,
+                                      storePrices,
+                                      useGuidePrices
+                                    )
+                                  : null
                               
                               return (
                                 <li key={itemIndex} className={`flex items-center justify-between gap-2 text-sm ${rowDone ? 'opacity-65' : ''}`}>
@@ -4131,19 +4251,30 @@ export default function MadbudgetPage() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                       {productInfo ? (
-                                        <div>
+                                        productInfo.isGuidePrice ? (
                                           <div className={`text-gray-700 font-medium ${rowDone ? 'line-through text-gray-500' : ''}`}>
-                                            {productInfo.name}
+                                            {item.name}
                                             {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
                                               <span className="text-sm font-normal text-gray-600 ml-2">
                                                 ({productInfo.quantityNeeded} stk)
                                               </span>
                                             )}
                                           </div>
-                                          <div className={`text-xs text-gray-500 ${rowDone ? 'line-through' : ''}`}>
-                                            {item.name}
+                                        ) : (
+                                          <div>
+                                            <div className={`text-gray-700 font-medium ${rowDone ? 'line-through text-gray-500' : ''}`}>
+                                              {productInfo.name}
+                                              {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                                <span className="text-sm font-normal text-gray-600 ml-2">
+                                                  ({productInfo.quantityNeeded} stk)
+                                                </span>
+                                              )}
+                                            </div>
+                                            <div className={`text-xs text-gray-500 ${rowDone ? 'line-through' : ''}`}>
+                                              {item.name}
+                                            </div>
                                           </div>
-                                        </div>
+                                        )
                                       ) : (
                                         <span className={`text-gray-700 ${rowDone ? 'line-through text-gray-500' : ''}`}>
                                           {item.name}
@@ -4160,7 +4291,14 @@ export default function MadbudgetPage() {
                                     </div>
                                     {productInfo && (productInfo.totalPrice || productInfo.price) && (
                                       <div className="text-sm">
-                                        {productInfo.isOnSale ? (
+                                        {productInfo.isGuidePrice ? (
+                                          <div className="italic text-gray-500">
+                                            <span>
+                                              ~{(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                            </span>
+                                            <span className="ml-1 not-italic text-xs">vejledende</span>
+                                          </div>
+                                        ) : productInfo.isOnSale ? (
                                           <div>
                                             <span className="text-green-600 font-semibold">
                                               {(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
@@ -4196,16 +4334,15 @@ export default function MadbudgetPage() {
                             })}
                           </ul>
                           </div>
-                        ))
-                      })()}
+                        ))}
                       
                       {/* Basis ingredients section - shown separately */}
-                      {displayShoppingList.categories?.find((cat: any) => cat.name === 'Varer du måske allerede har') && (
+                      {displayShoppingList.categories?.find((cat: any) => isBasisCategory(cat.name)) && (
                         <div className="border-t border-gray-200 pt-4 mt-6">
-                          <h4 className="font-semibold text-gray-900 mb-3 text-lg">Varer du måske allerede har</h4>
+                          <h4 className="font-semibold text-gray-900 mb-3 text-lg">{BASIS_CATEGORY_NAME}</h4>
                           <ul className="space-y-2">
                             {displayShoppingList.categories
-                              ?.find((cat: any) => cat.name === 'Varer du måske allerede har')
+                              ?.find((cat: any) => isBasisCategory(cat.name))
                               ?.items?.map((item: any, itemIndex: number) => {
                                 const rowKey = `maybe-${itemIndex}-${item.name}`
                                 const rowDone = shoppingMode && !!shoppingChecked[rowKey]
@@ -4255,7 +4392,9 @@ export default function MadbudgetPage() {
                                     if (basisItemNames.has(itemName.toLowerCase().trim())) {
                                       return sum
                                     }
-                                    return sum + (product.totalPrice || product.price || 0)
+                                    const displayProduct = resolveProductForDisplay(product, useGuidePrices)
+                                    if (!displayProduct) return sum
+                                    return sum + (displayProduct.totalPrice || displayProduct.price || 0)
                                   }, 0)
                               })()
                                 .toFixed(2)
@@ -5060,8 +5199,7 @@ export default function MadbudgetPage() {
                       <span>
                         <span className="text-sm font-medium text-gray-800">Prioriter økologi</span>
                         <span className="mt-0.5 block text-xs text-gray-500">
-                          Gemmes på profilen og bruges til at favorisere økologiske retter i madplanen, hvor det er
-                          understøttet.
+                          Foretrækker varer med øko/økologi i produktnavn i indkøbslisten (op til ca. 10 % dyrere).
                         </span>
                       </span>
                     </label>
@@ -5077,42 +5215,12 @@ export default function MadbudgetPage() {
                       <span>
                         <span className="text-sm font-medium text-gray-800">Prioriter animalsk økologi</span>
                         <span className="mt-0.5 block text-xs text-gray-500">
-                          Gemmes på profilen (kød, fisk, mælk m.m.); udvidet brug i planlægning kan tilføjes løbende.
+                          Foretrækker øko-varer i mejeri og kød i indkøbslisten (op til ca. 10 % dyrere).
                         </span>
                       </span>
                     </label>
                   </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Budgetloft pr. uge (valgfrit)
-                    </label>
-                    <p className="mb-2 text-xs text-gray-500">
-                      Vi prøver at lægge planen, så den rammer dit loft, ved at prioritere tilbud. Ved meget lave beløb
-                      er det ikke altid muligt at få det til at hænge sammen.
-                    </p>
-                    <div className="flex max-w-xs items-center gap-2">
-                      <input
-                        type="number"
-                        min={0}
-                        step={50}
-                        placeholder="Fx 1200"
-                        value={familyProfile.weeklyBudgetKr === null ? '' : familyProfile.weeklyBudgetKr}
-                        onChange={(e) => {
-                          const raw = e.target.value.trim()
-                          if (raw === '') {
-                            setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: null }))
-                            return
-                          }
-                          const n = parseInt(raw, 10)
-                          if (!Number.isFinite(n) || n < 0) return
-                          setFamilyProfile((prev) => ({ ...prev, weeklyBudgetKr: Math.min(500_000, n) }))
-                        }}
-                        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="shrink-0 text-sm text-gray-600">kr</span>
-                    </div>
-                  </div>
                 </div>
               </section>
 
@@ -5223,7 +5331,6 @@ export default function MadbudgetPage() {
                           excludedIngredients: familyProfile.excludedIngredients,
                           selectedStores: familyProfile.selectedStores,
                           variationLevel,
-                          weeklyBudgetKr: familyProfile.weeklyBudgetKr
                         },
                         adultProfiles: familyProfile.adultsProfiles
                       })

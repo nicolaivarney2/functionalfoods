@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
+import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
 
 // Manual sync from admin UI may target large stores like Bilka or Nemlig.
 // Bump function timeout to Vercel's 300s ceiling so big stores complete.
 export const maxDuration = 300
 
 export async function POST(request: NextRequest) {
+  if (!isGomaImportEnabled()) {
+    return NextResponse.json(
+      { success: false, sunset: true, error: GOMA_SUNSET_MESSAGE },
+      { status: 410 },
+    )
+  }
+
   console.log('🚀 Goma import endpoint called')
-  
+
   try {
     const body = await request.json().catch(() => ({}))
     console.log('📥 Request body:', JSON.stringify(body))

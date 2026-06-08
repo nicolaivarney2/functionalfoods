@@ -175,8 +175,6 @@ export interface MealPlanConfig {
   peoplePerMeal?: Record<string, number>;
   /** Samlet PE for børn (aldersbånd) – lægges oven i voksne pr. måltid ved portionsberegning. */
   childPersonEquivalent?: number;
-  /** Valgfrit budgetloft pr. uge (kr). Når sat, vægtes opskrifter med aktuelle tilbud højere (lavere loft → stærkere prioritering). */
-  weeklyBudgetKr?: number | null;
 }
 
 export interface MealStructureConfig {

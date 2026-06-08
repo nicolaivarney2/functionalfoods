@@ -1,23 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
-import { databaseService } from '@/lib/database-service'
+import {
+  FOODDATA_ACTIVE_SYNC_STORE_IDS,
+  FOODDATA_STORE_IDS,
+  mapStoreIdToDisplayName,
+} from '@/lib/fooddata-stores'
+
+const FROZEN_MODIFIER_TOKENS = new Set([
+  'frosne',
+  'frossen',
+  'frost',
+  'dybfrost',
+  'frozen',
+])
+
+/** Primære dagligvarekæder — søg per butik så én kæde ikke fylder hele limit. */
+const PRIMARY_MATCHING_STORE_IDS = [
+  ...new Set(
+    FOODDATA_ACTIVE_SYNC_STORE_IDS.map((id) => (id === 'fotex' ? 'foetex' : id))
+  ),
+] as const
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+const DEFAULT_LIMIT = 500
+const MAX_LIMIT = 800
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '100')
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
+    const limit = Math.min(
+      MAX_LIMIT,
+      Math.max(1, parseInt(searchParams.get('limit') || String(DEFAULT_LIMIT), 10))
+    )
     const search = searchParams.get('search') || ''
     const ingredientId = searchParams.get('ingredient_id') || ''
 
-    console.log(`📦 Loading products for matching - page ${page}, limit ${limit}, search: "${search}"`)
-
     const supabase = createSupabaseServiceClient()
 
-    // Get existing matches for THIS ingredient only (so already-selected products don't show in dropdown)
     let matchQuery = supabase
       .from('product_ingredient_matches')
       .select('product_external_id')
@@ -27,15 +49,20 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: existingMatches } = await matchQuery
-    
-    const matchedIds = new Set(existingMatches?.map(m => m.product_external_id) || [])
-    console.log(
-      `📋 Found ${matchedIds.size} already matched products to exclude${ingredientId ? ` for ingredient_id=${ingredientId}` : ''}`
-    )
+    const matchedIds = new Set(existingMatches?.map((m) => m.product_external_id) || [])
 
-    // We only support search-based loading here (UI already enforces min 2 chars).
-    // This avoids Supabase's 1000-row cap and keeps the endpoint fast.
-    if (!search || search.trim().length < 2) {
+    const parseSearchTerm = (raw: string) => {
+      const trimmed = raw.trim()
+      const quoted = trimmed.match(/^["'](.+)["']$/)
+      if (quoted) {
+        return { term: quoted[1].trim(), wholeWordOnly: true }
+      }
+      return { term: trimmed, wholeWordOnly: false }
+    }
+
+    const { term, wholeWordOnly } = parseSearchTerm(search)
+
+    if (!term || term.length < 2) {
       return NextResponse.json({
         success: true,
         message: 'Search term too short',
@@ -45,8 +72,6 @@ export async function GET(request: NextRequest) {
         }
       })
     }
-
-    const term = search.trim()
     const buildSearchVariants = (value: string) => {
       const variants = new Set<string>()
       const lower = value.toLowerCase()
@@ -79,306 +104,329 @@ export async function GET(request: NextRequest) {
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-    const queryTokens = normalizeForSearch(term).split(' ').filter(Boolean)
-    const rawTokens = termVariants.flatMap((v) => v.toLowerCase().split(/\s+/).filter(Boolean))
-    const normalizedTokens = termVariants.flatMap((v) => normalizeForSearch(v).split(' ').filter(Boolean))
-    const searchTermsForFilters = Array.from(new Set([...termVariants, ...rawTokens, ...normalizedTokens, ...queryTokens]))
-      .map((t) => t.replace(/[(),]/g, ' ').trim())
-      .filter((t) => t.length >= 2)
+    const allTokens = normalizeForSearch(term).split(' ').filter((t) => t.length >= 2)
+    const wantsFrozen = allTokens.some((t) => FROZEN_MODIFIER_TOKENS.has(t))
+    const productTokens = allTokens.filter((t) => !FROZEN_MODIFIER_TOKENS.has(t))
+    const queryTokens = wantsFrozen && productTokens.length > 0 ? productTokens : allTokens
+    // Primary search: full phrase only (not per-token OR — avoids "bok choy" → "boksers")
+    const phraseVariants = Array.from(
+      new Set(
+        termVariants
+          .map((t) => t.replace(/[(),]/g, ' ').replace(/\s+/g, ' ').trim())
+          .filter((t) => t.length >= 2)
+      )
+    )
+
+    const nameMatchesAllTokens = (name: string) => {
+      const nameNorm = normalizeForSearch(name)
+      return queryTokens.every((t) => nameNorm.includes(t))
+    }
+
+    /** Quoted search: "citron" matches "frisk citron" but not "citronmåne" */
+    const nameContainsWholeTerm = (name: string, searchTerm: string) => {
+      const nameNorm = normalizeForSearch(name)
+      return buildSearchVariants(searchTerm).some((variant) => {
+        const termNorm = normalizeForSearch(variant)
+        if (!termNorm) return false
+        if (nameNorm === termNorm) return true
+        return ` ${nameNorm} `.includes(` ${termNorm} `)
+      })
+    }
+
+    const isFrozenDepartment = (department?: string, category?: string) => {
+      const meta = normalizeForSearch(`${department || ''} ${category || ''}`)
+      return /frost|dybfrost|frosne|frozen/.test(meta)
+    }
 
     const scoreProductRelevance = (product: {
       name?: string
       category?: string
-      store?: string
       is_on_sale?: boolean
+      _frozenMatch?: boolean
     }) => {
       const nameNorm = normalizeForSearch(product.name || '')
-      const categoryNorm = normalizeForSearch(product.category || '')
-      const storeNorm = normalizeForSearch(product.store || '')
+      const termNorm = normalizeForSearch(term)
 
       let score = 0
+      if (nameNorm === termNorm) score += 1200
+      if (nameNorm.startsWith(termNorm)) score += 900
+      if (nameNorm.includes(termNorm)) score += 700
+      if (` ${nameNorm} `.includes(` ${termNorm} `)) score += 450
 
-      // Strong signal: exact/prefix in product name
-      if (nameNorm === normalizeForSearch(term)) score += 1200
-      if (nameNorm.startsWith(normalizeForSearch(term))) score += 900
-      if (nameNorm.includes(normalizeForSearch(term))) score += 700
-
-      // Token-based matching (best for partial and multi-word queries)
       let tokenHits = 0
       for (const t of queryTokens) {
-        if (nameNorm.includes(t)) {
-          score += 220
-          tokenHits++
-        } else if (categoryNorm.includes(t) || storeNorm.includes(t)) {
-          score += 80
-        }
+        if (nameNorm.includes(t)) tokenHits++
       }
-      if (queryTokens.length > 1 && tokenHits === queryTokens.length) {
-        score += 250
-      }
-
-      // Slight boost to sale products when relevance is similar
+      score += tokenHits * 220
+      if (queryTokens.length > 1 && tokenHits === queryTokens.length) score += 250
+      if (product._frozenMatch) score += 600
+      if (product._frozenMatch && queryTokens.length === 1 && nameNorm === queryTokens[0]) score += 400
       if (product.is_on_sale) score += 20
 
       return score
     }
+
     const buildOrQuery = (fields: string[], terms: string[]) =>
       fields.flatMap((field) => terms.map((t) => `${field}.ilike.%${t}%`)).join(',')
 
-    const mapOfferRows = (offerRows: any[]) => {
-      const map = new Map<string, any>()
-      offerRows.forEach((row: any) => {
+    const offerSelect = `
+      product_id,
+      store_id,
+      store_product_id,
+      name_store,
+      current_price,
+      normal_price,
+      is_on_sale,
+      discount_percentage,
+      is_available,
+      products:product_id!inner (
+        name_generic,
+        brand,
+        category,
+        subcategory,
+        department,
+        unit,
+        amount
+      )
+    `
+
+    const mapStoreDisplay = (storeId: string | null) =>
+      mapStoreIdToDisplayName(storeId)
+
+    const mapOfferRows = (offerRows: unknown[]) => {
+      const map = new Map<string, Record<string, unknown>>()
+      for (const row of offerRows as Array<Record<string, unknown>>) {
+        const productId = row.product_id ? String(row.product_id) : ''
+        if (!productId || matchedIds.has(productId)) continue
+
         const p = Array.isArray(row.products) ? row.products[0] : row.products
-        const external_id = row.store_product_id || null
-        if (!external_id) return
-        if (matchedIds.has(external_id)) return
-        if (map.has(external_id)) return
+        const pRec = (p || {}) as Record<string, unknown>
 
-        const storeDisplay = databaseService['mapStoreIdToDisplayName']
-          ? // @ts-ignore internal helper
-            databaseService['mapStoreIdToDisplayName'](row.store_id)
-          : row.store_id
-
-        map.set(external_id, {
-          external_id,
-          name: row.name_store || p?.name_generic,
-          category: p?.category || p?.department || 'Andre',
-          store: storeDisplay,
+        const existing = map.get(productId)
+        const candidate = {
+          external_id: productId,
+          name: (row.name_store as string) || (pRec.name_generic as string),
+          category: (pRec.category as string) || (pRec.department as string) || 'Andre',
+          department: (pRec.department as string) || '',
+          store: mapStoreDisplay(row.store_id as string | null),
           source: 'product_offers',
           price: row.current_price,
           original_price: row.normal_price,
           is_on_sale: !!row.is_on_sale,
           last_updated: null
-        })
-      })
+        }
 
+        if (!existing) {
+          map.set(productId, candidate)
+          continue
+        }
+        if (!existing.is_on_sale && candidate.is_on_sale) {
+          map.set(productId, candidate)
+        }
+      }
       return Array.from(map.values())
     }
-    // 1) Old structure search (supermarket_products)
-    const oldOrQuery = buildOrQuery(['name', 'category', 'store'], searchTermsForFilters)
-    const { data: oldProducts, error: oldProductsError } = await supabase
-      .from('supermarket_products')
-      .select('external_id, name, category, store, source, price, original_price, is_on_sale, last_updated')
-      .or(oldOrQuery)
-      .order('name')
-      .limit(300)
 
-    if (oldProductsError) {
-      console.warn('⚠️ Error loading old products:', oldProductsError.message)
+    const nameOrQuery = buildOrQuery(['name_store'], phraseVariants)
+    const productsOrQuery = buildOrQuery(['name_generic'], phraseVariants)
+
+    const PER_STORE_SEARCH_LIMIT = 350
+
+    const fetchOffersByName = (orQuery: string, storeIds: readonly string[] = FOODDATA_STORE_IDS) =>
+      supabase
+        .from('product_offers')
+        .select(offerSelect)
+        .in('store_id', [...storeIds])
+        .eq('is_available', true)
+        .or(orQuery)
+        .order('is_on_sale', { ascending: false })
+        .limit(storeIds.length === 1 ? PER_STORE_SEARCH_LIMIT : 1000)
+
+    const fetchOffersPerPrimaryStore = async (orQuery: string) => {
+      const results = await Promise.all(
+        PRIMARY_MATCHING_STORE_IDS.map((storeId) => fetchOffersByName(orQuery, [storeId]))
+      )
+      const rows: unknown[] = []
+      for (const result of results) {
+        if (result.error) {
+          console.warn('⚠️ product_offers name search:', result.error.message)
+          continue
+        }
+        if (result.data?.length) rows.push(...result.data)
+      }
+      return rows
     }
 
-    const transformedOldProducts = (oldProducts || [])
-      .filter((p: any) => p?.external_id && !matchedIds.has(p.external_id))
-      .map((p: any) => ({
-        external_id: p.external_id,
-        name: p.name,
-        category: p.category || 'Andre',
-        store: p.store || 'REMA 1000',
-        source: p.source || 'supermarket_products',
-        price: p.price,
-        original_price: p.original_price,
-        is_on_sale: !!p.is_on_sale,
-        last_updated: p.last_updated
-      }))
+    const fetchProductIdsByName = (orQuery: string) =>
+      supabase.from('products').select('id').or(orQuery).limit(1000)
 
-    // 2) New structure search:
-    // The grocery catalog per store lives in product_offers (name is confusing), joined with products (global attrs).
-    // We find matching product_ids from:
-    // - product_offers.name_store
-    // - products.name_generic / brand / category / department / subcategory
-    const nameOrQuery = buildOrQuery(['name_store'], searchTermsForFilters)
-    const nameQuery = supabase
-      .from('product_offers')
-      .select('product_id')
-      .eq('is_available', true)
-      .or(nameOrQuery)
-      .limit(1000)
-
-    const productsOrQuery = buildOrQuery(
-      ['department', 'category', 'subcategory', 'name_generic', 'brand'],
-      searchTermsForFilters
+    const productTokenVariants = Array.from(
+      new Set(productTokens.flatMap((token) => buildSearchVariants(token)))
     )
-    const productsQuery = supabase
-      .from('products')
-      .select('id')
-      .or(productsOrQuery)
-      .limit(1000)
+    const productTokenOrQuery =
+      productTokenVariants.length > 0
+        ? buildOrQuery(['name_store'], productTokenVariants)
+        : nameOrQuery
 
-    const [{ data: nameMatches, error: nameErr }, { data: productMatches, error: prodErr }] =
-      await Promise.all([nameQuery, productsQuery])
+    const runFrozenProductSearch = async () => {
+      const offerRows = await fetchOffersPerPrimaryStore(productTokenOrQuery)
+      return mapOfferRows(offerRows)
+        .filter((p) => {
+          const row = p as Record<string, unknown>
+          const name = String(row.name || '')
+          const nameNorm = normalizeForSearch(name)
+          const tokensInName = queryTokens.every((t) => nameNorm.includes(t))
+          if (!tokensInName) return false
+          return (
+            isFrozenDepartment(
+              String(row.department || ''),
+              String(row.category || '')
+            ) || FROZEN_MODIFIER_TOKENS.has(nameNorm)
+          )
+        })
+        .map((p) => ({ ...p, _frozenMatch: true }))
+    }
 
-    if (nameErr) console.warn('⚠️ Error searching product_offers by name_store:', nameErr.message)
-    if (prodErr) console.warn('⚠️ Error searching products table:', prodErr.message)
+    let merged: Record<string, unknown>[] = []
 
-    const matchingProductIds = new Set<string>()
-    ;(nameMatches || []).forEach((m: any) => m?.product_id && matchingProductIds.add(String(m.product_id)))
-    ;(productMatches || []).forEach((m: any) => m?.id && matchingProductIds.add(String(m.id)))
+    if (wantsFrozen && productTokens.length > 0) {
+      merged = await runFrozenProductSearch()
+    } else {
+      const [directOfferRows, productsResult] = await Promise.all([
+        fetchOffersPerPrimaryStore(nameOrQuery),
+        fetchProductIdsByName(productsOrQuery),
+      ])
 
-    const productIds = Array.from(matchingProductIds)
-    let transformedNewProducts: any[] = []
-
-    if (productIds.length > 0) {
-      // Avoid oversized .in(...) requests by chunking product_ids.
-      const MAX_PRODUCT_IDS_TO_FETCH = 1200
-      const PRODUCT_ID_CHUNK_SIZE = 150
-      const prioritizedProductIds = productIds.slice(0, MAX_PRODUCT_IDS_TO_FETCH)
-      if (productIds.length > MAX_PRODUCT_IDS_TO_FETCH) {
-        console.log(
-          `⚠️ Too many matching product ids (${productIds.length}), limiting to ${MAX_PRODUCT_IDS_TO_FETCH}`
-        )
+      if (productsResult.error) {
+        console.warn('⚠️ products catalog search:', productsResult.error.message)
       }
 
-      const allOfferRows: any[] = []
-      for (let i = 0; i < prioritizedProductIds.length; i += PRODUCT_ID_CHUNK_SIZE) {
-        const chunk = prioritizedProductIds.slice(i, i + PRODUCT_ID_CHUNK_SIZE)
+      merged = mapOfferRows(directOfferRows)
+
+    const mergeOfferResults = (
+      primary: Record<string, unknown>[],
+      extra: Record<string, unknown>[]
+    ) => {
+      const byId = new Map<string, Record<string, unknown>>()
+      for (const p of [...primary, ...extra]) {
+        const key = String(p.external_id || '')
+        if (!key) continue
+        const existing = byId.get(key)
+        if (!existing || (!existing.is_on_sale && p.is_on_sale)) {
+          byId.set(key, p)
+        }
+      }
+      return Array.from(byId.values())
+    }
+
+    const loadOffersForProductIds = async (productIds: string[]) => {
+      if (!productIds.length) return [] as Record<string, unknown>[]
+      const PRODUCT_ID_CHUNK_SIZE = 200
+      const extraRows: unknown[] = []
+      for (let i = 0; i < productIds.length; i += PRODUCT_ID_CHUNK_SIZE) {
+        const chunk = productIds.slice(i, i + PRODUCT_ID_CHUNK_SIZE)
         const { data: offerRows, error: offersError } = await supabase
           .from('product_offers')
-          .select(
-            `
-            product_id,
-            store_id,
-            store_product_id,
-            name_store,
-            current_price,
-            normal_price,
-            is_on_sale,
-            discount_percentage,
-            is_available,
-            sale_valid_to,
-            products:product_id!inner (
-              name_generic,
-              brand,
-              category,
-              subcategory,
-              department,
-              unit,
-              amount
-            )
-          `
-          )
+          .select(offerSelect)
+          .in('store_id', [...FOODDATA_STORE_IDS])
           .eq('is_available', true)
           .in('product_id', chunk)
-          // IMPORTANT: for matching we need all available products,
-          // not only rows with non-expired sale_valid_to.
-          .order('is_on_sale', { ascending: false })
-          .order('discount_percentage', { ascending: false, nullsFirst: false })
-          .order('current_price', { ascending: true })
           .limit(1000)
 
         if (offersError) {
-          console.warn(
-            `⚠️ Error loading product_offers chunk ${Math.floor(i / PRODUCT_ID_CHUNK_SIZE) + 1}:`,
-            offersError.message
-          )
+          console.warn('⚠️ product_offers by product_id chunk:', offersError.message)
           continue
         }
-        if (offerRows?.length) {
-          allOfferRows.push(...offerRows)
-        }
+        if (offerRows?.length) extraRows.push(...offerRows)
       }
-
-      transformedNewProducts = mapOfferRows(allOfferRows)
+      return mapOfferRows(extraRows)
     }
-    
-    // Fallback: if product-id strategy yielded no rows, search directly in product_offers.name_store.
-    if (transformedNewProducts.length === 0) {
-      const fallbackOrQuery = buildOrQuery(
-        ['name_store'],
-        searchTermsForFilters
+
+    const collectCatalogProductIds = (
+      directRows: Array<{ product_id?: string }>,
+      catalogRows: Array<{ id?: string }>
+    ) => {
+      const ids = new Set<string>()
+      for (const m of catalogRows) {
+        if (m?.id) ids.add(String(m.id))
+      }
+      for (const row of directRows) {
+        if (row?.product_id) ids.delete(String(row.product_id))
+      }
+      return Array.from(ids)
+    }
+
+      let productIdsFromCatalog = collectCatalogProductIds(
+        directOfferRows as Array<{ product_id?: string }>,
+        (productsResult.data || []) as Array<{ id?: string }>
       )
-      const { data: offerRows, error: offersError } = await supabase
-        .from('product_offers')
-        .select(
-          `
-          product_id,
-          store_id,
-          store_product_id,
-          name_store,
-          current_price,
-          normal_price,
-          is_on_sale,
-          discount_percentage,
-          is_available,
-          sale_valid_to,
-          products:product_id!inner (
-            name_generic,
-            brand,
-            category,
-            subcategory,
-            department,
-            unit,
-            amount
-          )
-        `,
-          { count: 'exact' }
+      const extraMapped = await loadOffersForProductIds(productIdsFromCatalog.slice(0, 1200))
+      merged = mergeOfferResults(merged, extraMapped)
+
+      // Fallback for multi-word queries: all tokens in name, per store (avoids one chain filling limit)
+      const MIN_RESULTS_BEFORE_TOKEN_FALLBACK = 20
+      if (queryTokens.length > 1 && merged.length < MIN_RESULTS_BEFORE_TOKEN_FALLBACK) {
+        const tokenOrQuery = buildOrQuery(
+          ['name_store'],
+          queryTokens.flatMap((token) => buildSearchVariants(token))
         )
-        .eq('is_available', true)
-        .or(fallbackOrQuery)
-        .order('is_on_sale', { ascending: false })
-        .order('discount_percentage', { ascending: false, nullsFirst: false })
-        .order('current_price', { ascending: true })
-        .limit(1000)
+        const tokenProductsOrQuery = buildOrQuery(
+          ['name_generic'],
+          queryTokens.flatMap((token) => buildSearchVariants(token))
+        )
 
-      if (offersError) {
-        console.warn('⚠️ Error loading fallback product_offers:', offersError.message)
-      } else {
-        transformedNewProducts = mapOfferRows(offerRows || [])
+        const [tokenOfferRows, tokenProductsResult] = await Promise.all([
+          fetchOffersPerPrimaryStore(tokenOrQuery),
+          fetchProductIdsByName(tokenProductsOrQuery),
+        ])
+
+        const tokenDirect = mapOfferRows(tokenOfferRows).filter((p) =>
+          nameMatchesAllTokens(String(p.name || ''))
+        )
+        const tokenProductIds = collectCatalogProductIds(
+          tokenOfferRows as Array<{ product_id?: string }>,
+          (tokenProductsResult.data || []) as Array<{ id?: string }>
+        )
+        const tokenExtra = await loadOffersForProductIds(tokenProductIds.slice(0, 1200))
+        const tokenMerged = mergeOfferResults(tokenDirect, tokenExtra).filter((p) =>
+          nameMatchesAllTokens(String(p.name || ''))
+        )
+
+        merged = mergeOfferResults(merged, tokenMerged)
       }
     }
 
-    // Prefer the new per-store catalog results. Fall back to old structure only when needed.
-    // This avoids stale/noisy "supermarket_products" rows drowning out correct store-specific matches.
-    const preferredProducts =
-      transformedNewProducts.length > 0 ? transformedNewProducts : transformedOldProducts
-
-    // Dedupe by external_id
-    const byExternalId = new Map<string, any>()
-    for (const p of preferredProducts) {
-      const key = String(p.external_id || '')
-      if (!key) continue
-      const existing = byExternalId.get(key)
-      if (!existing) {
-        byExternalId.set(key, p)
-        continue
-      }
-      // Prefer on-sale row for same external_id
-      if (!existing.is_on_sale && p.is_on_sale) {
-        byExternalId.set(key, p)
-      }
+    if (wholeWordOnly) {
+      merged = merged.filter((p) => nameContainsWholeTerm(String(p.name || ''), term))
     }
 
-    const allProducts = Array.from(byExternalId.values())
-      .map((p) => ({ ...p, _score: scoreProductRelevance(p) }))
+    type ScoredProduct = Record<string, unknown> & { _score: number }
+
+    const allProducts: ScoredProduct[] = merged.map((p): ScoredProduct => {
+      const row = p as Record<string, unknown>
+      return {
+        ...row,
+        _score: scoreProductRelevance({
+          name: row.name as string | undefined,
+          category: row.category as string | undefined,
+          is_on_sale: row.is_on_sale as boolean | undefined,
+          _frozenMatch: row._frozenMatch as boolean | undefined,
+        }),
+      }
+    })
       .sort((a, b) => {
-        // Primary: relevance score
         if (b._score !== a._score) return b._score - a._score
-        // Secondary: offers first
         if (!!a.is_on_sale !== !!b.is_on_sale) return a.is_on_sale ? -1 : 1
-        // Tertiary: higher discount first (if available)
-        const aDiscount = Number(a.discount_percentage || 0)
-        const bDiscount = Number(b.discount_percentage || 0)
-        if (bDiscount !== aDiscount) return bDiscount - aDiscount
-        // Then lower price and finally name
         const aPrice = Number(a.price || 0)
         const bPrice = Number(b.price || 0)
         if (aPrice !== bPrice) return aPrice - bPrice
         return String(a.name || '').localeCompare(String(b.name || ''))
       })
 
-    const topRankedPreview = allProducts.slice(0, 10).map((p) => ({
-      external_id: p.external_id,
-      name: p.name,
-      store: p.store,
-      category: p.category,
-      score: p._score
-    }))
-
-    console.log(
-      `🔎 Top ranked products for "${term}" (${preferredProducts === transformedNewProducts ? 'product_offers' : 'supermarket_products'}):`,
-      topRankedPreview
-    )
-
-    const paginatedProducts = allProducts.slice(0, limit).map(({ _score, ...rest }) => rest)
+    const total = allProducts.length
+    const offset = (page - 1) * limit
+    const paginatedProducts = allProducts.slice(offset, offset + limit).map(({ _score, ...rest }) => rest)
+    const hasMore = offset + limit < total
 
     return NextResponse.json({
       success: true,
@@ -386,20 +434,22 @@ export async function GET(request: NextRequest) {
       data: {
         products: paginatedProducts,
         pagination: {
-          page: 1,
+          page,
           limit,
-          total: allProducts.length,
-          totalPages: 1,
-          hasMore: false
+          total,
+          totalPages: Math.ceil(total / limit) || 0,
+          hasMore
         }
       }
     })
-
   } catch (error) {
     console.error('❌ Error loading products for matching:', error)
-    return NextResponse.json({
-      success: false,
-      message: `Failed to load products: ${error instanceof Error ? error.message : 'Unknown error'}`
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Failed to load products: ${error instanceof Error ? error.message : 'Unknown error'}`
+      },
+      { status: 500 }
+    )
   }
 }

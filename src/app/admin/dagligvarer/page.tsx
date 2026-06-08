@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Store, RefreshCw, BarChart3 } from 'lucide-react'
+import { Store, BarChart3 } from 'lucide-react'
 
 export default function AdminDagligvarerPage() {
   return (
@@ -16,26 +16,25 @@ export default function AdminDagligvarerPage() {
           </div>
 
           <p className="text-sm text-gray-600 mb-6">
-            Vi har ryddet op i de gamle REMA/Netto‑scrapers. Al dagligvaredata kommer nu fra GOMA,
-            og al manuel synkronisering sker via GOMA‑sync.
+            FF scraper katalog og tilbud til <strong>fooddata</strong> (grocery Supabase).
+            Goma er <strong>sunset</strong> — eksisterende Goma-data på production bevares read-only
+            indtil cutover til fooddata.
           </p>
 
           <div className="grid grid-cols-1 gap-4">
             <Link
               href="/admin/dagligvarer/goma"
-              className="block border border-indigo-200 rounded-lg p-5 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 transition-colors"
+              className="block border border-gray-200 rounded-lg p-5 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-colors"
             >
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2">
-                  <Store className="h-5 w-5 text-indigo-700" />
-                  <span className="text-base font-semibold text-indigo-900">GOMA sync</span>
+                  <Store className="h-5 w-5 text-gray-600" />
+                  <span className="text-base font-semibold text-gray-800">GOMA (sunset)</span>
                 </div>
-                <RefreshCw className="h-4 w-4 text-indigo-500" />
               </div>
-              <p className="text-sm text-indigo-900">
-                Gå til GOMA‑dashboardet hvor du kan synce alle butikker (Netto, REMA 1000, Bilka,
-                Lidl, osv.) og rydde op i udløbne tilbud. Dette er den eneste dagligvare‑sync vi
-                bruger nu.
+              <p className="text-sm text-gray-700">
+                Read-only oversigt over sidste Goma-sync-status. Ingen nye imports eller cleanup —
+                data fryses indtil production skifter til fooddata.
               </p>
             </Link>
 

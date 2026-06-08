@@ -1,3 +1,9 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  normalizeExclusionTag,
+  parseIngredientTags,
+  type ExclusionTagId,
+} from '@/lib/dietary-exclusions'
 import { 
   IngredientTag, 
   IngredientCategory, 
@@ -11,9 +17,58 @@ import {
 
 export class IngredientTaggingService {
   private ingredients: Map<string, IngredientTag> = new Map();
+  private ingredientsLoadedFromDb = false
+  private ingredientsLoadPromise: Promise<void> | null = null
 
   constructor() {
     this.initializeDefaultIngredients();
+  }
+
+  async ensureLoadedFromDatabase(supabase: SupabaseClient): Promise<void> {
+    if (this.ingredientsLoadedFromDb) return
+    if (!this.ingredientsLoadPromise) {
+      this.ingredientsLoadPromise = this.loadFromDatabase(supabase)
+    }
+    await this.ingredientsLoadPromise
+    this.ingredientsLoadedFromDb = true
+  }
+
+  private async loadFromDatabase(supabase: SupabaseClient): Promise<void> {
+    const pageSize = 1000
+    let offset = 0
+
+    while (true) {
+      const { data, error } = await supabase
+        .from('ingredients')
+        .select('id, name, category, exclusions, allergens, commonNames')
+        .range(offset, offset + pageSize - 1)
+
+      if (error) throw new Error(`load ingredients: ${error.message}`)
+      if (!data?.length) break
+
+      for (const row of data) {
+        const parsed = parseIngredientTags(row.exclusions)
+        const categoryValues = Object.values(IngredientCategory) as string[]
+        const category = categoryValues.includes(String(row.category))
+          ? (row.category as IngredientCategory)
+          : IngredientCategory.Andre
+
+        this.ingredients.set(row.id, {
+          id: row.id,
+          name: row.name,
+          category,
+          exclusions: parsed.foodExclusions,
+          allergens: Array.isArray(row.allergens) ? row.allergens : [],
+          commonNames: Array.isArray(row.commonNames) ? row.commonNames : [],
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+      }
+
+      if (data.length < pageSize) break
+      offset += pageSize
+    }
   }
 
   /**
@@ -425,23 +480,30 @@ export class IngredientTaggingService {
    * Check if recipe contains excluded ingredients
    */
   checkRecipeExclusions(recipe: Recipe, excludedIngredients: string[]): string[] {
-    const violations: string[] = [];
+    const excluded = new Set<ExclusionTagId>()
+    for (const raw of excludedIngredients) {
+      const normalized = normalizeExclusionTag(String(raw))
+      if (normalized) excluded.add(normalized)
+    }
+    if (excluded.size === 0) return []
 
-    recipe.ingredients.forEach(recipeIngredient => {
-      const ingredient = this.ingredients.get(recipeIngredient.ingredientId);
-      if (ingredient) {
-        // Check if ingredient has exclusions that match user preferences
-        const matchingExclusions = ingredient.exclusions.filter(exclusion =>
-          excludedIngredients.includes(exclusion)
-        );
-        
-        if (matchingExclusions.length > 0) {
-          violations.push(`${ingredient.name} (${matchingExclusions.join(', ')})`);
-        }
+    const violations: string[] = []
+
+    recipe.ingredients.forEach((recipeIngredient) => {
+      const ingredient = this.ingredients.get(recipeIngredient.ingredientId)
+      if (!ingredient) return
+
+      const matchingExclusions = ingredient.exclusions.filter((tag) => {
+        const normalized = normalizeExclusionTag(tag) ?? tag
+        return excluded.has(normalized as ExclusionTagId)
+      })
+
+      if (matchingExclusions.length > 0) {
+        violations.push(`${ingredient.name} (${matchingExclusions.join(', ')})`)
       }
-    });
+    })
 
-    return violations;
+    return violations
   }
 
   /**

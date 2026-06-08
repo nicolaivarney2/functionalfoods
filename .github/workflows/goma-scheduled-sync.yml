@@ -1,54 +1,17 @@
-name: Goma Scheduled Sync
+name: Goma Scheduled Sync (sunset)
 
+# Goma er sunset — ingen scheduled kørsler. Eksisterende data bevares read-only.
+# Nød-genaktivering: sæt GOMA_IMPORT_ENABLED=true i Vercel + kør workflow_dispatch manuelt.
 on:
-  schedule:
-    # Two runs per day in UTC:
-    #   02:00 UTC ≈ 04:00 dansk (sommer) / 03:00 (vinter) — fanger morgen-opdateringer
-    #   14:00 UTC ≈ 16:00 dansk (sommer) / 15:00 (vinter) — fanger sene tilbud + virker som gratis retry hvis morgensync fejlede
-    # Begge kald kører også expired-offer cleanup, så udløbne tilbud forsvinder samme dag.
-    - cron: '0 2 * * *'
-    - cron: '0 14 * * *'
   workflow_dispatch:
 
 jobs:
   goma-scheduled-sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Call scheduled Goma sync endpoint
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL }}
+      - name: Goma sunset — springer over
         run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "SITE_URL GitHub variable is not set. Please set it to your production URL (e.g. https://functionalfoods.dk)."
-            exit 1
-          fi
-
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET GitHub secret is not set. Please add it and keep it in sync with the Vercel env CRON_SECRET."
-            exit 1
-          fi
-
-          echo "Calling scheduled Goma sync on $SITE_URL ..."
-          curl -fsS --max-time 300 --retry 3 --retry-delay 5 -X POST \
-            -H "Content-Type: application/json" \
-            -H "x-cron-secret: $CRON_SECRET" \
-            -o /tmp/goma-scheduled-sync.json \
-            "$SITE_URL/api/admin/goma/scheduled-sync" || {
-            echo "HTTP request failed (netværk, DNS eller timeout — ikke nødvendigvis Goma)."
-            exit 1
-          }
-          echo "Svar fra endpoint:"
-          cat /tmp/goma-scheduled-sync.json
-          echo ""
-          if ! command -v jq >/dev/null 2>&1; then
-            echo "jq mangler — springer success-check over."
-            exit 0
-          fi
-          if ! jq -e '.success == true' /tmp/goma-scheduled-sync.json >/dev/null 2>&1; then
-            echo ""
-            echo "Fejl: success er false. Tjek importError / cleanupError ovenfor og Vercel function logs."
-            exit 1
-          fi
-
-
+          echo "Goma scheduled sync er sunset."
+          echo "Eksisterende produkt/tilbuds-data bevares uændret indtil fooddata cutover."
+          echo "Aktivér kun med GOMA_IMPORT_ENABLED=true i Vercel ved nødtilfælde."
+          exit 0

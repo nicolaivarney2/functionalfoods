@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { runFooddataPublish, upsertQueueRowInFooddata } from '@/lib/fooddata-publish'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest) {
       .update({ status: 'dismissed', resolved_at: now })
       .eq('id', queueId)
       .eq('status', 'pending')
-      .select('id')
+      .select('product_id, store_product_id, store_id, product_name_snapshot, queued_at')
       .maybeSingle()
 
     if (error) throw error
@@ -31,14 +32,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ success: true, message: 'Afviset' })
+    const fooddataSync = await runFooddataPublish('queue-dismiss', (client) =>
+      upsertQueueRowInFooddata(client, {
+        product_id: data.product_id,
+        store_product_id: data.store_product_id,
+        store_id: data.store_id,
+        product_name_snapshot: data.product_name_snapshot,
+        status: 'dismissed',
+        queued_at: data.queued_at,
+        resolved_at: now,
+      })
+    )
+
+    return NextResponse.json({ success: true, message: 'Afviset', fooddataSync })
   } catch (error) {
     console.error('❌ product-match-queue dismiss:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { success: false, message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 },
     )
   }

@@ -29,6 +29,8 @@ import {
   scheduledStepIds,
   type ScheduledGrocerySync,
 } from '@/lib/grocery/sync-schedule'
+import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
+import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -39,6 +41,8 @@ type StepResult =
   | (TjekSyncResult & { step: string })
   | { step: string; status: 'failed'; errorMessage: string; durationMs: number }
   | { step: string; status: 'success'; rowsAffected: number; durationMs: number }
+  | (EnqueueFooddataQueueResult & { step: 'enqueue'; status: 'success'; durationMs: number })
+  | { step: 'enqueue'; status: 'skipped'; reason: string; durationMs: number }
 
 interface CronSummary {
   startedAt: string
@@ -79,7 +83,7 @@ async function runStep(
   const t0 = Date.now()
   try {
     const result = await fn()
-    return { ...result, step }
+    return { ...result, step } as StepResult
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     return {
@@ -202,7 +206,48 @@ async function handle(request: Request) {
     )
   }
 
-  const ranProductSync = steps.some((s) => s.step !== 'snapshot')
+  const ranProductSync = steps.some(
+    (s) => s.step !== 'snapshot' && s.step !== 'enqueue',
+  )
+
+  if (ranProductSync) {
+    const enqueueT0 = Date.now()
+    try {
+      const supabase = getGroceryServiceClient()
+      const enqueueResult = await enqueueAfterGrocerySync({
+        supabase,
+        startedAt,
+        mode,
+        schedule,
+        only,
+        steps,
+      })
+      if (!enqueueResult) {
+        steps.push({
+          step: 'enqueue',
+          status: 'skipped',
+          reason: 'Ingen nye produkter at enqueue',
+          durationMs: Date.now() - enqueueT0,
+        })
+      } else {
+        steps.push({
+          step: 'enqueue',
+          status: 'success',
+          durationMs: Date.now() - enqueueT0,
+          ...enqueueResult,
+        })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.warn('[grocery/cron] enqueue failed (non-fatal):', message)
+      steps.push({
+        step: 'enqueue',
+        status: 'skipped',
+        reason: message,
+        durationMs: Date.now() - enqueueT0,
+      })
+    }
+  }
 
   if (!skipSnapshot && ranProductSync) {
     steps.push(

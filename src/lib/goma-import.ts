@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { assertGomaImportEnabled } from '@/lib/goma-sunset'
 
 // Deterministic hash function as fallback if crypto fails
 // Uses a combination of character codes to create a 32-char hex string
@@ -368,6 +369,8 @@ function resolveStoreSlug(storeName: string): string {
  */
 
 export async function importGomaProducts(options: ImportOptions) {
+  assertGomaImportEnabled()
+
   const supabase = getSupabaseAdminClient()
   const apiKey = getGomaApiKey()
   const importStartedAtIso = new Date().toISOString()

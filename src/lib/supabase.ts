@@ -60,10 +60,26 @@ export function createSupabaseServiceClient(): SupabaseClient {
   return client
 }
 
-// Export a default instance for convenience
-export const supabase = createSupabaseClient()
+// Lazy default instance — scripts must load dotenv before first use (not at import time)
+let defaultSupabaseInstance: SupabaseClient | null = null
+
+function getDefaultSupabase(): SupabaseClient {
+  if (!defaultSupabaseInstance) {
+    defaultSupabaseInstance = createSupabaseClient()
+  }
+  return defaultSupabaseInstance
+}
+
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getDefaultSupabase()
+    const value = Reflect.get(client, prop, client)
+    return typeof value === 'function' ? value.bind(client) : value
+  },
+})
 
 // Function to reset client (useful for testing or auth changes)
 export function resetSupabaseClient() {
   supabaseInstance = null
+  defaultSupabaseInstance = null
 } 

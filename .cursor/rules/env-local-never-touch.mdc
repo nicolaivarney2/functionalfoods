@@ -1,0 +1,32 @@
+---
+description: NEVER read, write, or run commands that modify .env.local or other local secret env files
+alwaysApply: true
+---
+
+# .env.local — ABSOLUT FORBUDT AT RØRE
+
+**Brugeren har eksplicit forbudt det. Overtræd aldrig dette — heller ikke "for at hjælpe".**
+
+## Agent må ALDRIG
+
+- **Skrive, redigere eller slette** `.env.local`, `.env.local.override`, eller andre lokale env-filer med secrets
+- **Køre** `npm run env:pull`, `vercel env pull`, `merge-env-override.js`, `env-pull-safe.js`, eller enhver kommando der skriver til `.env*`
+- **Foreslå** at agenten selv kører env-pull som fix — brugeren gør det selv hvis de vil
+- **Køre terminal-kommandoer** der indirekte overskriver env (fx `cp`, `mv`, `echo >>`, `sed -i` på `.env.local`)
+
+## Agent må (read-only)
+
+- Fortælle brugeren **manuelt** hvad der mangler i env (navne på variabler, ikke gætte værdier)
+- Køre `npm run env:check` **kun hvis brugeren beder om det** — det læser, skriver ikke
+- Pege på Vercel Dashboard / Supabase Dashboard som kilde til secrets
+
+## Ved manglende env-variabler
+
+1. Stop. Kør **ingen** env-relaterede scripts.
+2. Sig hvilke **variabelnavne** der mangler.
+3. Lad brugeren udfylde `.env.local` selv.
+4. Fortsæt først når brugeren bekræfter env er klar.
+
+## Historik
+
+Agent har flere gange overskrevet `.env.local` via `vercel env pull`. Det må **aldrig** gentages.

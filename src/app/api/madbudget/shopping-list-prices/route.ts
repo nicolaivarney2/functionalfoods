@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
+import { isFooddataProductExternalId } from '@/lib/product-match-snapshots'
+import {
+  comparisonPriceForOrganicPreference,
+  resolveProductOrganicTags,
+  type OrganicPreferenceInput,
+} from '@/lib/madbudget/organic-preference'
+import {
+  applyGuidePricesForOfferStores,
+  anySelectedStoreNeedsGuidePrices,
+  GUIDE_PRICE_REFERENCE_STORE_IDS,
+  storeNeedsGuidePrices,
+  stripUnrequestedReferenceStores,
+} from '@/lib/madbudget/guide-prices'
 
 /**
  * API endpoint to fetch best matching products with prices for shopping list items
@@ -8,14 +21,19 @@ import { createSupabaseClient } from '@/lib/supabase'
  * This endpoint:
  * 1. Takes shopping list items (ingredient names + amounts)
  * 2. Takes selected store IDs
- * 3. Finds best matching products from product_ingredient_matches
- * 4. Filters by store and matches volume (closest >= needed, or largest if insufficient)
- * 5. Returns prices per store
+ * 3. Finds best matching products from product_ingredient_matches (fooddata keys first)
+ * 4. Loads live prices from products + product_offers (fooddata catalog in FF cache)
+ * 5. Filters by store and matches volume (closest >= needed, or largest if insufficient)
+ * 6. Snapshot fallback only for fooddata matches in the same store (no Goma/name guessing)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { shoppingListItems, selectedStoreIds } = body
+    const { shoppingListItems, selectedStoreIds, organicPreferences } = body
+    const organicPrefs: OrganicPreferenceInput = {
+      prioritizeOrganic: organicPreferences?.prioritizeOrganic === true,
+      prioritizeAnimalOrganic: organicPreferences?.prioritizeAnimalOrganic === true,
+    }
 
     if (!shoppingListItems || !Array.isArray(shoppingListItems)) {
       return NextResponse.json(
@@ -43,19 +61,32 @@ export async function POST(request: NextRequest) {
       5: { key: 'nemlig', candidates: ['nemlig'] },
       6: { key: 'meny', candidates: ['meny'] },
       7: { key: 'spar', candidates: ['spar'] },
-      8: { key: 'løvbjerg', candidates: ['løvbjerg', 'lovbjerg'] },
+      8: { key: 'løvbjerg', candidates: ['loevbjerg', 'løvbjerg', 'lovbjerg'] },
     }
 
     const requestedStores = selectedStoreIds
       .map((id: number) => storeIdMap[id])
       .filter((s): s is { key: string; candidates: string[] } => Boolean(s))
-    const storeKeys = Array.from(new Set(requestedStores.map((s) => s.key)))
+    const requestedStoreKeys = Array.from(new Set(requestedStores.map((s) => s.key)))
+
+    // Tilbuds-butikker: prissæt også REMA + Netto internt til vejledende priser
+    const storesForPricing = [...requestedStores]
+    if (anySelectedStoreNeedsGuidePrices(requestedStoreKeys)) {
+      for (const refId of GUIDE_PRICE_REFERENCE_STORE_IDS) {
+        const refStore = storeIdMap[refId]
+        if (refStore && !requestedStoreKeys.includes(refStore.key)) {
+          storesForPricing.push(refStore)
+        }
+      }
+    }
+
+    const storeKeys = Array.from(new Set(storesForPricing.map((s) => s.key)))
     const storeCandidatesByKey = new Map<string, string[]>()
-    requestedStores.forEach((s) => {
+    storesForPricing.forEach((s) => {
       storeCandidatesByKey.set(s.key, s.candidates)
     })
     const dbStoreIds = Array.from(
-      new Set(requestedStores.flatMap((s) => s.candidates))
+      new Set(storesForPricing.flatMap((s) => s.candidates))
     )
 
     const normalizeStoreKey = (v: string): string =>
@@ -67,7 +98,7 @@ export async function POST(request: NextRequest) {
     const canonicalStoreKey = (raw: string): string => {
       const n = normalizeStoreKey(raw)
       if (n === 'fotex' || n === 'foetex' || n === 'føtex') return 'føtex'
-      if (n === 'lovbjerg' || n === 'løvbjerg') return 'løvbjerg'
+      if (n === 'loevbjerg' || n === 'lovbjerg' || n === 'løvbjerg') return 'løvbjerg'
       return raw
     }
 
@@ -247,7 +278,10 @@ export async function POST(request: NextRequest) {
         .select(`
           ingredient_id,
           product_external_id,
-          confidence
+          confidence,
+          product_name_snapshot,
+          product_store_snapshot,
+          last_known_price
         `)
         .in('ingredient_id', ingredientIds)
         .order('ingredient_id', { ascending: true })
@@ -274,7 +308,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Step 2: Found ${allMatches.length} product matches for ${ingredientIds.length} ingredients`)
 
-    // Index matches by ingredient id for fast lookup
+    // Index matches by ingredient id — prefer fooddata product keys over legacy Goma ids
     const matchesByIngredient = new Map<string, any[]>()
     for (const match of allMatches) {
       const id = String(match.ingredient_id || '')
@@ -283,7 +317,6 @@ export async function POST(request: NextRequest) {
       if (list) list.push(match)
       else matchesByIngredient.set(id, [match])
     }
-    
     if (allMatches.length === 0) {
       console.log('⚠️ No product matches found in database for these ingredientIds')
       console.log(`📋 Sample ingredientIds that were searched:`, ingredientIds.slice(0, 5))
@@ -306,20 +339,116 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Step 3: Found ${productExternalIds.length} unique products from matches`)
     console.log(`🔍 Step 4: Looking for prices in stores: ${dbStoreIds.join(', ')}`)
 
-    // Fetch product offers for these products, filtered by selected stores
-    // Support both old (supermarket_products) and new (products + product_offers) structures
-    const productOffersMap = new Map<string, any[]>()
     const chunkSize = 200
+    const productOrganicTagsMap = new Map<string, string[]>()
+    for (let i = 0; i < productExternalIds.length; i += chunkSize) {
+      const chunk = productExternalIds.slice(i, i + chunkSize)
+      const fooddataChunk = chunk.filter((id) => isFooddataProductExternalId(id))
+      const legacyChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+
+      if (fooddataChunk.length > 0) {
+        const { data: byId } = await supabase
+          .from('products')
+          .select('id, organic_tags')
+          .in('id', fooddataChunk)
+        byId?.forEach((row) => {
+          productOrganicTagsMap.set(
+            row.id,
+            resolveProductOrganicTags(row.organic_tags)
+          )
+        })
+      }
+
+      if (legacyChunk.length > 0) {
+        const { data: byExternal } = await supabase
+          .from('products')
+          .select('external_id, organic_tags')
+          .in('external_id', legacyChunk)
+        byExternal?.forEach((row) => {
+          if (row.external_id) {
+            productOrganicTagsMap.set(
+              row.external_id,
+              resolveProductOrganicTags(row.organic_tags)
+            )
+          }
+        })
+      }
+    }
+
+    // Fetch live offers from fooddata catalog (products + product_offers in FF cache)
+    const productOffersMap = new Map<string, any[]>()
     let totalOffersFound = 0
 
     for (let i = 0; i < productExternalIds.length; i += chunkSize) {
       const chunk = productExternalIds.slice(i, i + chunkSize)
 
-      // Try new structure first: products + product_offers
-      const { data: products, error: productsError } = await supabase
+      // Fooddata-style: products.id = {chain}-{source_id}
+      const { data: productsById, error: productsByIdError } = await supabase
         .from('products')
-        .select('id, external_id, amount, unit')
-        .in('external_id', chunk)
+        .select('id, amount, unit')
+        .in('id', chunk)
+
+      if (!productsByIdError && productsById && productsById.length > 0) {
+        const productIdToExternalId = new Map<string, string>()
+        const productIdToAmount = new Map<string, { amount: string | null, unit: string | null }>()
+        productsById.forEach(p => {
+          productIdToExternalId.set(p.id, p.id)
+          productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
+        })
+
+        const productIds = Array.from(productIdToExternalId.keys())
+        if (productIds.length > 0) {
+          const { data: offers, error: offersError } = await supabase
+            .from('product_offers')
+            .select(`
+              id,
+              product_id,
+              store_id,
+              name_store,
+              current_price,
+              normal_price,
+              is_on_sale,
+              is_offer_active,
+              discount_percentage,
+              is_available,
+              amount,
+              unit
+            `)
+            .in('product_id', productIds)
+            .in('store_id', dbStoreIds)
+            .eq('is_available', true)
+
+          if (!offersError && offers) {
+            totalOffersFound += offers.length
+            offers.forEach(offer => {
+              const externalId = productIdToExternalId.get(offer.product_id)
+              if (!externalId) return
+
+              if (!productOffersMap.has(externalId)) {
+                productOffersMap.set(externalId, [])
+              }
+
+              const amountInfo = productIdToAmount.get(offer.product_id)
+              productOffersMap.get(externalId)!.push({
+                ...offer,
+                product_external_id: externalId,
+                store_id: canonicalStoreKey(String(offer.store_id || '')),
+                amount: amountInfo?.amount ?? offer.amount,
+                unit: amountInfo?.unit ?? offer.unit
+              })
+            })
+          }
+        }
+      }
+
+      // Legacy Goma: products.external_id (only when match id is not a fooddata key)
+      const legacyChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+      const { data: products, error: productsError } = legacyChunk.length > 0
+        ? await supabase
+            .from('products')
+            .select('id, external_id, amount, unit')
+            .in('external_id', legacyChunk)
+        : { data: [], error: null }
 
       if (!productsError && products && products.length > 0) {
         // New structure: use products + product_offers
@@ -496,58 +625,6 @@ export async function POST(request: NextRequest) {
         console.error('❌ Error fetching product_offers by store_product_id:', offersByStoreProductIdError)
       }
 
-      // Also try old structure: supermarket_products (fallback)
-      const { data: oldProducts, error: oldProductsError } = await supabase
-        .from('supermarket_products')
-        .select('external_id, name, category, store, price, original_price, is_on_sale, amount, unit')
-        .in('external_id', chunk)
-
-      if (!oldProductsError && oldProducts) {
-        oldProducts.forEach(product => {
-          // Check if store matches (old structure uses store name, need to map)
-          const storeNameMap: Record<string, string[]> = {
-            'rema-1000': ['REMA 1000', 'REMA'],
-            'netto': ['Netto'],
-            'føtex': ['Føtex', 'Fotex', 'Foetex'],
-            'bilka': ['Bilka'],
-            'nemlig': ['Nemlig', 'Nemlig.com'],
-            'meny': ['MENY'],
-            'spar': ['Spar'],
-            'løvbjerg': ['Løvbjerg', 'Lovbjerg'],
-          }
-
-          const productStore = product.store || ''
-          const matchesStore = storeKeys.some(storeId => {
-            const storeNames = storeNameMap[storeId] || []
-            return storeNames.some(name => productStore.includes(name))
-          })
-
-          if (!matchesStore) return
-
-          if (!productOffersMap.has(product.external_id)) {
-            productOffersMap.set(product.external_id, [])
-          }
-
-          productOffersMap.get(product.external_id)!.push({
-            id: product.external_id,
-            product_external_id: product.external_id,
-            store_id: storeKeys.find(sid => {
-              const storeNames = storeNameMap[sid] || []
-              return storeNames.some(name => productStore.includes(name))
-            }) || '',
-            name_store: product.name,
-            current_price: product.price,
-            normal_price: product.original_price,
-            is_on_sale: product.is_on_sale || false,
-            discount_percentage: product.original_price && product.price
-              ? ((product.original_price - product.price) / product.original_price) * 100
-              : 0,
-            is_available: true,
-            amount: product.amount,
-            unit: product.unit
-          })
-        })
-      }
     }
 
     console.log(`🔍 Step 5: Found ${totalOffersFound} total offers from product_offers table`)
@@ -571,9 +648,9 @@ export async function POST(request: NextRequest) {
     const result: Record<string, Record<string, any>> = {}
     let itemsWithProducts = 0
     let itemsWithoutProducts = 0
-    const nameFallbackCache = new Map<string, any | null>()
 
     for (const item of shoppingListItems) {
+      if (item.isBasis) continue
       const shoppingItemName = item.name?.toLowerCase().trim()
       if (!shoppingItemName) continue
 
@@ -606,15 +683,49 @@ export async function POST(request: NextRequest) {
         }
 
         // Find best product for this ingredient in this store
-        // Strategy: Choose product with lowest total price (price * quantity needed)
+        // Strategy: lowest effective price; øko-præference giver op til 10 % premium
         let bestProduct: any = null
-        let bestTotalPrice = Infinity
+        let bestComparisonPrice = Infinity
         let bestExcess = Infinity // For tie-breaking: prefer less waste
         const neededAmount = Number(String(item.amount ?? '0').replace(',', '.')) || 0
         const neededUnit = item.unit?.toLowerCase() || ''
 
-        for (const match of matchesForIngredient) {
+        const storeMatches = selectMatchesForStore(matchesForIngredient, storeKey)
+
+        for (const match of storeMatches) {
             const storeOffers = productOffersByStore.get(match.product_external_id)?.get(storeKey) || []
+
+          if (
+            !storeNeedsGuidePrices(storeKey) &&
+            match.product_name_snapshot &&
+            match.last_known_price
+          ) {
+            const snapshotPrice = Number(match.last_known_price)
+            if (Number.isFinite(snapshotPrice) && snapshotPrice > 0) {
+              const gramsPerUnit =
+                (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
+                gramsPerUnitByNameMap.get(normalizeName(String(item.name || '')))
+              const built = buildSnapshotProduct(match, {
+                snapshotPrice,
+                neededAmount,
+                neededUnit,
+                storeKey,
+                gramsPerUnit,
+                productOrganicTagsMap,
+                organicPrefs,
+              })
+              const { comparisonPrice, excess, product } = built
+              if (comparisonPrice < bestComparisonPrice) {
+                bestComparisonPrice = comparisonPrice
+                bestExcess = excess
+                bestProduct = product
+              } else if (Math.abs(comparisonPrice - bestComparisonPrice) < 0.01 && excess < bestExcess) {
+                bestComparisonPrice = comparisonPrice
+                bestExcess = excess
+                bestProduct = product
+              }
+            }
+          }
 
           for (const offer of storeOffers) {
             // Parse product amount (e.g., "500g", "1 stk")
@@ -656,7 +767,12 @@ export async function POST(request: NextRequest) {
               : Math.ceil(neededAmount / convertedAmount)
 
             // Sanity guard: ignore clearly broken package calculations
-            if (!Number.isFinite(quantityNeeded) || quantityNeeded <= 0 || quantityNeeded > 120) {
+            if (
+              !Number.isFinite(quantityNeeded) ||
+              quantityNeeded <= 0 ||
+              quantityNeeded > 120 ||
+              isSuspiciousQuantity(neededUnit, neededAmount, convertedAmount, quantityNeeded)
+            ) {
               continue
             }
             
@@ -679,9 +795,18 @@ export async function POST(request: NextRequest) {
             // 1. Less excess (less waste)
             // 2. Products on sale
             // 3. Products that exactly match or are closer to needed amount
-            const priceDifference = Math.abs(totalPrice - bestTotalPrice)
-            const isBetterPrice = totalPrice < bestTotalPrice
-            const isSimilarPrice = priceDifference < 0.01 && totalPrice <= bestTotalPrice
+            const organicTags = resolveProductOrganicTags(
+              productOrganicTagsMap.get(match.product_external_id),
+              offer.name_store
+            )
+            const comparisonPrice = comparisonPriceForOrganicPreference(
+              totalPrice,
+              organicPrefs,
+              organicTags
+            )
+            const priceDifference = Math.abs(comparisonPrice - bestComparisonPrice)
+            const isBetterPrice = comparisonPrice < bestComparisonPrice
+            const isSimilarPrice = priceDifference < 0.01 && comparisonPrice <= bestComparisonPrice
             
             let shouldUpdate = false
             
@@ -703,7 +828,7 @@ export async function POST(request: NextRequest) {
             }
 
             if (shouldUpdate) {
-              bestTotalPrice = totalPrice
+              bestComparisonPrice = comparisonPrice
               bestExcess = excess
               
               const totalNormalPrice = offer.normal_price ? offer.normal_price * quantityNeeded : null
@@ -728,8 +853,35 @@ export async function POST(request: NextRequest) {
                 productAmount: convertedAmount,
                 neededAmount: neededAmount,
                 quantityNeeded: quantityNeeded, // How many units to buy
-                isSufficient: convertedAmount >= neededAmount
+                isSufficient: convertedAmount >= neededAmount,
+                pricingSource: 'fooddata_offer',
+                isOrganicMatch: organicTags.length > 0,
               }
+            }
+          }
+        }
+
+        // Sidste udvej: kurateret match med snapshot-pris for denne butik
+        if (!bestProduct && !storeNeedsGuidePrices(storeKey)) {
+          for (const match of storeMatches) {
+            if (!match.product_name_snapshot || match.last_known_price == null) continue
+            const snapshotPrice = Number(match.last_known_price)
+            if (!Number.isFinite(snapshotPrice) || snapshotPrice <= 0) continue
+            const gramsPerUnit =
+              (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
+              gramsPerUnitByNameMap.get(normalizeName(String(item.name || '')))
+            const built = buildSnapshotProduct(match, {
+              snapshotPrice,
+              neededAmount,
+              neededUnit,
+              storeKey,
+              gramsPerUnit,
+              productOrganicTagsMap,
+              organicPrefs,
+            })
+            if (built) {
+              bestProduct = built.product
+              break
             }
           }
         }
@@ -738,128 +890,6 @@ export async function POST(request: NextRequest) {
           result[storeKey][shoppingItemName] = bestProduct
           itemsWithProducts++
         } else {
-          // Fallback: if matched products do not produce a usable candidate in this store,
-          // try a direct name lookup in the target store.
-          const fallbackCacheKey = `${storeKey}::${shoppingItemName}`
-          let fallbackProduct = nameFallbackCache.get(fallbackCacheKey)
-          if (fallbackProduct === undefined) {
-            fallbackProduct = null
-            const candidatesForStore = storeCandidatesByKey.get(storeKey) || [storeKey]
-            const searchTerm = String(item.name || '').trim()
-            if (searchTerm.length >= 2) {
-              const { data: fallbackOffers, error: fallbackOffersError } = await supabase
-                .from('product_offers')
-                .select(`
-                  id,
-                  store_id,
-                  store_product_id,
-                  name_store,
-                  current_price,
-                  normal_price,
-                  is_on_sale,
-                  is_offer_active,
-                  discount_percentage,
-                  amount,
-                  unit
-                `)
-                .in('store_id', candidatesForStore)
-                .eq('is_available', true)
-                .ilike('name_store', `%${searchTerm}%`)
-                .order('current_price', { ascending: true })
-                .limit(30)
-
-              if (!fallbackOffersError && fallbackOffers && fallbackOffers.length > 0) {
-                const normalizedSearch = normalizeName(searchTerm)
-                const searchTokens = normalizedSearch.split(/\s+/).filter(Boolean)
-
-                const scored = fallbackOffers.map((offer) => {
-                  const nameRaw = String(offer.name_store || '')
-                  const nameNorm = normalizeName(nameRaw)
-                  const nameLower = nameRaw.toLowerCase()
-                  let score = 0
-
-                  if (nameNorm === normalizedSearch) score += 1200
-                  if (nameNorm.startsWith(normalizedSearch)) score += 900
-                  if (nameNorm.includes(normalizedSearch)) score += 500
-
-                  let tokenHits = 0
-                  for (const t of searchTokens) {
-                    if (nameNorm.includes(t)) {
-                      score += 180
-                      tokenHits++
-                    }
-                  }
-                  if (searchTokens.length > 1 && tokenHits === searchTokens.length) {
-                    score += 250
-                  }
-
-                  // De-prioritize "flavor-like" false positives (e.g. kyllingesmag noodles).
-                  if (nameLower.includes('smag')) score -= 500
-                  if (nameLower.includes('nudler')) score -= 220
-
-                  return { offer, score }
-                })
-                scored.sort((a, b) => {
-                  if (b.score !== a.score) return b.score - a.score
-                  const pa = Number(a.offer.current_price || 0)
-                  const pb = Number(b.offer.current_price || 0)
-                  return pa - pb
-                })
-
-                const chosen = scored[0]?.offer
-                if (!chosen) {
-                  nameFallbackCache.set(fallbackCacheKey, null)
-                  continue
-                }
-
-                const offerIsActive = chosen.is_offer_active === true
-                  ? true
-                  : !!chosen.is_on_sale || (
-                    chosen.normal_price &&
-                    chosen.current_price &&
-                    chosen.normal_price > chosen.current_price
-                  )
-
-                let discountPercentage = chosen.discount_percentage
-                if (
-                  offerIsActive &&
-                  chosen.normal_price &&
-                  chosen.current_price &&
-                  chosen.normal_price > chosen.current_price
-                ) {
-                  discountPercentage = Math.round(
-                    ((chosen.normal_price - chosen.current_price) / chosen.normal_price) * 100
-                  )
-                }
-
-                fallbackProduct = {
-                  product_external_id: chosen.store_product_id || null,
-                  name: chosen.name_store,
-                  price: chosen.current_price,
-                  totalPrice: chosen.current_price || 0,
-                  normalPrice: chosen.normal_price,
-                  totalNormalPrice: chosen.normal_price ?? null,
-                  isOnSale: offerIsActive,
-                  discountPercentage,
-                  amount: chosen.amount,
-                  unit: chosen.unit,
-                  productAmount: null,
-                  neededAmount,
-                  quantityNeeded: 1,
-                  isSufficient: true,
-                  isNameFallback: true,
-                }
-              }
-            }
-            nameFallbackCache.set(fallbackCacheKey, fallbackProduct)
-          }
-
-          if (fallbackProduct) {
-            result[storeKey][shoppingItemName] = fallbackProduct
-            itemsWithProducts++
-            continue
-          }
-
           itemsWithoutProducts++
           // Only log if there were matches but no offers found
           if (matchesForIngredient.length > 0) {
@@ -878,6 +908,17 @@ export async function POST(request: NextRequest) {
     console.log(`📊 Stores in result: ${Object.keys(result).join(', ') || 'none'}`)
     console.log(`📊 Total items per store:`, Object.entries(result).map(([store, items]) => `${store}: ${Object.keys(items).length}`).join(', ') || 'none')
 
+    const guideCount = applyGuidePricesForOfferStores(
+      result,
+      requestedStoreKeys,
+      shoppingListItems
+    )
+    stripUnrequestedReferenceStores(result, requestedStoreKeys)
+
+    if (guideCount > 0) {
+      console.log(`📎 Guide prices: filled ${guideCount} missing items for offer-only stores`)
+    }
+
     // Include debug info in response if no products found
     const debugInfo = itemsWithProducts === 0 ? {
       ingredientIdsCount: ingredientIds.length,
@@ -890,6 +931,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: result,
+      guideCount,
       ...(debugInfo && { debug: debugInfo })
     })
   } catch (error: any) {
@@ -899,6 +941,35 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+/** Afvis pakkeberegninger hvor enheder sandsynligvis er fejltolket (fx 1 g = 1 glas). */
+function isSuspiciousQuantity(
+  neededUnit: string,
+  neededAmount: number,
+  convertedAmount: number,
+  quantityNeeded: number
+): boolean {
+  if (quantityNeeded <= 3 || neededAmount <= 0) return false
+
+  const need = neededUnit.toLowerCase().trim()
+  const isWeightVolume =
+    need === 'g' ||
+    need === 'kg' ||
+    need === 'ml' ||
+    need === 'l' ||
+    need.includes('gram') ||
+    need.includes('milliliter')
+
+  if (!isWeightVolume) return false
+
+  // Lille "pakke" men mange stk nødvendige → klassisk 1 g = 1 pakke-fejl
+  if (convertedAmount < 10 && quantityNeeded > 3) return true
+
+  // Moderat opskriftsmængde men 10+ pakker
+  if (neededAmount <= 250 && quantityNeeded >= 10) return true
+
+  return false
 }
 
 /**
@@ -994,6 +1065,10 @@ function convertToUnit(
   // Same unit
   if (from === to) return value
 
+  // Fresh herbs / bundles: retail sells as 1 stk ≈ 1 bundt (purløg, persille, …)
+  if (from === 'bundt' && to === 'stk') return value
+  if (from === 'stk' && to === 'bundt') return value
+
   // g <-> stk using ingredient's standard weight per piece (e.g. rødløg 80 g/stk)
   if (gramsPerUnit != null && gramsPerUnit > 0) {
     if (from === 'g' && to === 'stk') return value / gramsPerUnit
@@ -1023,4 +1098,136 @@ function convertToUnit(
   if (from === 'ml' && to === 'tsk') return value / 5
 
   return null
+}
+
+/** Alle kuraterede matches for den aktuelle butik — ingen global fooddata-prioritering. */
+function selectMatchesForStore(matches: any[], storeKey: string): any[] {
+  return matches.filter((m) =>
+    matchBelongsToStore(
+      m.product_external_id,
+      m.product_store_snapshot,
+      storeKey
+    )
+  )
+}
+
+function buildSnapshotProduct(
+  match: any,
+  opts: {
+    snapshotPrice: number
+    neededAmount: number
+    neededUnit: string
+    storeKey: string
+    gramsPerUnit?: number
+    productOrganicTagsMap: Map<string, string[]>
+    organicPrefs: OrganicPreferenceInput
+  }
+): { product: any; comparisonPrice: number; excess: number } {
+  const {
+    snapshotPrice,
+    neededAmount,
+    neededUnit,
+    storeKey,
+    gramsPerUnit,
+    productOrganicTagsMap,
+    organicPrefs,
+  } = opts
+
+  // Snapshots mangler pakkestørrelse — prøv stk→opskrift-enhed, ellers 1 pakke
+  let quantityNeeded = 1
+  let convertedAmount = 1
+  const fromStk = convertToUnit(1, 'stk', neededUnit, gramsPerUnit)
+  if (fromStk != null && fromStk > 0 && neededAmount > 0) {
+    const calculated =
+      fromStk >= neededAmount ? 1 : Math.ceil(neededAmount / fromStk)
+    if (
+      calculated > 0 &&
+      calculated <= 120 &&
+      !isSuspiciousQuantity(neededUnit, neededAmount, fromStk, calculated)
+    ) {
+      quantityNeeded = calculated
+      convertedAmount = fromStk
+    }
+  }
+
+  const totalPrice = snapshotPrice * quantityNeeded
+  const excess = convertedAmount * quantityNeeded - neededAmount
+  const organicTags = resolveProductOrganicTags(
+    productOrganicTagsMap.get(match.product_external_id),
+    match.product_name_snapshot
+  )
+  const comparisonPrice = comparisonPriceForOrganicPreference(
+    totalPrice,
+    organicPrefs,
+    organicTags
+  )
+
+  return {
+    comparisonPrice,
+    excess,
+    product: {
+      product_external_id: match.product_external_id,
+      name: match.product_name_snapshot,
+      price: snapshotPrice,
+      totalPrice,
+      normalPrice: null,
+      totalNormalPrice: null,
+      isOnSale: false,
+      discountPercentage: null,
+      amount: '1',
+      unit: 'stk',
+      productAmount: convertedAmount,
+      neededAmount,
+      quantityNeeded,
+      isSufficient: convertedAmount * quantityNeeded >= neededAmount,
+      isSnapshotPrice: true,
+      pricingSource: 'fooddata_snapshot',
+      store: match.product_store_snapshot || storeKey,
+      isOrganicMatch: organicTags.length > 0,
+    },
+  }
+}
+
+/** True when a curated match belongs to the store tab being priced. */
+function matchBelongsToStore(
+  productExternalId: string,
+  productStoreSnapshot: string | null | undefined,
+  storeKey: string
+): boolean {
+  const id = String(productExternalId || '').toLowerCase().trim()
+  const storePrefixes: Record<string, string[]> = {
+    'rema-1000': ['rema-1000-'],
+    netto: ['netto-'],
+    'føtex': ['føtex-', 'fotex-', 'foetex-'],
+    bilka: ['bilka-'],
+    nemlig: ['nemlig-'],
+    meny: ['meny-'],
+    spar: ['spar-'],
+    'løvbjerg': ['loevbjerg-', 'løvbjerg-', 'lovbjerg-'],
+  }
+
+  const prefixes = storePrefixes[storeKey] || [`${storeKey}-`]
+  if (prefixes.some((prefix) => id.startsWith(prefix))) return true
+
+  if (!productStoreSnapshot) return false
+
+  const snap = String(productStoreSnapshot)
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const storeAliases: Record<string, string[]> = {
+    'rema-1000': ['rema-1000', 'rema 1000', 'rema'],
+    netto: ['netto'],
+    'føtex': ['fotex', 'foetex', 'føtex'],
+    bilka: ['bilka', 'salling'],
+    nemlig: ['nemlig'],
+    meny: ['meny'],
+    spar: ['spar'],
+    'løvbjerg': ['loevbjerg', 'lovbjerg', 'løvbjerg'],
+  }
+
+  const aliases = storeAliases[storeKey] || [storeKey]
+  return aliases.some((alias) => snap.includes(alias))
 }

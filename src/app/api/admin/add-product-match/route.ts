@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { runFooddataPublish, upsertMatchInFooddata } from '@/lib/fooddata-publish'
+import { resolveProductMatchSnapshot } from '@/lib/product-match-snapshots'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -98,22 +100,39 @@ export async function POST(request: NextRequest) {
       console.warn(`⚠️ Product not found in either source for product_external_id="${product_external_id}". Allowing match anyway.`)
     }
 
-    // Insert the match
-    const insertData = {
+    const snapshot = await resolveProductMatchSnapshot(supabase, product_external_id)
+
+    const insertBase = {
       ingredient_id,
       product_external_id,
       confidence: confidence || 100,
       match_type: match_type || 'manual',
-      is_manual: true
+      is_manual: true,
     }
-    
-    console.log(`📝 Inserting match with data:`, JSON.stringify(insertData, null, 2))
-    
-    const { data, error } = await supabase
+    const insertWithSnapshots = {
+      ...insertBase,
+      product_name_snapshot: snapshot.product_name_snapshot,
+      product_store_snapshot: snapshot.product_store_snapshot,
+      last_known_price: snapshot.last_known_price,
+    }
+
+    console.log(`📝 Inserting match with data:`, JSON.stringify(insertWithSnapshots, null, 2))
+
+    let { data, error } = await supabase
       .from('product_ingredient_matches')
-      .insert(insertData)
+      .insert(insertWithSnapshots)
       .select()
       .single()
+
+    if (error?.message?.includes('last_known_price') || error?.message?.includes('product_name_snapshot')) {
+      const retry = await supabase
+        .from('product_ingredient_matches')
+        .insert(insertBase)
+        .select()
+        .single()
+      data = retry.data
+      error = retry.error
+    }
 
     if (error) {
       console.error('❌ Error adding product match:', error)
@@ -149,6 +168,14 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`✅ Successfully added product match: ${data?.id}`)
+
+    const publishResult = await runFooddataPublish('add-product-match', async (client) => {
+      await upsertMatchInFooddata(client, insertWithSnapshots)
+    })
+    if (!publishResult.ok && !publishResult.skipped) {
+      console.warn('⚠️ fooddata publish failed (local match saved):', publishResult.error)
+    }
+
     return NextResponse.json({ 
       success: true, 
       message: 'Product match added successfully',

@@ -102,10 +102,16 @@ const adminNavItems = [
     description: 'Match produkter med ingredienser'
   },
   {
-    name: 'Goma-kø (nye varer)',
-    href: '/admin/product-match-queue',
+    name: 'Nye varer (fooddata-kø)',
+    href: '/admin/product-ingredient-matching/nye-varer',
     icon: List,
-    description: 'Nye dagligvarevarer fra Goma der venter på ingrediensmatch'
+    description: 'Fælles fooddata-kø — nye mad-varer uden ingrediensmatch'
+  },
+  {
+    name: 'Fravalg-tags',
+    href: '/admin/exclusions',
+    icon: Tag,
+    description: 'Fravalg og økologi-tags på ingredienser'
   },
   {
     name: 'Blogs',

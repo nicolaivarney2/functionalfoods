@@ -212,7 +212,6 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
         excludedIngredients: data.excludedFoods ?? [],
         selectedStores: data.selectedStores.length ? data.selectedStores : [1, 2],
         variationLevel: 2,
-        weeklyBudgetKr: null,
       },
       adultProfiles: [
         {

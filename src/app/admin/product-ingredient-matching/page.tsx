@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { ChevronDownIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
+import { IngredientTagEditor } from '@/components/admin/IngredientTagEditor'
 
 interface Ingredient {
   id: string
   name: string
   category: string
   description?: string
+  exclusions?: unknown
   is_basis?: boolean
   grams_per_unit?: number | null
   created_at?: string | null
@@ -149,7 +151,8 @@ export default function ProductIngredientMatchingPage() {
             id: ing.id,
             name: ing.name,
             category: ing.category || 'Andre',
-            description: `${ing.name} - importeret fra opskrifter`,
+            description: ing.description || undefined,
+            exclusions: ing.exclusions,
             is_basis: ing.is_basis || false,
             grams_per_unit: ing.grams_per_unit ?? null,
             created_at: ing.created_at ?? null
@@ -834,6 +837,18 @@ export default function ProductIngredientMatchingPage() {
                           {ingredient.description}
                         </div>
                       )}
+                      <IngredientTagEditor
+                        ingredientId={ingredient.id}
+                        name={ingredient.name}
+                        exclusions={ingredient.exclusions}
+                        onUpdated={(tags) => {
+                          setIngredients((prev) =>
+                            prev.map((ing) =>
+                              ing.id === ingredient.id ? { ...ing, exclusions: tags } : ing
+                            )
+                          )
+                        }}
+                      />
                     </div>
                     <div className="text-sm text-gray-500">
                       {matchedProducts.length} product{matchedProducts.length !== 1 ? 's' : ''} matched

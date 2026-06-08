@@ -191,10 +191,7 @@ export async function POST(request: NextRequest) {
         excluded_ingredients: familyProfile.excludedIngredients || [],
         selected_stores: familyProfile.selectedStores || [],
         variation_level: familyProfile.variationLevel || 2,
-        weekly_budget_kr:
-          familyProfile.weeklyBudgetKr === null || familyProfile.weeklyBudgetKr === undefined
-            ? null
-            : Math.min(500_000, Math.max(0, Math.round(Number(familyProfile.weeklyBudgetKr)))),
+        weekly_budget_kr: null,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'user_id'

@@ -480,14 +480,16 @@ export class MealPlanGenerator {
       excludedIngredients: string[]
       selectedStores: number[]
       prioritizeOrganic: boolean
-      /** Valgfrit max-indkøb pr. uge (kr). Styrker scoring af opskrifter med tilbud. */
-      weeklyBudgetKr?: number | null
+      prioritizeAnimalOrganic?: boolean
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
     const startTime = Date.now();
 
     await this.recipesLoadPromise
+
+    const { createSupabaseClient } = await import('../supabase')
+    await ingredientService.ensureLoadedFromDatabase(createSupabaseClient())
 
     // Determine primary dietary approach from actually completed profiles.
     // This avoids one stale keto value hijacking all generated plans.
@@ -612,19 +614,10 @@ export class MealPlanGenerator {
         preferredCookingDays: ['monday', 'wednesday', 'friday'],
         batchCookingAllowed: true
       },
-      weeklyBudgetKr:
-        familyProfile.weeklyBudgetKr != null && familyProfile.weeklyBudgetKr > 0
-          ? familyProfile.weeklyBudgetKr
-          : null
     };
 
     const storeIds = familyProfile.selectedStores ?? []
     console.log(`🛒 Loading offers from stores: ${storeIds.length ? storeIds.join(', ') : '(ingen butikker valgt)'}`)
-    if (familyProfile.weeklyBudgetKr != null && familyProfile.weeklyBudgetKr > 0) {
-      console.log(
-        `💶 Budgetloft: ${familyProfile.weeklyBudgetKr} kr/uge – tilbud vægtes stærkere (faktor op til ~${Math.min(2.2, Math.max(1, 1200 / familyProfile.weeklyBudgetKr)).toFixed(2)})`
-      )
-    }
     await this.loadCurrentOffers(storeIds)
 
     // Generate 1 week of meal plans
@@ -1101,13 +1094,6 @@ export class MealPlanGenerator {
       
       // Add offer-based scoring (async)
       let offerScore = await this.calculateOfferScore(recipe);
-
-      // Budgetloft: jo lavere ugentligt loft, jo mere vægtes tilbud (samme retning som "køb efter tilbud")
-      const budgetKr = config.weeklyBudgetKr
-      if (budgetKr != null && budgetKr > 0 && offerScore > 0) {
-        const pressure = Math.min(2.2, Math.max(1, 1200 / budgetKr))
-        offerScore *= pressure
-      }
 
       // Add ingredient overlap scoring (bonus for shared ingredients)
       const overlapScore = this.calculateIngredientOverlapScore(recipe);

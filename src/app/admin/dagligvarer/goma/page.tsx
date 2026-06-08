@@ -5,8 +5,6 @@ import { useAdminAuth } from '@/hooks/useAdminAuth'
 import {
   Store,
   RefreshCw,
-  CheckCircle2,
-  AlertCircle,
   CalendarDays,
   ArrowLeft,
   Activity,
@@ -118,10 +116,6 @@ const GOMA_STORES: {
 
 export default function AdminGomaDagligvarerPage() {
   const { isAdmin, checking } = useAdminAuth()
-  const [syncingStore, setSyncingStore] = useState<GomaStoreId | null>(null)
-  const [statusMessage, setStatusMessage] = useState<string | null>(null)
-  const [statusType, setStatusType] = useState<'success' | 'error' | null>(null)
-  const [cleaningUp, setCleaningUp] = useState(false)
   const [healthLoading, setHealthLoading] = useState(false)
   const [healthError, setHealthError] = useState<string | null>(null)
   const [healthSummary, setHealthSummary] = useState<SyncHealthSummary | null>(null)
@@ -166,104 +160,6 @@ export default function AdminGomaDagligvarerPage() {
     return null
   }
 
-  const handleSyncStore = async (storeId: GomaStoreId) => {
-    setSyncingStore(storeId)
-    setStatusMessage(null)
-    setStatusType(null)
-
-    try {
-      const res = await fetch('/api/admin/goma/import', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          stores: [storeId],
-          limit: 150,
-          // 250 * 150 = 37.500 produkter pr. butik – nok til selv Nemlig (~30k).
-          // Selve import-funktionen stopper når en side er tom, så det her er
-          // bare loftet, ikke det faktiske antal kald.
-          pages: 250
-        })
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Ukendt fejl ved Goma sync')
-      }
-
-      const imported = typeof data.imported === 'number' ? data.imported : undefined
-      const cleanedExpired =
-        data.cleanup && typeof data.cleanup.cleaned === 'number'
-          ? (data.cleanup.cleaned as number)
-          : null
-      const parts: string[] = []
-      parts.push(
-        imported != null
-          ? `Synkronisering for ${storeId} gennemført. Importerede ca. ${imported} produkter.`
-          : `Synkronisering for ${storeId} gennemført.`
-      )
-      if (cleanedExpired != null) {
-        parts.push(
-          cleanedExpired === 0
-            ? 'Ingen udløbne tilbud at rydde op i.'
-            : `Ryddet op i ${cleanedExpired} udløbne tilbud på tværs af alle butikker.`
-        )
-      }
-      setStatusMessage(parts.join(' '))
-      setStatusType('success')
-      fetchHealth()
-    } catch (error) {
-      console.error('GOMA sync fejl:', error)
-      setStatusMessage(
-        `Kunne ikke synce ${storeId}: ${
-          error instanceof Error ? error.message : 'Ukendt fejl'
-        }`
-      )
-      setStatusType('error')
-    } finally {
-      setSyncingStore(null)
-    }
-  }
-
-  const handleCleanupExpired = async () => {
-    setCleaningUp(true)
-    setStatusMessage(null)
-    setStatusType(null)
-
-    try {
-      const res = await fetch('/api/admin/dagligvarer/cleanup-expired-offers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-
-      const data = await res.json()
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || data.message || 'Ukendt fejl ved cleanup')
-      }
-
-      setStatusMessage(
-        `Ryddet op i ${data.cleaned || 0} udløbne tilbud. ${data.byStore ? Object.entries(data.byStore).map(([store, count]) => `${store}: ${count}`).join(', ') : ''}`
-      )
-      setStatusType('success')
-      fetchHealth()
-    } catch (error) {
-      console.error('Cleanup fejl:', error)
-      setStatusMessage(
-        `Kunne ikke rydde op: ${
-          error instanceof Error ? error.message : 'Ukendt fejl'
-        }`
-      )
-      setStatusType('error')
-    } finally {
-      setCleaningUp(false)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-5xl mx-auto">
@@ -279,44 +175,27 @@ export default function AdminGomaDagligvarerPage() {
           </div>
         </div>
 
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-medium text-amber-900">Goma er sunset</p>
+          <p className="mt-1 text-sm text-amber-800">
+            Eksisterende produkt- og tilbudsdata bevares uændret — production bruger den stadig.
+            Ingen nye imports, ingen cleanup, ingen scheduled sync. Når production skifter til
+            fooddata, kan Goma-data slettes.
+          </p>
+        </div>
+
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Store className="h-6 w-6 text-indigo-600" />
-                GOMA dagligvarer sync
+                <Store className="h-6 w-6 text-gray-500" />
+                GOMA dagligvarer (read-only)
               </h1>
               <p className="mt-2 text-sm text-gray-600">
-                Her kan du manuelt synce produkter fra GOMAs API for hver butik. Disse data
-                bruges på dagligvarer-siden via vores fælles produktstruktur.
-              </p>
-            </div>
-            <div className="flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2 border border-blue-100">
-              <CalendarDays className="h-4 w-4 text-blue-600 mt-0.5" />
-              <p className="text-xs text-blue-800">
-                Automatisk sync kører via GitHub Actions kl. 04:00 og 16:00 dansk tid.
-                Begge kørsler synker butikker med nye tilbud den pågældende dag og rydder
-                op i udløbne tilbud bagefter.
+                Oversigt over sidste sync-status pr. butik. Sync og cleanup er deaktiveret.
               </p>
             </div>
           </div>
-
-          {statusMessage && (
-            <div
-              className={`mb-4 flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${
-                statusType === 'success'
-                  ? 'bg-green-50 text-green-800 border border-green-100'
-                  : 'bg-red-50 text-red-800 border border-red-100'
-              }`}
-            >
-              {statusType === 'success' ? (
-                <CheckCircle2 className="h-4 w-4 mt-0.5" />
-              ) : (
-                <AlertCircle className="h-4 w-4 mt-0.5" />
-              )}
-              <p>{statusMessage}</p>
-            </div>
-          )}
 
           {/* Sync health overview */}
           <div className="mb-6 rounded-lg border border-gray-200 bg-white">
@@ -462,30 +341,19 @@ export default function AdminGomaDagligvarerPage() {
                       {store.note}
                     </p>
                   )}
-                  <p className="mt-2 text-xs text-gray-600">
-                    Synker både produkter og tilbud for denne butik fra Goma. Henter
-                    op til ~37.500 produkter pr. butik (nok til selv Nemlig), parallelt
-                    i batches af 6 sider. Stopper automatisk når kataloget er tomt.
+                  <p className="mt-2 text-xs text-gray-500">
+                    Sidste kendte sync-status — manuel sync er deaktiveret (Goma sunset).
                   </p>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => handleSyncStore(store.id)}
-                  disabled={!!syncingStore}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled
+                  title="Goma sunset — sync deaktiveret"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 px-4 py-2 text-sm font-medium text-gray-500 cursor-not-allowed"
                 >
-                  {syncingStore === store.id ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      <span>Synker {store.label}…</span>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4" />
-                      <span>Sync {store.label} nu</span>
-                    </>
-                  )}
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Sync deaktiveret</span>
                 </button>
               </div>
             ))}
@@ -493,44 +361,11 @@ export default function AdminGomaDagligvarerPage() {
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Vedligeholdelse</h3>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-yellow-800 mb-3">
-                <strong>Ryd op i udløbne tilbud:</strong> Finder og deaktiverer alle tilbud hvor 
-                <code className="bg-yellow-100 px-1 rounded">sale_valid_to</code> er i fortiden, 
-                men stadig er markeret som aktive. Dette sikrer at udløbne tilbud ikke vises på siden.
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-600">
+                Cleanup af udløbne tilbud er deaktiveret under sunset — data fryses som den er.
               </p>
-              <button
-                type="button"
-                onClick={handleCleanupExpired}
-                disabled={cleaningUp || !!syncingStore}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-700 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {cleaningUp ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Rydder op...</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Ryd op i udløbne tilbud</span>
-                  </>
-                )}
-              </button>
             </div>
-          </div>
-
-          <div className="mt-6 text-xs text-gray-500">
-            <p className="mb-1">
-              Bemærk: Vi behøver ikke at hente hele kataloget hver dag. Vi fokuserer på
-              aktuelle tilbud og vigtigste produkter for at holde svartiden under Vercels
-              10 sekunders grænse.
-            </p>
-            <p>
-              Hvis du vil lave en fuld re-import af alle produkter fra Goma, kan det gøres
-              via scripts eller ved at justere limit/pages manuelt i backend – spørg
-              udvikleren først.
-            </p>
           </div>
         </div>
       </div>

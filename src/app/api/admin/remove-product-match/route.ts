@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { deleteMatchInFooddata, runFooddataPublish } from '@/lib/fooddata-publish'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,7 +18,19 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = createSupabaseServiceClient()
 
-    // Delete the match
+    const { data: existing, error: fetchError } = await supabase
+      .from('product_ingredient_matches')
+      .select('ingredient_id, product_external_id')
+      .eq('id', match_id)
+      .maybeSingle()
+
+    if (fetchError || !existing) {
+      return NextResponse.json({
+        success: false,
+        message: 'Match not found',
+      }, { status: 404 })
+    }
+
     const { error } = await supabase
       .from('product_ingredient_matches')
       .delete()
@@ -29,6 +42,17 @@ export async function DELETE(request: NextRequest) {
         success: false, 
         message: 'Failed to remove product match' 
       }, { status: 500 })
+    }
+
+    const publishResult = await runFooddataPublish('remove-product-match', async (client) => {
+      await deleteMatchInFooddata(
+        client,
+        existing.ingredient_id,
+        existing.product_external_id
+      )
+    })
+    if (!publishResult.ok && !publishResult.skipped) {
+      console.warn('⚠️ fooddata delete failed (local match removed):', publishResult.error)
     }
 
     return NextResponse.json({ 
