@@ -16,9 +16,18 @@ export function anySelectedStoreNeedsGuidePrices(storeKeys: string[]): boolean {
 }
 
 type PriceEntry = Record<string, unknown> & {
+  name?: string
   totalPrice?: number
   price?: number
+  totalNormalPrice?: number
+  quantityNeeded?: number
   isGuidePrice?: boolean
+  isSnapshotPrice?: boolean
+  isOnSale?: boolean
+}
+
+export function productDisplayTotal(product: PriceEntry): number {
+  return product.totalPrice ?? product.price ?? 0
 }
 
 /**
@@ -67,8 +76,8 @@ export function applyGuidePricesForOfferStores(
         isGuidePrice: true,
         isOnSale: false,
         discountPercentage: 0,
-        totalNormalPrice: null,
-        normalPrice: null,
+        totalNormalPrice: undefined,
+        normalPrice: undefined,
         name: item.name,
       }
       guideCount++

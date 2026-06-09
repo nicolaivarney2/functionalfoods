@@ -43,6 +43,7 @@ import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 import {
   GUIDE_PRICES_STORAGE_KEY,
+  productDisplayTotal,
   resolveProductForDisplay,
   storeNeedsGuidePrices,
   stripGuidePricesFromStoreMap,
@@ -142,6 +143,16 @@ function storeIdFromTabKey(tab: string): number | null {
 /** Samme kategori som generator + indkøbsliste-UI — tæller ikke med i dækningsprocent. */
 const BASIS_CATEGORY_NAME = 'Varer du måske allerede har'
 
+type ShoppingListItem = {
+  name: string
+  isBasis?: boolean
+  isOptional?: boolean
+  notes?: string
+  quantity?: string | number
+  amount?: string | number
+  unit?: string
+}
+
 function normalizeShoppingItemName(value: string): string {
   return String(value || '')
     .toLowerCase()
@@ -178,11 +189,11 @@ function buildBasisExcludedNames(
 
 /** Én kilde til sandhed for hovedlisten + dækningsprocent (uden basis). */
 function buildMainShoppingListView(
-  categories: Array<{ name?: string; items?: Array<{ name?: string; isBasis?: boolean; [key: string]: unknown }> }> | undefined,
+  categories: Array<{ name?: string; items?: Array<Partial<ShoppingListItem> & { name?: string }> }> | undefined,
   extraExcludedNames: Iterable<string> = []
 ): {
-  mainCategories: Array<{ name: string; items: Array<{ name: string; isBasis?: boolean; [key: string]: unknown }> }>
-  allItems: Array<{ name: string; isBasis?: boolean; [key: string]: unknown }>
+  mainCategories: Array<{ name: string; items: ShoppingListItem[] }>
+  allItems: ShoppingListItem[]
 } {
   const excludedNames = buildBasisExcludedNames(categories, extraExcludedNames)
 
@@ -190,7 +201,7 @@ function buildMainShoppingListView(
     .filter((cat) => !isBasisCategory(String(cat?.name || '')))
     .map((cat) => ({
       name: String(cat?.name || ''),
-      items: (cat?.items || []).filter((item) => {
+      items: (cat?.items || []).filter((item): item is ShoppingListItem => {
         if (!item?.name || item.isBasis) return false
         return !excludedNames.has(normalizeShoppingItemName(item.name))
       }),
@@ -209,7 +220,7 @@ function findProductInfoForStoreTab(
   storeKey: string,
   storePrices: Record<string, Record<string, any>>,
   useGuidePrices: boolean
-): Record<string, unknown> | null {
+): ReturnType<typeof resolveProductForDisplay> {
   if (!storeKey || storeKey === 'all' || !storePrices[storeKey]) return null
 
   const itemNameLower = itemName?.toLowerCase().trim() || ''
@@ -4279,7 +4290,6 @@ export default function MadbudgetPage() {
                           <h4 className="font-semibold text-gray-900 mb-3">{category.name}</h4>
                           <ul className="space-y-2">
                             {category.items.map((item, itemIndex) => {
-                              const itemNameLower = item.name?.toLowerCase().trim() || ''
                               const rowKey = `m-${catIndex}-${itemIndex}-${category.name}`
                               const rowDone = shoppingMode && !!shoppingChecked[rowKey]
                               const productInfo =
@@ -4352,39 +4362,39 @@ export default function MadbudgetPage() {
                                     <div className="text-gray-900 font-medium">
                                       {formatQuantity(item.amount)} {item.unit}
                                     </div>
-                                    {productInfo && (productInfo.totalPrice || productInfo.price) && (
+                                    {productInfo && productDisplayTotal(productInfo) > 0 && (
                                       <div className="text-sm">
                                         {productInfo.isGuidePrice ? (
                                           <div className="italic text-gray-500">
                                             <span>
-                                              ~{(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                              ~{productDisplayTotal(productInfo).toFixed(2).replace('.', ',')} kr
                                             </span>
                                             <span className="ml-1 not-italic text-xs">vejledende</span>
                                           </div>
                                         ) : productInfo.isOnSale ? (
                                           <div>
                                             <span className="text-green-600 font-semibold">
-                                              {(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                              {productDisplayTotal(productInfo).toFixed(2).replace('.', ',')} kr
                                             </span>
-                                            {productInfo.totalNormalPrice && (
+                                            {productInfo.totalNormalPrice != null && (
                                               <span className="text-gray-400 line-through ml-1 text-xs">
                                                 {productInfo.totalNormalPrice.toFixed(2).replace('.', ',')} kr
                                               </span>
                                             )}
-                                            {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                            {productInfo.quantityNeeded != null && productInfo.quantityNeeded > 1 && (
                                               <div className="text-xs text-gray-500 mt-0.5">
-                                                ({productInfo.price.toFixed(2).replace('.', ',')} kr pr. stk)
+                                                ({(productInfo.price ?? 0).toFixed(2).replace('.', ',')} kr pr. stk)
                                               </div>
                                             )}
                                           </div>
                                         ) : (
                                           <div>
                                             <span className="text-gray-700">
-                                              {(productInfo.totalPrice || productInfo.price).toFixed(2).replace('.', ',')} kr
+                                              {productDisplayTotal(productInfo).toFixed(2).replace('.', ',')} kr
                                             </span>
-                                            {productInfo.quantityNeeded && productInfo.quantityNeeded > 1 && (
+                                            {productInfo.quantityNeeded != null && productInfo.quantityNeeded > 1 && (
                                               <div className="text-xs text-gray-500 mt-0.5">
-                                                ({productInfo.price.toFixed(2).replace('.', ',')} kr pr. stk)
+                                                ({(productInfo.price ?? 0).toFixed(2).replace('.', ',')} kr pr. stk)
                                               </div>
                                             )}
                                           </div>

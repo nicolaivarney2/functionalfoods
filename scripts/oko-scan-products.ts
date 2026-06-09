@@ -74,7 +74,7 @@ async function fetchAllProducts(
   let offset = 0
 
   while (true) {
-    const { data, error } = await withRetry(`products ${offset}`, () =>
+    const { data, error } = await withRetry(`products ${offset}`, async () =>
       supabase
         .from('products')
         .select('id, name_generic, category, department, organic_tags')
@@ -112,7 +112,7 @@ async function fetchOfferNamesByProduct(
       console.log(`   Henter butiksnavne: ${chunkNo}/${totalChunks}…`)
     }
 
-    const { data, error } = await withRetry(`offers ${chunkNo}`, () =>
+    const { data, error } = await withRetry(`offers ${chunkNo}`, async () =>
       supabase
         .from('product_offers')
         .select('product_id, name_store')
@@ -148,7 +148,7 @@ async function main() {
   const supabase = createSupabaseServiceClient()
 
   try {
-    await withRetry('probe organic_tags', () =>
+    await withRetry('probe organic_tags', async () =>
       supabase.from('products').select('organic_tags').limit(1)
     )
   } catch (err) {

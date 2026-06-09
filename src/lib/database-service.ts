@@ -456,7 +456,7 @@ export class DatabaseService {
     stores?: string[],
     foodOnly: boolean = true,
     organicOnly?: boolean,
-    excludeSnacksAndDrinks?: boolean
+    _excludeSnacksAndDrinks?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
