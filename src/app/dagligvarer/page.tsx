@@ -374,12 +374,8 @@ const CATEGORIES = [
   { id: 'Mejeri og køl', name: 'Mejeri og køl', icon: '🥛' },
   { id: 'Nemt og hurtigt', name: 'Nemt og hurtigt', icon: '⚡' },
   { id: 'Slik og snacks', name: 'Slik og snacks', icon: '🍿' },
-  { id: 'Personlig pleje', name: 'Personlig pleje', icon: '🧴' },
-  { id: 'Husholdning', name: 'Husholdning', icon: '🧽' },
-  { id: 'Baby og familie', name: 'Baby og familie', icon: '👶' },
   { id: 'Frost', name: 'Frost', icon: '❄️' },
   { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
-  { id: 'Dyr', name: 'Dyr', icon: '🐾' }
 ]
 
 /**
@@ -430,12 +426,12 @@ export default function DagligvarerPage() {
   const [selectedStores, setSelectedStores] = useState<string[]>([])
   const [sortBy, setSortBy] = useState('discount')
   const [showOnlyOffers, setShowOnlyOffers] = useState(true)
-  const [showOnlyFoodProducts, setShowOnlyFoodProducts] = useState(true)
   const [showOnlyOrganic, setShowOnlyOrganic] = useState(false)
   
   // Data state
   const [products, setProducts] = useState<Product[]>([])
   const [counts, setCounts] = useState<ProductCounts>({ total: 0, categories: {}, offers: 0 })
+  const [countsLoading, setCountsLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
@@ -455,16 +451,21 @@ export default function DagligvarerPage() {
   const startY = useRef(0)
   const isDragging = useRef(false)
 
-  // Fetch product counts
+  // Fetch product counts — vises før produktlisten så siden føles hurtig.
   const fetchCounts = useCallback(async () => {
+    setCountsLoading(true)
     try {
-      const response = await fetch('/api/supermarket/products?counts=true')
+      const response = await fetch('/api/supermarket/products?counts=true&foodOnly=true', {
+        cache: 'no-store',
+      })
       const data = await response.json()
       if (data.success && data.counts) {
         setCounts(data.counts)
       }
     } catch (error) {
       console.error('Failed to fetch counts:', error)
+    } finally {
+      setCountsLoading(false)
     }
   }, [])
 
@@ -524,7 +525,6 @@ export default function DagligvarerPage() {
         params.append('search', searchQuery.trim())
       }
       if (showOnlyOffers) params.append('offers', 'true')
-      if (showOnlyFoodProducts) params.append('foodOnly', 'true')
       if (showOnlyOrganic) params.append('organic', 'true')
 
       const url = `/api/supermarket/products?${params}`
@@ -565,7 +565,7 @@ export default function DagligvarerPage() {
         abortControllerRef.current = null
       }
     }
-  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyFoodProducts, showOnlyOrganic, sortBy])
+  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyOrganic, sortBy])
 
   // Sort products function: tilbud først, derefter valgt sortering
   const sortProducts = (products: Product[], sortBy: string): Product[] => {
@@ -681,11 +681,7 @@ export default function DagligvarerPage() {
     isDragging.current = false
   }
 
-  // Single source of truth for filter-driven re-fetches. Includes searchQuery
-  // here so a pending search timer can no longer fire AFTER a filter toggle
-  // and resurrect old filter values via a stale fetchProducts closure.
-  // - searchQuery changes are debounced (300 ms)
-  // - all other filter changes fire immediately on next tick
+  // Produkt-fetch kører parallelt med counts (total tid = max, ikke sum).
   useEffect(() => {
     const debounceMs = searchQuery ? 300 : 0
     const timer = setTimeout(() => {
@@ -697,7 +693,6 @@ export default function DagligvarerPage() {
   }, [
     searchQuery,
     showOnlyOffers,
-    showOnlyFoodProducts,
     showOnlyOrganic,
     selectedCategories,
     selectedStores,
@@ -712,7 +707,6 @@ export default function DagligvarerPage() {
     setSelectedStores([])
     setSortBy('discount')
     setShowOnlyOffers(true) // Keep offers active by default
-    setShowOnlyFoodProducts(false)
     setShowOnlyOrganic(false)
     setCurrentPage(1)
     fetchProducts(1, false)
@@ -784,7 +778,22 @@ export default function DagligvarerPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Dagligvarer</h1>
           <p className="text-gray-600">Find de bedste tilbud fra dine foretrukne supermarkeder</p>
           <p className="text-sm text-gray-500 mt-2 mb-4">
-            {counts.total.toLocaleString()} produkter tilgængelige
+            {countsLoading ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-4 w-40 bg-gray-200 rounded animate-pulse" />
+                <span className="inline-block h-4 w-24 bg-gray-200 rounded animate-pulse" />
+              </span>
+            ) : (
+              <>
+                {counts.total.toLocaleString('da-DK')} produkter tilgængelige
+                {counts.offers > 0 && (
+                  <span className="text-gray-400"> · </span>
+                )}
+                {counts.offers > 0 && (
+                  <span>{counts.offers.toLocaleString('da-DK')} tilbud</span>
+                )}
+              </>
+            )}
           </p>
           
           {/* Mobile Search */}
@@ -903,17 +912,15 @@ export default function DagligvarerPage() {
                     onChange={handleOffersToggle}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm">Kun tilbudsvarer ({counts.offers})</span>
-                </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyFoodProducts}
-                    onChange={(e) => setShowOnlyFoodProducts(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm">Kun fødevarer</span>
+                  <span className="text-sm">
+                    Kun tilbudsvarer (
+                    {countsLoading ? (
+                      <span className="inline-block w-8 h-3 bg-gray-200 rounded animate-pulse align-middle" />
+                    ) : (
+                      counts.offers.toLocaleString('da-DK')
+                    )}
+                    )
+                  </span>
                 </label>
                 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -950,7 +957,11 @@ export default function DagligvarerPage() {
                         <span className="text-sm">{category.icon}</span>
                         <span className="text-sm flex-1 truncate">{category.name}</span>
                         <span className="text-xs text-gray-500">
-                          ({counts.categories[category.id] || 0})
+                          {countsLoading ? (
+                            <span className="inline-block w-6 h-3 bg-gray-200 rounded animate-pulse" />
+                          ) : (
+                            `(${ (counts.categories[category.id] || 0).toLocaleString('da-DK') })`
+                          )}
                         </span>
                       </label>
                     ))}
@@ -1034,7 +1045,9 @@ export default function DagligvarerPage() {
                         : 'bg-gray-100 text-gray-700'
                     }`}
                   >
-                    {showOnlyOffers ? '✓ Tilbud' : 'Alle'}
+                    {showOnlyOffers ? (
+                      countsLoading ? 'Tilbud…' : `✓ Tilbud (${counts.offers.toLocaleString('da-DK')})`
+                    ) : 'Alle'}
                   </button>
                   <button
                     onClick={(e) => {
@@ -1083,11 +1096,13 @@ export default function DagligvarerPage() {
                         >
                           <span className="text-sm">{category.icon}</span>
                           <span>{category.name}</span>
-                          {count > 0 && (
+                          {countsLoading ? (
+                            <span className="inline-block w-5 h-3 bg-gray-200 rounded animate-pulse" />
+                          ) : count > 0 ? (
                             <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
-                              ({count})
+                              ({count.toLocaleString('da-DK')})
                             </span>
-                          )}
+                          ) : null}
                         </button>
                       )
                     })}

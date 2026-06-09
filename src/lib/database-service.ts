@@ -1,7 +1,47 @@
-import { createSupabaseClient } from './supabase'
+import { createSupabaseClient, createSupabaseServiceClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
+import { getFoodCatalogLabelsForFilter } from '@/lib/product-food-classification'
+
+/** Proven discount — stol ikke på is_on_sale / is_offer_active alene (Planomo jun 2026). */
+export type OfferPricingFields = {
+  current_price?: number | null
+  normal_price?: number | null
+  sale_valid_to?: string | null
+}
+
+export function isRealOfferFields(offer: OfferPricingFields): boolean {
+  const price = Number(offer.current_price || 0)
+  if (price <= 0) return false
+  if (offer.sale_valid_to && new Date(offer.sale_valid_to) < new Date()) return false
+  const normal = offer.normal_price != null ? Number(offer.normal_price) : null
+  return normal != null && normal > price + 0.01
+}
+
+export function resolveOfferDisplayPricing(
+  offer: OfferPricingFields & {
+    is_on_sale?: boolean
+    is_offer_active?: boolean
+    discount_percentage?: number | null
+  },
+) {
+  const price = Number(offer.current_price || 0)
+  const normal = offer.normal_price != null ? Number(offer.normal_price) : null
+  const isReal = isRealOfferFields(offer)
+  const originalPrice = isReal && normal != null ? normal : price
+  const discountPct =
+    isReal && normal != null && normal > price + 0.01
+      ? Math.round(((normal - price) / normal) * 100)
+      : null
+  return {
+    price,
+    original_price: originalPrice,
+    is_on_sale: isReal,
+    is_offer_active: isReal,
+    discount_percentage: discountPct,
+  }
+}
 
 /**
  * Run async work over a list with bounded concurrency.
@@ -33,9 +73,9 @@ export class DatabaseService {
   private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
   private allRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
 
-  /** Short TTL: counts change nightly; avoids repeated heavy work on page refresh. */
-  private readonly PRODUCT_COUNTS_CACHE_TTL_MS = 45_000
+  private readonly PRODUCT_COUNTS_CACHE_TTL_MS = 600_000
   private productCountsCache: {
+    slot: 'food' | 'all'
     data: { total: number; categories: { [key: string]: number }; offers: number }
     expiresAt: number
   } | null = null
@@ -52,18 +92,26 @@ export class DatabaseService {
     'frugt & grønt': 'Frugt og grønt',
     'frugt og grønt': 'Frugt og grønt',
     'brød & kager': 'Brød og kager',
+    'brød & bavinchi': 'Brød og kager',
     'brød og kager': 'Brød og kager',
     'drikkevarer': 'Drikkevarer',
+    'drikke': 'Drikkevarer',
     'kød, fisk & fjerkræ': 'Kød og fisk',
+    'kød & fisk': 'Kød og fisk',
     'kød og fisk': 'Kød og fisk',
     'kolonial': 'Kolonial',
     'mejeri': 'Mejeri og køl',
+    'køl': 'Mejeri og køl',
+    'ost m.v.': 'Mejeri og køl',
+    'mejeri & køl': 'Mejeri og køl',
     'mejeri og køl': 'Mejeri og køl',
     'ost & mejeri': 'Mejeri og køl',
     'nemt & hurtigt': 'Nemt og hurtigt',
     'nemt og hurtigt': 'Nemt og hurtigt',
     'snacks & slik': 'Slik og snacks',
+    'slik & snacks': 'Slik og snacks',
     'slik og snacks': 'Slik og snacks',
+    'slik': 'Slik og snacks',
     'personlig pleje': 'Personlig pleje',
     'husholdning & rengøring': 'Husholdning',
     'husholdning': 'Husholdning',
@@ -74,30 +122,67 @@ export class DatabaseService {
     'dyr': 'Dyr'
   }
 
+  /** UI-kanoniske fødevarekategorier på /dagligvarer */
   private readonly FOOD_ONLY_CATEGORIES = [
     'Frugt og grønt',
     'Brød og kager',
     'Kød og fisk',
     'Kolonial',
     'Mejeri og køl',
+    'Drikkevarer',
     'Nemt og hurtigt',
-  ]
-
-  /**
-   * Ekstra department-strenge fra Goma/REMA m.fl. der er fødevarer, men ikke identiske med FOOD_ONLY_CATEGORIES.
-   * Bruges når "Kun fødevarer" er valgt uden kategori — filtrering sker på join (ikke findProductIdsForCategories),
-   * ellers mangler fx REMA-varer med "Køl", "Frost", "Kød & fisk" osv.
-   */
-  private readonly FOOD_ONLY_DEPARTMENT_EXTRA = [
+    'Slik og snacks',
     'Frost',
+    'Kiosk',
+  ] as const
+
+  /** Ekstra department-strenge i DB uden egen UI-fane (Planomo FOOD_ONLY_DEPARTMENT_EXTRA). */
+  private readonly FOOD_ONLY_DEPARTMENT_EXTRA = [
     'Køl',
     'Mejeri',
-    'Ost m.v.',
     'Kød & fisk',
     'Kød, fisk & fjerkræ',
     'Brød',
+    'Kager',
     'Frugt & grønt',
+    'Ost m.v.',
+    'Mad fra hele verden',
+    'Drikke',
+    'Slik & snacks',
+    'Slik',
+    'Nemt & hurtigt',
   ] as const
+
+  private readonly OFFER_SELECT_WITH_PRODUCT = `
+    id,
+    product_id,
+    store_id,
+    store_product_id,
+    name_store,
+    product_url,
+    current_price,
+    normal_price,
+    currency,
+    is_on_sale,
+    is_offer_active,
+    discount_percentage,
+    price_per_unit,
+    price_per_kilogram,
+    is_available,
+    sale_valid_from,
+    sale_valid_to,
+    products:product_id!inner (
+      id,
+      name_generic,
+      brand,
+      category,
+      subcategory,
+      department,
+      unit,
+      amount,
+      image_url
+    )
+  `
   /**
    * Get published recipes from database (for frontend use)
    */
@@ -248,7 +333,9 @@ export class DatabaseService {
     }
     const total = Number(obj.total)
     const offers = Number(obj.offers)
-    if (!Number.isFinite(total) || !Number.isFinite(offers)) return null
+    if (!Number.isFinite(total)) return null
+    // offers may be missing in older RPC versions — treat as 0
+    const offersCount = Number.isFinite(offers) ? offers : 0
     const categories: { [key: string]: number } = {}
     const rawCats = obj.categories
     if (rawCats && typeof rawCats === 'object' && rawCats !== null && !Array.isArray(rawCats)) {
@@ -257,138 +344,103 @@ export class DatabaseService {
         if (Number.isFinite(n)) categories[k] = n
       }
     }
-    return { total, offers, categories }
+    return { total, offers: offersCount, categories }
   }
 
-  /**
-   * Legacy: many batched selects (slow on large catalogs). Kept as fallback if RPC is missing.
-   */
-  private async getProductCountsV2Legacy(): Promise<{
+  /** Fast fallback when RPC unavailable: department-join head counts. */
+  private async getProductCountsV2FastFallback(foodOnly: boolean = true): Promise<{
     total: number
     categories: { [key: string]: number }
     offers: number
   }> {
-    try {
-      const supabase = createSupabaseClient()
+    const supabase = createSupabaseServiceClient()
+    const foodDepts = foodOnly ? this.getFoodOnlyDepartmentAllowList() : null
 
-      const { count: totalCount, error: totalError } = await supabase
-        .from('product_offers')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_available', true)
+    let totalQuery = supabase
+      .from('product_offers')
+      .select('id, products!inner(department)', { count: 'exact', head: true })
+      .eq('is_available', true)
+      .neq('source', 'goma')
 
-      if (totalError) {
-        console.error('Error getting total count (V2):', totalError)
-        return { total: 0, categories: {}, offers: 0 }
-      }
+    let offersQuery = supabase
+      .from('product_offers')
+      .select('id, products!inner(department)', { count: 'exact', head: true })
+      .eq('is_available', true)
+      .neq('source', 'goma')
+      .not('normal_price', 'is', null)
+      .gt('normal_price', 0)
 
-      let allCategoryData: any[] = []
-      let start = 0
-      const batchSize = 1000
-      const total = totalCount || 0
+    if (foodDepts) {
+      totalQuery = totalQuery.in('products.department', foodDepts)
+      offersQuery = offersQuery.in('products.department', foodDepts)
+    }
 
-      while (start < total) {
-        const end = Math.min(start + batchSize - 1, total - 1)
-        const { data: batchData, error: batchError } = await supabase
-          .from('product_offers')
-          .select(`
-            products:product_id (
-              department,
-              category
-            )
-          `)
-          .eq('is_available', true)
-          .range(start, end)
+    const [{ count: totalCount, error: totalError }, { count: offersCount, error: offersError }] =
+      await Promise.all([totalQuery, offersQuery])
 
-        if (batchError) {
-          console.error(`Error getting category batch ${start}-${end}:`, batchError)
-          break
-        }
+    if (totalError) console.error('Fast counts total error:', totalError)
+    if (offersError) console.error('Fast counts offers error:', offersError)
 
-        if (batchData) {
-          allCategoryData = [...allCategoryData, ...batchData]
-        }
-
-        start += batchSize
-
-        if (start > 50000) {
-          console.warn('Breaking category fetch at 50000 to prevent infinite loop')
-          break
-        }
-      }
-
-      const categoryCounts = allCategoryData.reduce((acc: { [key: string]: number }, offer: any) => {
-        const product = offer.products || {}
-        const category = product.department || product.category || 'Ukategoriseret'
-        acc[category] = (acc[category] || 0) + 1
-        return acc
-      }, {})
-
-      const { count: offersCount, error: offersError } = await supabase
-        .from('product_offers')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_available', true)
-        .eq('is_offer_active', true)
-
-      if (offersError) {
-        console.error('Error getting offers count (V2):', offersError)
-      }
-
-      return {
-        total: totalCount || 0,
-        categories: categoryCounts,
-        offers: offersCount || 0,
-      }
-    } catch (error) {
-      console.error('Error in getProductCountsV2Legacy:', error)
-      return { total: 0, categories: {}, offers: 0 }
+    return {
+      total: totalCount || 0,
+      categories: {},
+      offers: offersCount || 0,
     }
   }
 
-  /**
-   * NEW: Get product counts from new structure (product_offers + products).
-   * Prefers Postgres RPC (single query); falls back to legacy batched reads if RPC unavailable.
-   */
-  async getProductCountsV2(): Promise<{ total: number; categories: { [key: string]: number }; offers: number }> {
+  async getProductCountsV2(foodOnly: boolean = true): Promise<{ total: number; categories: { [key: string]: number }; offers: number }> {
     const now = Date.now()
-    if (this.productCountsCache && this.productCountsCache.expiresAt > now) {
+    const cacheSlot = foodOnly ? 'food' : 'all'
+    if (
+      this.productCountsCache &&
+      this.productCountsCache.slot === cacheSlot &&
+      this.productCountsCache.expiresAt > now &&
+      !(this.productCountsCache.data.total === 0 && this.productCountsCache.data.offers === 0)
+    ) {
       return this.productCountsCache.data
     }
 
     try {
-      const supabase = createSupabaseClient()
-      const { data, error } = await supabase.rpc('get_product_counts_v2')
+      const supabase = createSupabaseServiceClient()
+      const { data, error } = await supabase.rpc('get_product_counts_v2', { filter_food_only: foodOnly })
       if (!error && data != null) {
         const parsed = this.parseProductCountsRpc(data)
         if (parsed) {
+          const mapped = {
+            ...parsed,
+            categories: this.mapCountsToCanonicalCategories(parsed.categories),
+          }
           this.productCountsCache = {
-            data: parsed,
+            slot: cacheSlot,
+            data: mapped,
             expiresAt: now + this.PRODUCT_COUNTS_CACHE_TTL_MS,
           }
-          return parsed
+          return mapped
         }
       }
       if (error) {
-        console.warn('get_product_counts_v2 RPC unavailable, using legacy counts:', error.message)
+        console.warn('get_product_counts_v2 RPC failed, using department head-count fallback:', error.message)
       }
     } catch (e) {
-      console.warn('get_product_counts_v2 RPC exception, using legacy counts:', e)
+      console.warn('get_product_counts_v2 RPC exception, using department head-count fallback:', e)
     }
 
-    const legacy = await this.getProductCountsV2Legacy()
+    const fast = await this.getProductCountsV2FastFallback(foodOnly)
+    const mappedFast = {
+      ...fast,
+      categories: this.mapCountsToCanonicalCategories(fast.categories),
+    }
     this.productCountsCache = {
-      data: legacy,
+      slot: cacheSlot,
+      data: mappedFast,
       expiresAt: now + this.PRODUCT_COUNTS_CACHE_TTL_MS,
     }
-    return legacy
+    return mappedFast
   }
 
-  /**
-   * Get optimized product counts and category breakdown without fetching full products
-   * @deprecated Use getProductCountsV2() instead
-   */
-  async getProductCounts(): Promise<{total: number, categories: {[key: string]: number}, offers: number}> {
-    // Use new V2 method
-    return this.getProductCountsV2()
+  /** @deprecated Use getProductCountsV2() instead */
+  async getProductCounts(): Promise<{ total: number; categories: { [key: string]: number }; offers: number }> {
+    return this.getProductCountsV2(true)
   }
 
   /**
@@ -402,79 +454,33 @@ export class DatabaseService {
     offersOnly?: boolean,
     search?: string,
     stores?: string[],
-    foodOnly?: boolean,
-    organicOnly?: boolean
+    foodOnly: boolean = true,
+    organicOnly?: boolean,
+    excludeSnacksAndDrinks?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
       const supabase = createSupabaseClient()
-      // Safety filter for "foodOnly": remove obvious drinks/snacks even if source category is mislabeled.
-      const shouldExcludeFromFoodOnly = (name?: string | null, category?: string | null, subcategory?: string | null, department?: string | null) => {
-        if (!foodOnly) return false
-        const text = `${name || ''} ${category || ''} ${subcategory || ''} ${department || ''}`.toLowerCase()
-        const excludedPatterns = [
-          /\bchips?\b/,
-          /\bsnacks?\b/,
-          /\bslik\b/,
-          /\bsodavand\b/,
-          /\bjuice\b/,
-          /\benergidrik\b/,
-          /\bøl\b/,
-          /\bvin\b/,
-          /\bcider\b/,
-          /\bcocio\b/,
-          /\bice latte\b/,
-        ]
-        return excludedPatterns.some((pattern) => pattern.test(text))
-      }
 
       const offset = (page - 1) * limit
       const categoryFilter = this.buildCategoryFilterList(categories, foodOnly)
 
-      // Kun fødevarer + ugyldig kategori (fx kun Drikkevarer): ingen resultater
       if (foodOnly && this.hasUserCategorySelection(categories) && categoryFilter.length === 0) {
         return { products: [], total: 0, hasMore: false }
       }
 
       const implicitFoodOnly = Boolean(foodOnly && !this.hasUserCategorySelection(categories))
+      const useFastFoodOfferScan =
+        implicitFoodOnly && !search?.trim() && categoryFilter.length === 0
 
-      // Category filtering using the new product_offers structure
+      if (useFastFoodOfferScan) {
+        return this.listFoodDepartmentOffers(supabase, page, limit, stores, offersOnly, organicOnly)
+      }
 
-      // Base query: offers + join til products
       let query = supabase
         .from('product_offers')
-        .select(
-          `
-          id,
-          product_id,
-          store_id,
-          store_product_id,
-          name_store,
-          product_url,
-          current_price,
-          normal_price,
-          currency,
-          is_on_sale,
-          is_offer_active,
-          discount_percentage,
-          price_per_unit,
-          price_per_kilogram,
-          is_available,
-          sale_valid_from,
-          sale_valid_to,
-          products:product_id!inner (
-            id,
-            name_generic,
-            brand,
-            category,
-            subcategory,
-            department,
-            unit,
-            amount,
-            image_url
-          )
-        `
-        )
+        .select(this.OFFER_SELECT_WITH_PRODUCT)
         .eq('is_available', true)
+        .neq('source', 'goma')
 
       if (stores && stores.length > 0) {
         query = query.in('store_id', this.mapStoreFilterToIds(stores))
@@ -490,8 +496,8 @@ export class DatabaseService {
         const { data: organicProducts, error: organicError } = await supabase
           .from('products')
           .select('id')
-          .contains('labels', ['Økologi'])
-          .limit(10000) // Should be enough for all organic products
+          .overlaps('organic_tags', ['organic-priority', 'organic-animal'])
+          .limit(20000) // Should be enough for all organic products
         
         if (organicError) {
           console.error('Error fetching organic products:', organicError)
@@ -506,8 +512,7 @@ export class DatabaseService {
       }
 
       if (categoryFilter.length === 0 && implicitFoodOnly) {
-        const allow = this.getFoodOnlyDepartmentAllowList()
-        query = query.in('products.department', allow)
+        query = this.applyFoodDepartmentFilterToOffersQuery(query, true)
       }
 
       if (categoryFilter.length > 0) {
@@ -526,11 +531,19 @@ export class DatabaseService {
           
           if (search && search.trim()) {
             const term = search.trim()
-            const nameQuery = supabase
+            let nameQuery = supabase
               .from('product_offers')
               .select('product_id')
+              .neq('source', 'goma')
               .or(`name_store.ilike.%${term}%`)
               .limit(1000)
+
+            if (foodOnly) {
+              nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
+                nameQuery.select('product_id, products!inner(department)'),
+                true,
+              )
+            }
 
             let categoryQuery = supabase
               .from('products')
@@ -538,8 +551,12 @@ export class DatabaseService {
               .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
               .limit(1000)
 
+            if (foodOnly) {
+              categoryQuery = this.applyFoodDepartmentFilterToProductsQuery(categoryQuery, true)
+            }
+
             if (organicOnly) {
-              categoryQuery = categoryQuery.contains('labels', ['Økologi'])
+              categoryQuery = categoryQuery.overlaps('organic_tags', ['organic-priority', 'organic-animal'])
             }
 
             const { data: nameMatches, error: nameErr } = await nameQuery
@@ -615,6 +632,7 @@ export class DatabaseService {
               .from('product_offers')
               .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to')
               .eq('is_available', true)
+              .neq('source', 'goma')
               .in('product_id', chunk)
 
             if (stores && stores.length > 0) {
@@ -674,30 +692,14 @@ export class DatabaseService {
           console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
         }
         
-        const isRealOffer = (offer: {
-          is_on_sale: boolean
-          is_offer_active: boolean
-          discount_percentage: number | null
-          current_price: number | null
-          normal_price: number | null
-          sale_valid_to: string | null
-        }) => {
-          const price = Number(offer.current_price || 0)
-          const normalPrice = Number(offer.normal_price || 0)
-          const isOnSaleByPrice = normalPrice > price && normalPrice > 0
-          const isOfferDateValid = !offer.sale_valid_to || new Date(offer.sale_valid_to) >= new Date()
-          return isOfferDateValid && (offer.is_on_sale || offer.is_offer_active || isOnSaleByPrice)
-        }
-
         let matchingOffersArray = Array.from(allMatchingOffers.values())
         if (offersOnly) {
-          matchingOffersArray = matchingOffersArray.filter(isRealOffer)
+          matchingOffersArray = matchingOffersArray.filter((o) => isRealOfferFields(o))
         }
 
-        // Global offer-first + discount + price sort before pagination
         matchingOffersArray.sort((a, b) => {
-          const aOffer = isRealOffer(a)
-          const bOffer = isRealOffer(b)
+          const aOffer = isRealOfferFields(a)
+          const bOffer = isRealOfferFields(b)
           if (aOffer && !bOffer) return -1
           if (!aOffer && bOffer) return 1
 
@@ -772,6 +774,7 @@ export class DatabaseService {
               )
               .in('id', offerChunk)
               .eq('is_available', true)
+              .neq('source', 'goma')
             
             if (stores && stores.length > 0) {
               chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
@@ -813,41 +816,27 @@ export class DatabaseService {
         // Map the data first to determine which are actually on sale
         const mapped = allPageData.map((row: any) => {
           const p = row.products || {}
-          const price = row.current_price || 0
-          const originalPrice = row.normal_price || row.current_price || 0
-          const isOnSaleByFlag = !!row.is_on_sale
-          const isOnSaleByPrice = originalPrice > price && originalPrice > 0
-          const isOfferDateValid = !row.sale_valid_to || new Date(row.sale_valid_to) >= new Date()
-          // Real offer state must be date-valid AND either sale-flag OR price-discount.
-          // Do not blindly trust stale is_offer_active flags.
-          const isOfferActive = isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice)
-          const priceDiff = originalPrice - price
-          const discountPct =
-            isOnSaleByPrice && priceDiff > 0.01
-              ? Math.round((priceDiff / originalPrice) * 100)
-              : null
-
+          const pricing = resolveOfferDisplayPricing(row)
           return {
             id: row.id,
             name: row.name_store || p.name_generic,
             description: null,
             category: p.category || p.department || null,
-            price,
-            original_price: originalPrice,
+            price: pricing.price,
+            original_price: pricing.original_price,
             unit: p.unit || 'stk',
             unit_price: row.price_per_unit || row.price_per_kilogram || null,
-            is_on_sale: isOfferActive,
-            is_offer_active: isOfferActive,
+            is_on_sale: pricing.is_on_sale,
+            is_offer_active: pricing.is_offer_active,
             sale_end_date: row.sale_valid_to || null,
-            discount_percentage: discountPct,
+            discount_percentage: pricing.discount_percentage,
             image_url: p.image_url || this.getProductPlaceholderImage(),
             store: this.mapStoreIdToDisplayName(row.store_id),
             amount: p.amount ? String(p.amount) : null,
           }
         })
-        
-        const finalMapped = (offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped)
-          .filter((p) => !shouldExcludeFromFoodOnly(p.name, p.category, (p as { subcategory?: string }).subcategory, (p as { department?: string }).department))
+
+        const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
 
         // Sort the results
         finalMapped.sort((a, b) => {
@@ -876,22 +865,33 @@ export class DatabaseService {
         const term = search.trim()
         
         // Find products matching the search term in name/brand fields
-        const nameQuery = supabase
+        let nameQuery = supabase
           .from('product_offers')
           .select('product_id')
+          .neq('source', 'goma')
           .or(`name_store.ilike.%${term}%`)
           .limit(1000)
-        
-        // Also find products matching in category fields
+
+        if (foodOnly) {
+          nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
+            nameQuery.select('product_id, products!inner(department)'),
+            true,
+          )
+        }
+
         let categoryQuery = supabase
           .from('products')
           .select('id')
           .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
           .limit(1000)
+
+        if (foodOnly) {
+          categoryQuery = this.applyFoodDepartmentFilterToProductsQuery(categoryQuery, true)
+        }
         
         // Apply organic filter to product search if needed
         if (organicOnly) {
-          categoryQuery = categoryQuery.contains('labels', ['Økologi'])
+          categoryQuery = categoryQuery.overlaps('organic_tags', ['organic-priority', 'organic-animal'])
         }
         
         const { data: nameMatches, error: nameErr } = await nameQuery
@@ -926,18 +926,11 @@ export class DatabaseService {
         query = query.in('product_id', organicProductIds)
       }
 
-      // NOTE: When offersOnly=true, we fetch all products and filter in application layer
-      // This ensures we catch products that are actually on sale (normal_price > current_price)
-      // even if the is_on_sale flag is incorrectly set to false
-      
-      // Fetch limit+1 rows so we can detect "hasMore" without an expensive
-      // separate COUNT(*) query. count: 'exact' on this join with multiple
-      // sort keys was previously costing ~100-300 ms per request.
+      // Proven tilbud filtreres i app — stol ikke på DB sale flags.
       query = query
-        .order('is_offer_active', { ascending: false }) // tilbud først
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
-        .range(offset, offset + limit) // inclusive: returns up to limit+1 rows
+        .range(offset, offset + (offersOnly ? limit * 8 : limit))
 
       const { data, error } = await query
 
@@ -946,55 +939,43 @@ export class DatabaseService {
         return { products: [], total: 0, hasMore: false }
       }
 
-      const fetched = (data || []) as Array<Record<string, unknown>>
+      let fetched = (data || []) as Array<Record<string, unknown>>
+      if (offersOnly) {
+        fetched = fetched.filter((row) =>
+          isRealOfferFields({
+            current_price: row.current_price as number | null,
+            normal_price: row.normal_price as number | null,
+            sale_valid_to: row.sale_valid_to as string | null,
+          }),
+        )
+      }
       const hasMore = fetched.length > limit
       const pageRows = hasMore ? fetched.slice(0, limit) : fetched
 
-        // Map the data first to determine which are actually on sale
       const mapped = pageRows.map((row: any) => {
         const p = row.products || {}
-        
-        // Debug: Log if products object is missing
-        if (!row.products && categoryFilter.length > 0) {
-          console.warn(`⚠️ Missing products object for offer ${row.id}, product_id: ${row.product_id}`)
-        }
-
-        const price = row.current_price || 0
-        const originalPrice = row.normal_price || row.current_price || 0
-        const isOnSaleByFlag = !!row.is_on_sale
-        const isOnSaleByPrice = originalPrice > price && originalPrice > 0
-        const isOfferDateValid = !row.sale_valid_to || new Date(row.sale_valid_to) >= new Date()
-        // Real offer state must be date-valid AND either sale-flag OR price-discount.
-        // Do not blindly trust stale is_offer_active flags.
-        const isOfferActive = isOfferDateValid && (isOnSaleByFlag || isOnSaleByPrice)
-        const priceDiff = originalPrice - price
-        const discountPct =
-          isOnSaleByPrice && priceDiff > 0.01
-            ? Math.round((priceDiff / originalPrice) * 100)
-            : null
+        const pricing = resolveOfferDisplayPricing(row)
 
         return {
-          // id bruges af /dagligvarer
           id: row.id,
           name: row.name_store || p.name_generic,
           description: null,
           category: p.category || p.department || null,
-          price,
-          original_price: originalPrice,
+          price: pricing.price,
+          original_price: pricing.original_price,
           unit: p.unit || 'stk',
           unit_price: row.price_per_unit || row.price_per_kilogram || null,
-          is_on_sale: isOfferActive,
-          is_offer_active: isOfferActive,
+          is_on_sale: pricing.is_on_sale,
+          is_offer_active: pricing.is_offer_active,
           sale_end_date: row.sale_valid_to || null,
-          discount_percentage: discountPct,
+          discount_percentage: pricing.discount_percentage,
           image_url: p.image_url || this.getProductPlaceholderImage(),
           store: this.mapStoreIdToDisplayName(row.store_id),
           amount: p.amount ? String(p.amount) : null,
-          }
-        })
-        
-      const finalMapped = (offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped)
-        .filter((p) => !shouldExcludeFromFoodOnly(p.name, p.category, (p as { subcategory?: string }).subcategory, (p as { department?: string }).department))
+        }
+      })
+
+      const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
 
       // Sort the results
       finalMapped.sort((a, b) => {
@@ -1032,14 +1013,248 @@ export class DatabaseService {
     const map: Record<string, string[]> = {
       'Kød og fisk': ['Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød fisk'],
       'Mejeri og køl': ['Køl', 'Mejeri', 'Ost m.v.'],
-      'Brød og kager': ['Brød', 'Kager'],
+      'Brød og kager': ['Brød', 'Kager', 'Brød & Bavinchi'],
       'Frugt og grønt': ['Frugt & grønt'],
+      'Drikkevarer': ['Drikke'],
+      'Slik og snacks': ['Slik & snacks', 'Slik'],
+      'Nemt og hurtigt': ['Nemt & hurtigt'],
     }
     return map[canonical] || []
   }
 
+  /** Map raw DB department buckets to canonical /dagligvarer category ids. */
+  private mapCountsToCanonicalCategories(categories: { [key: string]: number }): { [key: string]: number } {
+    const result: { [key: string]: number } = {}
+    for (const [raw, count] of Object.entries(categories)) {
+      const canonical = this.normalizeCategoryInput(raw) || raw
+      result[canonical] = (result[canonical] || 0) + count
+    }
+    return result
+  }
+
+  /** Map offer row → dagligvarer product shape. */
+  private mapOfferRowToProduct(row: Record<string, any>) {
+    const p = row.products || {}
+    const pricing = resolveOfferDisplayPricing(row)
+    return {
+      id: row.id,
+      name: row.name_store || p.name_generic,
+      description: null,
+      category: p.category || p.department || null,
+      price: pricing.price,
+      original_price: pricing.original_price,
+      unit: p.unit || 'stk',
+      unit_price: row.price_per_unit || row.price_per_kilogram || null,
+      is_on_sale: pricing.is_on_sale,
+      is_offer_active: pricing.is_offer_active,
+      sale_end_date: row.sale_valid_to || null,
+      discount_percentage: pricing.discount_percentage,
+      image_url: p.image_url || this.getProductPlaceholderImage(),
+      store: this.mapStoreIdToDisplayName(row.store_id),
+      amount: p.amount ? String(p.amount) : null,
+    }
+  }
+
+  /** Food departments — default /dagligvarer scan (Planomo jun 2026). */
+  private async listFoodDepartmentOffers(
+    supabase: ReturnType<typeof createSupabaseClient>,
+    page: number,
+    limit: number,
+    stores?: string[],
+    offersOnly?: boolean,
+    organicOnly?: boolean,
+  ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
+    // Primær vej: RPC gør join + sort + pagination i Postgres (reliable, ingen cold timeout).
+    const rpc = await this.listFoodDepartmentOffersViaRpc(page, limit, stores, offersOnly, organicOnly)
+    if (rpc) return rpc
+
+    // Fallback hvis RPC ikke er deployet endnu.
+    return this.listFoodDepartmentOffersAppSide(supabase, page, limit, stores, offersOnly, organicOnly)
+  }
+
+  private async listFoodDepartmentOffersViaRpc(
+    page: number,
+    limit: number,
+    stores?: string[],
+    offersOnly?: boolean,
+    organicOnly?: boolean,
+  ): Promise<{ products: any[]; total: number; hasMore: boolean } | null> {
+    try {
+      const supabase = createSupabaseServiceClient()
+      const offset = (page - 1) * limit
+      const storeIds = stores && stores.length > 0 ? this.mapStoreFilterToIds(stores) : null
+      // Hent limit+1 for at kunne sige hasMore uden separat count.
+      const { data, error } = await supabase.rpc('get_food_offers_v2', {
+        p_offers_only: !!offersOnly,
+        p_limit: limit + 1,
+        p_offset: offset,
+        p_stores: storeIds,
+        p_organic_only: !!organicOnly,
+      })
+      if (error) {
+        console.warn('get_food_offers_v2 RPC unavailable, using app-side fallback:', error.message)
+        return null
+      }
+      const rows = Array.isArray(data) ? data : []
+      const hasMore = rows.length > limit
+      const pageRows = hasMore ? rows.slice(0, limit) : rows
+      return {
+        products: pageRows.map((row: any) => this.mapOfferRowToProduct(this.normalizeRpcOfferRow(row))),
+        total: offset + pageRows.length + (hasMore ? 1 : 0),
+        hasMore,
+      }
+    } catch (e) {
+      console.warn('get_food_offers_v2 RPC exception, using app-side fallback:', e)
+      return null
+    }
+  }
+
+  /** RPC returnerer flade kolonner — pak product-felter ind så mapOfferRowToProduct passer. */
+  private normalizeRpcOfferRow(row: Record<string, any>): Record<string, any> {
+    return {
+      ...row,
+      products: {
+        id: row.product_id,
+        name_generic: row.name_generic,
+        brand: row.brand,
+        category: row.category,
+        subcategory: row.subcategory,
+        department: row.department,
+        unit: row.unit,
+        amount: row.amount,
+        image_url: row.image_url,
+      },
+    }
+  }
+
+  private async listFoodDepartmentOffersAppSide(
+    supabase: ReturnType<typeof createSupabaseClient>,
+    page: number,
+    limit: number,
+    stores?: string[],
+    offersOnly?: boolean,
+    organicOnly?: boolean,
+  ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
+    const offset = (page - 1) * limit
+    const foodDeptSet = new Set(
+      this.getFoodOnlyDepartmentAllowList().map((d) => d.toLowerCase().trim()),
+    )
+
+    const isFoodRow = (row: Record<string, any>) => {
+      const dept = String(row.products?.department ?? '').trim().toLowerCase()
+      return dept.length > 0 && foodDeptSet.has(dept)
+    }
+
+    const storeIds = stores && stores.length > 0 ? this.mapStoreFilterToIds(stores) : null
+
+    // Øko (fallback): hent øko-produkt-IDs og begræns til dem.
+    let organicIdSet: Set<string> | null = null
+    if (organicOnly) {
+      const { data: orgRows } = await supabase
+        .from('products')
+        .select('id')
+        .overlaps('organic_tags', ['organic-priority', 'organic-animal'])
+        .limit(20000)
+      organicIdSet = new Set((orgRows || []).map((r: any) => String(r.id)))
+      if (organicIdSet.size === 0) return { products: [], total: 0, hasMore: false }
+    }
+    const passesOrganic = (row: Record<string, any>) =>
+      !organicIdSet || organicIdSet.has(String(row.product_id))
+
+    if (offersOnly) {
+      // Pre-filter normal_price IS NOT NULL so sorting only touches the offer set (fast).
+      // Over-fetch so the in-app food + proven-offer filter still fills the page.
+      const fetchSize = Math.min((offset + limit) * 3 + 100, 1500)
+      let q = supabase
+        .from('product_offers')
+        .select(this.OFFER_SELECT_WITH_PRODUCT)
+        .eq('is_available', true)
+        .neq('source', 'goma')
+        .not('normal_price', 'is', null)
+        .order('discount_percentage', { ascending: false, nullsFirst: false })
+        .order('current_price', { ascending: true })
+        .limit(fetchSize)
+
+      if (storeIds) q = q.in('store_id', storeIds)
+
+      const { data, error } = await q
+      if (error) {
+        console.error('listFoodDepartmentOffers (offers) error:', error)
+        return { products: [], total: 0, hasMore: false }
+      }
+
+      const products = (data || [])
+        .filter(isFoodRow)
+        .filter(passesOrganic)
+        .filter((row) => isRealOfferFields(row))
+        .map((row) => this.mapOfferRowToProduct(row))
+
+      return {
+        products: products.slice(offset, offset + limit),
+        total: products.length,
+        hasMore: products.length > offset + limit,
+      }
+    }
+
+    // Alle produkter: ingen tung sortering over 160k rækker — paginér rå og filtrér food i app.
+    const fetchSize = (offset + limit) * 2 + 50
+    let q = supabase
+      .from('product_offers')
+      .select(this.OFFER_SELECT_WITH_PRODUCT)
+      .eq('is_available', true)
+      .neq('source', 'goma')
+      .order('id', { ascending: true })
+      .range(0, fetchSize - 1)
+
+    if (storeIds) q = q.in('store_id', storeIds)
+
+    const { data, error } = await q
+    if (error) {
+      console.error('listFoodDepartmentOffers (all) error:', error)
+      return { products: [], total: 0, hasMore: false }
+    }
+
+    const products = (data || [])
+      .filter(isFoodRow)
+      .filter(passesOrganic)
+      .map((row) => this.mapOfferRowToProduct(row))
+    products.sort((a, b) => {
+      if (a.is_on_sale && !b.is_on_sale) return -1
+      if (!a.is_on_sale && b.is_on_sale) return 1
+      return (b.discount_percentage || 0) - (a.discount_percentage || 0)
+    })
+
+    return {
+      products: products.slice(offset, offset + limit),
+      total: products.length,
+      hasMore: products.length > offset + limit,
+    }
+  }
+
+  private applyFoodDepartmentFilterToOffersQuery<T extends { in: (col: string, vals: string[]) => T }>(
+    query: T,
+    foodOnly: boolean,
+  ): T {
+    if (!foodOnly) return query
+    return query.in('products.department', this.getFoodOnlyDepartmentAllowList())
+  }
+
+  private applyFoodDepartmentFilterToProductsQuery<T extends { in: (col: string, vals: string[]) => T }>(
+    query: T,
+    foodOnly: boolean,
+  ): T {
+    if (!foodOnly) return query
+    return query.in('department', this.getFoodOnlyDepartmentAllowList())
+  }
+
   private getFoodOnlyDepartmentAllowList(): string[] {
-    return Array.from(new Set([...this.FOOD_ONLY_CATEGORIES, ...this.FOOD_ONLY_DEPARTMENT_EXTRA]))
+    return Array.from(
+      new Set([
+        ...this.FOOD_ONLY_CATEGORIES,
+        ...getFoodCatalogLabelsForFilter(),
+        ...this.FOOD_ONLY_DEPARTMENT_EXTRA,
+      ]),
+    )
   }
 
   private hasUserCategorySelection(categories?: string[]): boolean {
@@ -1103,7 +1318,6 @@ export class DatabaseService {
         new Set([normalized, ...this.getDepartmentAliasesForCanonicalCategory(normalized)])
       )
 
-      let matchedThisCategory = false
       for (const alias of aliasesToTry) {
         const { data: exactDept, error: deptErr } = await supabase
           .from('products')
@@ -1111,10 +1325,8 @@ export class DatabaseService {
           .ilike('department', alias)
           .limit(10000)
 
-        if (!deptErr && exactDept && exactDept.length > 0) {
+        if (!deptErr && exactDept?.length) {
           exactDept.forEach((r) => r?.id && seen.add(r.id))
-          matchedThisCategory = true
-          break
         }
 
         const { data: exactCat, error: catErr } = await supabase
@@ -1123,18 +1335,12 @@ export class DatabaseService {
           .ilike('category', alias)
           .limit(10000)
 
-        if (!catErr && exactCat && exactCat.length > 0) {
+        if (!catErr && exactCat?.length) {
           exactCat.forEach((r) => r?.id && seen.add(r.id))
-          matchedThisCategory = true
-          break
         }
       }
 
-      if (matchedThisCategory) {
-        continue
-      }
-
-      // STEP 3: If no exact match, try variants with OR query (faster than multiple separate queries)
+      // Fallback: variant OR query for partial matches
       const variants = expandedVariants(cat)
       const keyVariants = Array.from(new Set(variants)).filter(Boolean)
 

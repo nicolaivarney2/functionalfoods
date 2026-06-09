@@ -1,5 +1,5 @@
--- Counts + produktliste RPC for /dagligvarer (fooddata only, proven tilbud).
--- Kør i Supabase SQL Editor. Se også migration 20260609120000_product_counts_speed.sql.
+-- Speed up /dagligvarer counts + offer listing (single-pass aggregation + fooddata index).
+-- Safe: same filter logic (food departments, proven offer, no goma). No data changes.
 
 CREATE INDEX IF NOT EXISTS idx_product_offers_fooddata_available
   ON public.product_offers (product_id)
@@ -14,6 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_product_offers_fooddata_offer_sort
 DROP FUNCTION IF EXISTS public.get_product_counts_v2();
 DROP FUNCTION IF EXISTS public.get_product_counts_v2(boolean);
 
+-- One scan + GROUP BY instead of MATERIALIZED CTE + 3 separate COUNTs.
 CREATE OR REPLACE FUNCTION public.get_product_counts_v2(filter_food_only boolean DEFAULT true)
 RETURNS jsonb
 LANGUAGE sql
@@ -72,6 +73,7 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_product_counts_v2(boolean) TO anon, authenticated, service_role;
 
+-- Offers-only path: skip sorting non-offers (default /dagligvarer view).
 DROP FUNCTION IF EXISTS public.get_food_offers_v2(boolean, integer, integer, text[]);
 DROP FUNCTION IF EXISTS public.get_food_offers_v2(boolean, integer, integer, text[], boolean);
 

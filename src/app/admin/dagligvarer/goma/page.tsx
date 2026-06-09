@@ -120,6 +120,26 @@ export default function AdminGomaDagligvarerPage() {
   const [healthError, setHealthError] = useState<string | null>(null)
   const [healthSummary, setHealthSummary] = useState<SyncHealthSummary | null>(null)
   const [healthStores, setHealthStores] = useState<SyncHealthStore[]>([])
+  const [sunsetStatus, setSunsetStatus] = useState<{
+    simulateGone: boolean
+    legacyDataAvailable: boolean
+    message: string
+  } | null>(null)
+
+  const fetchSunsetStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/goma/status', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      setSunsetStatus({
+        simulateGone: Boolean(data.simulateGone),
+        legacyDataAvailable: Boolean(data.legacyDataAvailable),
+        message: String(data.message || ''),
+      })
+    } catch {
+      // ignore
+    }
+  }, [])
 
   const fetchHealth = useCallback(async () => {
     setHealthLoading(true)
@@ -142,8 +162,9 @@ export default function AdminGomaDagligvarerPage() {
   useEffect(() => {
     if (isAdmin) {
       fetchHealth()
+      fetchSunsetStatus()
     }
-  }, [isAdmin, fetchHealth])
+  }, [isAdmin, fetchHealth, fetchSunsetStatus])
 
   if (checking) {
     return (
@@ -183,6 +204,17 @@ export default function AdminGomaDagligvarerPage() {
             fooddata, kan Goma-data slettes.
           </p>
         </div>
+
+        {sunsetStatus?.simulateGone && (
+          <div className="mb-6 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3">
+            <p className="text-sm font-medium text-violet-900">Lokal simulation: Goma-data er væk</p>
+            <p className="mt-1 text-sm text-violet-800">
+              <code className="rounded bg-violet-100 px-1">GOMA_SIMULATE_GONE=true</code> — madbudget og
+              prissøgning ignorerer legacy Goma-produktnøgler. Data i DB er uændret. Slå flaget fra for
+              normal lokal adfærd.
+            </p>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">

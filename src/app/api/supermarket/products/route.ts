@@ -30,13 +30,18 @@ function parseListParam(value: string | null): string[] | undefined {
 function buildCacheControl({
   countsOnly,
   hasSearch,
+  allowCountsCache,
 }: {
   countsOnly: boolean
   hasSearch: boolean
+  allowCountsCache?: boolean
 }): string {
   if (countsOnly) {
-    // Counts change slowly and can be aggressively cached.
-    return 'public, s-maxage=3600, stale-while-revalidate=86400'
+    // Cache counts at edge when non-zero — cold DB path is ~3–8s; stale 10 min is OK for sidebar.
+    if (allowCountsCache) {
+      return 'public, s-maxage=600, stale-while-revalidate=3600'
+    }
+    return 'private, no-cache, no-store, must-revalidate'
   }
   if (hasSearch) {
     // Search responses vary more; keep shorter CDN cache.
@@ -66,20 +71,25 @@ export async function GET(request: NextRequest) {
       : undefined
     const search = rawSearch ? rawSearch.trim().slice(0, MAX_SEARCH_LENGTH) : undefined
     const countsOnly = searchParams.get('counts') === 'true'
-    const foodOnly = searchParams.get('foodOnly') === 'true'
+    const foodOnly = searchParams.get('foodOnly') !== 'false'
     const organic = searchParams.get('organic') === 'true'
     
     
     // If only counts are requested, return optimized count data
     if (countsOnly) {
-      const counts = await databaseService.getProductCounts()
+      const counts = await databaseService.getProductCountsV2(foodOnly)
+      const hasUsableCounts = counts.total > 0 || counts.offers > 0
       return NextResponse.json({
         success: true,
         counts: counts,
         timestamp: new Date().toISOString()
       }, {
         headers: {
-          'Cache-Control': buildCacheControl({ countsOnly: true, hasSearch: false }),
+          'Cache-Control': buildCacheControl({
+            countsOnly: true,
+            hasSearch: false,
+            allowCountsCache: hasUsableCounts,
+          }),
         },
       })
     }
@@ -88,6 +98,12 @@ export async function GET(request: NextRequest) {
     const finalCategory = categories?.length ? categories : (category ? [category] : undefined)
     
     const result = await databaseService.getSupermarketProductsV2(page, limit, finalCategory, offers, search, stores, foodOnly, organic)
+
+    // Cache aldrig et tomt resultat — en transient timeout må ikke "fryses" i CDN i 15 min.
+    const cacheControl =
+      result.products.length === 0
+        ? 'private, no-cache, no-store, must-revalidate'
+        : buildCacheControl({ countsOnly: false, hasSearch: Boolean(search && search.trim()) })
 
     return NextResponse.json({
       success: true,
@@ -102,7 +118,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, {
       headers: {
-        'Cache-Control': buildCacheControl({ countsOnly: false, hasSearch: Boolean(search && search.trim()) }),
+        'Cache-Control': cacheControl,
       },
     })
     

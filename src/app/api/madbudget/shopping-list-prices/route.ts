@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
+import { getGomaSunsetStatus, isGomaLegacyDataEnabled } from '@/lib/goma-sunset'
 import { isFooddataProductExternalId } from '@/lib/product-match-snapshots'
 import {
   comparisonPriceForOrganicPreference,
@@ -308,32 +309,46 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔍 Step 2: Found ${allMatches.length} product matches for ${ingredientIds.length} ingredients`)
 
+    const gomaSunset = getGomaSunsetStatus()
+    const pricingMatches = isGomaLegacyDataEnabled()
+      ? allMatches
+      : allMatches.filter((m) => isFooddataProductExternalId(m.product_external_id))
+
+    if (!isGomaLegacyDataEnabled() && pricingMatches.length < allMatches.length) {
+      console.log(
+        `🌅 GOMA_SIMULATE_GONE: ignorerer ${allMatches.length - pricingMatches.length} legacy matches — kun fooddata-nøgler`,
+      )
+    }
+
     // Index matches by ingredient id — prefer fooddata product keys over legacy Goma ids
     const matchesByIngredient = new Map<string, any[]>()
-    for (const match of allMatches) {
+    for (const match of pricingMatches) {
       const id = String(match.ingredient_id || '')
       if (!id) continue
       const list = matchesByIngredient.get(id)
       if (list) list.push(match)
       else matchesByIngredient.set(id, [match])
     }
-    if (allMatches.length === 0) {
+    if (pricingMatches.length === 0) {
       console.log('⚠️ No product matches found in database for these ingredientIds')
       console.log(`📋 Sample ingredientIds that were searched:`, ingredientIds.slice(0, 5))
       return NextResponse.json({
         success: true,
         data: {}, // No product matches found
+        gomaSunset,
         debug: {
           ingredientIdsCount: ingredientIds.length,
           sampleIngredientIds: ingredientIds.slice(0, 5),
-          message: 'No product_ingredient_matches found for these ingredients'
-        }
+          message: gomaSunset.simulateGone
+            ? 'Ingen fooddata-matches — legacy Goma matches ignoreres (GOMA_SIMULATE_GONE)'
+            : 'No product_ingredient_matches found for these ingredients',
+        },
       })
     }
 
     // Get unique product external IDs
     const productExternalIds = Array.from(
-      new Set(allMatches.map(m => m.product_external_id).filter(Boolean))
+      new Set(pricingMatches.map(m => m.product_external_id).filter(Boolean))
     )
 
     console.log(`🔍 Step 3: Found ${productExternalIds.length} unique products from matches`)
@@ -344,7 +359,9 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < productExternalIds.length; i += chunkSize) {
       const chunk = productExternalIds.slice(i, i + chunkSize)
       const fooddataChunk = chunk.filter((id) => isFooddataProductExternalId(id))
-      const legacyChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+      const legacyChunk = isGomaLegacyDataEnabled()
+        ? chunk.filter((id) => !isFooddataProductExternalId(id))
+        : []
 
       if (fooddataChunk.length > 0) {
         const { data: byId } = await supabase
@@ -442,7 +459,9 @@ export async function POST(request: NextRequest) {
       }
 
       // Legacy Goma: products.external_id (only when match id is not a fooddata key)
-      const legacyChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+      const legacyChunk = isGomaLegacyDataEnabled()
+        ? chunk.filter((id) => !isFooddataProductExternalId(id))
+        : []
       const { data: products, error: productsError } = legacyChunk.length > 0
         ? await supabase
             .from('products')
@@ -506,7 +525,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Also support matches stored as product_offers.store_product_id (new Goma matches)
+      // Goma: product_offers.store_product_id — skip under GOMA_SIMULATE_GONE
+      if (isGomaLegacyDataEnabled()) {
+        const legacyStoreProductChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+        if (legacyStoreProductChunk.length > 0) {
       const { data: offersByStoreProductId, error: offersByStoreProductIdError } = await supabase
         .from('product_offers')
         .select(`
@@ -524,7 +546,7 @@ export async function POST(request: NextRequest) {
           amount,
           unit
         `)
-        .in('store_product_id', chunk)
+        .in('store_product_id', legacyStoreProductChunk)
         .in('store_id', dbStoreIds)
         .eq('is_available', true)
 
@@ -623,6 +645,8 @@ export async function POST(request: NextRequest) {
         }
       } else if (offersByStoreProductIdError) {
         console.error('❌ Error fetching product_offers by store_product_id:', offersByStoreProductIdError)
+      }
+        }
       }
 
     }
@@ -922,17 +946,21 @@ export async function POST(request: NextRequest) {
     // Include debug info in response if no products found
     const debugInfo = itemsWithProducts === 0 ? {
       ingredientIdsCount: ingredientIds.length,
-      productMatchesCount: allMatches.length,
+      productMatchesCount: pricingMatches.length,
+      legacyMatchesIgnored: gomaSunset.simulateGone ? allMatches.length - pricingMatches.length : 0,
       offersCount: totalOffersFound,
       storesSearched: dbStoreIds,
-      message: 'No products found - check if product_ingredient_matches exist for these ingredients'
+      message: gomaSunset.simulateGone
+        ? 'Ingen fooddata-priser fundet — tjek at matches og katalog-import er kørt'
+        : 'No products found - check if product_ingredient_matches exist for these ingredients',
     } : undefined
 
     return NextResponse.json({
       success: true,
       data: result,
       guideCount,
-      ...(debugInfo && { debug: debugInfo })
+      gomaSunset,
+      ...(debugInfo && { debug: debugInfo }),
     })
   } catch (error: any) {
     console.error('Error in shopping-list-prices API:', error)

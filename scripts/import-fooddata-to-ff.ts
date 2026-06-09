@@ -29,6 +29,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { pullCurationFromFooddata } from '../src/lib/fooddata-import/curation-pull'
 import { parseFooddataProductId } from '../src/lib/product-match-snapshots'
 import { enqueueUnmatchedFooddataProducts } from '../src/lib/product-match-queue'
+import { isFoodCatalogProduct } from '../src/lib/product-food-classification'
 
 const args = new Set(process.argv.slice(2))
 const limitArg = process.argv.slice(2).find((a) => a.startsWith('--limit='))
@@ -224,14 +225,23 @@ function mapStore(s: any) {
 
 function mapProduct(p: any) {
   const id = `${p.source_chain}-${p.source_id}`
+  const department = p.category_lvl0 ?? null
+  const category = p.category_lvl1 ?? null
+  const subcategory = p.category_lvl2 ?? null
   return {
     id,
     ean: p.gtin ?? null,
     name_generic: p.name,
     brand: p.brand ?? null,
-    category: p.category_lvl1 ?? null,
-    subcategory: p.category_lvl2 ?? null,
-    department: p.category_lvl0 ?? null,
+    category,
+    subcategory,
+    department,
+    is_food: isFoodCatalogProduct({
+      department,
+      category,
+      subcategory,
+      name: p.name,
+    }),
     amount: p.amount ?? null,
     unit: p.unit ?? null,
     image_url: p.image_url ?? null,

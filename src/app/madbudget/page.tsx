@@ -502,6 +502,16 @@ export default function MadbudgetPage() {
   const [shopSurveyOpen, setShopSurveyOpen] = useState(false)
   const [shopSurveyStores, setShopSurveyStores] = useState<{ id: number; name: string }[]>([])
   const [shopSurveyToken, setShopSurveyToken] = useState('')
+  const [gomaSimulateGone, setGomaSimulateGone] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/dev/goma-sunset-status', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.simulateGone) setGomaSimulateGone(true)
+      })
+      .catch(() => {})
+  }, [])
 
   const getMealTypeFromRecipe = (recipe: any): MealType | undefined => {
     const labelPool = [
@@ -4017,6 +4027,15 @@ export default function MadbudgetPage() {
 
             {/* Shopping List */}
             <div data-tour="shopping-list" className="bg-white p-6 rounded-lg shadow-sm mt-6">
+              {gomaSimulateGone && (
+                <div className="mb-4 rounded-lg border border-violet-300 bg-violet-50 px-4 py-3">
+                  <p className="text-sm font-medium text-violet-900">Test: Goma-data simuleres væk</p>
+                  <p className="mt-1 text-sm text-violet-800">
+                    <code className="rounded bg-violet-100 px-1">GOMA_SIMULATE_GONE=true</code> — priser kommer kun
+                    fra fooddata-produktnøgler. Genberegn indkøbslisten for at se effekten.
+                  </p>
+                </div>
+              )}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-900 flex items-center">
                   <ShoppingCart size={20} className="mr-2" />

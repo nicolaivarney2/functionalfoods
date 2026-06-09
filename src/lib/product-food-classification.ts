@@ -13,52 +13,62 @@ export function normalizeCatalogLabel(value: string | null | undefined): string 
     .replace(/å/g, 'aa')
 }
 
-const NON_FOOD_DEPARTMENTS = new Set(
-  [
-    'Personlig pleje',
-    'Pleje',
-    'Bolig & køkken',
-    'Tøj & sko',
-    'Tøj',
-    'Leg',
-    'Fritid & sport',
-    'Elektronik',
-    'Husholdning',
-    'Non-food',
-    'Nonfood',
-    'Øvrig nonfood',
-    'Byggemarked',
-    'Have',
-    'Biludstyr',
-    'Dyremad',
-  ].map(normalizeCatalogLabel),
-)
+/** Raw department/category labels in DB that are never food (used for SQL/API filters). */
+export const NON_FOOD_CATALOG_LABELS = [
+  'Personlig pleje',
+  'Pleje',
+  'Bolig & køkken',
+  'Tøj & sko',
+  'Tøj',
+  'Leg',
+  'Fritid & sport',
+  'Elektronik',
+  'Husholdning',
+  'Husholdning & rengøring',
+  'Non-food',
+  'Nonfood',
+  'Øvrig nonfood',
+  'Byggemarked',
+  'Have',
+  'Biludstyr',
+  'Dyremad',
+  'Baby & børn',
+  'Baby og småbørn',
+  'Baby og familie',
+  'Dyr',
+] as const
 
-const FOOD_DEPARTMENTS = new Set(
-  [
-    'Kolonial',
-    'Drikkevarer',
-    'Drikke',
-    'Mejeri og køl',
-    'Mejeri & køl',
-    'Mejeri',
-    'Køl',
-    'Slik & snacks',
-    'Slik',
-    'Frost',
-    'Brød og kager',
-    'Brød & Bavinchi',
-    'Frugt og grønt',
-    'Frugt & grønt',
-    'Kød & fisk',
-    'Kød, fisk & fjerkræ',
-    'Kød og fisk',
-    'Kiosk',
-    'Mad fra hele verden',
-    'Nemt & hurtigt',
-    'Ost m.v.',
-  ].map(normalizeCatalogLabel),
-)
+/** Raw department/category labels in DB that are food (whitelist for /dagligvarer). */
+export const FOOD_CATALOG_LABELS = [
+  'Frugt og grønt',
+  'Frugt & grønt',
+  'Brød og kager',
+  'Brød & Bavinchi',
+  'Brød',
+  'Kød og fisk',
+  'Kød & fisk',
+  'Kød, fisk & fjerkræ',
+  'Kolonial',
+  'Mejeri og køl',
+  'Mejeri & køl',
+  'Mejeri',
+  'Køl',
+  'Ost m.v.',
+  'Frost',
+  'Drikkevarer',
+  'Drikke',
+  'Slik og snacks',
+  'Slik & snacks',
+  'Slik',
+  'Kiosk',
+  'Nemt og hurtigt',
+  'Nemt & hurtigt',
+  'Mad fra hele verden',
+] as const
+
+const NON_FOOD_DEPARTMENTS = new Set(NON_FOOD_CATALOG_LABELS.map(normalizeCatalogLabel))
+
+const FOOD_DEPARTMENTS = new Set(FOOD_CATALOG_LABELS.map(normalizeCatalogLabel))
 
 const AMBIGUOUS_DEPARTMENTS = new Set(
   [
@@ -101,6 +111,14 @@ export type CatalogProductFoodInput = {
 function hasNonFoodName(name: string): boolean {
   if (!name) return false
   return NON_FOOD_NAME_PATTERNS.some((pattern) => pattern.test(name))
+}
+
+export function getFoodCatalogLabelsForFilter(): string[] {
+  return Array.from(new Set(FOOD_CATALOG_LABELS))
+}
+
+export function getNonFoodCatalogLabelsForFilter(): string[] {
+  return Array.from(new Set(NON_FOOD_CATALOG_LABELS))
 }
 
 export function isFoodCatalogProduct(input: CatalogProductFoodInput): boolean {

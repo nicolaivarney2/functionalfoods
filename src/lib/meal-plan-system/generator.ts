@@ -2312,8 +2312,9 @@ export class MealPlanGenerator {
         true, // offersOnly = true
         undefined, // No search filter
         storeIds, // Filter by selected stores
-        true, // foodOnly = true
-        false // organicOnly = false (we'll handle this separately)
+        true, // foodOnly = true (exclude non-food departments)
+        false, // organicOnly = false (we'll handle this separately)
+        true // excludeSnacksAndDrinks for meal-plan offer matching
       );
 
       console.log(`🛒 Loaded ${total} offers from ${selectedStores.length} store(s)`);

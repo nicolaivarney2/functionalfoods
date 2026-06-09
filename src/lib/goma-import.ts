@@ -507,6 +507,7 @@ export async function importGomaProducts(options: ImportOptions) {
           category: p.category,
           subcategory: p.s_category,
           department: p.department_name,
+          is_food: isFoodRelevantForIngredientQueue(p),
           unit: p.unit,
           amount: p.amount,
           image_url: p.image_url,
