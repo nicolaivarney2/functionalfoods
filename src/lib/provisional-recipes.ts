@@ -5,7 +5,7 @@
  */
 
 export type ProvisionalStatus = 'draft' | 'pending' | 'approved' | 'rejected'
-export type ProvisionalSource = 'ai-photo' | 'manual'
+export type ProvisionalSource = 'ai-photo' | 'ai-voice' | 'manual'
 
 export interface ProvisionalIngredient {
   name: string
@@ -59,6 +59,11 @@ export interface ProvisionalRecipeRow {
   reviewed_at: string | null
   created_at: string
   updated_at: string
+  /**
+   * Indsenderens visningsnavn/email til kreditering. Findes ikke i tabellen —
+   * admin-API'et beriger rækken via service role (auth.users).
+   */
+  submittedBy?: string | null
 }
 
 export const PROVISIONAL_SELECT =
@@ -166,6 +171,36 @@ Returnér KUN gyldig JSON i præcis dette format:
   "instructions": [{ "stepNumber": 1, "instruction": "..." }],
   "nutritionalInfo": { "calories": 450, "protein": 35, "carbs": 30, "fat": 18, "fiber": 6 },
   "clarifyingQuestions": ["Hvor mange portioner var det?", "Brugte du olie eller smør?"]
+}`
+
+export const VOICE_SYSTEM_PROMPT = `Du er en dansk ernærings- og madekspert. Du får en transskription af, hvad en bruger fortæller, de har spist (talesprog — kan være rodet, ufuldstændigt eller indeholde fyldord).
+Tolk det og lav et kvalificeret bud på en opskrift/et måltid på dansk.
+
+VIGTIGT:
+- Udled måltidet ud fra det brugeren siger. Ignorér fyldord ("øh", "altså", "tror jeg").
+- Hvis mængder ikke nævnes, estimér realistiske portioner (fx "en håndfuld mandler" ≈ 30 g).
+- Ingrediensnavne skal være rene basisnavne (fx "havregryn", "skyr", "banan").
+  Læg tilberedning/forklaring i "notes" (fx "ristet", "hakket").
+- Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk.
+- Krydderier skal være nøgterne: brug som udgangspunkt ca. 0,5 tsk salt og 0,25 tsk
+  peber pr. opskrift, medmindre retten tydeligvis kræver mere.
+- Estimér ernæring PR. PORTION så godt du kan.
+- Stil 2-4 korte opklarende spørgsmål om det du er usikker på (fx portionsstørrelse,
+  mængder, skjulte ingredienser, tilberedning).
+
+Returnér KUN gyldig JSON i præcis dette format:
+{
+  "title": "Kort, beskrivende titel",
+  "description": "1-2 sætninger om måltidet",
+  "servings": 1,
+  "prepTime": 0,
+  "cookTime": 0,
+  "difficulty": "Easy|Medium|Hard",
+  "dietaryCategories": ["fx proteinrig"],
+  "ingredients": [{ "name": "skyr", "amount": 150, "unit": "g", "notes": null }],
+  "instructions": [{ "stepNumber": 1, "instruction": "..." }],
+  "nutritionalInfo": { "calories": 220, "protein": 20, "carbs": 18, "fat": 5, "fiber": 2 },
+  "clarifyingQuestions": ["Hvor stor en portion var det?", "Var der sukker eller honning i?"]
 }`
 
 /** Trækker første JSON-objekt ud af et LLM-svar (tåler markdown-fences). */
