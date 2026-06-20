@@ -60,6 +60,12 @@ const adminNavItems = [
     description: 'Administrer alle opskrifter'
   },
   {
+    name: 'Foreløbige opskrifter',
+    href: '/admin/provisional-recipes',
+    icon: FileText,
+    description: 'Godkend bruger-opskrifter (AI/byg selv)'
+  },
+  {
     name: 'Tags',
     href: '/admin/tags',
     icon: Tag,
