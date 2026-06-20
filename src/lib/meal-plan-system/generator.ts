@@ -481,6 +481,12 @@ export class MealPlanGenerator {
       selectedStores: number[]
       prioritizeOrganic: boolean
       prioritizeAnimalOrganic?: boolean
+      /**
+       * Familiens valgte FF-kostretninger (family_profiles.included_recipe_categories,
+       * fx ['keto'] eller ['sense']). Bruges som kostretning når ingen voksen har en
+       * vægttabsprofil med dietaryApproach — ellers ville planen altid falde til 'sense'.
+       */
+      includedRecipeCategories?: string[]
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
@@ -525,9 +531,17 @@ export class MealPlanGenerator {
           .map((p) => String(p.dietaryApproach || '').trim())
           .filter(Boolean)
 
+    // Familiens valgte FF-kostretning (fx 'keto'/'sense') bruges som fallback før
+    // den hårdkodede 'sense', så familieindstillingernes kategori-valg faktisk
+    // styrer motoren når der ikke er en voksen-vægttabsprofil.
+    const familyDietFallback = (familyProfile.includedRecipeCategories ?? [])
+      .map((c) => String(c || '').trim())
+      .find(Boolean)
+
     let primaryDietaryApproach =
       approachesForSelection[0] ||
       familyProfile.adultsProfiles[0]?.dietaryApproach ||
+      familyDietFallback ||
       'sense'
 
     if (hasChildren && approachesForSelection.includes('familiemad')) {

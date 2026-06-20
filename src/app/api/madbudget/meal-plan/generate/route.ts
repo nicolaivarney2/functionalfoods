@@ -18,6 +18,14 @@ function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
   }, {} as Record<DayKey, Record<MealType, unknown | null>>)
 }
 
+/** Lokal kalenderdato YYYY-MM-DD (undgår UTC-drift fra toISOString). */
+function localIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function isoWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
   const dayNum = d.getUTCDay() || 7
@@ -31,6 +39,50 @@ function effectiveChildrenAges(children: number, raw: unknown): string[] {
   const arr = Array.isArray(raw) ? (raw as string[]) : []
   if (arr.length >= children) return arr.slice(0, Math.max(0, children))
   return [...arr, ...Array.from({ length: children - arr.length }, () => '4-9')]
+}
+
+/**
+ * Børne-kulhydrat til aftensmaden: voksen-kostretninger (keto, sense, GLP-1 …) er
+ * ofte lav-kulhydrat, men børn skal have et mættende tilbehør. Vi tilføjer 100 g
+ * pasta/ris/bulgur pr. barn til hver aftensret (og dermed til indkøbslisten, der
+ * bygges ud fra celle-ingredienserne). Roteres over ugen for variation.
+ */
+const KID_CARBS = ['Pasta (til børn)', 'Ris (til børn)', 'Bulgur (til børn)']
+
+/**
+ * Tilføjer 100 g kulhydrat pr. barn til hver aftensret (i grid-cellen) og lægger
+ * den samlede mængde på indkøbslisten under en "Til børnene"-kategori.
+ */
+function appendKidCarbToDinners(
+  grid: Record<DayKey, Record<MealType, unknown | null>>,
+  childCount: number,
+  shoppingList?: { categories?: { name: string; items: { name: string; amount: number; unit: string; notes?: string }[] }[] } | null
+) {
+  if (childCount <= 0) return
+  const perCarb = new Map<string, number>()
+  DAY_KEYS.forEach((dayKey, dayIndex) => {
+    const cell = grid[dayKey]?.dinner
+    if (!cell || typeof cell !== 'object') return
+    const c = cell as Record<string, unknown>
+    const carbName = KID_CARBS[dayIndex % KID_CARBS.length]
+    const amount = 100 * childCount
+    const ingredients = Array.isArray(c.ingredients) ? (c.ingredients as unknown[]) : []
+    ingredients.push({ name: carbName, amount, unit: 'g', isKidCarb: true })
+    c.ingredients = ingredients
+    perCarb.set(carbName, (perCarb.get(carbName) ?? 0) + amount)
+  })
+
+  if (shoppingList && perCarb.size > 0) {
+    const items = Array.from(perCarb.entries()).map(([name, amount]) => ({
+      name,
+      amount,
+      unit: 'g',
+      notes: 'Mættende tilbehør til børnene',
+    }))
+    const categories = Array.isArray(shoppingList.categories) ? shoppingList.categories : []
+    categories.push({ name: 'Til børnene', items })
+    shoppingList.categories = categories
+  }
 }
 
 /**
@@ -123,6 +175,9 @@ export async function POST(request: NextRequest) {
         selectedStores: profile.selected_stores ?? [],
         prioritizeOrganic: profile.prioritize_organic === true,
         prioritizeAnimalOrganic: profile.prioritize_animal_organic === true,
+        includedRecipeCategories: Array.isArray(profile.included_recipe_categories)
+          ? profile.included_recipe_categories
+          : [],
       },
       variationLevel
     )
@@ -136,6 +191,18 @@ export async function POST(request: NextRequest) {
         const mealType = meal.mealType as MealType
         if (!mealType || !grid[dayKey]) return
         const recipe = meal.recipe as any
+        // adjusted*-værdierne er total for hele måltidet (alle portioner). Vi gemmer
+        // næring PR. PORTION — præcis som web-klienten (madbudget/page.tsx) gør —
+        // så app'ens madplan ikke viser husstands-totaler (fx ~6200 kcal/dag).
+        const nutritionServings = Math.max(1, meal.servings || 1)
+        const perPortion = (v: number | null | undefined) =>
+          v != null && Number.isFinite(v) ? v / nutritionServings : v
+        const perPortionMap = (obj: Record<string, unknown> | null | undefined) =>
+          obj
+            ? Object.fromEntries(
+                Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' ? v / nutritionServings : v])
+              )
+            : obj
         grid[dayKey][mealType] = {
           id: recipe.id,
           slug: recipe.slug || '',
@@ -151,16 +218,19 @@ export async function POST(request: NextRequest) {
           prepTime: recipe.prepTime ? `${recipe.prepTime} min` : '30 min',
           category: recipe.categories?.[0] || 'Dinner',
           dietaryTags: recipe.dietaryApproaches || [],
-          calories: meal.adjustedCalories,
-          protein: meal.adjustedProtein,
-          carbs: meal.adjustedCarbs,
-          fat: meal.adjustedFat,
-          fiber: meal.adjustedFiber,
-          vitamins: meal.adjustedVitamins,
-          minerals: meal.adjustedMinerals,
+          calories: perPortion(meal.adjustedCalories),
+          protein: perPortion(meal.adjustedProtein),
+          carbs: perPortion(meal.adjustedCarbs),
+          fat: perPortion(meal.adjustedFat),
+          fiber: perPortion(meal.adjustedFiber),
+          vitamins: perPortionMap(meal.adjustedVitamins),
+          minerals: perPortionMap(meal.adjustedMinerals),
         }
       })
     })
+
+    // Børne-kulhydrat til aftensmaden (100 g pasta/ris/bulgur pr. barn) — også til indkøbslisten.
+    appendKidCarbToDinners(grid, profile.children ?? 0, weekPlan.shoppingList as any)
 
     // Uge-datoer (mandag–søndag for indeværende uge).
     const weekStart = new Date()
@@ -168,8 +238,8 @@ export async function POST(request: NextRequest) {
     weekStart.setHours(0, 0, 0, 0)
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekEnd.getDate() + 6)
-    const weekStartDate = weekStart.toISOString().split('T')[0]
-    const weekEndDate = weekEnd.toISOString().split('T')[0]
+    const weekStartDate = localIsoDate(weekStart)
+    const weekEndDate = localIsoDate(weekEnd)
     const weekNumber = isoWeekNumber(weekStart)
 
     const mealPlanData = { v: 2 as const, grid, slotLocks: {} }
