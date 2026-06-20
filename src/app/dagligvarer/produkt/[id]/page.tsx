@@ -1,9 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ShoppingCart, Heart, Share2, TrendingUp, TrendingDown, Minus, Clock } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, Share2, TrendingUp, TrendingDown, Minus, Clock, Bell, List } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import {
+  addToBasisliste,
+  addToShoppingList,
+  createPriceAlert,
+} from '@/lib/dagligvarer-actions'
 
 interface Product {
   id: string
@@ -127,26 +133,63 @@ function formatOfferEndDate(dateString: string | null): string {
   })
 }
 
-// 🚀 STATE-OF-THE-ART PRICE CHART COMPONENT
-interface PriceChartProps {
-  data: any[]
-  currentPrice: number
-  hoveredPoint: any
-  onHover: (point: any) => void
+interface ChartPoint {
+  price: number
+  normalPrice?: number | null
+  isOnSale?: boolean
+  timestamp: string
+  label?: string
 }
 
-function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartProps) {
+function buildChartSeries(
+  history: ChartPoint[],
+  currentPrice: number,
+  normalPrice: number,
+): ChartPoint[] {
+  const series = [...history]
+  const last = series[series.length - 1]
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const lastDate = last ? last.timestamp.slice(0, 10) : null
+
+  if (!last || lastDate !== todayIso || Math.abs(last.price - currentPrice) > 0.009) {
+    series.push({
+      price: currentPrice,
+      normalPrice,
+      timestamp: new Date().toISOString(),
+      label: 'I dag',
+    })
+  } else if (last && !last.label) {
+    series[series.length - 1] = { ...last, label: 'I dag' }
+  }
+
+  return series
+}
+
+// Price chart with corrected min/max including current price
+interface PriceChartProps {
+  data: ChartPoint[]
+  currentPrice: number
+  normalPrice: number
+  hoveredPoint: ChartPoint | null
+  onHover: (point: ChartPoint | null) => void
+}
+
+function PriceChart({ data, currentPrice, normalPrice, hoveredPoint, onHover }: PriceChartProps) {
   if (!data || data.length === 0) return null
-  
-  // Calculate chart dimensions and scales
+
   const chartWidth = 800
   const chartHeight = 200
   const padding = 40
-  
-  const prices = data.map(d => d.price)
-  const minPrice = Math.min(...prices)
-  const maxPrice = Math.max(...prices)
-  const priceRange = maxPrice - minPrice || 1 // Avoid division by zero
+
+  const allPrices = [
+    ...data.map((d) => d.price),
+    currentPrice,
+    normalPrice,
+  ].filter((p) => p > 0)
+
+  const minPrice = Math.min(...allPrices)
+  const maxPrice = Math.max(...allPrices)
+  const priceRange = maxPrice - minPrice || 1
   
   // Create SVG path for the price line
   const createPath = () => {
@@ -182,9 +225,12 @@ function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartPro
     return path
   }
   
-  // Calculate price trend
-  const priceChange = data.length > 1 ? data[data.length - 1].price - data[0].price : 0
-  const priceChangePercent = data.length > 1 ? ((priceChange / data[0].price) * 100) : 0
+  const priceChange = data.length > 1 ? currentPrice - data[0].price : 0
+  const priceChangePercent = data.length > 1 && data[0].price > 0
+    ? ((priceChange / data[0].price) * 100)
+    : 0
+
+  const normalY = padding + ((maxPrice - normalPrice) / priceRange) * (chartHeight - 2 * padding)
   
   return (
     <div className="space-y-4">
@@ -209,7 +255,7 @@ function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartPro
             <Minus className="w-8 h-8 text-blue-500" />
           </div>
         </div>
-        
+
         <div className="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-100">
           <div className="flex items-center justify-between">
             <div>
@@ -274,6 +320,18 @@ function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartPro
               </text>
             </g>
           ))}
+
+          {normalPrice > 0 && (
+            <line
+              x1={padding}
+              y1={normalY}
+              x2={chartWidth - padding}
+              y2={normalY}
+              stroke="#9CA3AF"
+              strokeWidth="2"
+              strokeDasharray="6,4"
+            />
+          )}
           
           {/* Area fill */}
           <path
@@ -353,9 +411,9 @@ function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartPro
             if (i === 0 || i === data.length - 1 || i === Math.floor(data.length / 2)) {
               return (
                 <span key={i} className="text-xs text-gray-500">
-                  {new Date(point.timestamp).toLocaleDateString('da-DK', { 
-                    month: 'short', 
-                    day: 'numeric' 
+                  {point.label ?? new Date(point.timestamp).toLocaleDateString('da-DK', {
+                    month: 'short',
+                    day: 'numeric',
                   })}
                 </span>
               )
@@ -370,14 +428,30 @@ function PriceChart({ data, currentPrice, hoveredPoint, onHover }: PriceChartPro
 
 export default function ProductPage() {
   const params = useParams()
+  const { user } = useAuth()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [priceHistory] = useState<any[]>([])
-  const [hoveredPoint, setHoveredPoint] = useState<any>(null)
+  const [priceHistory, setPriceHistory] = useState<ChartPoint[]>([])
+  const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null)
   const [similarProducts, setSimilarProducts] = useState<Product[]>([])
   const [otherSizeProducts, setOtherSizeProducts] = useState<Product[]>([])
   const [similarLoading] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  const chartData = useMemo(() => {
+    if (!product) return []
+    return buildChartSeries(
+      priceHistory,
+      product.price,
+      product.original_price || product.price,
+    )
+  }, [priceHistory, product])
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -387,11 +461,20 @@ export default function ProductPage() {
         const data = await response.json()
         if (data.success && data.product) {
           setProduct(data.product)
-          if (data.similarProducts) {
-            setSimilarProducts(data.similarProducts)
-          }
-          if (data.otherSizeProducts) {
-            setOtherSizeProducts(data.otherSizeProducts)
+          if (data.similarProducts) setSimilarProducts(data.similarProducts)
+          if (data.otherSizeProducts) setOtherSizeProducts(data.otherSizeProducts)
+
+          const histRes = await fetch(`/api/supermarket/product/${params.id}/price-history`)
+          if (histRes.ok) {
+            const histData = await histRes.json()
+            setPriceHistory(
+              (histData.history ?? []).map((h: { price: number; normalPrice: number | null; isOnSale: boolean; timestamp: string }) => ({
+                price: h.price,
+                normalPrice: h.normalPrice,
+                isOnSale: h.isOnSale,
+                timestamp: h.timestamp,
+              })),
+            )
           }
         } else {
           setError('Produkt ikke fundet')
@@ -404,10 +487,21 @@ export default function ProductPage() {
       }
     }
 
-    if (params.id) {
-      fetchProduct()
-    }
+    if (params.id) fetchProduct()
   }, [params.id])
+
+  const runAction = async (fn: () => Promise<void>, successMsg: string) => {
+    if (!user) {
+      showToast('Du skal være logget ind')
+      return
+    }
+    try {
+      await fn()
+      showToast(successMsg)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Noget gik galt')
+    }
+  }
 
   if (loading) {
     return (
@@ -484,10 +578,17 @@ export default function ProductPage() {
                 )}
               </div>
               <div className="flex gap-2 ml-4">
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
-                  <Heart size={20} />
-                </button>
-                <button className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100">
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({ title: product.name, url: window.location.href }).catch(() => {})
+                    } else {
+                      navigator.clipboard.writeText(window.location.href)
+                      showToast('Link kopieret')
+                    }
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+                >
                   <Share2 size={20} />
                 </button>
               </div>
@@ -737,18 +838,56 @@ export default function ProductPage() {
               )}
 
               {/* Action buttons */}
-              <div className="flex gap-3 pt-4">
-                <button className="flex-1 bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
-                  <ShoppingCart size={20} />
-                  Tilføj til kurv
+              <div className="space-y-3 pt-4">
+                <button
+                  onClick={() => runAction(() => addToBasisliste(product.name), 'Tilføjet til basisliste')}
+                  className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+                >
+                  <List size={20} />
+                  Tilføj til basisliste
                 </button>
-                {/* "Se i butik" knap fjernet - REMA 1000 links giver 404 fejl */}
+                <button
+                  onClick={() => runAction(() => addToShoppingList(product.id), 'Tilføjet til indkøbsliste')}
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart size={20} />
+                  Tilføj til indkøbsliste
+                </button>
+
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+                    <Bell size={16} /> Prisalarm
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => runAction(() => createPriceAlert(product.id, 'any_sale'), 'Prisalarm oprettet')}
+                      className="flex-1 min-w-[100px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm hover:bg-amber-100"
+                    >
+                      På tilbud
+                    </button>
+                    <button
+                      onClick={() => runAction(() => createPriceAlert(product.id, 'min_discount', 20), 'Prisalarm oprettet')}
+                      className="flex-1 min-w-[100px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm hover:bg-amber-100"
+                    >
+                      Min. 20%
+                    </button>
+                    <button
+                      onClick={() => runAction(() => createPriceAlert(product.id, 'min_discount', 30), 'Prisalarm oprettet')}
+                      className="flex-1 min-w-[100px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm hover:bg-amber-100"
+                    >
+                      Min. 30%
+                    </button>
+                  </div>
+                  <Link href="/prisalarmer" className="block mt-2 text-sm text-gray-500 hover:text-gray-700">
+                    Se alle prisalarmer →
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
 
           {/* 🚀 STATE-OF-THE-ART PRICE HISTORY CHART */}
-          {priceHistory.length > 0 && (
+          {chartData.length > 0 && (
             <div className="p-6 border-t border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50">
               <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg">
@@ -756,14 +895,15 @@ export default function ProductPage() {
                 </div>
                 Prisudvikling
                 <span className="text-sm font-normal text-gray-500">
-                  Sidste {priceHistory.length} opdateringer
+                  Sidste {chartData.length} datapunkter
                 </span>
               </h3>
               
               <div className="bg-white rounded-2xl shadow-lg p-6 border border-white/50">
                 <PriceChart 
-                  data={priceHistory} 
+                  data={chartData}
                   currentPrice={product.price}
+                  normalPrice={product.original_price || product.price}
                   hoveredPoint={hoveredPoint}
                   onHover={setHoveredPoint}
                 />
@@ -799,6 +939,11 @@ export default function ProductPage() {
           )}
         </div>
       </div>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

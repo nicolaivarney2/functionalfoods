@@ -1,9 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Search, Heart, Plus, ChevronDown, X, Clock } from 'lucide-react'
+import { Search, Plus, ChevronDown, X, Clock, Bell, List, ShoppingCart } from 'lucide-react'
+import Link from 'next/link'
 import GuestExperienceBanner from '@/components/GuestExperienceBanner'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
+import { useAuth } from '@/contexts/AuthContext'
+import {
+  addToBasisliste,
+  addToShoppingList,
+  createPriceAlert,
+} from '@/lib/dagligvarer-actions'
 
 
 // Types
@@ -22,7 +29,6 @@ interface Product {
   image_url?: string
   store: string
   amount?: string
-  isFavorite?: boolean
 }
 
 interface ProductCounts {
@@ -67,10 +73,12 @@ const formatOfferExpiration = (saleEndDate: string | null | undefined): string |
 }
 
 // Product Card Component
-const ProductCard = ({ product, onToggleFavorite, onOpenModal }: { 
-  product: Product, 
-  onToggleFavorite: (id: string) => void,
-  onOpenModal: (product: Product) => void
+const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAlert }: { 
+  product: Product,
+  onOpenModal: (product: Product) => void,
+  onBasisliste: (product: Product) => void,
+  onShopping: (product: Product) => void,
+  onPriceAlert: (product: Product) => void,
 }) => (
   <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-100 relative group">
     {/* Product Image */}
@@ -94,16 +102,17 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
         </div>
       )}
       
-      {/* Favorite Button */}
+      {/* Price alert */}
       <div className="absolute top-3 right-3">
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggleFavorite(product.id);
+            onPriceAlert(product);
           }}
-          className="p-2 rounded-full shadow-sm bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all duration-200"
+          className="p-2 rounded-full shadow-sm bg-white text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all duration-200"
+          title="Opret prisalarm"
         >
-          <Heart size={16} />
+          <Bell size={16} />
         </button>
       </div>
       
@@ -220,17 +229,27 @@ const ProductCard = ({ product, onToggleFavorite, onOpenModal }: {
       )}
 
       {/* Actions */}
-      <div className="flex space-x-2">
-        <button className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-2 rounded text-xs font-medium transition-colors">
-          <Plus size={12} className="inline mr-1" />
-          Tilføj
+      <div className="flex space-x-1">
+        <button
+          onClick={(e) => { e.stopPropagation(); onBasisliste(product); }}
+          className="flex-1 bg-transparent hover:bg-green-50 text-green-600 border border-green-300 py-1.5 px-1 rounded text-xs font-medium transition-colors"
+        >
+          <List size={12} className="inline mr-0.5" />
+          Basisliste
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onShopping(product); }}
+          className="flex-1 bg-transparent hover:bg-blue-50 text-blue-600 border border-blue-300 py-1.5 px-1 rounded text-xs font-medium transition-colors"
+        >
+          <ShoppingCart size={12} className="inline mr-0.5" />
+          Indkøb
         </button>
         <button 
           onClick={() => onOpenModal(product)}
           className="bg-gray-100 hover:bg-gray-200 text-gray-600 py-1.5 px-2 rounded text-xs font-medium transition-colors"
         >
-            Se mere
-          </button>
+          Mere
+        </button>
       </div>
     </div>
   </div>
@@ -420,6 +439,7 @@ const STORES = [
 ]
 
 export default function DagligvarerPage() {
+  const { user } = useAuth()
   // State
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -443,6 +463,54 @@ export default function DagligvarerPage() {
   const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(true) // Mobile filter bar expanded state - starts open
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const showToast = useCallback((message: string) => {
+    setToast(message)
+    setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  const requireAuth = useCallback(() => {
+    if (!user) {
+      showToast('Du skal være logget ind')
+      return false
+    }
+    return true
+  }, [user, showToast])
+
+  const handleBasisliste = useCallback(async (product: Product) => {
+    if (!requireAuth()) return
+    try {
+      await addToBasisliste(product.name)
+      showToast(`${product.name} tilføjet til basisliste`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Noget gik galt')
+    }
+  }, [requireAuth, showToast])
+
+  const handleShopping = useCallback(async (product: Product) => {
+    if (!requireAuth()) return
+    try {
+      await addToShoppingList(product.id)
+      showToast(`${product.name} tilføjet til indkøbsliste`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Noget gik galt')
+    }
+  }, [requireAuth, showToast])
+
+  const handlePriceAlert = useCallback(async (
+    product: Product,
+    thresholdType: 'any_sale' | 'min_discount' = 'any_sale',
+    minDiscountPct?: number,
+  ) => {
+    if (!requireAuth()) return
+    try {
+      await createPriceAlert(product.id, thresholdType, minDiscountPct)
+      showToast('Prisalarm oprettet')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Noget gik galt')
+    }
+  }, [requireAuth, showToast])
 
   // Refs
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -478,17 +546,6 @@ export default function DagligvarerPage() {
   const closeProductModal = useCallback(() => {
     setModalOpen(false)
     setSelectedProduct(null)
-  }, [])
-
-  const toggleFavorite = useCallback((productId: string) => {
-    console.log('Toggle favorite for product:', productId)
-    setProducts(prev => 
-      prev.map(product => 
-        product.id === productId 
-          ? { ...product, isFavorite: !product.isFavorite }
-          : product
-      )
-    )
   }, [])
 
 
@@ -1252,7 +1309,9 @@ export default function DagligvarerPage() {
                     key={product.id}
                     product={product}
                     onOpenModal={openProductModal}
-                    onToggleFavorite={toggleFavorite}
+                    onBasisliste={handleBasisliste}
+                    onShopping={handleShopping}
+                    onPriceAlert={(p) => { openProductModal(p); }}
                   />
                 ))}
               </div>
@@ -1465,29 +1524,65 @@ export default function DagligvarerPage() {
 
                 {/* Action Buttons */}
                 <div className="space-y-3 pt-4">
-                  <div className="flex gap-3">
-                    <button className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors">
-                      Tilføj til kurv
-                    </button>
-                    <button 
-                      onClick={() => toggleFavorite(selectedProduct.id)}
-                      className="p-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-                    >
-                      <Heart size={20} className="text-gray-600" />
-                    </button>
+                  <button
+                    onClick={() => handleBasisliste(selectedProduct)}
+                    className="w-full bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors"
+                  >
+                    Tilføj til basisliste
+                  </button>
+                  <button
+                    onClick={() => handleShopping(selectedProduct)}
+                    className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Tilføj til indkøbsliste
+                  </button>
+
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Prisalarm</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handlePriceAlert(selectedProduct, 'any_sale')}
+                        className="flex-1 min-w-[120px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm font-medium hover:bg-amber-100"
+                      >
+                        På tilbud
+                      </button>
+                      <button
+                        onClick={() => handlePriceAlert(selectedProduct, 'min_discount', 20)}
+                        className="flex-1 min-w-[120px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm font-medium hover:bg-amber-100"
+                      >
+                        Min. 20%
+                      </button>
+                      <button
+                        onClick={() => handlePriceAlert(selectedProduct, 'min_discount', 30)}
+                        className="flex-1 min-w-[120px] bg-amber-50 text-amber-800 border border-amber-200 py-2 px-3 rounded-lg text-sm font-medium hover:bg-amber-100"
+                      >
+                        Min. 30%
+                      </button>
+                    </div>
                   </div>
-                  
-                  {/* Price History Link */}
-                  <a 
+
+                  <Link
                     href={`/dagligvarer/produkt/${selectedProduct.id}`}
                     className="block w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-xl font-medium text-center transition-colors border border-blue-200"
                   >
-                    📈 Se pris-historik
-                  </a>
+                    Se pris-historik
+                  </Link>
+                  <Link
+                    href="/prisalarmer"
+                    className="block w-full text-center text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Se alle prisalarmer →
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm">
+          {toast}
         </div>
       )}
       </div>

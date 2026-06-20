@@ -63,10 +63,10 @@ function SenseSpisekasseTable({
               {group.name}
             </h4>
             <ul className="m-0 list-none space-y-1.5 p-0">
-              {group.ingredients.map((ingredient) => {
+              {group.ingredients.map((ingredient, index) => {
                 const isChecked = checkedIngredients.has(ingredient.id)
                 return (
-                  <li key={ingredient.id}>
+                  <li key={`${ingredient.id}-${index}`}>
                     <button
                       type="button"
                       onClick={() => toggleIngredient(ingredient.id)}
@@ -244,11 +244,11 @@ export default function DynamicIngredientsList({ recipe, servings, onServingsCha
                   {group.name}
                 </h3>
                 <div className="space-y-1 pl-2">
-                  {group.ingredients.map((ingredient) => {
+                  {group.ingredients.map((ingredient, index) => {
                     const isChecked = checkedIngredients.has(ingredient.id)
                     return (
                       <div
-                        key={ingredient.id}
+                        key={`${ingredient.id}-${index}`}
                         className={`flex cursor-pointer items-center space-x-2 rounded-md border border-gray-200 bg-white p-2 transition-colors ${
                           isChecked ? 'border-green-300 bg-green-50' : 'hover:bg-gray-50'
                         }`}
@@ -274,11 +274,11 @@ export default function DynamicIngredientsList({ recipe, servings, onServingsCha
             ))
           )
         ) : (
-          recipe.ingredients.map((ingredient) => {
+          recipe.ingredients.map((ingredient, index) => {
             const isChecked = checkedIngredients.has(ingredient.id)
             return (
               <div 
-                key={ingredient.id} 
+                key={`${ingredient.id}-${index}`} 
                 className={`flex items-center space-x-2 p-2 bg-white border border-gray-200 rounded-md cursor-pointer transition-colors ${
                   isChecked ? 'bg-green-50 border-green-300' : 'hover:bg-gray-50'
                 }`}

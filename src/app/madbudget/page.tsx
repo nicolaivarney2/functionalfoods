@@ -74,6 +74,16 @@ interface BasisvarerIngredient {
   created_at: string
 }
 
+interface ManualShoppingItem {
+  id: string
+  name: string
+  quantity: number
+  unit: string
+  image_url?: string | null
+  is_checked: boolean
+  created_at: string
+}
+
 interface Product {
   id: number
   name: string
@@ -691,6 +701,7 @@ export default function MadbudgetPage() {
   }, [shoppingList, shoppingListDietId])
   const [recalculatingShoppingList, setRecalculatingShoppingList] = useState(false)
   const [basisvarer, setBasisvarer] = useState<BasisvarerIngredient[]>([])
+  const [manualShoppingItems, setManualShoppingItems] = useState<ManualShoppingItem[]>([])
   const [storePrices, setStorePrices] = useState<Record<string, Record<string, any>>>({})
   const [selectedStoreTab, setSelectedStoreTab] = useState<string>('all')
   const [loadingPrices, setLoadingPrices] = useState(false)
@@ -1193,7 +1204,10 @@ export default function MadbudgetPage() {
 
   // Load basisvarer on component mount (gæster får demo-data via applyGuestDemoScaling)
   useEffect(() => {
-    if (!isGuest) loadBasisvarer()
+    if (!isGuest) {
+      loadBasisvarer()
+      loadManualShoppingItems()
+    }
   }, [isGuest])
 
   // ---------------------------------------------------------------
@@ -1827,6 +1841,63 @@ export default function MadbudgetPage() {
       console.error('Error loading basisvarer:', error)
     } finally {
       setLoadingBasisvarer(false)
+    }
+  }
+
+  const loadManualShoppingItems = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setManualShoppingItems([])
+        return
+      }
+      const response = await fetch('/api/manual-shopping-items', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setManualShoppingItems(data.items || [])
+      }
+    } catch (error) {
+      console.error('Error loading manual shopping items:', error)
+    }
+  }
+
+  const toggleManualShoppingItem = async (id: string, isChecked: boolean) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const response = await fetch('/api/manual-shopping-items', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, isChecked }),
+      })
+      if (response.ok) {
+        setManualShoppingItems((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, is_checked: isChecked } : item)),
+        )
+      }
+    } catch (error) {
+      console.error('Error toggling manual item:', error)
+    }
+  }
+
+  const removeManualShoppingItem = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const response = await fetch(`/api/manual-shopping-items?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (response.ok) {
+        setManualShoppingItems((prev) => prev.filter((item) => item.id !== id))
+      }
+    } catch (error) {
+      console.error('Error removing manual item:', error)
     }
   }
 
@@ -4507,6 +4578,53 @@ export default function MadbudgetPage() {
                                 </span>
                               </li>
                             )})}
+                          </ul>
+                        </div>
+                      )}
+
+                      {manualShoppingItems.length > 0 && (
+                        <div className="border-t border-gray-200 pt-4 mt-4">
+                          <h4 className="font-semibold text-gray-900 mb-3">Manuelt tilføjede varer</h4>
+                          <ul className="space-y-2">
+                            {manualShoppingItems.map((item) => {
+                              const rowKey = `manual-${item.id}`
+                              const rowDone = shoppingMode && !!shoppingChecked[rowKey]
+                              return (
+                                <li key={item.id} className={`flex items-center justify-between gap-2 text-sm ${rowDone ? 'opacity-65' : ''}`}>
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    {shoppingMode && (
+                                      <input
+                                        type="checkbox"
+                                        className="h-4 w-4 shrink-0 rounded border-gray-300"
+                                        checked={item.is_checked || !!shoppingChecked[rowKey]}
+                                        onChange={(e) => {
+                                          toggleManualShoppingItem(item.id, e.target.checked)
+                                          toggleShoppingItem(rowKey)
+                                        }}
+                                        aria-label={`Kryds af ${item.name}`}
+                                      />
+                                    )}
+                                    <span className={`text-gray-700 ${rowDone || item.is_checked ? 'line-through text-gray-500' : ''}`}>
+                                      {item.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`text-gray-900 font-medium ${rowDone || item.is_checked ? 'line-through text-gray-500' : ''}`}>
+                                      {formatQuantity(item.quantity)} {item.unit}
+                                    </span>
+                                    {!shoppingMode && (
+                                      <button
+                                        type="button"
+                                        onClick={() => removeManualShoppingItem(item.id)}
+                                        className="text-xs text-red-500 hover:text-red-700"
+                                      >
+                                        Fjern
+                                      </button>
+                                    )}
+                                  </div>
+                                </li>
+                              )
+                            })}
                           </ul>
                         </div>
                       )}
