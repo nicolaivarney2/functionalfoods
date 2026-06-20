@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       })
       if (items.length > 0) {
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
+          const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin).replace(/\/+$/, '')
           const controller = new AbortController()
           const timeout = setTimeout(() => controller.abort(), 8000)
           const res = await fetch(`${baseUrl}/api/madbudget/shopping-list-prices`, {
@@ -125,7 +125,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
+    // Fjern evt. afsluttende "/" så vi ikke får dobbelt "//" i det delte link.
+    const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin).replace(/\/+$/, '')
     const shareUrl = `${baseUrl}/madplan/${token}`
     return NextResponse.json({ success: true, shareUrl, token })
   } catch (error) {
