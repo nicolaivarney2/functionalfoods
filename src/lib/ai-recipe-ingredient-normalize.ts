@@ -20,14 +20,14 @@ export type AiIngredientOutput = {
 export type AiInstructionInput = {
   stepNumber?: number
   instruction: string
-  time?: number
+  time?: number | null
   tips?: string | null
 }
 
 export type AiInstructionOutput = {
   stepNumber?: number
   instruction: string
-  time?: number
+  time?: number | null
   tips?: string | null
 }
 
