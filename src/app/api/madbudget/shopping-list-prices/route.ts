@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       6: { key: 'meny', candidates: ['meny'] },
       7: { key: 'spar', candidates: ['spar'] },
       8: { key: 'løvbjerg', candidates: ['loevbjerg', 'løvbjerg', 'lovbjerg'] },
+      9: { key: 'min-koebmand', candidates: ['min-koebmand'] },
     }
 
     const requestedStores = selectedStoreIds

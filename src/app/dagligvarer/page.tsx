@@ -123,9 +123,10 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
         product.store === 'Netto' ? 'border-yellow-400' :
         product.store === 'REMA 1000' ? 'border-blue-900' :
         product.store === 'Bilka' ? 'border-blue-400' :
-        product.store === 'Nemlig' ? 'border-orange-600' :
+        product.store === 'Føtex' ? 'border-blue-600' :
         product.store === 'MENY' ? 'border-red-800' :
         product.store === 'Spar' ? 'border-red-600' :
+        product.store === 'Min Købmand' ? 'border-orange-500' :
         product.store === '365 Discount' ? 'border-green-400' :
         product.store === 'Lidl' ? 'border-yellow-500' :
         product.store === 'Kvickly' ? 'border-red-500' :
@@ -304,9 +305,10 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   '365 Discount': 'Onsdag',
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
-  'Nemlig': 'Søndag',
+  'Føtex': 'Torsdag',
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
+  'Min Købmand': 'Torsdag',
   'Kvickly': 'Torsdag',
   'Super Brugsen': 'Torsdag',
   'Brugsen': 'Fredag',
@@ -420,9 +422,10 @@ const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   '365discount': '365discount',
   Lidl: 'lidl',
   Bilka: 'bilka',
-  Nemlig: 'nemlig',
+  'Føtex': 'foetex',
   MENY: 'meny',
   Spar: 'spar',
+  'min-koebmand': 'min-koebmand',
   Kvickly: 'kvickly',
   superbrugsen: 'superbrugsen',
   Brugsen: 'brugsen',
@@ -437,15 +440,15 @@ const STORES = [
   { id: '365discount', name: '365 Discount', icon: '3️⃣' }, // Goma uses "365discount" (no space)
   { id: 'Lidl', name: 'Lidl', icon: '🟡' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
-  { id: 'Nemlig', name: 'Nemlig', icon: '🟠' },
+  { id: 'Føtex', name: 'Føtex', icon: '🔵' },
   { id: 'MENY', name: 'MENY', icon: '🔴' }, // Goma uses "MENY" (not "MENU")
   { id: 'Spar', name: 'Spar', icon: '🔺' },
+  { id: 'min-koebmand', name: 'Min Købmand', icon: '🛒' }, // DB store_id "min-koebmand"
   { id: 'Kvickly', name: 'Kvickly', icon: '🟥' },
   { id: 'superbrugsen', name: 'Super Brugsen', icon: '🧺' }, // Goma uses "superbrugsen" (no space, lowercase)
   { id: 'Brugsen', name: 'Brugsen', icon: '🧺' },
   { id: 'Løvbjerg', name: 'Løvbjerg', icon: '💚' },
   { id: 'ABC Lavpris', name: 'ABC Lavpris', icon: '🔤' }
-  // Note: Føtex removed - Goma has no products for this store
 ]
 
 export default function DagligvarerPage() {
@@ -1418,9 +1421,10 @@ export default function DagligvarerPage() {
                   selectedProduct.store === 'Netto' ? 'border-yellow-400' :
                   selectedProduct.store === 'REMA 1000' ? 'border-blue-900' :
                   selectedProduct.store === 'Bilka' ? 'border-blue-400' :
-                  selectedProduct.store === 'Nemlig' ? 'border-orange-600' :
+                  selectedProduct.store === 'Føtex' ? 'border-blue-600' :
                   selectedProduct.store === 'MENY' ? 'border-red-800' :
                   selectedProduct.store === 'Spar' ? 'border-red-600' :
+                  selectedProduct.store === 'Min Købmand' ? 'border-orange-500' :
                   selectedProduct.store === '365 Discount' ? 'border-green-400' :
                   selectedProduct.store === 'Lidl' ? 'border-yellow-500' :
                   selectedProduct.store === 'Kvickly' ? 'border-red-500' :

@@ -104,7 +104,8 @@ const STORE_NAMES: Record<number, string> = {
   5: 'Nemlig.com',
   6: 'MENY',
   7: 'Spar',
-  8: 'Løvbjerg'
+  8: 'Løvbjerg',
+  9: 'Min Købmand'
 }
 
 const STORE_COLORS: Record<number, string> = {
@@ -115,7 +116,8 @@ const STORE_COLORS: Record<number, string> = {
   5: 'bg-orange-500',
   6: 'bg-red-600',
   7: 'bg-red-500',
-  8: 'bg-green-600'
+  8: 'bg-green-600',
+  9: 'bg-orange-500'
 }
 
 const STORE_ID_TO_KEY: Record<number, string> = {
@@ -126,7 +128,8 @@ const STORE_ID_TO_KEY: Record<number, string> = {
   5: 'nemlig',
   6: 'meny',
   7: 'spar',
-  8: 'løvbjerg'
+  8: 'løvbjerg',
+  9: 'min-koebmand'
 }
 
 const DIETARY_LABELS: Record<string, string> = {

@@ -1417,8 +1417,10 @@ export class DatabaseService {
         return 'Lidl'
       case 'bilka':
         return 'Bilka'
-      case 'nemlig':
-        return 'Nemlig'
+      case 'foetex':
+      case 'fotex':
+      case 'føtex':
+        return 'Føtex'
       case 'menu':
       case 'meny':
         return 'MENY'
@@ -1436,6 +1438,9 @@ export class DatabaseService {
         return 'Løvbjerg'
       case 'abc-lavpris':
         return 'ABC Lavpris'
+      case 'min-koebmand':
+      case 'min-købmand':
+        return 'Min Købmand'
       default:
         return storeId
     }
@@ -1451,10 +1456,9 @@ export class DatabaseService {
       '365discount': '365discount',
       '365 Discount': '365discount',
       'Lidl': 'lidl',
-      'Føtex': 'fotex',
-      'Foetex': 'fotex',
+      'Føtex': 'foetex',
+      'Foetex': 'foetex',
       'Bilka': 'bilka',
-      'Nemlig': 'nemlig',
       'MENY': 'meny',
       'MENU': 'meny',
       'Spar': 'spar',
@@ -1464,6 +1468,8 @@ export class DatabaseService {
       'Brugsen': 'brugsen',
       'Løvbjerg': 'loevbjerg',
       'ABC Lavpris': 'abc-lavpris',
+      'min-koebmand': 'min-koebmand',
+      'Min Købmand': 'min-koebmand',
     }
 
     return stores.map((s) => mapping[s] || s.toLowerCase().replace(/\s+/g, '-'))

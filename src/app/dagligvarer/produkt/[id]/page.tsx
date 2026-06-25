@@ -46,9 +46,10 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   '365 Discount': 'Onsdag',
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
-  'Nemlig': 'Søndag',
+  'Føtex': 'Torsdag',
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
+  'Min Købmand': 'Torsdag',
   'Kvickly': 'Torsdag',
   'Super Brugsen': 'Torsdag',
   'Brugsen': 'Fredag',
@@ -696,9 +697,10 @@ export default function ProductPage() {
                           product.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
                           product.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
                           product.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
-                          product.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
+                          product.store === 'Føtex' ? 'border-blue-600 bg-blue-100' :
                           product.store === 'MENY' ? 'border-red-800 bg-red-100' :
                           product.store === 'Spar' ? 'border-red-600 bg-red-100' :
+                          product.store === 'Min Købmand' ? 'border-orange-500 bg-orange-100' :
                           'border-gray-300 bg-gray-100'
                         }`}></div>
                         <span className="font-medium">{product.store} (denne side)</span>
@@ -730,9 +732,10 @@ export default function ProductPage() {
                               similarProduct.store === 'Netto' ? 'border-yellow-400 bg-yellow-100' :
                               similarProduct.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
                               similarProduct.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
-                              similarProduct.store === 'Nemlig' ? 'border-orange-600 bg-orange-100' :
+                              similarProduct.store === 'Føtex' ? 'border-blue-600 bg-blue-100' :
                               similarProduct.store === 'MENY' ? 'border-red-800 bg-red-100' :
                               similarProduct.store === 'Spar' ? 'border-red-600 bg-red-100' :
+                              similarProduct.store === 'Min Købmand' ? 'border-orange-500 bg-orange-100' :
                               'border-gray-300 bg-gray-100'
                             }`}></div>
                             {similarProduct.store_url ? (

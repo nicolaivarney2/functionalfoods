@@ -38,9 +38,9 @@ const STORE_OPTIONS = [
   { id: 2, name: 'Netto', color: 'bg-yellow-500' },
   { id: 3, name: 'Føtex', color: 'bg-blue-500' },
   { id: 4, name: 'Bilka', color: 'bg-blue-700' },
-  { id: 5, name: 'Nemlig.com', color: 'bg-orange-500' },
   { id: 6, name: 'MENY', color: 'bg-red-600' },
   { id: 7, name: 'Spar', color: 'bg-red-500' },
+  { id: 9, name: 'Min Købmand', color: 'bg-orange-500' },
   { id: 8, name: 'Løvbjerg', color: 'bg-green-600' },
 ] as const
 
