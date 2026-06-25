@@ -1,0 +1,63 @@
+name: Fooddata Daily Import (incl. price history)
+
+# Runs the full fooddata -> FF import on a GitHub runner DAILY.
+#
+# Why GitHub Actions and not a Vercel cron: the full import takes ~12 min
+# (price_history alone ~11 min), which blows past Vercel's 300s function limit.
+# GitHub-hosted runners allow up to 6 hours per job, so there is no timeout risk.
+#
+# The Vercel scrape cron (/api/grocery/sync/cron) still runs at 04:00 UTC and
+# only refreshes the separate fooddata DB; THIS job copies that data into the
+# main FF DB (products + offers + price_history + match-queue) so /dagligvarer
+# and the savings charts actually reflect it.
+
+on:
+  schedule:
+    # Dagligt 05:00 UTC — efter den natlige scrape (04:00 UTC).
+    # NB: GitHubs scheduler kan være et par minutter forsinket; det er fint her.
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  fooddata-import:
+    runs-on: ubuntu-latest
+    # Secrets ligger på GitHub Environment "FF" — jobbet SKAL pege på det
+    # environment for at kunne læse dem (ellers er secrets.* tomme).
+    environment: FF
+    # GitHub-hostede runners tillader op til 6 timer pr. job; ~12 min import
+    # ligger trygt under. Eksplicit loft som sikkerhed.
+    timeout-minutes: 40
+    env:
+      GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
+      GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify required secrets are present
+        run: |
+          missing=0
+          for v in GROCERY_SUPABASE_URL GROCERY_SUPABASE_SECRET_KEY NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required secret: $v"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "Set the missing secrets under Settings → Environments → FF (or check the environment name matches 'environment: FF' in this workflow)."
+            exit 1
+          fi
+
+      - name: Run full fooddata import (incl. price history)
+        run: npx tsx scripts/import-fooddata-to-ff.ts
