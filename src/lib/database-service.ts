@@ -364,7 +364,7 @@ export class DatabaseService {
     return { total, offers: offersCount, categories }
   }
 
-  /** Fast fallback when RPC unavailable: department-join head counts. */
+  /** Fast fallback when RPC unavailable: department-join head counts (+ tjek). */
   private async getProductCountsV2FastFallback(foodOnly: boolean = true): Promise<{
     total: number
     categories: { [key: string]: number }
@@ -392,16 +392,41 @@ export class DatabaseService {
       offersQuery = offersQuery.in('products.department', foodDepts)
     }
 
-    const [{ count: totalCount, error: totalError }, { count: offersCount, error: offersError }] =
-      await Promise.all([totalQuery, offersQuery])
+    // Tilbudsavis-kilder (tjek) har forhandlernavn som department og fanges ikke
+    // af food-department-listen. Tæl dem separat og læg til (ingen overlap, da
+    // deres department aldrig er en food-kategori).
+    const tjekTotalQuery = supabase
+      .from('product_offers')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_available', true)
+      .like('source', 'tjek%')
+
+    const tjekOffersQuery = supabase
+      .from('product_offers')
+      .select('id', { count: 'exact', head: true })
+      .eq('is_available', true)
+      .like('source', 'tjek%')
+      .gt('current_price', 0)
+
+    const [
+      { count: totalCount, error: totalError },
+      { count: offersCount, error: offersError },
+      { count: tjekTotal, error: tjekTotalError },
+      { count: tjekOffers, error: tjekOffersError },
+    ] = await Promise.all([totalQuery, offersQuery, tjekTotalQuery, tjekOffersQuery])
 
     if (totalError) console.error('Fast counts total error:', totalError)
     if (offersError) console.error('Fast counts offers error:', offersError)
+    if (tjekTotalError) console.error('Fast counts tjek total error:', tjekTotalError)
+    if (tjekOffersError) console.error('Fast counts tjek offers error:', tjekOffersError)
+
+    const extraTotal = foodOnly ? tjekTotal || 0 : 0
+    const extraOffers = foodOnly ? tjekOffers || 0 : 0
 
     return {
-      total: totalCount || 0,
+      total: (totalCount || 0) + extraTotal,
       categories: {},
-      offers: offersCount || 0,
+      offers: (offersCount || 0) + extraOffers,
     }
   }
 
@@ -1162,7 +1187,10 @@ export class DatabaseService {
       this.getFoodOnlyDepartmentAllowList().map((d) => d.toLowerCase().trim()),
     )
 
+    // Tilbudsavis-kilder (tjek) har forhandlernavn som department og falder
+    // ellers ud af det department-baserede allow-list — vis hele tilbudsavisen.
     const isFoodRow = (row: Record<string, any>) => {
+      if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
       const dept = String(row.products?.department ?? '').trim().toLowerCase()
       return dept.length > 0 && foodDeptSet.has(dept)
     }
