@@ -9,6 +9,17 @@ export type OfferPricingFields = {
   current_price?: number | null
   normal_price?: number | null
   sale_valid_to?: string | null
+  source?: string | null
+}
+
+/**
+ * Kilder hvor hele "kataloget" per definition er ugens tilbud — tilbudsaviser
+ * (Tjek/Squid) har sjældent en struktureret førpris, men varen ER et tilbud så
+ * længe den er i sit gyldighedsvindue. Derfor skal de tælle som tilbud selv
+ * uden en bevist prisnedsættelse (Løvbjerg, Lidl, MENY, Spar, Kvickly, …).
+ */
+export function isSaleOnlySource(source?: string | null): boolean {
+  return typeof source === 'string' && source.toLowerCase().startsWith('tjek')
 }
 
 export function isRealOfferFields(offer: OfferPricingFields): boolean {
@@ -16,7 +27,10 @@ export function isRealOfferFields(offer: OfferPricingFields): boolean {
   if (price <= 0) return false
   if (offer.sale_valid_to && new Date(offer.sale_valid_to) < new Date()) return false
   const normal = offer.normal_price != null ? Number(offer.normal_price) : null
-  return normal != null && normal > price + 0.01
+  // Bevist rabat: en rigtig førpris over tilbudsprisen.
+  if (normal != null && normal > price + 0.01) return true
+  // Tilbudsavis-kilder uden førpris: stadig et reelt tilbud i gyldighedsvinduet.
+  return isSaleOnlySource(offer.source)
 }
 
 export function resolveOfferDisplayPricing(
@@ -29,11 +43,13 @@ export function resolveOfferDisplayPricing(
   const price = Number(offer.current_price || 0)
   const normal = offer.normal_price != null ? Number(offer.normal_price) : null
   const isReal = isRealOfferFields(offer)
-  const originalPrice = isReal && normal != null ? normal : price
-  const discountPct =
-    isReal && normal != null && normal > price + 0.01
-      ? Math.round(((normal - price) / normal) * 100)
-      : null
+  // Vis kun førpris/besparelse når vi faktisk har en bevist førpris. Tilbudsavis-
+  // tilbud uden førpris vises som tilbud, men uden overstreget pris / SPAR-%.
+  const hasProvenDiscount = isReal && normal != null && normal > price + 0.01
+  const originalPrice = hasProvenDiscount ? normal! : price
+  const discountPct = hasProvenDiscount
+    ? Math.round(((normal! - price) / normal!) * 100)
+    : null
   return {
     price,
     original_price: originalPrice,
@@ -171,6 +187,7 @@ export class DatabaseService {
     is_available,
     sale_valid_from,
     sale_valid_to,
+    source,
     products:product_id!inner (
       id,
       name_generic,
@@ -618,6 +635,7 @@ export class DatabaseService {
           current_price: number | null
           normal_price: number | null
           sale_valid_to: string | null
+          source: string | null
         }>()
         let chunkErrors = 0
 
@@ -630,7 +648,7 @@ export class DatabaseService {
           try {
             let chunkQuery = supabase
               .from('product_offers')
-              .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to')
+              .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to, source')
               .eq('is_available', true)
               .neq('source', 'goma')
               .in('product_id', chunk)
@@ -674,6 +692,7 @@ export class DatabaseService {
             current_price?: number | null
             normal_price?: number | null
             sale_valid_to?: string | null
+            source?: string | null
           }>) {
             if (!offer?.id) continue
             allMatchingOffers.set(String(offer.id), {
@@ -684,6 +703,7 @@ export class DatabaseService {
               current_price: offer.current_price ?? null,
               normal_price: offer.normal_price ?? null,
               sale_valid_to: offer.sale_valid_to ?? null,
+              source: offer.source ?? null,
             })
           }
         }
@@ -758,6 +778,7 @@ export class DatabaseService {
                 is_available,
                 sale_valid_from,
                 sale_valid_to,
+                source,
                 products:product_id!inner (
                   id,
                   name_generic,
@@ -946,6 +967,7 @@ export class DatabaseService {
             current_price: row.current_price as number | null,
             normal_price: row.normal_price as number | null,
             sale_valid_to: row.sale_valid_to as string | null,
+            source: row.source as string | null,
           }),
         )
       }
@@ -1170,7 +1192,8 @@ export class DatabaseService {
         .select(this.OFFER_SELECT_WITH_PRODUCT)
         .eq('is_available', true)
         .neq('source', 'goma')
-        .not('normal_price', 'is', null)
+        // Bevist rabat (normal_price sat) ELLER tilbudsavis-kilde (fx tjek) uden førpris.
+        .or('normal_price.not.is.null,source.like.tjek*')
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
         .limit(fetchSize)
@@ -1387,6 +1410,7 @@ export class DatabaseService {
       case 'rema-1000':
       case 'rema':
         return 'REMA 1000'
+      case '365discount':
       case '365-discount':
         return '365 Discount'
       case 'lidl':
@@ -1402,10 +1426,12 @@ export class DatabaseService {
         return 'Spar'
       case 'kvickly':
         return 'Kvickly'
+      case 'superbrugsen':
       case 'super-brugsen':
         return 'Super Brugsen'
       case 'brugsen':
         return 'Brugsen'
+      case 'loevbjerg':
       case 'løvbjerg':
         return 'Løvbjerg'
       case 'abc-lavpris':
@@ -1436,7 +1462,7 @@ export class DatabaseService {
       'superbrugsen': 'superbrugsen',
       'Super Brugsen': 'superbrugsen',
       'Brugsen': 'brugsen',
-      'Løvbjerg': 'lovbjerg',
+      'Løvbjerg': 'loevbjerg',
       'ABC Lavpris': 'abc-lavpris',
     }
 

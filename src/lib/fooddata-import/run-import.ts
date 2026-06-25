@@ -293,7 +293,11 @@ function mapOffer(o: Record<string, any>, productLookup: Map<string, ProductRef>
   const currentKr = o.price_cents != null ? Number(o.price_cents) / 100 : 0
   const beforeKr = resolveBeforePriceKr(o as Parameters<typeof resolveBeforePriceKr>[0])
   const hasProvenDiscount = beforeKr != null
-  const isOfferActive = !!(fromOk && untilOk && hasProvenDiscount)
+  // Tilbudsavis-kilder (Tjek/Squid) har sjældent en førpris, men varen ER et
+  // tilbud i sit gyldighedsvindue — behandl dem som tilbud uden bevist rabat.
+  const isSaleOnlySource =
+    typeof o.source === 'string' && o.source.toLowerCase().startsWith('tjek')
+  const isOfferActive = !!(fromOk && untilOk && (hasProvenDiscount || isSaleOnlySource))
   return {
     product_id: ref.id,
     store_product_id: ref.id.includes('-') ? ref.id.split('-').slice(1).join('-') : ref.id,

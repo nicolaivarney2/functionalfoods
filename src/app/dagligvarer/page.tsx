@@ -154,8 +154,8 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
       
       {/* Price Section */}
       <div className="mb-3">
-        {product.is_on_sale && product.discount_percentage ? (
-          // Product on sale - show both prices with clear indicators
+        {product.is_on_sale ? (
+          // Product on sale - show offer price + TILBUD. Savings only when we have a before-price.
           <div className="space-y-2">
             {/* Offer Price with "TILBUD" tag */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -173,23 +173,33 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
                 {formatOfferExpiration(product.sale_end_date)}
               </div>
             )}
-            
-            {/* Normal Price (crossed out) */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500 line-through">
-                Normalpris: {(product.original_price || 0).toFixed(2)} kr
-              </span>
-            </div>
-            
-            {/* Savings Information */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full shadow-sm">
-                SPAR {product.discount_percentage}%
-        </span>
-              <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full">
-                Besparelse: {((product.original_price || 0) - (product.price || 0)).toFixed(2)} kr
-            </span>
-            </div>
+
+            {/* Before-price + savings — only when a real before-price is known
+                (tilbudsavis-kilder som tjek har sjældent en førpris). */}
+            {product.discount_percentage &&
+            product.original_price &&
+            product.original_price > product.price ? (
+              <>
+                {/* Normal Price (crossed out) */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500 line-through">
+                    Normalpris: {(product.original_price || 0).toFixed(2)} kr
+                  </span>
+                </div>
+
+                {/* Savings Information */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-full shadow-sm">
+                    SPAR {product.discount_percentage}%
+                  </span>
+                  <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full">
+                    Besparelse: {((product.original_price || 0) - (product.price || 0)).toFixed(2)} kr
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-xs text-gray-500">Tilbudspris fra ugens avis</div>
+            )}
             
             {/* Offer End Date */}
             {(() => {
@@ -1440,7 +1450,7 @@ export default function DagligvarerPage() {
 
                 {/* Price Section */}
                 <div className="bg-gray-50 rounded-xl p-4">
-                  {selectedProduct.is_on_sale && selectedProduct.discount_percentage ? (
+                  {selectedProduct.is_on_sale ? (
                     // Product on sale
                     <div className="space-y-3">
                       {/* Offer Price with "TILBUD" tag */}
@@ -1459,25 +1469,30 @@ export default function DagligvarerPage() {
                           {formatOfferExpiration(selectedProduct.sale_end_date)}
                         </div>
                       )}
-                      
-                      {/* Normal Price (crossed out) */}
-                      {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
-                        <div className="text-sm text-gray-500">
-                          <span className="line-through">Normalpris: {selectedProduct.original_price.toFixed(2)} kr</span>
-                        </div>
-                      )}
-                      
-                      {/* Savings badges */}
-                      <div className="flex gap-2 flex-wrap">
-                        <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold">
-                          SPAR {selectedProduct.discount_percentage}%
-                        </div>
-                        {selectedProduct.original_price && selectedProduct.original_price > selectedProduct.price && (
-                          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold">
-                            Besparelse: {(selectedProduct.original_price - selectedProduct.price).toFixed(2)} kr
+
+                      {/* Before-price + savings — only when a real before-price is known. */}
+                      {selectedProduct.discount_percentage &&
+                      selectedProduct.original_price &&
+                      selectedProduct.original_price > selectedProduct.price ? (
+                        <>
+                          {/* Normal Price (crossed out) */}
+                          <div className="text-sm text-gray-500">
+                            <span className="line-through">Normalpris: {selectedProduct.original_price.toFixed(2)} kr</span>
                           </div>
-                        )}
-                      </div>
+
+                          {/* Savings badges */}
+                          <div className="flex gap-2 flex-wrap">
+                            <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black px-3 py-1 rounded-full text-xs font-bold">
+                              SPAR {selectedProduct.discount_percentage}%
+                            </div>
+                            <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                              Besparelse: {(selectedProduct.original_price - selectedProduct.price).toFixed(2)} kr
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-gray-500">Tilbudspris fra ugens tilbudsavis</div>
+                      )}
                       
                       {/* Offer End Date */}
                       {(() => {
