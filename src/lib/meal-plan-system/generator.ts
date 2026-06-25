@@ -722,9 +722,6 @@ export class MealPlanGenerator {
         const c = { ...(cell as Record<string, unknown>) }
         const pe = this.resolvePeopleEatingForPlannerCell(c, mt, family)
         c.householdServings = pe
-        if (!c.recipeServings && Number(c.servings) > 0) {
-          c.recipeServings = c.servings
-        }
         dayRow[mt] = c
       }
       next[dayKey] = dayRow
@@ -847,10 +844,18 @@ export class MealPlanGenerator {
       instructions: [],
       prepTime: 0,
       cookTime: 0,
-      servings:
-        Number(cell.recipeServings ?? cell.servings) > 0
-          ? Number(cell.recipeServings ?? cell.servings)
-          : 4,
+      servings: (() => {
+        const fromCell =
+          Number(cell.recipeServings) || Number(cell.recipeBaseServings)
+        if (fromCell > 0) return fromCell
+        const legacy = Number(cell.servings)
+        const household = Number(cell.householdServings)
+        // Legacy: `servings` kan være antal personer (PE) — brug kun som opskrift-portioner når det ikke matcher husstanden.
+        if (legacy > 0 && (!household || Math.abs(legacy - household) > 0.01)) {
+          return legacy
+        }
+        return 4
+      })(),
       categories: [],
       dietaryApproaches,
       nutritionalInfo: {

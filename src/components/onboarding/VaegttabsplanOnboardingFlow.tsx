@@ -17,10 +17,11 @@ import {
   TrendingDown,
   Lock,
   Ban,
+  Users,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAnalytics } from '@/components/AnalyticsProvider'
-import { MADBUDGET_STORE_CATALOG } from '@/lib/madbudget-stores'
+import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
 import {
   ACTIVITY_OPTIONS,
   EXCLUDED_FOOD_OPTIONS,
@@ -47,22 +48,23 @@ const PRESETS = [
 
 const STEP = {
   INTRO: 0,
-  WEIGHT_GOAL: 1,
-  GENDER: 2,
-  AGE: 3,
-  HEIGHT: 4,
-  WEIGHT: 5,
-  ACTIVITY: 6,
-  CALORIES: 7,
-  STORES: 8,
-  DIETARY: 9,
-  MEAL_SCOPE: 10,
-  EXCLUDED: 11,
-  SUMMARY: 12,
-  SIGNUP: 13,
+  HOUSEHOLD: 1,
+  WEIGHT_GOAL: 2,
+  GENDER: 3,
+  AGE: 4,
+  HEIGHT: 5,
+  WEIGHT: 6,
+  ACTIVITY: 7,
+  CALORIES: 8,
+  STORES: 9,
+  DIETARY: 10,
+  MEAL_SCOPE: 11,
+  EXCLUDED: 12,
+  SUMMARY: 13,
+  SIGNUP: 14,
 } as const
 
-const TOTAL_STEPS = 14
+const TOTAL_STEPS = 15
 const ALMOST_DONE_FROM_STEP = STEP.AGE
 
 const USP_INTRO = {
@@ -225,6 +227,8 @@ function VaegttabsplanOnboardingInner() {
     switch (step) {
       case STEP.INTRO:
         return true
+      case STEP.HOUSEHOLD:
+        return Boolean(data.adults && data.adults >= 1 && data.children != null && data.children >= 0)
       case STEP.WEIGHT_GOAL:
         return Boolean(data.weightGoal)
       case STEP.GENDER:
@@ -442,8 +446,15 @@ function VaegttabsplanOnboardingInner() {
 
   if (!hydrated || authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-emerald-950 text-emerald-100">
-        <p className="text-sm">Indlæser…</p>
+      <div className="flex min-h-screen items-center justify-center bg-brand-950 text-emerald-100">
+        <Image
+          src="/billeder/favicon/ff-logo%20favicon%20white%20logo.jpg.png"
+          alt="Functional Foods"
+          width={80}
+          height={80}
+          className="h-20 w-20 rounded-2xl object-contain"
+          priority
+        />
       </div>
     )
   }
@@ -502,6 +513,46 @@ function VaegttabsplanOnboardingInner() {
                 <p className="text-sm text-emerald-50/95 leading-relaxed">{USP_INTRO.body}</p>
               </div>
             </motion.div>
+          )}
+
+          {step === STEP.HOUSEHOLD && (
+            <ProfileFieldStep
+              key="household"
+              eyebrow="Din husstand"
+              title="Hvem spiser med?"
+              hint="Madplan og indkøbsliste skaleres efter antal personer."
+            >
+              <div className="space-y-6">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-emerald-100/90">
+                    Antal voksne (inkl. dig)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={data.adults ?? 1}
+                    onChange={(e) =>
+                      patch({ adults: Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)) })
+                    }
+                    className={fieldInputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-emerald-100/90">Antal børn</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={data.children ?? 0}
+                    onChange={(e) =>
+                      patch({ children: Math.max(0, Math.min(10, parseInt(e.target.value, 10) || 0)) })
+                    }
+                    className={fieldInputClass}
+                  />
+                </div>
+              </div>
+            </ProfileFieldStep>
           )}
 
           {step === STEP.WEIGHT_GOAL && (
@@ -703,7 +754,7 @@ function VaegttabsplanOnboardingInner() {
                 <p className="mt-2 text-sm text-emerald-100/85">Vi matcher planen med tilbud i dine butikker.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {MADBUDGET_STORE_CATALOG.map((store) => {
+                {MADBUDGET_SELECTABLE_STORES.map((store) => {
                   const on = data.selectedStores.includes(store.id)
                   return (
                     <button
@@ -839,9 +890,11 @@ function VaegttabsplanOnboardingInner() {
               </div>
               <ul className="space-y-3 rounded-2xl bg-white/10 p-5 ring-1 ring-white/15">
                 {[
+                  { icon: Users, text: `Husstand: ${data.adults ?? 1} voksen(e)${(data.children ?? 0) > 0 ? `, ${data.children} barn` : ''}` },
                   { icon: Target, text: `Mål: ${WEIGHT_GOAL_OPTIONS.find((g) => g.value === data.weightGoal)?.label ?? '—'}` },
                   { icon: TrendingDown, text: energy ? `Kalorietarget: ${energy.targetCalories} kcal/dag` : 'Kalorier beregnet' },
                   { icon: Clock, text: `Måltider: ${mealPlanScopeLabel(data.mealPlanScope)}` },
+                  { icon: Tag, text: `Kostretning: ${ONBOARDING_DIETARY_OPTIONS.find((d) => d.id === data.dietaryApproach)?.name ?? '—'}` },
                   { icon: Tag, text: `Butikker: ${data.selectedStores.map(storeName).join(', ')}` },
                   ...((data.excludedFoods ?? []).length
                     ? [

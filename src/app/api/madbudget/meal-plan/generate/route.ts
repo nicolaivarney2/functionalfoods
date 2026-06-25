@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import {
+  getWeekInfo,
+  getWeekInfoByOffset,
+  type MealPlanWeekTarget,
+} from '@/lib/madbudget/week-dates'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,20 +23,8 @@ function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
   }, {} as Record<DayKey, Record<MealType, unknown | null>>)
 }
 
-/** Lokal kalenderdato YYYY-MM-DD (undgår UTC-drift fra toISOString). */
-function localIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function isoWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+function parseWeekTarget(raw: unknown): MealPlanWeekTarget {
+  return raw === 'next' ? 'next' : 'current'
 }
 
 /** Udled børnenes aldersbånd (fallback til '4-9' hvis ikke sat), så generatoren altid får et array. */
@@ -94,7 +87,7 @@ function appendKidCarbToDinners(
  * vi genbruger samme generator (mealPlanGenerator) her med samme input-form, så
  * app og web deler præcis samme logik og output-format.
  *
- * Body (valgfrit): { variationLevel?: number }
+ * Body (valgfrit): { variationLevel?: number; targetWeek?: 'current' | 'next'; weekOffset?: number }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -161,6 +154,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
     const variationLevel =
       typeof body?.variationLevel === 'number' ? body.variationLevel : profile.variation_level ?? 2
+    const targetWeek = parseWeekTarget(body?.targetWeek)
+    const weekInfo =
+      typeof body?.weekOffset === 'number' && Number.isFinite(body.weekOffset)
+        ? getWeekInfoByOffset(Math.max(0, Math.floor(body.weekOffset)))
+        : getWeekInfo(targetWeek)
 
     const childrenAges = effectiveChildrenAges(profile.children ?? 0, profile.children_ages)
 
@@ -191,16 +189,21 @@ export async function POST(request: NextRequest) {
         const mealType = meal.mealType as MealType
         if (!mealType || !grid[dayKey]) return
         const recipe = meal.recipe as any
-        // adjusted*-værdierne er total for hele måltidet (alle portioner). Vi gemmer
-        // næring PR. PORTION — præcis som web-klienten (madbudget/page.tsx) gør —
-        // så app'ens madplan ikke viser husstands-totaler (fx ~6200 kcal/dag).
-        const nutritionServings = Math.max(1, meal.servings || 1)
+        // adjusted*-værdierne er husstands-total: (per-person måltidsmål) × (antal
+        // personer der spiser). For at gemme næring PR. PERSON deler vi med
+        // peopleEating — så summen af dagens måltider rammer den enkeltes dagsmål
+        // (ikke husstands-totaler som ~6200 kcal/dag). At dele med `servings` ville
+        // i stedet give opskriftens rå pr-portion-værdi, der ikke følger dagsmålet.
+        const peopleEating = Math.max(
+          1,
+          ((meal as any).peopleEating as number) || meal.servings || 1
+        )
         const perPortion = (v: number | null | undefined) =>
-          v != null && Number.isFinite(v) ? v / nutritionServings : v
+          v != null && Number.isFinite(v) ? v / peopleEating : v
         const perPortionMap = (obj: Record<string, unknown> | null | undefined) =>
           obj
             ? Object.fromEntries(
-                Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' ? v / nutritionServings : v])
+                Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' ? v / peopleEating : v])
               )
             : obj
         grid[dayKey][mealType] = {
@@ -214,6 +217,7 @@ export async function POST(request: NextRequest) {
             unit: ing.unit,
           })),
           servings: meal.servings,
+          recipeServings: recipe.servings,
           recipeBaseServings: recipe.servings,
           prepTime: recipe.prepTime ? `${recipe.prepTime} min` : '30 min',
           category: recipe.categories?.[0] || 'Dinner',
@@ -232,15 +236,7 @@ export async function POST(request: NextRequest) {
     // Børne-kulhydrat til aftensmaden (100 g pasta/ris/bulgur pr. barn) — også til indkøbslisten.
     appendKidCarbToDinners(grid, profile.children ?? 0, weekPlan.shoppingList as any)
 
-    // Uge-datoer (mandag–søndag for indeværende uge).
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)) // mandag
-    weekStart.setHours(0, 0, 0, 0)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekEnd.getDate() + 6)
-    const weekStartDate = localIsoDate(weekStart)
-    const weekEndDate = localIsoDate(weekEnd)
-    const weekNumber = isoWeekNumber(weekStart)
+    const { weekStartDate, weekEndDate, weekNumber } = weekInfo
 
     const mealPlanData = { v: 2 as const, grid, slotLocks: {} }
     const familyProfileSnapshot = {

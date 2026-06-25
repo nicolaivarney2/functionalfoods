@@ -13,12 +13,18 @@ import { getMedianReferencePrices } from './reference-price';
 import type { StorePrices } from './types';
 
 /**
- * Motor B-baseline: typisk pris pr. portion (aftensmåltid) til NORMALPRIS, i øre.
+ * Motor B-baseline: typisk pris pr. måltids-portion til NORMALPRIS, i øre.
  *
- * Læses fra savings_config (key 'typical_dinner_portion_normal_cents').
- * 0 = Motor B slået fra (indtil baseline er beregnet).
+ * Læses fra savings_config (key 'typical_dinner_portion_normal_cents'); denne
+ * konstant er fallback når der ikke er en override i databasen.
+ *
+ * Konservativt sat: ~35 kr for en hjemmelavet måltids-portion til normalpris
+ * (inkl. kød/protein). Motor B sammenligner planens normalpris-total med dette,
+ * så besparelsen klippes automatisk til 0, hvis planen er dyrere end "typisk" —
+ * vi oppuster derfor ikke. At sætte den > 0 (frem for 0) gør, at "Smartere
+ * madplan"-delen rent faktisk tæller med, i stedet for altid at vise 0 kr.
  */
-export const TYPICAL_DINNER_PORTION_NORMAL_CENTS = 0;
+export const TYPICAL_DINNER_PORTION_NORMAL_CENTS = 3500;
 
 const BASELINE_CONFIG_KEY = 'typical_dinner_portion_normal_cents';
 

@@ -20,6 +20,13 @@ import GuestDemoBanner from '@/components/madbudget/GuestDemoBanner'
 import GuestPageTour, { type GuestPageTourStep } from '@/components/madbudget/GuestPageTour'
 import GuestGuidedTour, { type GuestTourFamilyState } from '@/components/madbudget/GuestGuidedTour'
 import GuestSignupPromptModal from '@/components/madbudget/GuestSignupPromptModal'
+import WeekTargetPickerModal from '@/components/madbudget/WeekTargetPickerModal'
+import {
+  getWeekInfo,
+  isWeekendShoppingWindow,
+  weekInfoFromStartDate,
+  type MealPlanWeekTarget,
+} from '@/lib/madbudget/week-dates'
 import {
   GUEST_DEMO_ADULT_PROFILES,
   GUEST_DEMO_BASISVARER,
@@ -39,6 +46,8 @@ import {
   scaleAmount,
 } from '@/lib/madbudget/guest-demo-data'
 import { FF_GUEST_TOUR_STEPS, FF_GUEST_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-guest-tour-steps'
+import { FF_USER_TOUR_STEPS, FF_USER_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-user-tour-steps'
+import { hasPendingOnboardingData } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 import {
@@ -143,6 +152,7 @@ const STORE_KEY_BY_ID: Record<number, string> = {
   6: 'meny',
   7: 'spar',
   8: 'løvbjerg',
+  9: 'min-koebmand',
 }
 
 function storeIdFromTabKey(tab: string): number | null {
@@ -265,6 +275,7 @@ const TAB_KEY_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   meny: 'meny',
   spar: 'spar',
   løvbjerg: 'loevbjerg',
+  'min-koebmand': 'min-koebmand',
 }
 
 function sourceChainFromTabKey(tab: string): SourceChain | null {
@@ -320,9 +331,9 @@ const mockStores = [
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
   { id: 3, name: 'Føtex', color: 'bg-blue-500', isSelected: false },
   { id: 4, name: 'Bilka', color: 'bg-blue-700', isSelected: false },
-  { id: 5, name: 'Nemlig.com', color: 'bg-orange-500', isSelected: false },
   { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
+  { id: 9, name: 'Min Købmand', color: 'bg-orange-500', isSelected: false },
   { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false }
 ]
 
@@ -417,7 +428,10 @@ export default function MadbudgetPage() {
   const [guestDataApplied, setGuestDataApplied] = useState(false)
   const [showGuestBanner, setShowGuestBanner] = useState(true)
   const [showGuidedTour, setShowGuidedTour] = useState(false)
+  const [showUserTour, setShowUserTour] = useState(false)
   const [showGuidedFamilyTour, setShowGuidedFamilyTour] = useState(false)
+  const [showRecalculatePrompt, setShowRecalculatePrompt] = useState(false)
+  const [showWeekTargetPicker, setShowWeekTargetPicker] = useState(false)
   const [guestSignupPrompt, setGuestSignupPrompt] = useState<string | null>(null)
 
   const [profileReloadKey, setProfileReloadKey] = useState(0)
@@ -471,6 +485,23 @@ export default function MadbudgetPage() {
   const [activePlanRef, setActivePlanRef] = useState<any>(null)
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null)
   const [currentWeekNumber, setCurrentWeekNumber] = useState<number>(0)
+
+  const currentWeekInfo = useMemo(() => getWeekInfo('current'), [])
+  const nextWeekInfo = useMemo(() => getWeekInfo('next'), [])
+
+  const weekSelectorOptions = useMemo(() => {
+    const options = savedMealPlans.map((p: any) => {
+      const weekNum =
+        p.week_number ||
+        weekInfoFromStartDate(p.week_start_date).weekNumber
+      return { weekNum, plan: p as any }
+    })
+    const weekNums = new Set(options.map((o) => o.weekNum))
+    if (isWeekendShoppingWindow() && !weekNums.has(nextWeekInfo.weekNumber)) {
+      options.push({ weekNum: nextWeekInfo.weekNumber, plan: null })
+    }
+    return options.sort((a, b) => b.weekNum - a.weekNum)
+  }, [savedMealPlans, nextWeekInfo.weekNumber])
   
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
@@ -502,6 +533,30 @@ export default function MadbudgetPage() {
       return step
     })
   }, [])
+  const userPageTourSteps = useMemo((): GuestPageTourStep[] => {
+    const focusWeekMealPlan = () => setViewMode('week')
+    const focusSwapMealExample = () => {
+      setViewMode('week')
+      setCurrentDayOffset(1)
+      setSelectedDayIndex(2)
+    }
+    return FF_USER_TOUR_STEPS.map((step) => {
+      if (step.selector === '[data-tour="swap-meal-example"]') {
+        return { ...step, onEnter: focusSwapMealExample }
+      }
+      if (step.selector === '[data-tour="meal-plan-grid"]') {
+        const prevOnEnter = step.onEnter
+        return {
+          ...step,
+          onEnter: () => {
+            focusWeekMealPlan()
+            prevOnEnter?.()
+          },
+        }
+      }
+      return step
+    })
+  }, [])
   const [showRecipeDetail, setShowRecipeDetail] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<any>(null)
   const [availableRecipes, setAvailableRecipes] = useState<PlannerRecipe[]>([])
@@ -513,6 +568,7 @@ export default function MadbudgetPage() {
   const [recipeViewLoading, setRecipeViewLoading] = useState(false)
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
   const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
+  const [recipeMealTypeFilter, setRecipeMealTypeFilter] = useState<MealType | 'all'>('all')
   const [showNutritionDetails, setShowNutritionDetails] = useState(false)
   const [selectedNutritionAdultIndex, setSelectedNutritionAdultIndex] = useState(0)
   const [shareLoading, setShareLoading] = useState(false)
@@ -909,17 +965,7 @@ export default function MadbudgetPage() {
     const selectedStoreKeys =
       selectedStoreTab === 'all'
         ? familyProfile.selectedStores
-            .map((storeId: number) => {
-              const storeKey = storeId === 1 ? 'rema-1000' :
-                              storeId === 2 ? 'netto' :
-                              storeId === 3 ? 'føtex' :
-                              storeId === 4 ? 'bilka' :
-                              storeId === 5 ? 'nemlig' :
-                              storeId === 6 ? 'meny' :
-                              storeId === 7 ? 'spar' :
-                              storeId === 8 ? 'løvbjerg' : ''
-              return storeKey
-            })
+            .map((storeId: number) => STORE_KEY_BY_ID[storeId] ?? '')
             .filter(Boolean)
         : [selectedStoreTab]
 
@@ -1152,6 +1198,7 @@ export default function MadbudgetPage() {
   // Save family profile to database when it changes (debounced)
   useEffect(() => {
     if (isGuest) return
+    if (hasPendingOnboardingData()) return
     const timeoutId = setTimeout(async () => {
       try {
         // Validate auth state before autosave to avoid noisy 401 spam on stale sessions
@@ -1413,6 +1460,21 @@ export default function MadbudgetPage() {
     }
   }
 
+  const markUserTourSeen = () => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(FF_USER_TOUR_STORAGE_KEY, '1')
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const finishUserPageTour = () => {
+    setShowUserTour(false)
+    markUserTourSeen()
+    setViewMode('day')
+  }
+
   const finishGuestPageTour = () => {
     setShowGuidedTour(false)
     markGuestTourSeen()
@@ -1507,16 +1569,7 @@ export default function MadbudgetPage() {
             const plans = Array.isArray(result.data) ? result.data : [result.data]
             setSavedMealPlans(plans)
             
-            // Calculate current week number
-            const now = new Date()
-            const getWeekNumber = (date: Date): number => {
-              const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-              const dayNum = d.getUTCDay() || 7
-              d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-              const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-              return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-            }
-            setCurrentWeekNumber(getWeekNumber(now))
+            setCurrentWeekNumber(getWeekInfo('current').weekNumber)
             
             // Load active meal plan if exists
             const activePlan = plans.find((p: any) => p.is_active)
@@ -1592,32 +1645,36 @@ export default function MadbudgetPage() {
       setActivePlanRef(plan)
     } else if (isGuest) {
       setSelectedWeekNumber(weekNumber)
+    } else {
+      setSelectedWeekNumber(weekNumber)
+      setActivePlanRef(null)
+      setMealPlan({
+        monday: { breakfast: null, lunch: null, dinner: null },
+        tuesday: { breakfast: null, lunch: null, dinner: null },
+        wednesday: { breakfast: null, lunch: null, dinner: null },
+        thursday: { breakfast: null, lunch: null, dinner: null },
+        friday: { breakfast: null, lunch: null, dinner: null },
+        saturday: { breakfast: null, lunch: null, dinner: null },
+        sunday: { breakfast: null, lunch: null, dinner: null },
+      })
+      setSlotLocks({})
+      setShoppingList([])
+      setShoppingListStale(false)
     }
   }
 
-  const getWeekDatesForSave = () => {
-    const now = new Date()
-    const dayNum = now.getDay()
-    const mondayOffset = dayNum === 0 ? -6 : 1 - dayNum
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() + mondayOffset)
-    weekStart.setHours(0, 0, 0, 0)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
-    weekEnd.setHours(23, 59, 59, 999)
-    const getWeekNumber = (date: Date): number => {
-      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-      const dayNum = d.getUTCDay() || 7
-      d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-      return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+  const resolveWeekInfoForSave = (): ReturnType<typeof getWeekInfo> => {
+    if (activePlanRef?.week_start_date) {
+      return weekInfoFromStartDate(activePlanRef.week_start_date)
     }
-    return {
-      weekStartDate: weekStart.toISOString().split('T')[0],
-      weekEndDate: weekEnd.toISOString().split('T')[0],
-      weekNumber: getWeekNumber(weekStart)
+    if (selectedWeekNumber != null) {
+      if (selectedWeekNumber === nextWeekInfo.weekNumber) return nextWeekInfo
+      if (selectedWeekNumber === currentWeekInfo.weekNumber) return currentWeekInfo
     }
+    return currentWeekInfo
   }
+
+  const getWeekDatesForSave = () => resolveWeekInfoForSave()
 
   const buildFamilyProfileSnapshot = () => {
     const ages = effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges)
@@ -2041,6 +2098,18 @@ export default function MadbudgetPage() {
     )
   }, [familyProfile.adultsProfiles, selectedNutritionAdultIndex])
 
+  /** Antal personer (PE) der spiser et givet måltid — til indkøbsliste-skala. */
+  const resolvePeopleEatingForMealType = (mealType: MealType): number => {
+    const ppm = getPeoplePerMealFromAdultsProfiles(
+      familyProfile.adultsProfiles,
+      familyProfile.adults
+    )
+    const childPe = computeChildPersonEquivalent(
+      effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges)
+    )
+    return Math.round((Math.max(1, ppm[mealType] ?? familyProfile.adults) + childPe) * 10) / 10
+  }
+
   const recipeMatchesMealSlot = (recipe: PlannerRecipe, meal: MealType): boolean => {
     const blob = `${recipe.category || ''} ${recipe.title || ''} ${(recipe.dietaryTags || []).join(' ')}`.toLowerCase()
     if (recipe.mealType === meal) return true
@@ -2081,9 +2150,8 @@ export default function MadbudgetPage() {
       )
     }
 
-    if (selectedMealSlot && selectedMealSlot.includes('-')) {
-      const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
-      filtered = filtered.filter((recipe) => recipeMatchesMealSlot(recipe, selectedMeal))
+    if (recipeMealTypeFilter !== 'all') {
+      filtered = filtered.filter((recipe) => recipeMatchesMealSlot(recipe, recipeMealTypeFilter))
     }
 
     if (recipeSearchQuery) {
@@ -2099,11 +2167,10 @@ export default function MadbudgetPage() {
       filtered = filtered.filter((recipe) => recipe.category === recipeCategoryFilter)
     }
 
-    if (selectedMealSlot && selectedMealSlot.includes('-')) {
-      const [, selectedMeal] = selectedMealSlot.split('-') as [DayKey, MealType]
+    if (recipeMealTypeFilter !== 'all') {
       return filtered.map((recipe) => ({
         ...recipe,
-        mealTypeMatch: recipe.mealType === selectedMeal,
+        mealTypeMatch: recipe.mealType === recipeMealTypeFilter,
       }))
     }
 
@@ -2114,11 +2181,18 @@ export default function MadbudgetPage() {
   const addRecipeToMeal = (recipe: any) => {
     if (selectedMealSlot) {
       const [day, meal] = selectedMealSlot.split('-') as [DayKey, MealType]
+      const recipeServings = recipe.recipeServings ?? recipe.servings ?? 4
+      const cell = {
+        ...recipe,
+        servings: recipeServings,
+        recipeServings,
+        householdServings: resolvePeopleEatingForMealType(meal),
+      }
       const updatedPlan = {
         ...mealPlan,
         [day]: {
           ...mealPlan[day],
-          [meal]: recipe
+          [meal]: cell
         }
       }
       setMealPlan(updatedPlan)
@@ -2155,6 +2229,7 @@ export default function MadbudgetPage() {
     setShowRecipeSelector(true)
     setRecipeSearchQuery('')
     setRecipeCategoryFilter('all')
+    setRecipeMealTypeFilter(meal)
   }
 
   const handleMealCellClick = (dayKey: DayKey, mealKey: MealType) => {
@@ -2258,12 +2333,17 @@ export default function MadbudgetPage() {
   const openWeightLossProfile = (adultIndex: number) => {
     setEditingAdultIndex(adultIndex)
     const existingProfile = familyProfile.adultsProfiles[adultIndex]
+    const planDiet = selectedPlanDietaryApproach || familyProfile.adultsProfiles[0]?.dietaryApproach
     if (existingProfile) {
-      setCurrentWeightLossProfile(existingProfile)
+      setCurrentWeightLossProfile({
+        ...existingProfile,
+        dietaryApproach: existingProfile.dietaryApproach || planDiet,
+      })
     } else {
       setCurrentWeightLossProfile({
         id: `adult-${Date.now()}-${adultIndex}`,
         mealsPerDay: ['dinner'],
+        dietaryApproach: planDiet,
         isComplete: false
       })
     }
@@ -2302,7 +2382,10 @@ export default function MadbudgetPage() {
       })
       if (response.ok) {
         setShowFamilySettings(false)
-        if (shoppingList) setShoppingListStale(true)
+        if (shoppingList) {
+          setShoppingListStale(true)
+          setShowRecalculatePrompt(true)
+        }
       } else {
         alert('Der opstod en fejl ved gemning. Prøv igen.')
       }
@@ -2319,6 +2402,10 @@ export default function MadbudgetPage() {
     if (editingAdultIndex === null) return
     const candidate = {
       ...currentWeightLossProfile,
+      dietaryApproach:
+        currentWeightLossProfile.dietaryApproach ||
+        selectedPlanDietaryApproach ||
+        familyProfile.adultsProfiles[0]?.dietaryApproach,
       mealsPerDay: currentWeightLossProfile.mealsPerDay?.length
         ? currentWeightLossProfile.mealsPerDay
         : ['dinner'],
@@ -2377,6 +2464,10 @@ export default function MadbudgetPage() {
     setShowWeightLossProfileModal(false)
     setEditingAdultIndex(null)
     setWeightLossProfileStep(0)
+    if (shoppingList) {
+      setShoppingListStale(true)
+      setShowRecalculatePrompt(true)
+    }
   }
 
   // Check if all adults have complete profiles
@@ -2421,7 +2512,7 @@ export default function MadbudgetPage() {
     return true
   }
 
-  const generateMealPlan = async () => {
+  const generateMealPlan = async (targetWeek: MealPlanWeekTarget = 'current') => {
     if (isGuest) {
       setGuestSignupPrompt(
         'For at generere din egen madplan med ugens tilbud skal du oprette en gratis bruger.',
@@ -2513,8 +2604,10 @@ export default function MadbudgetPage() {
         dayPlan.meals.forEach(meal => {
           const mealType = meal.mealType as MealType
           if (mealType && dayKey) {
-            // Generator: adjusted* er for alle portioner i slot (servings × personer).
-            // Madplanen viser ernæring pr. person/portion — divider med meal.servings.
+            // Generator: adjusted* er husstands-total = (per-person måltidsmål) ×
+            // (antal personer der spiser). Madplanen viser ernæring PR. PERSON, så vi
+            // deler med peopleEating (ikke meal.servings, der giver opskriftens rå
+            // pr-portion og ikke følger personens dagsmål).
             const peopleEating = Math.max(
               1,
               meal.peopleEating ??
@@ -2527,6 +2620,7 @@ export default function MadbudgetPage() {
                   )
             )
             const nutritionServings = Math.max(1, meal.servings || 1)
+            const perPersonDivisor = peopleEating
             newMealPlan[dayKey][mealType] = {
               id: meal.recipe.id,
               slug: meal.recipe.slug || '',
@@ -2544,16 +2638,16 @@ export default function MadbudgetPage() {
               prepTime: meal.recipe.prepTime ? `${meal.recipe.prepTime} min` : '30 min',
               category: meal.recipe.categories?.[0] || 'Dinner',
               dietaryTags: meal.recipe.dietaryApproaches || [],
-              calories: meal.adjustedCalories / nutritionServings,
-              protein: meal.adjustedProtein / nutritionServings,
-              carbs: meal.adjustedCarbs / nutritionServings,
-              fat: meal.adjustedFat / nutritionServings,
-              fiber: meal.adjustedFiber != null ? meal.adjustedFiber / nutritionServings : undefined,
+              calories: meal.adjustedCalories / perPersonDivisor,
+              protein: meal.adjustedProtein / perPersonDivisor,
+              carbs: meal.adjustedCarbs / perPersonDivisor,
+              fat: meal.adjustedFat / perPersonDivisor,
+              fiber: meal.adjustedFiber != null ? meal.adjustedFiber / perPersonDivisor : undefined,
               vitamins: meal.adjustedVitamins
                 ? Object.fromEntries(
                     Object.entries(meal.adjustedVitamins).map(([k, v]) => [
                       k,
-                      typeof v === 'number' ? v / nutritionServings : v,
+                      typeof v === 'number' ? v / perPersonDivisor : v,
                     ])
                   )
                 : undefined,
@@ -2578,6 +2672,17 @@ export default function MadbudgetPage() {
       // Generate shopping list
       setShoppingList(weekPlan.shoppingList)
       setShoppingListStale(false)
+
+      // Intro-rundvisning efter første madplan (loggede-in brugere)
+      if (!isGuest) {
+        try {
+          if (window.localStorage.getItem(FF_USER_TOUR_STORAGE_KEY) !== '1') {
+            window.setTimeout(() => setShowUserTour(true), 800)
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       
       // Save meal plan to database
       try {
@@ -2585,22 +2690,7 @@ export default function MadbudgetPage() {
         if (!session) {
           console.error('No session found, cannot save meal plan')
         } else {
-          const weekStart = new Date()
-          weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1) // Monday
-          weekStart.setHours(0, 0, 0, 0)
-          const weekEnd = new Date(weekStart)
-          weekEnd.setDate(weekEnd.getDate() + 6) // Sunday
-          weekEnd.setHours(23, 59, 59, 999)
-          
-          // Calculate week number (ISO week)
-          const getWeekNumber = (date: Date): number => {
-            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-            const dayNum = d.getUTCDay() || 7
-            d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-            return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-          }
-          const weekNumber = getWeekNumber(weekStart)
+          const weekInfo = getWeekInfo(targetWeek)
 
           const response = await fetch('/api/madbudget/meal-plan', {
             method: 'POST',
@@ -2609,10 +2699,10 @@ export default function MadbudgetPage() {
               'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({
-              name: `Madplan Uge ${weekNumber} (${weekStart.toISOString().split('T')[0]})`,
-              weekStartDate: weekStart.toISOString().split('T')[0],
-              weekEndDate: weekEnd.toISOString().split('T')[0],
-              weekNumber,
+              name: `Madplan Uge ${weekInfo.weekNumber} (${weekInfo.weekStartDate})`,
+              weekStartDate: weekInfo.weekStartDate,
+              weekEndDate: weekInfo.weekEndDate,
+              weekNumber: weekInfo.weekNumber,
               variationLevel,
               familyProfileSnapshot: {
                 adults: familyProfile.adults,
@@ -2634,6 +2724,7 @@ export default function MadbudgetPage() {
             const result = await response.json()
             if (result.success && result.data) {
               setActivePlanRef(result.data)
+              setSelectedWeekNumber(result.data.week_number ?? weekInfo.weekNumber)
               setSavedMealPlans(prev => {
                 const existing = prev.find((p: any) => p.week_number === result.data.week_number)
                 if (existing) {
@@ -2660,6 +2751,23 @@ export default function MadbudgetPage() {
       const hint = error instanceof Error && error.message ? `\n\nTeknisk: ${error.message}` : ''
       alert(`Der opstod en fejl ved generering af madplan. Prøv igen.${hint}`)
     }
+  }
+
+  const requestGenerateMealPlan = () => {
+    setLockDishesMode(false)
+    if (!isWeekendShoppingWindow()) {
+      void generateMealPlan('current')
+      return
+    }
+    if (selectedWeekNumber === nextWeekInfo.weekNumber) {
+      void generateMealPlan('next')
+      return
+    }
+    if (selectedWeekNumber === currentWeekInfo.weekNumber) {
+      void generateMealPlan('current')
+      return
+    }
+    setShowWeekTargetPicker(true)
   }
 
   const _calculateSavings = () => {
@@ -2879,13 +2987,14 @@ export default function MadbudgetPage() {
     return { intro, bullets }
   }
 
-  // Week dates (Mon–Sun) for day view calendar
+  // Week dates (Mon–Sun) for day view calendar — følger valgt/gemt uge
   const getWeekDates = () => {
-    const now = new Date()
-    const dayNum = now.getDay()
-    const mondayOffset = dayNum === 0 ? -6 : 1 - dayNum
-    const monday = new Date(now)
-    monday.setDate(now.getDate() + mondayOffset)
+    const weekStartDate =
+      activePlanRef?.week_start_date ??
+      (selectedWeekNumber === nextWeekInfo.weekNumber
+        ? nextWeekInfo.weekStartDate
+        : currentWeekInfo.weekStartDate)
+    const monday = new Date(`${weekStartDate}T12:00:00`)
     return (days as DayKey[]).map((dayKey, i) => {
       const d = new Date(monday)
       d.setDate(monday.getDate() + i)
@@ -2914,6 +3023,14 @@ export default function MadbudgetPage() {
             setShowGuestBanner(false)
             finishGuestPageTour()
           }}
+        />
+      )}
+      {!isGuest && (
+        <GuestPageTour
+          open={showUserTour}
+          steps={userPageTourSteps}
+          onClose={finishUserPageTour}
+          onDone={finishUserPageTour}
         />
       )}
       {isGuest && showGuidedFamilyTour && (
@@ -3010,7 +3127,7 @@ export default function MadbudgetPage() {
                     data-tour="week-selector"
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap"
                   >
-                    {savedMealPlans.length > 0 && (
+                    {(weekSelectorOptions.length > 0 || isWeekendShoppingWindow()) && (
                       <div className="flex items-center gap-2">
                         <label className="text-sm font-medium text-gray-700">Uge:</label>
                         <select
@@ -3021,26 +3138,13 @@ export default function MadbudgetPage() {
                           }}
                           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          {savedMealPlans
-                            .map((p: any) => {
-                              const weekNum =
-                                p.week_number ||
-                                (() => {
-                                  const date = new Date(p.week_start_date)
-                                  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-                                  const dayNum = d.getUTCDay() || 7
-                                  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-                                  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-                                  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-                                })()
-                              return { weekNum, plan: p }
-                            })
-                            .sort((a, b) => b.weekNum - a.weekNum)
-                            .map(({ weekNum, plan }) => (
-                              <option key={plan.id} value={weekNum}>
-                                Uge {weekNum} {weekNum === currentWeekNumber ? '(Nuværende)' : ''}
-                              </option>
-                            ))}
+                          {weekSelectorOptions.map(({ weekNum, plan }) => (
+                            <option key={plan?.id ?? `week-${weekNum}`} value={weekNum}>
+                              Uge {weekNum}
+                              {weekNum === currentWeekNumber ? ' (Denne)' : ''}
+                              {weekNum === nextWeekInfo.weekNumber && !plan ? ' (Næste — tom)' : ''}
+                            </option>
+                          ))}
                         </select>
                       </div>
                     )}
@@ -3107,10 +3211,7 @@ export default function MadbudgetPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setLockDishesMode(false)
-                          void generateMealPlan()
-                        }}
+                        onClick={requestGenerateMealPlan}
                         disabled={isGeneratingMealPlan}
                         className="rounded-lg bg-green-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50 whitespace-nowrap"
                       >
@@ -4218,14 +4319,7 @@ export default function MadbudgetPage() {
                           const store = mockStores.find(s => s.id === storeId)
                           if (!store) return null
                           
-                          const storeKey = storeId === 1 ? 'rema-1000' : 
-                                          storeId === 2 ? 'netto' :
-                                          storeId === 3 ? 'føtex' :
-                                          storeId === 4 ? 'bilka' :
-                                          storeId === 5 ? 'nemlig' :
-                                          storeId === 6 ? 'meny' :
-                                          storeId === 7 ? 'spar' :
-                                          storeId === 8 ? 'løvbjerg' : ''
+                          const storeKey = STORE_KEY_BY_ID[storeId] ?? ''
                           
                           if (!storeKey) {
                             console.warn('⚠️ Unknown store ID:', storeId)
@@ -4699,6 +4793,32 @@ export default function MadbudgetPage() {
 
             {/* Search and Filters */}
             <div className="mb-6 space-y-4">
+              <div>
+                <p className="mb-2 text-sm font-medium text-gray-700">Måltidstype</p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      { id: 'breakfast' as const, label: 'Morgenmad' },
+                      { id: 'lunch' as const, label: 'Frokost' },
+                      { id: 'dinner' as const, label: 'Aftensmad' },
+                      { id: 'all' as const, label: 'Alle' },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setRecipeMealTypeFilter(tab.id)}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        recipeMealTypeFilter === tab.id
+                          ? 'bg-brand-700 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="flex-1">
                   <input
@@ -4715,7 +4835,7 @@ export default function MadbudgetPage() {
                     onChange={(e) => setRecipeCategoryFilter(e.target.value)}
                     className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
-                    <option value="all">Alle kategorier</option>
+                    <option value="all">Alle kostprofiler</option>
                     {recipeCategories.map(category => (
                       <option key={category} value={category}>{category}</option>
                     ))}
@@ -5273,10 +5393,11 @@ export default function MadbudgetPage() {
                   {familyProfile.adults > 0 && (
                     <div>
                       <label className="mb-2 block text-sm font-medium text-gray-700">
-                        Madniche for madplanen
+                        Kostretning for madplanen
                       </label>
                       <p className="mb-3 text-xs text-gray-500">
-                        Denne niche gælder hele madplanen. Vælger du den her, bruges samme niche for alle voksne.
+                        Vælg én kostprofil for hele familien (Keto, Sense osv.). Du sætter den her — ikke igen under
+                        vægttabsprofilen.
                       </p>
                       <div className="mb-4 grid grid-cols-1 gap-2">
                         {DIETARY_APPROACH_OPTIONS.map((approach) => (
@@ -5727,14 +5848,14 @@ export default function MadbudgetPage() {
               <div className="mt-4">
                 <div className="flex items-center justify-center space-x-4 mb-2">
                   <span className="text-sm text-gray-500">
-                    Trin {weightLossProfileStep + 1} af 4
+                    Trin {weightLossProfileStep + 1} af 3
                   </span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                   <motion.div
                     className="h-full bg-gradient-to-r from-[#1B365D] to-[#87A96B]"
                     initial={{ width: 0 }}
-                    animate={{ width: `${((weightLossProfileStep + 1) / 4) * 100}%` }}
+                    animate={{ width: `${((weightLossProfileStep + 1) / 3) * 100}%` }}
                     transition={{ duration: 0.5 }}
                   />
                 </div>
@@ -5918,52 +6039,8 @@ export default function MadbudgetPage() {
                   </motion.div>
                 )}
 
-                {/* Step 3: Kostretning */}
+                {/* Step 3: Mål (kostretning vælges under Madniche i Familieindstillinger) */}
                 {weightLossProfileStep === 2 && (
-                  <motion.div
-                    key="step3"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
-                  >
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Kostretning</h4>
-                    <p className="mb-3 text-xs text-gray-500">
-                      Valg her synkroniseres med madplanens niche og bruges på tværs af alle voksne.
-                    </p>
-                    <div className="grid grid-cols-1 gap-3">
-                      {DIETARY_APPROACH_OPTIONS.map((approach) => (
-                        <label
-                          key={approach.id}
-                          className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                            currentWeightLossProfile.dietaryApproach === approach.id
-                              ? 'border-[#1B365D] bg-[#1B365D]/5'
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="dietaryApproach"
-                            value={approach.id}
-                            checked={currentWeightLossProfile.dietaryApproach === approach.id}
-                            onChange={(e) => setCurrentWeightLossProfile(prev => ({
-                              ...prev,
-                              dietaryApproach: e.target.value
-                            }))}
-                            className="mr-3"
-                          />
-                          <div>
-                            <div className="font-semibold text-gray-900">{approach.name}</div>
-                            <div className="text-sm text-gray-600">{approach.desc}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 4: Mål (måltider vælges på madplan-siden) */}
-                {weightLossProfileStep === 3 && (
                   <motion.div
                     key="step4goals"
                     initial={{ opacity: 0, x: 20 }}
@@ -6036,7 +6113,7 @@ export default function MadbudgetPage() {
 
               <button
                 onClick={() => {
-                  if (weightLossProfileStep < 3) {
+                  if (weightLossProfileStep < 2) {
                     setWeightLossProfileStep(prev => prev + 1)
                   } else {
                     saveWeightLossProfile()
@@ -6044,8 +6121,8 @@ export default function MadbudgetPage() {
                 }}
                 className="flex items-center space-x-2 px-6 py-2 bg-gradient-to-r from-[#1B365D] to-[#87A96B] text-white rounded-lg hover:shadow-lg transition-all"
               >
-                <span>{weightLossProfileStep === 3 ? 'Gem' : 'Næste'}</span>
-                {weightLossProfileStep < 3 && <ChevronRight size={20} />}
+                <span>{weightLossProfileStep === 2 ? 'Gem' : 'Næste'}</span>
+                {weightLossProfileStep < 2 && <ChevronRight size={20} />}
               </button>
             </div>
           </motion.div>
@@ -6106,6 +6183,50 @@ export default function MadbudgetPage() {
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {/* Ugevalg ved generering fredag–søndag */}
+      <WeekTargetPickerModal
+        open={showWeekTargetPicker}
+        currentWeek={currentWeekInfo}
+        nextWeek={nextWeekInfo}
+        onClose={() => setShowWeekTargetPicker(false)}
+        onSelect={(target) => {
+          setShowWeekTargetPicker(false)
+          void generateMealPlan(target)
+        }}
+      />
+
+      {/* Genberegn-indkøbsliste prompt efter indstillingsændringer */}
+      {showRecalculatePrompt && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Genberegn indkøbslisten?</h3>
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              Du har ændret husstand eller indstillinger. Indkøbslistens mængder og priser matcher ikke længere —
+              vil du genberegne nu?
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setShowRecalculatePrompt(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Senere
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRecalculatePrompt(false)
+                  void recalculateShoppingList()
+                }}
+                className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800"
+              >
+                Genberegn nu
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Del-loading modal – viser mens madplan forberedes til deling */}

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
+import { getWeekInfo } from '@/lib/madbudget/week-dates'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 60
 
 type DayKey =
   | 'monday'
@@ -40,18 +44,8 @@ function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
 }
 
 function getCurrentWeekDates(): { weekStartDate: string; weekEndDate: string } {
-  const now = new Date()
-  const day = now.getDay()
-  const diffToMonday = day === 0 ? -6 : 1 - day
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diffToMonday)
-  monday.setHours(0, 0, 0, 0)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return {
-    weekStartDate: monday.toISOString().slice(0, 10),
-    weekEndDate: sunday.toISOString().slice(0, 10),
-  }
+  const { weekStartDate, weekEndDate } = getWeekInfo('current')
+  return { weekStartDate, weekEndDate }
 }
 
 function parseMealPlanData(raw: unknown): {
@@ -163,11 +157,15 @@ export async function POST(request: NextRequest) {
 
     const mealPlanData = { v: 2, grid, slotLocks }
 
+    // Genopbyg indkøbslisten så priserne følger den ændrede madplan.
+    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, grid as any)
+
     if (existingPlan) {
       const { error: updateError } = await supabase
         .from('user_meal_plans')
         .update({
           meal_plan_data: mealPlanData,
+          ...(shoppingList != null ? { shopping_list: shoppingList } : {}),
           is_active: true,
           updated_at: new Date().toISOString(),
         })
@@ -190,6 +188,7 @@ export async function POST(request: NextRequest) {
         week_start_date: weekStartDate,
         week_end_date: weekEndDate,
         meal_plan_data: mealPlanData,
+        ...(shoppingList != null ? { shopping_list: shoppingList } : {}),
         is_active: true,
       })
 

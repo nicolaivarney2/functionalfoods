@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+export const maxDuration = 60
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 type MealType = 'breakfast' | 'lunch' | 'dinner'
@@ -96,10 +99,15 @@ export async function POST(request: NextRequest) {
     grid[dayKey][mealKey] = null
     delete slotLocks[`${dayKey}_${mealKey}`]
 
+    // Genopbyg indkøbslisten så priserne følger den ændrede madplan. Slår fejl ikke
+    // ud over hele kaldet — grid-ændringen gemmes uanset (listen markeres stale i app'en).
+    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, grid as any)
+
     const { error: updateError } = await supabase
       .from('user_meal_plans')
       .update({
         meal_plan_data: { v: 2, grid, slotLocks },
+        ...(shoppingList != null ? { shopping_list: shoppingList } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', plan.id)

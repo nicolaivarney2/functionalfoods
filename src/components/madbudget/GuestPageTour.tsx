@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronRight, X } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 
 export type GuestPageTourStep = {
   selector: string
@@ -183,6 +183,15 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] pointer-events-none">
+      {/* Spring over — Goma-stil, fast i øverste højre hjørne */}
+      <button
+        type="button"
+        onClick={handleSkip}
+        className="pointer-events-auto fixed top-4 right-4 z-[10001] rounded-lg px-3 py-2 text-sm font-medium text-white/90 hover:text-white hover:bg-white/10 transition-colors"
+      >
+        Spring over
+      </button>
+
       <motion.div
         animate={{
           top: spotlightStyle.top,
@@ -217,26 +226,13 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="bg-white rounded-2xl shadow-2xl ring-1 ring-black/5 overflow-hidden">
-            <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-1">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-semibold w-6 h-6">
-                  {stepIndex + 1}
-                </span>
-                <h3 className="text-base font-semibold text-gray-900 leading-tight">
-                  {currentStep.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={handleSkip}
-                className="text-gray-400 hover:text-gray-700 transition-colors -mr-1"
-                aria-label="Luk rundvisning"
-              >
-                <X size={18} />
-              </button>
+            <div className="px-5 pt-5 pb-1">
+              <h3 className="text-lg font-bold text-gray-900 leading-snug pr-6">
+                {currentStep.title}
+              </h3>
             </div>
-            <div className="px-5 pb-4">
-              <p className="text-sm text-gray-600 leading-relaxed mb-4">
+            <div className="px-5 pb-5">
+              <p className="text-sm text-gray-600 leading-relaxed mb-5">
                 {currentStep.description}
               </p>
               <div className="flex items-center justify-between gap-3">
@@ -255,15 +251,8 @@ export default function GuestPageTour({ open, steps, onClose, onDone }: Props) {
                   )}
                   <button
                     type="button"
-                    onClick={handleSkip}
-                    className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1.5"
-                  >
-                    Spring over
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleNext}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
                   >
                     {isLast ? 'Færdig' : 'Næste'}
                     {!isLast && <ChevronRight size={14} />}

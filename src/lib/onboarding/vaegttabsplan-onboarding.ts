@@ -64,6 +64,10 @@ export function mealPlanScopeLabel(scope?: MealPlanScope): string {
 export type VaegttabsplanOnboardingData = {
   version: 2
   currentStep: number
+  /** Antal voksne i husstanden (inkl. brugeren selv). */
+  adults?: number
+  /** Antal børn i husstanden. */
+  children?: number
   weightGoal?: WeightGoal
   gender?: 'male' | 'female'
   age?: number
@@ -82,6 +86,8 @@ export function defaultOnboardingData(): VaegttabsplanOnboardingData {
   return {
     version: 2,
     currentStep: 0,
+    adults: 1,
+    children: 0,
     selectedStores: [1, 2],
     excludedFoods: [],
   }
@@ -116,16 +122,22 @@ export function loadOnboardingData(): VaegttabsplanOnboardingData | null {
     type StoredOnboarding = Omit<Partial<VaegttabsplanOnboardingData>, 'version'> & { version?: number }
     const parsed = JSON.parse(raw) as StoredOnboarding
     const savedVersion = parsed.version
-    if (savedVersion != null && savedVersion !== 1 && savedVersion !== 2) return null
+    if (savedVersion != null && savedVersion !== 1 && savedVersion !== 2 && savedVersion !== 3) return null
     const merged: VaegttabsplanOnboardingData = {
       ...defaultOnboardingData(),
       ...parsed,
       version: 2,
+      adults: parsed.adults ?? 1,
+      children: parsed.children ?? 0,
       selectedStores: parsed.selectedStores ?? [1, 2],
       excludedFoods: parsed.excludedFoods ?? [],
     }
     if (savedVersion === 1) {
       merged.currentStep = migrateOnboardingStep(parsed.currentStep ?? 0, merged)
+    }
+    // v2 → husstandstrin indsat efter intro: bump gemt step
+    if (savedVersion === 2 && (merged.currentStep ?? 0) >= 1) {
+      merged.currentStep = (merged.currentStep ?? 0) + 1
     }
     return merged
   } catch {
@@ -158,7 +170,11 @@ export function hasPendingOnboardingData(): boolean {
 
 export function onboardingProfileComplete(data: VaegttabsplanOnboardingData): boolean {
   return Boolean(
-    data.weightGoal &&
+    data.adults &&
+      data.adults >= 1 &&
+      data.children != null &&
+      data.children >= 0 &&
+      data.weightGoal &&
       data.gender &&
       data.age &&
       data.height &&
@@ -196,6 +212,10 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
   const data = loadOnboardingData()
   if (!data || !onboardingProfileComplete(data)) return false
 
+  const adults = Math.max(1, Math.min(10, data.adults ?? 1))
+  const children = Math.max(0, Math.min(10, data.children ?? 0))
+  const childrenAges = Array.from({ length: children }, () => '4-9')
+
   const res = await fetch('/api/madbudget/family-profile', {
     method: 'POST',
     headers: {
@@ -204,28 +224,26 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
     },
     body: JSON.stringify({
       familyProfile: {
-        adults: 1,
-        children: 0,
-        childrenAges: [],
+        adults,
+        children,
+        childrenAges,
         prioritizeOrganic: false,
         prioritizeAnimalOrganic: false,
         excludedIngredients: data.excludedFoods ?? [],
         selectedStores: data.selectedStores.length ? data.selectedStores : [1, 2],
         variationLevel: 2,
       },
-      adultProfiles: [
-        {
-          gender: data.gender,
-          age: data.age,
-          height: data.height,
-          weight: data.weight,
-          activityLevel: data.activityLevel,
-          dietaryApproach: data.dietaryApproach,
-          mealsPerDay: data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner'],
-          weightGoal: data.weightGoal,
-          isComplete: true,
-        },
-      ],
+      adultProfiles: Array.from({ length: adults }, (_, i) => ({
+        gender: data.gender,
+        age: data.age,
+        height: data.height,
+        weight: data.weight,
+        activityLevel: data.activityLevel,
+        dietaryApproach: data.dietaryApproach,
+        mealsPerDay: data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner'],
+        weightGoal: data.weightGoal,
+        isComplete: i === 0,
+      })),
     }),
   })
 
