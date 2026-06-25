@@ -5,7 +5,7 @@ import AdminLayout from '@/components/AdminLayout'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
 import { createSupabaseClient } from '@/lib/supabase'
 import type { ProvisionalRecipeRow, ProvisionalIngredient } from '@/lib/provisional-recipes'
-import { Check, X, Loader2, RefreshCw, Image as ImageIcon, Trash2, Plus } from 'lucide-react'
+import { Check, X, Loader2, RefreshCw, Image as ImageIcon, Trash2, Plus, Sparkles, Copy } from 'lucide-react'
 
 const STATUS_TABS = [
   { key: 'pending', label: 'Afventer' },
@@ -23,6 +23,8 @@ type EditState = {
   imageUrl: string
   ingredients: ProvisionalIngredient[]
   instructionsText: string
+  credit: string
+  midjourneyPrompt: string
 }
 
 export default function AdminProvisionalRecipesPage() {
@@ -34,6 +36,8 @@ export default function AdminProvisionalRecipesPage() {
   const [edits, setEdits] = useState<Record<string, EditState>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const [aiBusyId, setAiBusyId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const supabase = createSupabaseClient()
@@ -49,6 +53,8 @@ export default function AdminProvisionalRecipesPage() {
     imageUrl: r.image_url || '',
     ingredients: (r.ingredients || []).map((i) => ({ ...i })),
     instructionsText: (r.instructions || []).map((s) => s.instruction).join('\n'),
+    credit: r.submittedBy ? `Indsendt af ${r.submittedBy}` : '',
+    midjourneyPrompt: '',
   })
 
   const load = useCallback(async () => {
@@ -97,6 +103,60 @@ export default function AdminProvisionalRecipesPage() {
     }
   }
 
+  const runAiCleanup = async (r: ProvisionalRecipeRow) => {
+    const e = edits[r.id]
+    if (!e) return
+    setAiBusyId(r.id)
+    try {
+      const headers = { 'Content-Type': 'application/json', ...(await authHeaders()) }
+      const instructions = e.instructionsText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((instruction, i) => ({ stepNumber: i + 1, instruction }))
+      const res = await fetch('/api/admin/provisional-recipes/ai-cleanup', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          recipe: {
+            title: e.title,
+            description: e.description,
+            servings: r.servings,
+            dietaryCategories: r.dietary_categories,
+            ingredients: e.ingredients,
+            instructions,
+          },
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'AI-klargøring fejlede')
+      patchEdit(r.id, {
+        ingredients: Array.isArray(json.ingredients) && json.ingredients.length
+          ? json.ingredients
+          : e.ingredients,
+        instructionsText: Array.isArray(json.instructions) && json.instructions.length
+          ? json.instructions.map((s: { instruction: string }) => s.instruction).join('\n')
+          : e.instructionsText,
+        midjourneyPrompt: json.midjourneyPrompt || e.midjourneyPrompt,
+      })
+      if (json.aiError) console.warn('AI-cleanup:', json.aiError)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'AI-klargøring fejlede')
+    } finally {
+      setAiBusyId(null)
+    }
+  }
+
+  const copyPrompt = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedId(id)
+      setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1500)
+    } catch {
+      // ignorér clipboard-fejl
+    }
+  }
+
   const approve = async (r: ProvisionalRecipeRow) => {
     const e = edits[r.id]
     if (!e) return
@@ -120,6 +180,7 @@ export default function AdminProvisionalRecipesPage() {
           action: 'approve',
           imageUrl: e.imageUrl || undefined,
           mainCategory: e.mainCategory,
+          credit: e.credit || undefined,
           recipe: {
             title: e.title,
             description: e.description,
@@ -291,6 +352,62 @@ export default function AdminProvisionalRecipesPage() {
                 </div>
               ) : null}
 
+              {/* AI-klargøring + kreditering */}
+              {editable && (
+                <div className="mt-4 bg-violet-50 border border-violet-100 rounded-lg p-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => runAiCleanup(r)}
+                      disabled={aiBusyId === r.id}
+                      className="inline-flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
+                    >
+                      {aiBusyId === r.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4" />
+                      )}
+                      Klargør med AI
+                    </button>
+                    <span className="text-xs text-violet-700/80">
+                      Retter ingredienser til vores format, skriver fremgangsmåden rent (uden at ændre
+                      opskriften) og laver en Midjourney-prompt.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-sm">
+                    <label className="text-gray-600 whitespace-nowrap">Kreditering</label>
+                    <input
+                      type="text"
+                      value={e.credit}
+                      onChange={(ev) => patchEdit(r.id, { credit: ev.target.value })}
+                      placeholder="Indsendt af …"
+                      className="flex-1 border border-gray-300 rounded px-2 py-1"
+                    />
+                  </div>
+
+                  {e.midjourneyPrompt && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-violet-800">Midjourney-prompt</span>
+                        <button
+                          onClick={() => copyPrompt(r.id, e.midjourneyPrompt)}
+                          className="inline-flex items-center gap-1 text-xs text-violet-700 hover:text-violet-900"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          {copiedId === r.id ? 'Kopieret!' : 'Kopiér'}
+                        </button>
+                      </div>
+                      <textarea
+                        readOnly
+                        value={e.midjourneyPrompt}
+                        rows={3}
+                        className="w-full text-xs border border-violet-200 rounded px-2 py-1 bg-white font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid md:grid-cols-2 gap-5 mt-4">
                 {/* Ingredienser */}
                 <div>
@@ -399,7 +516,7 @@ export default function AdminProvisionalRecipesPage() {
         })}
       </div>
     )
-  }, [items, edits, loading, status, busyId, uploadingId])
+  }, [items, edits, loading, status, busyId, uploadingId, aiBusyId, copiedId])
 
   if (checking) {
     return (

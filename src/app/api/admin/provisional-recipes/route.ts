@@ -18,6 +18,31 @@ function getServiceClient() {
   return createClient(url, key)
 }
 
+type ServiceClient = NonNullable<ReturnType<typeof getServiceClient>>
+
+/** Visningsnavn til kreditering ud fra en auth-bruger (metadata-navn → email-lokaldel). */
+async function resolveSubmitterName(
+  supabase: ServiceClient,
+  userId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.admin.getUserById(userId)
+    if (error || !data?.user) return null
+    const meta = (data.user.user_metadata ?? {}) as Record<string, unknown>
+    const metaName =
+      (typeof meta.full_name === 'string' && meta.full_name.trim()) ||
+      (typeof meta.name === 'string' && meta.name.trim()) ||
+      (typeof meta.first_name === 'string' && meta.first_name.trim()) ||
+      ''
+    if (metaName) return metaName.slice(0, 80)
+    const email = data.user.email
+    if (email) return email.split('@')[0].slice(0, 80)
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireAdmin(request)
@@ -44,7 +69,20 @@ export async function GET(request: NextRequest) {
       console.error('admin provisional GET', error)
       return NextResponse.json({ error: 'Kunne ikke hente', details: error.message }, { status: 500 })
     }
-    return NextResponse.json({ success: true, data: data ?? [] })
+
+    const rows = (data ?? []) as ProvisionalRecipeRow[]
+
+    // Berig med indsenders visningsnavn til kreditering (én opslag pr. unik bruger).
+    const uniqueUserIds = [...new Set(rows.map((r) => r.user_id))]
+    const nameById = new Map<string, string | null>()
+    await Promise.all(
+      uniqueUserIds.map(async (uid) => {
+        nameById.set(uid, await resolveSubmitterName(supabase, uid))
+      })
+    )
+    const enriched = rows.map((r) => ({ ...r, submittedBy: nameById.get(r.user_id) ?? null }))
+
+    return NextResponse.json({ success: true, data: enriched })
   } catch (e) {
     console.error('admin provisional GET', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -154,6 +192,15 @@ export async function POST(request: NextRequest) {
     const nutrition = prov.nutrition || {}
     const recipeId = crypto.randomUUID()
 
+    // Kreditering: admin-angivet felt vinder; ellers indsenderens navn; ellers generisk.
+    const adminCredit =
+      typeof body.credit === 'string' && body.credit.trim() ? body.credit.trim().slice(0, 120) : ''
+    let author = adminCredit
+    if (!author) {
+      const submitter = await resolveSubmitterName(supabase, prov.user_id)
+      author = submitter ? `Indsendt af ${submitter}` : 'Bruger (foreløbig opskrift)'
+    }
+
     const recipeData = {
       id: recipeId,
       title,
@@ -192,7 +239,7 @@ export async function POST(request: NextRequest) {
         time: ins.time || null,
         tips: ins.tips || null,
       })),
-      author: 'Bruger (foreløbig opskrift)',
+      author,
       status: 'draft',
       publishedAt: null,
       updatedAt: new Date().toISOString(),
