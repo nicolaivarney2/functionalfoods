@@ -32,8 +32,8 @@ const TJEK_ONLY_BY_CRON_WEEKDAY: Record<number, SourceChain[]> = {
   3: ['abc-lavpris'],
   // Torsdag ← onsdagens 365discount
   4: ['365discount'],
-  // Fredag ← torsdag: Coop + MENY m.fl. + Føtex (Salling separat)
-  5: ['meny', 'spar', 'kvickly', 'superbrugsen', 'loevbjerg'],
+  // Fredag ← torsdag: Coop + Dagrofa (MENY/Spar/Min Købmand) m.fl. + Føtex (Salling separat)
+  5: ['meny', 'spar', 'kvickly', 'superbrugsen', 'loevbjerg', 'min-koebmand'],
   // Lørdag ← fredag: Netto/Bilka (Salling) + Brugsen
   6: ['brugsen'],
   // Søndag ← lørdag: REMA + Lidl
@@ -64,7 +64,7 @@ const RELEASE_NOTE_BY_WEEKDAY: Record<number, string> = {
   1: 'Søndagens Nemlig',
   3: 'Tirsdagens ABC Lavpris',
   4: 'Onsdagens 365discount',
-  5: 'Torsdagens MENY/Coop + Føtex',
+  5: 'Torsdagens MENY/Coop/Dagrofa (inkl. Min Købmand) + Føtex',
   6: 'Fredagens Netto/Bilka + Brugsen',
 }
 
