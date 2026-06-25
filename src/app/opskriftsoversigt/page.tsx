@@ -187,6 +187,17 @@ export default function RecipeOverviewPage() {
     return counts
   }, [allRecipes])
 
+  // Tæl opskrifter pr. måltidstype (mainCategory) til de synlige filter-chips
+  const mealTypeCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const recipe of allRecipes) {
+      const type = recipe.mainCategory
+      if (!type) continue
+      counts[type] = (counts[type] || 0) + 1
+    }
+    return counts
+  }, [allRecipes])
+
   // Apply filters when dependencies change
   useEffect(() => {
     let filtered = allRecipes || []
@@ -392,12 +403,64 @@ export default function RecipeOverviewPage() {
               )}
             </div>
 
+            {/* Måltidstype — synligt på mobil og desktop */}
+            {mealTypes.length > 0 && (
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="mb-2 text-xs font-semibold text-slate-600">Måltidstype</p>
+                <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => setMealTypeFilter('all')}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                      mealTypeFilter === 'all'
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'
+                    }`}
+                  >
+                    Alle
+                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                      mealTypeFilter === 'all' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {allRecipes.length}
+                    </span>
+                  </button>
+                  {mealTypes.map((type) => {
+                    const active = mealTypeFilter === type
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setMealTypeFilter(type)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                          active
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        <span className="max-w-[10rem] truncate sm:max-w-none">{type}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                            active ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {mealTypeCounts[type] ?? 0}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Desktop/tablet: nicher som primære filtre (ikke skjult i dropdown) */}
             <div className="hidden md:block rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm ring-1 ring-slate-100">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Filtrér i den blandede liste</p>
                 <span className="text-xs text-slate-500">Eller vælg en kategori ovenfor for kun den mad-ideologi</span>
               </div>
+
+              {/* Mad-ideologi */}
+              <p className="mb-2 text-xs font-semibold text-slate-600">Mad-ideologi</p>
               <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
                 <button
                   type="button"
@@ -447,8 +510,8 @@ export default function RecipeOverviewPage() {
             {/* Filters Panel */}
             {showFilters && (
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                <p className="mb-4 hidden text-sm font-semibold text-slate-700 md:block">
-                  Flere filtre: tid og måltidstype
+                <p className="mb-4 text-sm font-semibold text-slate-700">
+                  Flere filtre: forberedelsestid og måltidstype
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Dietary: kun på mobil (desktop bruger chips ovenfor) */}

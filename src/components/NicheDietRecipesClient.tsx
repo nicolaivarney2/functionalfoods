@@ -332,6 +332,12 @@ export default function NicheDietRecipesClient({
   }, [searchQuery, prepTimeFilter, mealTypeFilter, poultryFilter, showPoultrySplit, allRecipes])
 
   const mealTypes = Array.from(new Set(allRecipes.map((r) => r.mainCategory).filter(Boolean))).sort()
+  const mealTypeCounts: Record<string, number> = {}
+  for (const recipe of allRecipes) {
+    if (recipe.mainCategory) {
+      mealTypeCounts[recipe.mainCategory] = (mealTypeCounts[recipe.mainCategory] || 0) + 1
+    }
+  }
 
   const clearFilters = () => {
     setPrepTimeFilter('all')
@@ -449,62 +455,77 @@ export default function NicheDietRecipesClient({
               )}
             </div>
 
+            {/* Måltidstype — synligt filter (frokost, aftensmad, morgenmad m.m.) */}
+            {mealTypes.length > 0 && (
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-b from-slate-50 to-white p-4 shadow-sm ring-1 ring-slate-100">
+                <p className="mb-2 text-xs font-semibold text-slate-600">Måltidstype</p>
+                <div className="flex flex-wrap justify-center gap-2 lg:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => setMealTypeFilter('all')}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                      mealTypeFilter === 'all'
+                        ? `border-transparent ${t.filterActive} text-white shadow-md`
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    Alle
+                    <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                      mealTypeFilter === 'all' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {allRecipes.length}
+                    </span>
+                  </button>
+                  {mealTypes.map((type) => {
+                    const active = mealTypeFilter === type
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setMealTypeFilter(type)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all ${
+                          active
+                            ? `border-transparent ${t.filterActive} text-white shadow-md`
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="max-w-[10rem] truncate sm:max-w-none">{type}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${
+                          active ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {mealTypeCounts[type] ?? 0}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {showFilters && (
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">Forberedelsestid</label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { value: 'all', label: 'Alle' },
-                        { value: 'quick', label: 'Under 30 min' },
-                        { value: 'medium', label: '30-60 min' },
-                        { value: 'long', label: 'Over 60 min' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setPrepTimeFilter(option.value as 'all' | 'quick' | 'medium' | 'long')}
-                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                            prepTimeFilter === option.value
-                              ? `${t.filterActive} text-white shadow-md`
-                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-3">Måltidstype</label>
-                    <div className="flex flex-wrap gap-2">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-3">Forberedelsestid</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'all', label: 'Alle' },
+                      { value: 'quick', label: 'Under 30 min' },
+                      { value: 'medium', label: '30-60 min' },
+                      { value: 'long', label: 'Over 60 min' },
+                    ].map((option) => (
                       <button
+                        key={option.value}
                         type="button"
-                        onClick={() => setMealTypeFilter('all')}
+                        onClick={() => setPrepTimeFilter(option.value as 'all' | 'quick' | 'medium' | 'long')}
                         className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                          mealTypeFilter === 'all'
+                          prepTimeFilter === option.value
                             ? `${t.filterActive} text-white shadow-md`
                             : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
                         }`}
                       >
-                        Alle
+                        {option.label}
                       </button>
-                      {mealTypes.map((type) => (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setMealTypeFilter(type)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                            mealTypeFilter === type
-                              ? `${t.filterActive} text-white shadow-md`
-                              : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
                 {showPoultrySplit ? (
