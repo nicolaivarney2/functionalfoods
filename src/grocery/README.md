@@ -18,7 +18,9 @@ src/grocery/
 │   ├── migrate.ts                      Migrations runner (ledger-tracked)
 │   └── migrations/
 │       ├── 001_initial_schema.sql      Idempotent: tables, indexes, RLS, seed
-│       └── 002_truncate_helpers.sql    truncate_chain() RPC
+│       ├── 002_truncate_helpers.sql    truncate_chain() RPC
+│       ├── 003_price_history_snapshot.sql  snapshot_price_history() RPC
+│       └── 004_cleanup_expired_offers.sql  cleanup_expired_offers() RPC (daily cron)
 ├── adapters/
 │   ├── salling-algolia/                Netto, Bilka, Føtex (shared Algolia index)
 │   ├── rema1000/                       REMA 1000 (direct public API)
@@ -45,6 +47,8 @@ src/app/api/grocery/                    Consumer-facing HTTP endpoints (Fooddata
 ├── curation/ingredient-tags/route.ts   GET    dietary exclusion tags
 ├── curation/organic-tags/route.ts      GET    organic product tags
 └── sync/salling/route.ts               POST   trigger sync
+    └── sync/cron/route.ts                 GET/POST  daily scheduled sync (Vercel cron 04:00 UTC)
+    └── sync/cleanup-expired/route.ts      GET/POST  daily expired-offer sweep (Vercel cron 04:30 UTC)
 
 docs/FOODDATA_API.md                    External API documentation
 
@@ -172,6 +176,32 @@ See `docs/FF_HANDOFF_FOODDATA_INGREDIENT_MATCHING.md` §11 and
 - Efter fuld REMA/Salling-sync: varer der forsvandt fra API → `products.active=false`
 - Efter Tjek-sync per kæde: tilbud ikke rørt i run → `in_stock=false`
 - `/dagligvarer` (main Supabase) er uændret
+
+### Daily expired-offer cleanup (cross-chain sweep)
+
+`sleepStaleOffersForChain` kun kører per-kæde på kædens scheduled sync-dag
+(fx lørdag for Netto/Bilka). Et Netto-tilbud der udløber tirsdag ville
+ellers forblive flagget aktivt i 4 dage → false positives på /dagligvarer.
+
+For at lukke hullet kører en daglig cross-chain sweep:
+
+- **Migration `004_cleanup_expired_offers.sql`** definerer RPC'en
+  `cleanup_expired_offers(p_stale_product_days, p_batch_limit)` der:
+  1. Sætter alle `product_offers` med `offer_until < now` til
+     `is_on_sale=false, in_stock=false` (pris bevares for Planomo).
+  2. Tombstoner `products.active=false` for rækker hvor ingen tilbud er
+     aktive og `last_seen_at > 30 dage` siden — dvs. produktet er
+     forsvundet fra kildens API. Rækken slettes ikke (sticky matches).
+- **Cron route** `/api/grocery/sync/cleanup-expired` kører både
+  grocery-RPC'en og main FF `cleanupExpiredOffers()` (fra
+  `src/lib/dagligvarer-offer-cleanup.ts`).
+- **Vercel cron** `30 4 * * *` (04:30 UTC ≈ 05:30 DK) — mellem
+  grocery-scrapet (04:00 UTC) og GitHub Actions fooddata→FF-import
+  (05:00 UTC), så main DB'ens tilbud er cleanet før de kopieres ind.
+
+Auth: Bearer `$CRON_SECRET` (samme som scrape-cron'en). Kan også triggers
+manuelt med `$GROCERY_SYNC_SECRET`. Idempotent — sikker at køre flere
+gange dagligt.
 
 ### Chain coverage (single source of truth)
 

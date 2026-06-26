@@ -7,6 +7,10 @@
     {
       "path": "/api/grocery/sync/cron",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/grocery/sync/cleanup-expired",
+      "schedule": "30 4 * * *"
     }
   ]
 }
