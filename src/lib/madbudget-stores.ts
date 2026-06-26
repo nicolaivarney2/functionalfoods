@@ -1,10 +1,25 @@
 /** Tilbuds-only kæder uden fuldt katalog — får vejledende priser fra reference-butikker. */
-export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set(['meny', 'spar', 'løvbjerg', 'min-koebmand'])
+export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set([
+  'meny',
+  'spar',
+  'løvbjerg',
+  'min-koebmand',
+  'lidl',
+  '365discount',
+  'kvickly',
+  'superbrugsen',
+  'brugsen',
+  'abc-lavpris',
+])
 
 /**
  * Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores).
  * Id 5 (Nemlig.com) er bevidst bevaret for id-troskab mod gemte profiler, men udelades fra
  * vælgeren — vi har ikke data derfra.
+ *
+ * Id 1–9 er de oprindelige kæder. Id 10–15 tilføjet efter /dagligvarer-udvidelsen
+ * (Lidl, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris) — alle tilbuds-only,
+ * men de indgår nu reelt i prissætningen via vejledende referencepriser.
  */
 export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 1, name: 'REMA 1000' },
@@ -16,6 +31,12 @@ export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 7, name: 'Spar' },
   { id: 8, name: 'Løvbjerg' },
   { id: 9, name: 'Min Købmand' },
+  { id: 10, name: 'Lidl' },
+  { id: 11, name: '365 Discount' },
+  { id: 12, name: 'Kvickly' },
+  { id: 13, name: 'Super Brugsen' },
+  { id: 14, name: 'Brugsen' },
+  { id: 15, name: 'ABC Lavpris' },
 ]
 
 /** Id'er bevaret i kataloget for troskab, men ikke valgbare (ingen data). */

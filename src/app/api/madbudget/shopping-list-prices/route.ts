@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
 
     // Map frontend store IDs to a canonical UI key + possible DB slug aliases.
     // We support both legacy slugs (føtex/løvbjerg) and ASCII slugs (fotex/lovbjerg).
+    // Id 1–9 er de oprindelige madbudget-kæder; id 10–15 er Tjek-tilbuds-kæder
+    // tilføjet for at synkronisere madbudget med /dagligvarer (14 butikker total).
     const storeIdMap: Record<number, { key: string; candidates: string[] }> = {
       1: { key: 'rema-1000', candidates: ['rema-1000'] },
       2: { key: 'netto', candidates: ['netto'] },
@@ -64,6 +66,12 @@ export async function POST(request: NextRequest) {
       7: { key: 'spar', candidates: ['spar'] },
       8: { key: 'løvbjerg', candidates: ['loevbjerg', 'løvbjerg', 'lovbjerg'] },
       9: { key: 'min-koebmand', candidates: ['min-koebmand'] },
+      10: { key: 'lidl', candidates: ['lidl'] },
+      11: { key: '365discount', candidates: ['365discount', '365-discount'] },
+      12: { key: 'kvickly', candidates: ['kvickly'] },
+      13: { key: 'superbrugsen', candidates: ['superbrugsen', 'super-brugsen'] },
+      14: { key: 'brugsen', candidates: ['brugsen'] },
+      15: { key: 'abc-lavpris', candidates: ['abc-lavpris'] },
     }
 
     const requestedStores = selectedStoreIds
@@ -1233,6 +1241,13 @@ function matchBelongsToStore(
     meny: ['meny-'],
     spar: ['spar-'],
     'løvbjerg': ['loevbjerg-', 'løvbjerg-', 'lovbjerg-'],
+    'min-koebmand': ['min-koebmand-'],
+    lidl: ['lidl-'],
+    '365discount': ['365discount-', '365-discount-'],
+    kvickly: ['kvickly-'],
+    superbrugsen: ['superbrugsen-', 'super-brugsen-'],
+    brugsen: ['brugsen-'],
+    'abc-lavpris': ['abc-lavpris-'],
   }
 
   const prefixes = storePrefixes[storeKey] || [`${storeKey}-`]
@@ -1255,6 +1270,13 @@ function matchBelongsToStore(
     meny: ['meny'],
     spar: ['spar'],
     'løvbjerg': ['loevbjerg', 'lovbjerg', 'løvbjerg'],
+    'min-koebmand': ['min-koebmand', 'min købmand'],
+    lidl: ['lidl'],
+    '365discount': ['365discount', '365 discount', '365-discount'],
+    kvickly: ['kvickly'],
+    superbrugsen: ['superbrugsen', 'super brugsen', 'super-brugsen'],
+    brugsen: ['brugsen'],
+    'abc-lavpris': ['abc-lavpris', 'abc lavpris'],
   }
 
   const aliases = storeAliases[storeKey] || [storeKey]

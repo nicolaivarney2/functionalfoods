@@ -153,6 +153,12 @@ const STORE_KEY_BY_ID: Record<number, string> = {
   7: 'spar',
   8: 'løvbjerg',
   9: 'min-koebmand',
+  10: 'lidl',
+  11: '365discount',
+  12: 'kvickly',
+  13: 'superbrugsen',
+  14: 'brugsen',
+  15: 'abc-lavpris',
 }
 
 function storeIdFromTabKey(tab: string): number | null {
@@ -276,6 +282,12 @@ const TAB_KEY_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   spar: 'spar',
   løvbjerg: 'loevbjerg',
   'min-koebmand': 'min-koebmand',
+  lidl: 'lidl',
+  '365discount': '365discount',
+  kvickly: 'kvickly',
+  superbrugsen: 'superbrugsen',
+  brugsen: 'brugsen',
+  'abc-lavpris': 'abc-lavpris',
 }
 
 function sourceChainFromTabKey(tab: string): SourceChain | null {
@@ -334,7 +346,13 @@ const mockStores = [
   { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
   { id: 9, name: 'Min Købmand', color: 'bg-orange-500', isSelected: false },
-  { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false }
+  { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false },
+  { id: 10, name: 'Lidl', color: 'bg-yellow-400', isSelected: false },
+  { id: 11, name: '365 Discount', color: 'bg-amber-500', isSelected: false },
+  { id: 12, name: 'Kvickly', color: 'bg-red-700', isSelected: false },
+  { id: 13, name: 'Super Brugsen', color: 'bg-emerald-600', isSelected: false },
+  { id: 14, name: 'Brugsen', color: 'bg-emerald-500', isSelected: false },
+  { id: 15, name: 'ABC Lavpris', color: 'bg-sky-700', isSelected: false },
 ]
 
 interface AdultProfile {
