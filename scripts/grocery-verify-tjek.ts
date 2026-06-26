@@ -77,6 +77,19 @@ async function main(): Promise<void> {
   console.log(`   products (Tjek chains): ${tjekProducts ?? 0}`)
   console.log(`   product_offers (Tjek):  ${tjekOffers ?? 0}\n`)
 
+  console.log('2b) Products with image_url (Tjek chains)')
+  const { count: withImage } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .in('source_chain', TJEK_CHAINS)
+    .not('image_url', 'is', null)
+    .neq('image_url', '')
+
+  const total = tjekProducts ?? 0
+  const images = withImage ?? 0
+  const pct = total > 0 ? Math.round((images / total) * 100) : 0
+  console.log(`   with image_url: ${images} / ${total} (${pct}%)\n`)
+
   console.log('3) Products per chain (from Tjek source)')
   const { data: byChain, error: chainErr } = await supabase
     .from('products')

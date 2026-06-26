@@ -17,7 +17,12 @@ import { getGroceryServiceClient } from '../../db/client'
 import { sleepStaleOffersForChain } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
 import { TjekClient, TjekAutoPausedError, TjekDisabledError } from './client'
-import { mapTjekOfferToOffer, mapTjekOfferToProduct, resolveChain } from './mapper'
+import {
+  mapTjekOfferToOffer,
+  mapTjekOfferToProduct,
+  pickTjekOfferImageUrl,
+  resolveChain,
+} from './mapper'
 import {
   CHAIN_TO_TJEK_DEALER,
   CHAINS_WITH_PRIMARY_CATALOG,
@@ -365,9 +370,7 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
 }
 
 function buildPreviewItem(chain: SourceChain, offer: TjekOffer): TjekSyncPreviewItem {
-  // Image URL — only used by the internal explorer for verification.
-  const imageUrl =
-    offer.images?.view ?? offer.images?.zoom ?? offer.images?.thumb ?? null
+  const imageUrl = pickTjekOfferImageUrl(offer.images)
   return {
     chain,
     offerId: offer.id,

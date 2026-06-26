@@ -136,7 +136,7 @@ The adapter is deliberately quiet:
 - 600-1400ms jitter sleep between requests (configurable).
 - Auto-pause after 3 consecutive 4xx/5xx responses (`TjekAutoPausedError`).
 - Hard kill-switch: set `GROCERY_TJEK_DISABLED=true` in Vercel env to abort all outbound requests immediately.
-- Image URLs are **not** populated on product rows (left in `raw_data` only) to prevent accidental hotlinking from public UI.
+- Product `image_url` is set from Tjek's offer image (view → zoom → thumb). Full `images` object is also kept in `raw_data`.
 
 Sample size of a full nightly run (verified 27. May 2026): 11 dealers, 3,420 offers, ~43 seconds total, ~50-100 HTTP requests.
 

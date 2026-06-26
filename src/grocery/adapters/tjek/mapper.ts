@@ -9,17 +9,14 @@
  * upsert semantics simple — when the offer expires (run_till < now), the
  * offer row is kept with in_stock=false (price preserved for Planomo).
  *
- * Image policy: we deliberately do NOT populate `image_url` on the product
- * row. Tjek's image-transformer-api.tjek.com URLs would otherwise be
- * hotlinked from our UI, which is exactly the visible signal we want to
- * avoid (see operational notes in TjekClient). The full URL is preserved in
- * `raw_data.images` for sync verification only. Future enhancement: mirror
- * images to our own Supabase Storage at sync time.
+ * Images: Tjek exposes thumb/view/zoom URLs on each offer. We pick the best
+ * available size for `image_url` (view → zoom → thumb). The full object is
+ * also kept in `raw_data.images` for debugging.
  */
 
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
 import { isPromoOfferExpired } from '../../sync/catalog-retention'
-import { TJEK_DEALER_TO_CHAIN, type TjekOffer } from './types'
+import { TJEK_DEALER_TO_CHAIN, type TjekImages, type TjekOffer } from './types'
 
 const SYNC_SOURCE = 'tjek:offers' as const
 
@@ -70,6 +67,14 @@ function discountPct(priceCents: number, beforeCents: number | null): number | n
   return Number((((beforeCents - priceCents) / beforeCents) * 100).toFixed(2))
 }
 
+/** Best product image from a Tjek offer (view preferred for UI cards). */
+export function pickTjekOfferImageUrl(images: TjekImages | null | undefined): string | null {
+  const url = images?.view ?? images?.zoom ?? images?.thumb ?? null
+  if (!url || typeof url !== 'string') return null
+  const trimmed = url.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 /**
  * Map a Tjek offer to a product row. Returns null when the dealer is not in
  * our chain whitelist (e.g. "MENY Vin" — a sub-dealer we don't track).
@@ -91,8 +96,7 @@ export function mapTjekOfferToProduct(offer: TjekOffer): ProductInsert | null {
     description: offer.description?.trim() || null,
     amount,
     unit,
-    // Intentionally null — see "Image policy" note at top of file.
-    image_url: null,
+    image_url: pickTjekOfferImageUrl(offer.images),
     category_path: dealerName, // Tjek has no taxonomy beyond dealer + page
     category_lvl0: dealerName,
     category_lvl1: null,

@@ -3,6 +3,7 @@ export {
   mapTjekOfferToOffer,
   mapTjekOfferToProduct,
   parseQuantity,
+  pickTjekOfferImageUrl,
   resolveChain,
 } from './mapper'
 export { syncTjek } from './sync'
