@@ -2,9 +2,13 @@ import type { GomaProduct, GomaSearchBody, GomaSearchResponse } from './types'
 
 const GOMA_RPC_URL = 'https://api.goma.gg/rest/v1/rpc/search_products_public_v1'
 
-/** Defaults: ~400–600 tilbud pr. kæde → 3 sider à 200. 8 sider giver headroom. */
+/** Tilbud-only kæder: ~400–600 tilbud → 8×200 sider. */
 export const GOMA_OFFERS_PAGE_SIZE = 200
 export const GOMA_OFFERS_MAX_PAGES = 8
+
+/** Fuldt katalog (MENY, Spar, Nemlig, Min Købmand): paginer til tom side. */
+export const GOMA_CATALOG_PAGE_SIZE = 150
+export const GOMA_CATALOG_MAX_PAGES = 250
 
 export function getGomaApiKey(): string {
   const key = process.env.GOMA_API_KEY
@@ -64,23 +68,36 @@ export async function searchGomaProducts(
   return (await res.json()) as GomaSearchResponse
 }
 
-/** Hent én side aktuelle tilbud (offers-only kæder — ikke fuldt katalog). */
+/** Hent én side produkter fra Goma. */
+export async function fetchGomaProductsPage(
+  storeName: string,
+  page: number,
+  limit: number,
+  sessionId: string,
+  onSaleOnly: boolean,
+): Promise<{ products: GomaProduct[]; totalCount: number; isLastPage: boolean }> {
+  const data = await searchGomaProducts(
+    buildSearchBody(storeName, page, limit, onSaleOnly, sessionId),
+  )
+
+  const products = data.products || []
+  return {
+    products,
+    totalCount: onSaleOnly
+      ? (data.total_on_sale_count ?? data.total_count)
+      : data.total_count,
+    isLastPage: products.length < limit,
+  }
+}
+
+/** Kun aktuelle tilbud (Lidl, Coop, …). */
 export async function fetchGomaOffersPage(
   storeName: string,
   page: number,
   limit: number,
   sessionId: string,
 ): Promise<{ products: GomaProduct[]; totalCount: number; isLastPage: boolean }> {
-  const data = await searchGomaProducts(
-    buildSearchBody(storeName, page, limit, true, sessionId),
-  )
-
-  const products = data.products || []
-  return {
-    products,
-    totalCount: data.total_on_sale_count ?? data.total_count,
-    isLastPage: products.length < limit,
-  }
+  return fetchGomaProductsPage(storeName, page, limit, sessionId, true)
 }
 
 /** Fallback verify når vi ikke nåede at paginere alle tilbud i import-run. */

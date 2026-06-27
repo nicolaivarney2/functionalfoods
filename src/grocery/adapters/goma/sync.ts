@@ -9,11 +9,15 @@ import { getGroceryServiceClient } from '../../db/client'
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
 import {
   filterGomaStoresForImport,
+  getGomaSyncMode,
   gomaStoreNameToChain,
+  isGomaFullCatalogChain,
 } from '@/lib/goma-import-stores'
 import {
   fetchGomaActiveOfferProductIds,
-  fetchGomaOffersPage,
+  fetchGomaProductsPage,
+  GOMA_CATALOG_MAX_PAGES,
+  GOMA_CATALOG_PAGE_SIZE,
   GOMA_OFFERS_MAX_PAGES,
   GOMA_OFFERS_PAGE_SIZE,
 } from './client'
@@ -22,18 +26,30 @@ import type { GomaProduct } from './types'
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
-const PAGE_CONCURRENCY = 4
+const OFFERS_PAGE_CONCURRENCY = 4
+const CATALOG_PAGE_CONCURRENCY = 6
 
-/** Standard cron/manual sync — kun tilbud, ikke fuldt katalog. */
+/** Standard cron/manual sync for tilbud-only kæder. */
 export const GOMA_SYNC_DEFAULTS = {
   limit: GOMA_OFFERS_PAGE_SIZE,
   pages: GOMA_OFFERS_MAX_PAGES,
 } as const
 
+/** Fuldt katalog via Goma (MENY, Spar, Nemlig, Min Købmand). */
+export const GOMA_CATALOG_SYNC_DEFAULTS = {
+  limit: GOMA_CATALOG_PAGE_SIZE,
+  pages: GOMA_CATALOG_MAX_PAGES,
+} as const
+
 export interface GomaSyncOptions {
   stores: string[]
+  /** Tilbud-only override (Lidl, Coop, …). */
   limit?: number
   pages?: number
+  /** Fuldt-katalog override (MENY, Spar, Nemlig, Min Købmand). */
+  catalogLimit?: number
+  catalogPages?: number
+  /** Admin override: sync Netto/Bilka/Føtex/REMA via Goma too (not recommended). */
   includeFullCatalog?: boolean
   onProgress?: (info: {
     store: string
@@ -48,6 +64,33 @@ export interface GomaSyncResult {
   skippedStores: string[]
   storesSynced: string[]
   errors: string[]
+}
+
+type StoreSyncParams = {
+  limit: number
+  pages: number
+  onSaleOnly: boolean
+  useSyncedIdsForVerify: boolean
+}
+
+function resolveStoreSyncParams(
+  chain: SourceChain,
+  options: GomaSyncOptions,
+): StoreSyncParams {
+  if (isGomaFullCatalogChain(chain)) {
+    return {
+      limit: options.catalogLimit ?? GOMA_CATALOG_SYNC_DEFAULTS.limit,
+      pages: options.catalogPages ?? GOMA_CATALOG_SYNC_DEFAULTS.pages,
+      onSaleOnly: false,
+      useSyncedIdsForVerify: false,
+    }
+  }
+  return {
+    limit: options.limit ?? GOMA_SYNC_DEFAULTS.limit,
+    pages: options.pages ?? GOMA_SYNC_DEFAULTS.pages,
+    onSaleOnly: true,
+    useSyncedIdsForVerify: true,
+  }
 }
 
 function dedupeBySourceId(products: GomaProduct[]): GomaProduct[] {
@@ -131,16 +174,18 @@ async function verifyAndDeactivateStaleOffers(
   storeName: string,
   importStartedAtIso: string,
   fullyScannedStore: boolean,
-  syncedSourceIds: Set<string>,
+  syncedOfferSourceIds: Set<string>,
+  useSyncedIdsForVerify: boolean,
 ): Promise<void> {
   const supabase = getGroceryServiceClient()
 
-  let currentOfferSourceIds = syncedSourceIds
-  let verificationSuccessful = fullyScannedStore
+  let currentOfferSourceIds = syncedOfferSourceIds
+  let verificationSuccessful =
+    useSyncedIdsForVerify && fullyScannedStore
 
   if (verificationSuccessful) {
     console.log(
-      `📋 Goma verify ${storeName}: ${currentOfferSourceIds.size} tilbud fra fuld tilbuds-scan (ingen ekstra API-kald)`,
+      `📋 Goma verify ${storeName}: ${currentOfferSourceIds.size} tilbud fra tilbuds-scan (ingen ekstra API-kald)`,
     )
   } else {
     try {
@@ -154,7 +199,7 @@ async function verifyAndDeactivateStaleOffers(
     }
   }
 
-  if (verificationSuccessful && currentOfferSourceIds.size >= 0) {
+  if (verificationSuccessful) {
     const { data: dbActive, error: dbErr } = await supabase
       .from('product_offers')
       .select('id, product_id')
@@ -234,35 +279,44 @@ async function verifyAndDeactivateStaleOffers(
 
 async function syncGomaStore(
   storeName: string,
-  options: Required<Pick<GomaSyncOptions, 'limit' | 'pages'>> &
-    Pick<GomaSyncOptions, 'onProgress'>,
+  params: StoreSyncParams,
+  onProgress?: GomaSyncOptions['onProgress'],
 ): Promise<number> {
   const chain = gomaStoreNameToChain(storeName)
   if (!chain) {
     throw new Error(`Ukendt Goma-butik: ${storeName}`)
   }
 
+  const mode = getGomaSyncMode(chain)
+  const pageConcurrency =
+    mode === 'full-catalog' ? CATALOG_PAGE_CONCURRENCY : OFFERS_PAGE_CONCURRENCY
+
   const importStartedAtIso = new Date().toISOString()
   const sessionId = `functionalfoods-goma-${chain}`
   let totalImported = 0
   let fullyScannedStore = false
-  const syncedSourceIds = new Set<string>()
+  const syncedOfferSourceIds = new Set<string>()
+
+  console.log(
+    `   mode=${mode}, on_sale_only=${params.onSaleOnly}, ${params.pages}×${params.limit}`,
+  )
 
   for (
     let batchStart = 0;
-    batchStart < options.pages && !fullyScannedStore;
-    batchStart += PAGE_CONCURRENCY
+    batchStart < params.pages && !fullyScannedStore;
+    batchStart += pageConcurrency
   ) {
-    const batchSize = Math.min(PAGE_CONCURRENCY, options.pages - batchStart)
+    const batchSize = Math.min(pageConcurrency, params.pages - batchStart)
     const pages = Array.from({ length: batchSize }, (_, i) => batchStart + i)
 
     const fetched = await Promise.all(
       pages.map(async (page) => {
-        const result = await fetchGomaOffersPage(
+        const result = await fetchGomaProductsPage(
           storeName,
           page,
-          options.limit,
+          params.limit,
           sessionId,
+          params.onSaleOnly,
         )
         return { page, ...result }
       }),
@@ -275,7 +329,9 @@ async function syncGomaStore(
       }
 
       for (const p of batch.products) {
-        if (p.product_id) syncedSourceIds.add(p.product_id)
+        if (p.product_id && p.is_on_sale) {
+          syncedOfferSourceIds.add(p.product_id)
+        }
       }
 
       const imported = await upsertProductsAndOffers(
@@ -286,8 +342,8 @@ async function syncGomaStore(
       )
       totalImported += imported
 
-      if (options.onProgress) {
-        options.onProgress({
+      if (onProgress) {
+        onProgress({
           store: storeName,
           page: batch.page,
           imported: batch.products.length,
@@ -307,7 +363,8 @@ async function syncGomaStore(
     storeName,
     importStartedAtIso,
     fullyScannedStore,
-    syncedSourceIds,
+    syncedOfferSourceIds,
+    params.useSyncedIdsForVerify,
   )
 
   return totalImported
@@ -320,7 +377,7 @@ export async function syncGoma(options: GomaSyncOptions): Promise<GomaSyncResult
 
   if (skipped.length > 0) {
     console.log(
-      `⏭️ Goma sync springer fuldt-katalog-kæder over (fooddata/Salling/REMA): ${skipped.join(', ')}`,
+      `⏭️ Goma sync springer Salling/REMA-kæder over (fooddata): ${skipped.join(', ')}`,
     )
   }
 
@@ -328,19 +385,21 @@ export async function syncGoma(options: GomaSyncOptions): Promise<GomaSyncResult
     return { totalImported: 0, skippedStores: skipped, storesSynced: [], errors: [] }
   }
 
-  const limit = options.limit ?? GOMA_SYNC_DEFAULTS.limit
-  const pages = options.pages ?? GOMA_SYNC_DEFAULTS.pages
   const errors: string[] = []
   let totalImported = 0
   const storesSynced: string[] = []
 
   for (const storeName of allowed) {
+    const chain = gomaStoreNameToChain(storeName)
+    if (!chain) continue
+
     try {
+      const params = resolveStoreSyncParams(chain, options)
       console.log(`🔄 Goma → fooddata sync: ${storeName}`)
-      const imported = await syncGomaStore(storeName, { limit, pages, onProgress: options.onProgress })
+      const imported = await syncGomaStore(storeName, params, options.onProgress)
       totalImported += imported
       storesSynced.push(storeName)
-      console.log(`✅ ${storeName}: ${imported} tilbud upsertet i fooddata`)
+      console.log(`✅ ${storeName}: ${imported} produkter upsertet i fooddata`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`${storeName}: ${msg}`)

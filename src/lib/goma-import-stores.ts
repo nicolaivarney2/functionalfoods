@@ -24,6 +24,17 @@ export type GomaStoreName =
   | 'Brugsen'
   | 'Løvbjerg'
   | 'ABC Lavpris'
+  | 'Min Købmand'
+
+/** Goma har fuldt katalog (ikke kun tilbudsavis) for disse kæder. */
+export const GOMA_FULL_CATALOG_CHAINS = [
+  'min-koebmand',
+  'nemlig',
+  'spar',
+  'meny',
+] as const satisfies readonly SourceChain[]
+
+export type GomaFullCatalogChain = (typeof GOMA_FULL_CATALOG_CHAINS)[number]
 
 const GOMA_NAME_TO_CHAIN: Record<string, SourceChain> = {
   netto: 'netto',
@@ -43,6 +54,22 @@ const GOMA_NAME_TO_CHAIN: Record<string, SourceChain> = {
   løvbjerg: 'loevbjerg',
   lovbjerg: 'loevbjerg',
   'abc lavpris': 'abc-lavpris',
+  'min købmand': 'min-koebmand',
+  'min koebmand': 'min-koebmand',
+}
+
+const CHAIN_TO_GOMA_STORE_NAME: Partial<Record<SourceChain, GomaStoreName>> = {
+  'min-koebmand': 'Min Købmand',
+  nemlig: 'Nemlig',
+  spar: 'Spar',
+  meny: 'MENY',
+  lidl: 'Lidl',
+  '365discount': '365discount',
+  kvickly: 'Kvickly',
+  superbrugsen: 'superbrugsen',
+  brugsen: 'Brugsen',
+  loevbjerg: 'Løvbjerg',
+  'abc-lavpris': 'ABC Lavpris',
 }
 
 /** All Goma store names we know how to sync. */
@@ -61,11 +88,26 @@ export const ALL_GOMA_STORE_NAMES: GomaStoreName[] = [
   'Brugsen',
   'Løvbjerg',
   'ABC Lavpris',
+  'Min Købmand',
 ]
 
 export function gomaStoreNameToChain(storeName: string): SourceChain | null {
   const key = String(storeName || '').trim().toLowerCase()
   return GOMA_NAME_TO_CHAIN[key] ?? null
+}
+
+export function gomaChainToStoreName(chain: SourceChain): GomaStoreName | null {
+  return CHAIN_TO_GOMA_STORE_NAME[chain] ?? null
+}
+
+export function isGomaFullCatalogChain(chain: SourceChain): chain is GomaFullCatalogChain {
+  return (GOMA_FULL_CATALOG_CHAINS as readonly SourceChain[]).includes(chain)
+}
+
+export type GomaSyncMode = 'offers-only' | 'full-catalog'
+
+export function getGomaSyncMode(chain: SourceChain): GomaSyncMode {
+  return isGomaFullCatalogChain(chain) ? 'full-catalog' : 'offers-only'
 }
 
 /** Chains where Goma is the intended tilbud source (not Salling/REMA fooddata). */
@@ -128,6 +170,7 @@ export function shouldImportFooddataProduct(
 ): boolean {
   if (!isGomaImportChain(chain)) return true
   if (matchedFfProductIds.has(ffProductId)) return true
+  if (gomaImportEnabled && isGomaFullCatalogChain(chain)) return true
   if (gomaImportEnabled) return gomaOfferProductUuids.has(fooddataProductUuid)
   return true
 }

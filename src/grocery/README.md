@@ -135,7 +135,9 @@ through the server-side secret key. Public/anon traffic must go through our
 
 When `GOMA_IMPORT_ENABLED=true` on Vercel:
 
-1. **Goma cron** (GitHub Actions 02:00 + 14:00 UTC) → `/api/admin/goma/scheduled-sync` → `syncGoma()` henter **kun aktuelle tilbud** (`p_on_sale_only=true`, 8×200 pr. butik) og skriver `products` + `product_offers` med `source=goma`.
+1. **Goma cron** → `syncGoma()` med **per-kæde strategi**:
+   - **Kun tilbud** (Lidl, Coop, Brugsen, …): `p_on_sale_only=true`, 8×200.
+   - **Fuldt katalog** (MENY, Spar, Nemlig, Min Købmand): `p_on_sale_only=false`, paginerer hele kataloget (150×250 max).
 2. **fooddata-import** (GitHub 05:00 UTC) copies `source=goma` rows to FF main DB for offers-only chains.
 3. **Planomo** reads from fooddata directly (same Supabase).
 
