@@ -9,6 +9,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { SourceChain } from '@/grocery/types'
 import { pullCurationFromFooddata } from './curation-pull'
 import { parseFooddataProductId } from '@/lib/product-match-snapshots'
 import {
@@ -16,6 +17,11 @@ import {
   type EnqueueFooddataQueueResult,
 } from '@/lib/product-match-queue'
 import { isFoodCatalogProduct } from '@/lib/product-food-classification'
+import { isGomaImportEnabled } from '@/lib/goma-sunset'
+import {
+  shouldImportFooddataOfferSource,
+  shouldImportFooddataProduct,
+} from '@/lib/goma-import-stores'
 
 /** PostgREST/Supabase default statement_timeout (~8s) bites on wide product rows. */
 const BATCH_SIZE = 500
@@ -61,7 +67,35 @@ export interface RunImportResult {
   durationMs: number
 }
 
-type ProductRef = { id: string; amount: number | null; unit: string | null; name: string }
+type ProductRef = {
+  id: string
+  source_chain: SourceChain
+  amount: number | null
+  unit: string | null
+  name: string
+}
+
+
+async function fetchGomaOfferProductUuids(fooddata: SupabaseClient): Promise<Set<string>> {
+  const ids = new Set<string>()
+  let from = 0
+  while (true) {
+    const { data, error } = await fooddata
+      .from('product_offers')
+      .select('product_id')
+      .eq('source', 'goma')
+      .order('product_id', { ascending: true })
+      .range(from, from + FETCH_PAGE_SIZE - 1)
+    if (error) throw new Error(`fetchGomaOfferProductUuids failed: ${error.message}`)
+    if (!data?.length) break
+    for (const row of data as { product_id: string }[]) {
+      if (row.product_id) ids.add(String(row.product_id))
+    }
+    if (data.length < FETCH_PAGE_SIZE) break
+    from += FETCH_PAGE_SIZE
+  }
+  return ids
+}
 
 const PRODUCT_SELECT_COLS =
   'id, source_chain, source_id, gtin, name, brand, manufacturer, description, amount, unit, image_url, category_path, category_lvl0, category_lvl1, category_lvl2, last_seen_at, active'
@@ -320,9 +354,22 @@ function resolveBeforePriceKr(o: {
   return null
 }
 
-function mapOffer(o: Record<string, any>, productLookup: Map<string, ProductRef>) {
+function mapOffer(
+  o: Record<string, any>,
+  productLookup: Map<string, ProductRef>,
+  gomaImportEnabled: boolean,
+) {
   const ref = productLookup.get(o.product_id)
   if (!ref) return null
+  if (
+    !shouldImportFooddataOfferSource(
+      ref.source_chain,
+      String(o.source ?? ''),
+      gomaImportEnabled,
+    )
+  ) {
+    return null
+  }
   const now = new Date()
   const fromOk = !o.offer_from || new Date(o.offer_from) <= now
   const untilOk = !o.offer_until || new Date(o.offer_until) > now
@@ -332,8 +379,9 @@ function mapOffer(o: Record<string, any>, productLookup: Map<string, ProductRef>
   // Tilbudsavis-kilder (Tjek/Squid) har sjældent en førpris, men varen ER et
   // tilbud i sit gyldighedsvindue — behandl dem som tilbud uden bevist rabat.
   const isSaleOnlySource =
-    typeof o.source === 'string' && o.source.toLowerCase().startsWith('tjek')
-  const isOfferActive = !!(fromOk && untilOk && (hasProvenDiscount || isSaleOnlySource))
+    typeof o.source === 'string' &&
+    (o.source.toLowerCase().startsWith('tjek') || o.source === 'goma')
+  const isOfferActive = !!(fromOk && untilOk && (hasProvenDiscount || isSaleOnlySource || o.is_on_sale))
   return {
     product_id: ref.id,
     store_product_id: ref.id.includes('-') ? ref.id.split('-').slice(1).join('-') : ref.id,
@@ -359,7 +407,10 @@ function mapOffer(o: Record<string, any>, productLookup: Map<string, ProductRef>
   }
 }
 
-function mapHistory(h: Record<string, any>, productLookup: Map<string, ProductRef>) {
+function mapHistory(
+  h: Record<string, any>,
+  productLookup: Map<string, ProductRef>,
+) {
   const ref = productLookup.get(h.product_id)
   if (!ref) return null
   // FF main `price_history` stores prices in DKK (columns `price`/`normal_price`),
@@ -400,6 +451,14 @@ export async function runFooddataImport(
   } = options
 
   const t0 = Date.now()
+  const gomaImportEnabled = isGomaImportEnabled()
+  if (gomaImportEnabled) {
+    log('Goma aktiv — fooddata→FF bruger source=goma for offers-only kæder (Tjek cold backup i grocery-DB)')
+  }
+  const gomaOfferProductUuids = gomaImportEnabled
+    ? await fetchGomaOfferProductUuids(fooddata)
+    : new Set<string>()
+  const matchedFfIdSet = new Set<string>()
   const result: RunImportResult = {
     dryRun,
     curationOnly,
@@ -476,6 +535,7 @@ export async function runFooddataImport(
     )
 
     const matchedFfIds = await fetchAllFfMatchedProductIds(ff)
+    for (const id of matchedFfIds) matchedFfIdSet.add(id)
     const activeFfIds = new Set(
       activeProducts.map((p) => `${p.source_chain}-${p.source_id}`),
     )
@@ -485,7 +545,16 @@ export async function runFooddataImport(
     const byFooddataUuid = new Map<string, Record<string, any>>()
     for (const p of activeProducts) byFooddataUuid.set(String(p.id), p)
     for (const p of matchedInactive) byFooddataUuid.set(String((p as any).id), p as any)
-    const fooddataProducts = Array.from(byFooddataUuid.values())
+    const fooddataProducts = Array.from(byFooddataUuid.values()).filter((p) =>
+      shouldImportFooddataProduct(
+        p.source_chain as SourceChain,
+        String(p.id),
+        gomaImportEnabled,
+        gomaOfferProductUuids,
+        matchedFfIdSet,
+        `${p.source_chain}-${p.source_id}`,
+      ),
+    )
 
     const mapped = fooddataProducts.map(mapProduct)
     productLookup = new Map(
@@ -493,6 +562,7 @@ export async function runFooddataImport(
         String(p.id),
         {
           id: `${p.source_chain}-${p.source_id}`,
+          source_chain: p.source_chain as SourceChain,
           amount: p.amount ?? null,
           unit: p.unit ?? null,
           name: p.name,
@@ -518,10 +588,27 @@ export async function runFooddataImport(
       { activeOnly: true, limit },
     )
     productLookup = new Map(
-      fooddataProducts.map((p) => [
-        String(p.id),
-        { id: `${p.source_chain}-${p.source_id}`, amount: p.amount ?? null, unit: p.unit ?? null, name: p.name },
-      ]),
+      fooddataProducts
+        .filter((p) =>
+          shouldImportFooddataProduct(
+            p.source_chain as SourceChain,
+            String(p.id),
+            gomaImportEnabled,
+            gomaOfferProductUuids,
+            matchedFfIdSet,
+            `${p.source_chain}-${p.source_id}`,
+          ),
+        )
+        .map((p) => [
+          String(p.id),
+          {
+            id: `${p.source_chain}-${p.source_id}`,
+            source_chain: p.source_chain as SourceChain,
+            amount: p.amount ?? null,
+            unit: p.unit ?? null,
+            name: p.name,
+          },
+        ]),
     )
   }
 
@@ -552,7 +639,7 @@ export async function runFooddataImport(
       'product_id, store_id, price_cents, before_price_cents, unit_price_cents, unit_price_unit, is_on_sale, offer_from, offer_until, discount_percentage, in_stock, source, source_synced_at, raw_data',
     )
     const mapped = fooddataOffers
-      .map((o) => mapOffer(o, productLookup))
+      .map((o) => mapOffer(o, productLookup, gomaImportEnabled))
       .filter((x): x is NonNullable<typeof x> => x !== null && ffProductIds!.has(x.product_id))
     result.offers.dropped = fooddataOffers.length - mapped.length
     if (!dryRun) {

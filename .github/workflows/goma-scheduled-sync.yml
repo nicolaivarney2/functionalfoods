@@ -1,17 +1,40 @@
-name: Goma Scheduled Sync (sunset)
+name: Goma Scheduled Sync
 
-# Goma er sunset — ingen scheduled kørsler. Eksisterende data bevares read-only.
-# Nød-genaktivering: sæt GOMA_IMPORT_ENABLED=true i Vercel + kør workflow_dispatch manuelt.
+# Goma sync for offers-only kæder (Lidl, Coop, MENY, …). Salling/REMA kommer fra fooddata.
+# Kræver GOMA_IMPORT_ENABLED=true + GOMA_API_KEY i Vercel. Slå import fra for at falde tilbage til Tjek via fooddata-import.
 on:
+  schedule:
+    # Two runs per day in UTC:
+    #   02:00 UTC ≈ 04:00 dansk (sommer) / 03:00 (vinter)
+    #   14:00 UTC ≈ 16:00 dansk (sommer) / 15:00 (vinter)
+    - cron: '0 2 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:
 
 jobs:
   goma-scheduled-sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Goma sunset — springer over
+      - name: Call scheduled Goma sync endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          echo "Goma scheduled sync er sunset."
-          echo "Eksisterende produkt/tilbuds-data bevares uændret indtil fooddata cutover."
-          echo "Aktivér kun med GOMA_IMPORT_ENABLED=true i Vercel ved nødtilfælde."
-          exit 0
+          if [ -z "$SITE_URL" ]; then
+            echo "SITE_URL GitHub variable is not set. Please set it to your production URL (e.g. https://functionalfoods.dk)."
+            exit 1
+          fi
+
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET GitHub secret is not set. Please add it and keep it in sync with the Vercel env CRON_SECRET."
+            exit 1
+          fi
+
+          echo "Calling scheduled Goma sync on $SITE_URL ..."
+          curl --fail --max-time 300 --retry 3 --retry-delay 5 -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "$SITE_URL/api/admin/goma/scheduled-sync" || {
+            echo "Failed to call scheduled sync endpoint"
+            exit 1
+          }

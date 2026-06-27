@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
+import { defaultGomaImportStoreNames } from '@/lib/goma-import-stores'
 
 // Manual sync from admin UI may target large stores like Bilka or Nemlig.
 // Bump function timeout to Vercel's 300s ceiling so big stores complete.
@@ -23,10 +24,11 @@ export async function POST(request: NextRequest) {
 
     const stores: string[] = Array.isArray(body.stores) && body.stores.length > 0
       ? body.stores
-      : ['Netto']
+      : defaultGomaImportStoreNames()
 
     const limit = typeof body.limit === 'number' ? body.limit : 100
     const pages = typeof body.pages === 'number' ? body.pages : 1
+    const includeFullCatalog = body.includeFullCatalog === true
 
     console.log(`🔄 Starting import: stores=${stores.join(',')}, limit=${limit}, pages=${pages}`)
 
@@ -34,6 +36,7 @@ export async function POST(request: NextRequest) {
       stores,
       limit,
       pages,
+      includeFullCatalog,
       onProgress: (info) => {
         console.log(
           `📊 Goma import progress – store=${info.store}, page=${info.page}, imported=${info.imported}/${info.total}`,
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       imported: result.totalImported,
+      skippedStores: result.skippedStores ?? [],
       stores,
       limit,
       pages,

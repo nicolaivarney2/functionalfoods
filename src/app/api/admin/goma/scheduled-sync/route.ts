@@ -2,26 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
+import { filterGomaStoresForImport, type GomaStoreName } from '@/lib/goma-import-stores'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 300
 
-type GomaStoreId =
-  | 'Netto'
-  | 'REMA 1000'
-  | '365discount'
-  | 'Lidl'
-  | 'Føtex'
-  | 'Bilka'
-  | 'Nemlig'
-  | 'MENY'
-  | 'Spar'
-  | 'Kvickly'
-  | 'superbrugsen'
-  | 'Brugsen'
-  | 'Løvbjerg'
-  | 'ABC Lavpris'
+type GomaStoreId = GomaStoreName
 
 function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
   const now = new Date()
@@ -41,13 +28,13 @@ function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
       stores = ['365discount']
       break
     case 4:
-      stores = ['MENY', 'Spar', 'Kvickly', 'superbrugsen', 'Løvbjerg', 'Føtex']
+      stores = ['MENY', 'Spar', 'Kvickly', 'superbrugsen', 'Løvbjerg']
       break
     case 5:
-      stores = ['Netto', 'Bilka', 'Brugsen']
+      stores = ['Brugsen']
       break
     case 6:
-      stores = ['REMA 1000', 'Lidl']
+      stores = ['Lidl']
       break
     case 0:
       stores = ['Nemlig']
@@ -81,7 +68,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const { dayIndex, stores } = getStoresForToday()
+    const { dayIndex, stores: scheduledStores } = getStoresForToday()
+    const { allowed: stores, skipped: skippedStores } = filterGomaStoresForImport(scheduledStores)
 
     let imported: number | null = null
     let importError: string | null = null
@@ -141,10 +129,12 @@ export async function POST(req: NextRequest) {
         message: overallSuccess
           ? stores.length === 0
             ? 'Ingen butikker planlagt til sync i dag, men cleanup blev kørt'
-            : 'Scheduled Goma sync + cleanup gennemført'
+            : 'Goma → fooddata sync + FF cleanup gennemført'
           : 'Scheduled Goma sync kørt med fejl (se importError / cleanupError)',
         dayIndex,
+        scheduledStores,
         stores,
+        skippedStores,
         imported,
         importError,
         cleanup: cleanupResult

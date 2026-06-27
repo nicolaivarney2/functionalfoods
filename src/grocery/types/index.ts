@@ -81,6 +81,7 @@ export type SyncSource =
   | `nemlig-api`
   | `tjek-offers`
   | `tjek:offers`
+  | `goma`
 
 export interface StoreRow {
   id: string

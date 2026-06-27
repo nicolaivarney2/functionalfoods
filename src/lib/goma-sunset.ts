@@ -1,9 +1,12 @@
 /**
- * Goma er sunset — production bruger kun fooddata (legacy Goma matches/priser ignoreres).
- * Eksisterende Goma-rækker i DB bevares read-only; slettes ikke.
+ * Goma som primær tilbudskilde for kæder uden fuldt fooddata-katalog.
+ *
+ * Netto/Bilka/Føtex/REMA synces via fooddata (Salling/REMA). Goma skriver til
+ * **fooddata** (grocery Supabase); FF main + Planomo læser via fooddata-import /
+ * direkte fooddata-adgang. Tjek i grocery-DB er cold backup.
  *
  * Env:
- * - GOMA_IMPORT_ENABLED=true      — nød-genaktivering af import/sync
+ * - GOMA_IMPORT_ENABLED=true      — daglig Goma sync for offers-only kæder
  * - GOMA_SIMULATE_GONE=true       — dev: ignorer legacy Goma product IDs (som production)
  * - GOMA_LEGACY_DATA_ENABLED=true — nød: genaktiver legacy Goma på production
  *
@@ -11,7 +14,7 @@
  */
 
 export const GOMA_SUNSET_MESSAGE =
-  'Goma-import er sunset. Eksisterende data bevares uændret indtil fooddata cutover på production.'
+  'Goma-import er slået fra. Sæt GOMA_IMPORT_ENABLED=true for tilbud på kæder uden fuldt fooddata-katalog.'
 
 export const GOMA_SIMULATE_GONE_MESSAGE =
   'Simulerer at Goma-data er væk — kun fooddata-produktnøgler bruges til priser og matches.'
@@ -25,9 +28,11 @@ export type GomaSunsetStatus = {
 
 export function isGomaSimulateGone(): boolean {
   if (process.env.GOMA_LEGACY_DATA_ENABLED === 'true') return false
+  // Aktiv Goma-import: brug synkede tilbud i prissøgning og dagligvarer.
+  if (isGomaImportEnabled()) return false
   if (process.env.GOMA_SIMULATE_GONE === 'true') return true
   if (process.env.GOMA_SIMULATE_GONE === 'false') return false
-  // Live: fooddata cutover — legacy Goma bruges ikke til priser/matches/dagligvarer.
+  // Live uden Goma-import: fooddata cutover — legacy Goma bruges ikke til priser/matches.
   return process.env.NODE_ENV === 'production'
 }
 
@@ -48,7 +53,8 @@ export function getGomaSunsetStatus(): GomaSunsetStatus {
   if (simulateGone) {
     message = GOMA_SIMULATE_GONE_MESSAGE
   } else if (importEnabled) {
-    message = 'Goma-import er midlertidigt genaktiveret (GOMA_IMPORT_ENABLED=true).'
+    message =
+      'Goma-import aktiv for offers-only kæder (Lidl, Coop, MENY, …). Salling/REMA kommer fra fooddata.'
   }
 
   return {
