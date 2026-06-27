@@ -3,6 +3,7 @@ import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
 import { filterGomaStoresForImport, type GomaStoreName } from '@/lib/goma-import-stores'
+import { GOMA_SYNC_DEFAULTS } from '@/grocery/adapters/goma/sync'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -78,8 +79,8 @@ export async function POST(req: NextRequest) {
       try {
         const result = await importGomaProducts({
           stores,
-          limit: 150,
-          pages: 250,
+          limit: GOMA_SYNC_DEFAULTS.limit,
+          pages: GOMA_SYNC_DEFAULTS.pages,
         })
         imported = result?.totalImported ?? 0
       } catch (err) {

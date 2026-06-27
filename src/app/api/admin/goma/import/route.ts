@@ -3,6 +3,7 @@ import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
 import { defaultGomaImportStoreNames } from '@/lib/goma-import-stores'
+import { GOMA_SYNC_DEFAULTS } from '@/grocery/adapters/goma/sync'
 
 // Manual sync from admin UI may target large stores like Bilka or Nemlig.
 // Bump function timeout to Vercel's 300s ceiling so big stores complete.
@@ -26,8 +27,8 @@ export async function POST(request: NextRequest) {
       ? body.stores
       : defaultGomaImportStoreNames()
 
-    const limit = typeof body.limit === 'number' ? body.limit : 100
-    const pages = typeof body.pages === 'number' ? body.pages : 1
+    const limit = typeof body.limit === 'number' ? body.limit : GOMA_SYNC_DEFAULTS.limit
+    const pages = typeof body.pages === 'number' ? body.pages : GOMA_SYNC_DEFAULTS.pages
     const includeFullCatalog = body.includeFullCatalog === true
 
     console.log(`🔄 Starting import: stores=${stores.join(',')}, limit=${limit}, pages=${pages}`)

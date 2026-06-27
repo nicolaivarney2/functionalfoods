@@ -11,13 +11,24 @@ import {
   filterGomaStoresForImport,
   gomaStoreNameToChain,
 } from '@/lib/goma-import-stores'
-import { fetchGomaActiveOfferProductIds, fetchGomaCatalogPage } from './client'
+import {
+  fetchGomaActiveOfferProductIds,
+  fetchGomaOffersPage,
+  GOMA_OFFERS_MAX_PAGES,
+  GOMA_OFFERS_PAGE_SIZE,
+} from './client'
 import { mapGomaToOffer, mapGomaToProduct } from './mapper'
 import type { GomaProduct } from './types'
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
-const PAGE_CONCURRENCY = 6
+const PAGE_CONCURRENCY = 4
+
+/** Standard cron/manual sync — kun tilbud, ikke fuldt katalog. */
+export const GOMA_SYNC_DEFAULTS = {
+  limit: GOMA_OFFERS_PAGE_SIZE,
+  pages: GOMA_OFFERS_MAX_PAGES,
+} as const
 
 export interface GomaSyncOptions {
   stores: string[]
@@ -120,20 +131,27 @@ async function verifyAndDeactivateStaleOffers(
   storeName: string,
   importStartedAtIso: string,
   fullyScannedStore: boolean,
+  syncedSourceIds: Set<string>,
 ): Promise<void> {
   const supabase = getGroceryServiceClient()
 
-  let verificationSuccessful = false
-  let currentOfferSourceIds = new Set<string>()
+  let currentOfferSourceIds = syncedSourceIds
+  let verificationSuccessful = fullyScannedStore
 
-  try {
-    currentOfferSourceIds = await fetchGomaActiveOfferProductIds(storeName)
-    verificationSuccessful = true
+  if (verificationSuccessful) {
     console.log(
-      `📋 Goma verify ${storeName}: ${currentOfferSourceIds.size} aktive tilbud iflg. API`,
+      `📋 Goma verify ${storeName}: ${currentOfferSourceIds.size} tilbud fra fuld tilbuds-scan (ingen ekstra API-kald)`,
     )
-  } catch (err) {
-    console.warn(`⚠️ Goma offer verification fejlede for ${storeName}:`, err)
+  } else {
+    try {
+      currentOfferSourceIds = await fetchGomaActiveOfferProductIds(storeName)
+      verificationSuccessful = true
+      console.log(
+        `📋 Goma verify ${storeName}: ${currentOfferSourceIds.size} aktive tilbud iflg. API`,
+      )
+    } catch (err) {
+      console.warn(`⚠️ Goma offer verification fejlede for ${storeName}:`, err)
+    }
   }
 
   if (verificationSuccessful && currentOfferSourceIds.size >= 0) {
@@ -228,6 +246,7 @@ async function syncGomaStore(
   const sessionId = `functionalfoods-goma-${chain}`
   let totalImported = 0
   let fullyScannedStore = false
+  const syncedSourceIds = new Set<string>()
 
   for (
     let batchStart = 0;
@@ -239,7 +258,7 @@ async function syncGomaStore(
 
     const fetched = await Promise.all(
       pages.map(async (page) => {
-        const result = await fetchGomaCatalogPage(
+        const result = await fetchGomaOffersPage(
           storeName,
           page,
           options.limit,
@@ -253,6 +272,10 @@ async function syncGomaStore(
       if (batch.products.length === 0) {
         fullyScannedStore = true
         break
+      }
+
+      for (const p of batch.products) {
+        if (p.product_id) syncedSourceIds.add(p.product_id)
       }
 
       const imported = await upsertProductsAndOffers(
@@ -284,6 +307,7 @@ async function syncGomaStore(
     storeName,
     importStartedAtIso,
     fullyScannedStore,
+    syncedSourceIds,
   )
 
   return totalImported
@@ -304,8 +328,8 @@ export async function syncGoma(options: GomaSyncOptions): Promise<GomaSyncResult
     return { totalImported: 0, skippedStores: skipped, storesSynced: [], errors: [] }
   }
 
-  const limit = options.limit ?? 100
-  const pages = options.pages ?? 1
+  const limit = options.limit ?? GOMA_SYNC_DEFAULTS.limit
+  const pages = options.pages ?? GOMA_SYNC_DEFAULTS.pages
   const errors: string[] = []
   let totalImported = 0
   const storesSynced: string[] = []
@@ -316,7 +340,7 @@ export async function syncGoma(options: GomaSyncOptions): Promise<GomaSyncResult
       const imported = await syncGomaStore(storeName, { limit, pages, onProgress: options.onProgress })
       totalImported += imported
       storesSynced.push(storeName)
-      console.log(`✅ ${storeName}: ${imported} produkter upsertet i fooddata`)
+      console.log(`✅ ${storeName}: ${imported} tilbud upsertet i fooddata`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`${storeName}: ${msg}`)

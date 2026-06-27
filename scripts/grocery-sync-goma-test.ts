@@ -11,19 +11,21 @@ import { config as loadEnv } from 'dotenv'
 
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
 
-import { syncGoma } from '../src/grocery/adapters/goma'
+import { syncGoma, GOMA_SYNC_DEFAULTS } from '../src/grocery/adapters/goma'
 import { getGroceryServiceClient } from '../src/grocery/db/client'
 import { gomaStoreNameToChain } from '../src/lib/goma-import-stores'
 
-function arg(name: string, fallback: string): string {
+function arg(name: string): string | null {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
-  return hit ? hit.split('=').slice(1).join('=') : fallback
+  return hit ? hit.split('=').slice(1).join('=') : null
 }
 
 async function main(): Promise<void> {
-  const store = arg('store', 'Lidl')
-  const limit = Number(arg('limit', '10'))
-  const pages = Number(arg('pages', '1'))
+  const store = arg('store') ?? 'Lidl'
+  const limitArg = arg('limit')
+  const pagesArg = arg('pages')
+  const limit = limitArg ? Number(limitArg) : GOMA_SYNC_DEFAULTS.limit
+  const pages = pagesArg ? Number(pagesArg) : GOMA_SYNC_DEFAULTS.pages
 
   for (const v of ['GOMA_API_KEY', 'GROCERY_SUPABASE_URL', 'GROCERY_SUPABASE_SECRET_KEY']) {
     if (!process.env[v]?.trim()) {
@@ -38,7 +40,11 @@ async function main(): Promise<void> {
 
   const grocery = getGroceryServiceClient()
 
-  console.log(`▶ Goma → fooddata test: ${store} → ${storeId} (${pages} side(r), ${limit} pr. side)\n`)
+  console.log(
+    `▶ Goma → fooddata test: ${store} → ${storeId} (${pages} side(r) × ${limit} tilbud, kun on_sale)\n`,
+  )
+
+  const t0 = Date.now()
 
   const { count: before } = await grocery
     .from('product_offers')
@@ -65,7 +71,7 @@ async function main(): Promise<void> {
     .order('source_synced_at', { ascending: false })
     .limit(3)
 
-  console.log(`\nEfter: ${after ?? 0} goma-tilbud i fooddata`)
+  console.log(`\nEfter: ${after ?? 0} goma-tilbud i fooddata (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
   console.log('Seneste 3:')
   for (const row of sample ?? []) {
     const p = row.products as { name?: string; source_id?: string } | null
