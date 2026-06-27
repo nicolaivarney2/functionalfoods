@@ -17,8 +17,15 @@ import {
 } from '@/lib/product-match-queue'
 import { isFoodCatalogProduct } from '@/lib/product-food-classification'
 
-const BATCH_SIZE = 2000
+/** PostgREST/Supabase default statement_timeout (~8s) bites on wide product rows. */
+const BATCH_SIZE = 500
 const FETCH_PAGE_SIZE = 1000
+const MIN_UPSERT_BATCH = 25
+
+function isStatementTimeout(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes('statement timeout') || m.includes('canceling statement')
+}
 
 export interface RunImportOptions {
   ff: SupabaseClient
@@ -161,18 +168,47 @@ function dedupeByConflictKey<T extends Record<string, unknown>>(
   return Array.from(seen.values())
 }
 
+async function upsertBatchWithRetry<T extends Record<string, unknown>>(
+  client: SupabaseClient,
+  table: string,
+  batch: T[],
+  onConflict: string,
+  offset: number,
+): Promise<void> {
+  const { error } = await client.from(table).upsert(batch, { onConflict })
+  if (!error) return
+
+  if (isStatementTimeout(error.message) && batch.length > MIN_UPSERT_BATCH) {
+    const mid = Math.ceil(batch.length / 2)
+    await upsertBatchWithRetry(client, table, batch.slice(0, mid), onConflict, offset)
+    await upsertBatchWithRetry(
+      client,
+      table,
+      batch.slice(mid),
+      onConflict,
+      offset + mid,
+    )
+    return
+  }
+
+  throw new Error(
+    `upsert ${table} batch ${offset}-${offset + batch.length} failed: ${error.message}`,
+  )
+}
+
 async function upsertBatched<T extends Record<string, unknown>>(
   client: SupabaseClient,
   table: string,
   rows: T[],
   onConflict: string,
+  options: { log?: (msg: string) => void } = {},
 ): Promise<number> {
   const uniqueRows = dedupeByConflictKey(rows, onConflict)
   for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
     const batch = uniqueRows.slice(i, i + BATCH_SIZE)
-    const { error } = await client.from(table).upsert(batch, { onConflict })
-    if (error) {
-      throw new Error(`upsert ${table} batch ${i}-${i + batch.length} failed: ${error.message}`)
+    await upsertBatchWithRetry(client, table, batch, onConflict, i)
+    if (options.log && (i + BATCH_SIZE) % 5000 === 0) {
+      options.log(`  ${table}: ${Math.min(i + BATCH_SIZE, uniqueRows.length)}/${uniqueRows.length}`)
     }
   }
   return uniqueRows.length
@@ -464,7 +500,7 @@ export async function runFooddataImport(
       ]),
     )
     if (!dryRun) {
-      result.products.upserted = await upsertBatched(ff, 'products', mapped, 'id')
+      result.products.upserted = await upsertBatched(ff, 'products', mapped, 'id', { log })
       for (const ref of productLookup.values()) {
         if (!ffIdsBeforeProducts.has(ref.id)) newlyImportedProductIds.push(ref.id)
       }
@@ -525,6 +561,7 @@ export async function runFooddataImport(
         'product_offers',
         mapped,
         'store_id,store_product_id',
+        { log },
       )
     }
     log(
@@ -550,6 +587,7 @@ export async function runFooddataImport(
         'price_history',
         mapped,
         'product_id,store_id,snapshot_date',
+        { log },
       )
     }
     log(
