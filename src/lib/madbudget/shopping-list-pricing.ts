@@ -32,6 +32,17 @@ export function isWeightOrVolumeUnit(unit: string): boolean {
   return u === 'g' || u === 'kg' || u === 'ml' || u === 'l'
 }
 
+/** Normaliser opskriftsmængde til g/ml så 1,4 kg og 1400 g behandles ens. */
+export function canonicalNeededAmount(
+  neededAmount: number,
+  neededUnit: string
+): { amount: number; unit: string } {
+  const u = normalizeShoppingUnit(neededUnit)
+  if (u === 'kg') return { amount: neededAmount * 1000, unit: 'g' }
+  if (u === 'l') return { amount: neededAmount * 1000, unit: 'ml' }
+  return { amount: neededAmount, unit: u }
+}
+
 /** Afvis pakkeberegninger hvor enheder sandsynligvis er fejltolket (fx 1 g = 1 glas). */
 export function isSuspiciousQuantity(
   neededUnit: string,
@@ -213,6 +224,10 @@ export function buildSnapshotProduct(
   } = opts
 
   const normalizedNeeded = normalizeShoppingUnit(neededUnit)
+  const { amount: neededCanonical, unit: neededCanonicalUnit } = canonicalNeededAmount(
+    neededAmount,
+    normalizedNeeded
+  )
 
   let quantityNeeded = 1
   let convertedAmount = 1
@@ -222,26 +237,27 @@ export function buildSnapshotProduct(
   const computed =
     (parsedFromName
       ? computePackageQuantity(
-          neededAmount,
-          normalizedNeeded,
+          neededCanonical,
+          neededCanonicalUnit,
           parsedFromName.value,
           parsedFromName.unit,
           gramsPerUnit
         )
       : null) ??
     (gramsPerUnit
-      ? computePackageQuantity(neededAmount, normalizedNeeded, 1, 'stk', gramsPerUnit)
+      ? computePackageQuantity(neededCanonical, neededCanonicalUnit, 1, 'stk', gramsPerUnit)
       : null)
 
   if (computed) {
     quantityNeeded = computed.quantityNeeded
     convertedAmount = computed.convertedAmount
-  } else if (isWeightOrVolumeUnit(normalizedNeeded) && neededAmount >= 250) {
+  } else if (isWeightOrVolumeUnit(normalizedNeeded)) {
+    // Ingen gæt på 1 pakke for vægt/volumen — brug live tilbud eller spring snapshot over.
     return null
   }
 
   const totalPrice = snapshotPrice * quantityNeeded
-  const excess = convertedAmount * quantityNeeded - neededAmount
+  const excess = convertedAmount * quantityNeeded - neededCanonical
   const organicTags = resolveProductOrganicTags(
     productOrganicTagsMap.get(match.product_external_id),
     match.product_name_snapshot
@@ -263,9 +279,9 @@ export function buildSnapshotProduct(
       amount: '1',
       unit: 'stk',
       productAmount: convertedAmount,
-      neededAmount,
+      neededAmount: neededCanonical,
       quantityNeeded,
-      isSufficient: convertedAmount * quantityNeeded >= neededAmount,
+      isSufficient: convertedAmount * quantityNeeded >= neededCanonical,
       isSnapshotPrice: true,
       pricingSource: 'fooddata_snapshot',
       store: match.product_store_snapshot || storeKey,

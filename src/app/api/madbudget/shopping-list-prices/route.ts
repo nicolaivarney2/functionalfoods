@@ -16,6 +16,7 @@ import {
 } from '@/lib/madbudget/guide-prices'
 import {
   buildSnapshotProduct,
+  canonicalNeededAmount,
   computePackageQuantity,
   normalizeShoppingUnit,
   parseAmountFromNameStore,
@@ -728,46 +729,17 @@ export async function POST(request: NextRequest) {
         let bestProduct: any = null
         let bestComparisonPrice = Infinity
         let bestExcess = Infinity // For tie-breaking: prefer less waste
-        const neededAmount = Number(String(item.amount ?? '0').replace(',', '.')) || 0
-        const neededUnit = normalizeShoppingUnit(item.unit?.toLowerCase() || '')
+        const neededRaw = Number(String(item.amount ?? '0').replace(',', '.')) || 0
+        const neededUnitRaw = normalizeShoppingUnit(item.unit?.toLowerCase() || '')
+        const { amount: neededAmount, unit: neededUnit } = canonicalNeededAmount(
+          neededRaw,
+          neededUnitRaw
+        )
 
         const storeMatches = selectMatchesForStore(matchesForIngredient, storeKey)
 
         for (const match of storeMatches) {
             const storeOffers = productOffersByStore.get(match.product_external_id)?.get(storeKey) || []
-
-          if (
-            !storeNeedsGuidePrices(storeKey) &&
-            match.product_name_snapshot &&
-            match.last_known_price
-          ) {
-            const snapshotPrice = Number(match.last_known_price)
-            if (Number.isFinite(snapshotPrice) && snapshotPrice > 0) {
-              const gramsPerUnit =
-                (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
-                gramsPerUnitByNameMap.get(normalizeName(String(item.name || '')))
-              const built = buildSnapshotProduct(match, {
-                snapshotPrice,
-                neededAmount,
-                neededUnit,
-                storeKey,
-                gramsPerUnit,
-                productOrganicTagsMap,
-                organicPrefs,
-              })
-              if (!built) continue
-              const { comparisonPrice, excess, product } = built
-              if (comparisonPrice < bestComparisonPrice) {
-                bestComparisonPrice = comparisonPrice
-                bestExcess = excess
-                bestProduct = product
-              } else if (Math.abs(comparisonPrice - bestComparisonPrice) < 0.01 && excess < bestExcess) {
-                bestComparisonPrice = comparisonPrice
-                bestExcess = excess
-                bestProduct = product
-              }
-            }
-          }
 
           for (const offer of storeOffers) {
             // Parse product amount (e.g., "500g", "1 stk")
