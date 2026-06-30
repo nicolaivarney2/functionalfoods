@@ -20,7 +20,7 @@ export type GomaStoreName =
   | 'MENY'
   | 'Spar'
   | 'Kvickly'
-  | 'superbrugsen'
+  | 'SuperBrugsen'
   | 'Brugsen'
   | 'Løvbjerg'
   | 'ABC Lavpris'
@@ -66,7 +66,7 @@ const CHAIN_TO_GOMA_STORE_NAME: Partial<Record<SourceChain, GomaStoreName>> = {
   lidl: 'Lidl',
   '365discount': '365discount',
   kvickly: 'Kvickly',
-  superbrugsen: 'superbrugsen',
+  superbrugsen: 'SuperBrugsen',
   brugsen: 'Brugsen',
   loevbjerg: 'Løvbjerg',
   'abc-lavpris': 'ABC Lavpris',
@@ -84,7 +84,7 @@ export const ALL_GOMA_STORE_NAMES: GomaStoreName[] = [
   'MENY',
   'Spar',
   'Kvickly',
-  'superbrugsen',
+  'SuperBrugsen',
   'Brugsen',
   'Løvbjerg',
   'ABC Lavpris',

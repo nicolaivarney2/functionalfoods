@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
 import { databaseService } from '@/lib/database-service'
+import { resolveProductImageUrlWithLookup } from '@/lib/product-image-fallback'
 
 const PRODUCT_DETAILS_CACHE_CONTROL = 'public, s-maxage=1800, stale-while-revalidate=86400'
 const PRODUCT_DETAILS_MEMORY_TTL_MS = 5 * 60 * 1000
@@ -80,6 +81,7 @@ export async function GET(
         last_seen_at,
         products:product_id (
           id,
+          ean,
           name_generic,
           brand,
           category,
@@ -106,6 +108,7 @@ export async function GET(
     const productsArray = Array.isArray(offer.products) ? offer.products : (offer.products ? [offer.products] : [])
     const p: {
       id?: string
+      ean?: string | null
       name_generic?: string
       brand?: string
       category?: string
@@ -115,6 +118,13 @@ export async function GET(
       amount?: number
       image_url?: string
     } = productsArray[0] || {}
+
+    const resolvedImageUrl = await resolveProductImageUrlWithLookup(supabase, {
+      ownImageUrl: p.image_url,
+      ean: p.ean,
+      productId: p.id || offer.product_id,
+      placeholder: '/images/recipe-placeholder.jpg',
+    })
 
     const price = offer.current_price || 0
     const originalPrice = offer.normal_price || offer.current_price || 0
@@ -154,7 +164,7 @@ export async function GET(
       currency: offer.currency || 'DKK',
       store: storeDisplay,
       store_url: offer.product_url,
-      image_url: p.image_url,
+      image_url: resolvedImageUrl,
       available: offer.is_available,
       temperature_zone: null,
       nutrition_info: null,

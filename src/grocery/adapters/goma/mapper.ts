@@ -1,5 +1,6 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
 import type { GomaProduct } from './types'
+import { extractEanFromSourceId } from '@/lib/product-ean'
 
 const SYNC_SOURCE = 'goma' as const
 
@@ -13,12 +14,14 @@ function resolveSaleState(p: GomaProduct): {
   isOfferActive: boolean
   discountPct: number | null
 } {
+  // Stol på Gomas eget is_on_sale-flag: for offers-only kæder (Lidl, 365discount,
+  // SuperBrugsen, ABC Lavpris, Løvbjerg, …) leverer Goma sjældent en førpris, men
+  // varen ER ugens tilbud (total_count == total_on_sale_count). En bevist førpris
+  // opgraderer kun — vi nedgraderer aldrig et Goma-tilbud bare fordi normal<=current.
   let isOnSale = p.is_on_sale
 
   if (p.normal_price && p.current_price && p.normal_price > p.current_price) {
     isOnSale = true
-  } else if (p.normal_price && p.current_price && p.normal_price <= p.current_price) {
-    isOnSale = false
   }
 
   if (isOnSale && p.sale_valid_to) {
@@ -49,7 +52,7 @@ export function mapGomaToProduct(
 ): ProductInsert {
   const parts = [p.department_name, p.category, p.s_category].filter(Boolean)
   return {
-    gtin: null,
+    gtin: extractEanFromSourceId(p.product_id),
     name: p.product_name,
     brand: p.brand,
     manufacturer: null,

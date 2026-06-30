@@ -14,6 +14,14 @@ import {
   storeNeedsGuidePrices,
   stripUnrequestedReferenceStores,
 } from '@/lib/madbudget/guide-prices'
+import {
+  buildSnapshotProduct,
+  computePackageQuantity,
+  normalizeShoppingUnit,
+  parseAmountFromNameStore,
+  parseProductAmount,
+  selectMatchesForStore,
+} from '@/lib/madbudget/shopping-list-pricing'
 
 /**
  * API endpoint to fetch best matching products with prices for shopping list items
@@ -721,7 +729,7 @@ export async function POST(request: NextRequest) {
         let bestComparisonPrice = Infinity
         let bestExcess = Infinity // For tie-breaking: prefer less waste
         const neededAmount = Number(String(item.amount ?? '0').replace(',', '.')) || 0
-        const neededUnit = item.unit?.toLowerCase() || ''
+        const neededUnit = normalizeShoppingUnit(item.unit?.toLowerCase() || '')
 
         const storeMatches = selectMatchesForStore(matchesForIngredient, storeKey)
 
@@ -747,6 +755,7 @@ export async function POST(request: NextRequest) {
                 productOrganicTagsMap,
                 organicPrefs,
               })
+              if (!built) continue
               const { comparisonPrice, excess, product } = built
               if (comparisonPrice < bestComparisonPrice) {
                 bestComparisonPrice = comparisonPrice
@@ -772,42 +781,15 @@ export async function POST(request: NextRequest) {
             const gramsPerUnit =
               (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
               gramsPerUnitByNameMap.get(normalizeName(String(item.name || '')))
-            // Convert to same unit if possible (use ingredient's grams_per_unit for g <-> stk)
-            let convertedAmount = convertToUnit(productAmount.value, productAmount.unit, neededUnit, gramsPerUnit)
-
-            // If conversion failed, try matching same unit (e.g., "bundt" to "bundt")
-            if (convertedAmount === null) {
-              const normalizedProductUnit = productAmount.unit.toLowerCase().trim()
-              const normalizedNeededUnit = neededUnit.toLowerCase().trim()
-
-              // If units match exactly (after normalization), use product amount directly
-              if (normalizedProductUnit === normalizedNeededUnit) {
-                convertedAmount = productAmount.value
-              } else {
-                // Can't match - skip this product
-                continue
-              }
-            }
-
-            // Skip invalid conversions (prevents divide-by-zero and absurd quantities)
-            if (!Number.isFinite(convertedAmount) || convertedAmount <= 0) {
-              continue
-            }
-
-            // Calculate how many units are needed
-            const quantityNeeded = convertedAmount >= neededAmount 
-              ? 1 
-              : Math.ceil(neededAmount / convertedAmount)
-
-            // Sanity guard: ignore clearly broken package calculations
-            if (
-              !Number.isFinite(quantityNeeded) ||
-              quantityNeeded <= 0 ||
-              quantityNeeded > 120 ||
-              isSuspiciousQuantity(neededUnit, neededAmount, convertedAmount, quantityNeeded)
-            ) {
-              continue
-            }
+            const packQty = computePackageQuantity(
+              neededAmount,
+              neededUnit,
+              productAmount.value,
+              productAmount.unit,
+              gramsPerUnit
+            )
+            if (!packQty) continue
+            const { quantityNeeded, convertedAmount } = packQty
             
             // Calculate total price (price per unit * quantity needed)
             const totalPrice = (offer.current_price || 0) * quantityNeeded
@@ -978,307 +960,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-/** Afvis pakkeberegninger hvor enheder sandsynligvis er fejltolket (fx 1 g = 1 glas). */
-function isSuspiciousQuantity(
-  neededUnit: string,
-  neededAmount: number,
-  convertedAmount: number,
-  quantityNeeded: number
-): boolean {
-  if (quantityNeeded <= 3 || neededAmount <= 0) return false
-
-  const need = neededUnit.toLowerCase().trim()
-  const isWeightVolume =
-    need === 'g' ||
-    need === 'kg' ||
-    need === 'ml' ||
-    need === 'l' ||
-    need.includes('gram') ||
-    need.includes('milliliter')
-
-  if (!isWeightVolume) return false
-
-  // Lille "pakke" men mange stk nødvendige → klassisk 1 g = 1 pakke-fejl
-  if (convertedAmount < 10 && quantityNeeded > 3) return true
-
-  // Moderat opskriftsmængde men 10+ pakker
-  if (neededAmount <= 250 && quantityNeeded >= 10) return true
-
-  return false
-}
-
-/**
- * Parse product amount string (e.g., "500g", "1 stk", "250 ml") into value and unit
- */
-function parseProductAmount(amount: string | number | null, unit: string | null): { value: number, unit: string } | null {
-  // If amount is a number, use it directly
-  if (typeof amount === 'number' && !isNaN(amount)) {
-    return {
-      value: amount,
-      unit: (unit || '').toLowerCase().trim() || 'stk'
-    }
-  }
-
-  if (!amount && !unit) return null
-
-  // Convert amount to string if it's not null/undefined
-  const amountStr = amount !== null && amount !== undefined ? String(amount) : null
-
-  // If we have both amount string and unit, use them
-  if (amountStr && unit) {
-    const num = parseFloat(amountStr.replace(',', '.'))
-    if (isNaN(num)) return null
-    return { value: num, unit: unit.toLowerCase() }
-  }
-
-  // Try to parse from amount string (e.g., "500g", "1 stk")
-  if (amountStr) {
-    const match = amountStr.match(/^([\d.,]+)\s*([a-zæøå]+)?$/i)
-    if (match) {
-      const num = parseFloat(match[1].replace(',', '.'))
-      if (isNaN(num)) return null
-      const parsedUnit = (match[2] || unit || '').toLowerCase().trim()
-      return { value: num, unit: parsedUnit || 'stk' }
-    }
-  }
-
-  return null
-}
-
-/**
- * Parse amount/unit from product display name as fallback
- * Examples: "ØKO. SALAT MIX 75 g", "SKRABEÆG 10 stk", "HVIDKÅL 1 kg"
- */
-function parseAmountFromNameStore(name: string): { value: number, unit: string } | null {
-  if (!name) return null
-  const normalized = name.toLowerCase().replace(',', '.')
-
-  // Prefer explicit unit-bearing numbers near the end of the string
-  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(kg|g|gram|stk|styk|stykker|ml|l)\b/)
-  if (!match) return null
-
-  const value = Number(match[1])
-  if (!Number.isFinite(value) || value <= 0) return null
-
-  const rawUnit = match[2]
-  let unit = rawUnit
-  if (rawUnit === 'gram') unit = 'g'
-  if (rawUnit === 'styk' || rawUnit === 'stykker') unit = 'stk'
-
-  return { value, unit }
-}
-
-/**
- * Convert amount to target unit (simplified - only handles common conversions).
- * gramsPerUnit: optional weight in gram per 1 stk (from ingredients.grams_per_unit) for g <-> stk.
- */
-function convertToUnit(
-  value: number,
-  fromUnit: string,
-  toUnit: string,
-  gramsPerUnit?: number
-): number | null {
-  // Normalize units
-  const normalize = (unit: string) => {
-    unit = unit.toLowerCase().trim()
-    // Handle noisy units from stores, e.g. "kg / vej selv", "gram pr pose", "stk/pk"
-    if (/\bkg\b|\bkilo\b|\bkilogram\b/.test(unit)) return 'kg'
-    if (/\bg\b|\bgram\b/.test(unit)) return 'g'
-    if (/\bml\b|\bmilliliter\b/.test(unit)) return 'ml'
-    if (/\bl\b|\bliter\b/.test(unit)) return 'l'
-    if (/\bstk\b|\bstyk\b|\bstykker\b/.test(unit)) return 'stk'
-    // Common cooking units
-    if (/\bspsk\b|spiseskefuld|spiseskefulde/.test(unit)) return 'spsk'
-    if (/\btsk\b|teskefuld|teskefulde/.test(unit)) return 'tsk'
-    if (/\bbundt\b|\bbundter\b/.test(unit)) return 'bundt'
-    return unit
-  }
-
-  const from = normalize(fromUnit)
-  const to = normalize(toUnit)
-
-  // Same unit
-  if (from === to) return value
-
-  // Fresh herbs / bundles: retail sells as 1 stk ≈ 1 bundt (purløg, persille, …)
-  if (from === 'bundt' && to === 'stk') return value
-  if (from === 'stk' && to === 'bundt') return value
-
-  // g <-> stk using ingredient's standard weight per piece (e.g. rødløg 80 g/stk)
-  if (gramsPerUnit != null && gramsPerUnit > 0) {
-    if (from === 'g' && to === 'stk') return value / gramsPerUnit
-    if (from === 'stk' && to === 'g') return value * gramsPerUnit
-    if (from === 'kg' && to === 'stk') return (value * 1000) / gramsPerUnit
-    if (from === 'stk' && to === 'kg') return (value * gramsPerUnit) / 1000
-  }
-
-  // Weight conversions
-  if (from === 'kg' && to === 'g') return value * 1000
-  if (from === 'g' && to === 'kg') return value / 1000
-
-  // Volume conversions
-  if (from === 'l' && to === 'ml') return value * 1000
-  if (from === 'ml' && to === 'l') return value / 1000
-
-  // Cooking unit conversions (approximate)
-  if (from === 'spsk' && to === 'g') return value * 15
-  if (from === 'spsk' && to === 'ml') return value * 15
-  if (from === 'tsk' && to === 'g') return value * 5
-  if (from === 'tsk' && to === 'ml') return value * 5
-  if (from === 'bundt' && to === 'g') return value * 25
-  if (from === 'g' && to === 'spsk') return value / 15
-  if (from === 'g' && to === 'tsk') return value / 5
-  if (from === 'g' && to === 'bundt') return value / 25
-  if (from === 'ml' && to === 'spsk') return value / 15
-  if (from === 'ml' && to === 'tsk') return value / 5
-
-  return null
-}
-
-/** Alle kuraterede matches for den aktuelle butik — ingen global fooddata-prioritering. */
-function selectMatchesForStore(matches: any[], storeKey: string): any[] {
-  return matches.filter((m) =>
-    matchBelongsToStore(
-      m.product_external_id,
-      m.product_store_snapshot,
-      storeKey
-    )
-  )
-}
-
-function buildSnapshotProduct(
-  match: any,
-  opts: {
-    snapshotPrice: number
-    neededAmount: number
-    neededUnit: string
-    storeKey: string
-    gramsPerUnit?: number
-    productOrganicTagsMap: Map<string, string[]>
-    organicPrefs: OrganicPreferenceInput
-  }
-): { product: any; comparisonPrice: number; excess: number } {
-  const {
-    snapshotPrice,
-    neededAmount,
-    neededUnit,
-    storeKey,
-    gramsPerUnit,
-    productOrganicTagsMap,
-    organicPrefs,
-  } = opts
-
-  // Snapshots mangler pakkestørrelse — prøv stk→opskrift-enhed, ellers 1 pakke
-  let quantityNeeded = 1
-  let convertedAmount = 1
-  const fromStk = convertToUnit(1, 'stk', neededUnit, gramsPerUnit)
-  if (fromStk != null && fromStk > 0 && neededAmount > 0) {
-    const calculated =
-      fromStk >= neededAmount ? 1 : Math.ceil(neededAmount / fromStk)
-    if (
-      calculated > 0 &&
-      calculated <= 120 &&
-      !isSuspiciousQuantity(neededUnit, neededAmount, fromStk, calculated)
-    ) {
-      quantityNeeded = calculated
-      convertedAmount = fromStk
-    }
-  }
-
-  const totalPrice = snapshotPrice * quantityNeeded
-  const excess = convertedAmount * quantityNeeded - neededAmount
-  const organicTags = resolveProductOrganicTags(
-    productOrganicTagsMap.get(match.product_external_id),
-    match.product_name_snapshot
-  )
-  const comparisonPrice = comparisonPriceForOrganicPreference(
-    totalPrice,
-    organicPrefs,
-    organicTags
-  )
-
-  return {
-    comparisonPrice,
-    excess,
-    product: {
-      product_external_id: match.product_external_id,
-      name: match.product_name_snapshot,
-      price: snapshotPrice,
-      totalPrice,
-      normalPrice: null,
-      totalNormalPrice: null,
-      isOnSale: false,
-      discountPercentage: null,
-      amount: '1',
-      unit: 'stk',
-      productAmount: convertedAmount,
-      neededAmount,
-      quantityNeeded,
-      isSufficient: convertedAmount * quantityNeeded >= neededAmount,
-      isSnapshotPrice: true,
-      pricingSource: 'fooddata_snapshot',
-      store: match.product_store_snapshot || storeKey,
-      isOrganicMatch: organicTags.length > 0,
-    },
-  }
-}
-
-/** True when a curated match belongs to the store tab being priced. */
-function matchBelongsToStore(
-  productExternalId: string,
-  productStoreSnapshot: string | null | undefined,
-  storeKey: string
-): boolean {
-  const id = String(productExternalId || '').toLowerCase().trim()
-  const storePrefixes: Record<string, string[]> = {
-    'rema-1000': ['rema-1000-'],
-    netto: ['netto-'],
-    'føtex': ['føtex-', 'fotex-', 'foetex-'],
-    bilka: ['bilka-'],
-    nemlig: ['nemlig-'],
-    meny: ['meny-'],
-    spar: ['spar-'],
-    'løvbjerg': ['loevbjerg-', 'løvbjerg-', 'lovbjerg-'],
-    'min-koebmand': ['min-koebmand-'],
-    lidl: ['lidl-'],
-    '365discount': ['365discount-', '365-discount-'],
-    kvickly: ['kvickly-'],
-    superbrugsen: ['superbrugsen-', 'super-brugsen-'],
-    brugsen: ['brugsen-'],
-    'abc-lavpris': ['abc-lavpris-'],
-  }
-
-  const prefixes = storePrefixes[storeKey] || [`${storeKey}-`]
-  if (prefixes.some((prefix) => id.startsWith(prefix))) return true
-
-  if (!productStoreSnapshot) return false
-
-  const snap = String(productStoreSnapshot)
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-
-  const storeAliases: Record<string, string[]> = {
-    'rema-1000': ['rema-1000', 'rema 1000', 'rema'],
-    netto: ['netto'],
-    'føtex': ['fotex', 'foetex', 'føtex'],
-    bilka: ['bilka', 'salling'],
-    nemlig: ['nemlig'],
-    meny: ['meny'],
-    spar: ['spar'],
-    'løvbjerg': ['loevbjerg', 'lovbjerg', 'løvbjerg'],
-    'min-koebmand': ['min-koebmand', 'min købmand'],
-    lidl: ['lidl'],
-    '365discount': ['365discount', '365 discount', '365-discount'],
-    kvickly: ['kvickly'],
-    superbrugsen: ['superbrugsen', 'super brugsen', 'super-brugsen'],
-    brugsen: ['brugsen'],
-    'abc-lavpris': ['abc-lavpris', 'abc lavpris'],
-  }
-
-  const aliases = storeAliases[storeKey] || [storeKey]
-  return aliases.some((alias) => snap.includes(alias))
 }

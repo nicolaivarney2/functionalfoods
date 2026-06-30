@@ -3,6 +3,18 @@ import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 import { getFoodCatalogLabelsForFilter } from '@/lib/product-food-classification'
+import {
+  applyDagligvarerSourceFilter,
+  applyDagligvarerTjekStoreFilter,
+  dagligvarerOfferScanOrFilter,
+  isGomaOffersOnlyStoreId,
+} from '@/lib/dagligvarer-source-filter'
+import { isGomaLegacyDataEnabled } from '@/lib/goma-sunset'
+import {
+  buildEanImageLookup,
+  collectEansNeedingImagesFromOfferRows,
+  resolveProductImageUrl,
+} from '@/lib/product-image-fallback'
 
 /** Proven discount — stol ikke på is_on_sale / is_offer_active alene (Planomo jun 2026). */
 export type OfferPricingFields = {
@@ -10,6 +22,7 @@ export type OfferPricingFields = {
   normal_price?: number | null
   sale_valid_to?: string | null
   source?: string | null
+  store_id?: string | null
 }
 
 /**
@@ -30,7 +43,10 @@ export function isRealOfferFields(offer: OfferPricingFields): boolean {
   // Bevist rabat: en rigtig førpris over tilbudsprisen.
   if (normal != null && normal > price + 0.01) return true
   // Tilbudsavis-kilder uden førpris: stadig et reelt tilbud i gyldighedsvinduet.
-  return isSaleOnlySource(offer.source)
+  if (isSaleOnlySource(offer.source)) return true
+  // Goma offers-only sync (p_on_sale_only): hele rækken er ugens tilbud.
+  if (offer.source === 'goma' && isGomaOffersOnlyStoreId(offer.store_id)) return true
+  return false
 }
 
 export function resolveOfferDisplayPricing(
@@ -190,6 +206,7 @@ export class DatabaseService {
     source,
     products:product_id!inner (
       id,
+      ean,
       name_generic,
       brand,
       category,
@@ -373,19 +390,21 @@ export class DatabaseService {
     const supabase = createSupabaseServiceClient()
     const foodDepts = foodOnly ? this.getFoodOnlyDepartmentAllowList() : null
 
-    let totalQuery = supabase
-      .from('product_offers')
-      .select('id, products!inner(department)', { count: 'exact', head: true })
-      .eq('is_available', true)
-      .neq('source', 'goma')
+    let totalQuery = applyDagligvarerSourceFilter(
+      supabase
+        .from('product_offers')
+        .select('id, products!inner(department)', { count: 'exact', head: true })
+        .eq('is_available', true),
+    )
 
-    let offersQuery = supabase
-      .from('product_offers')
-      .select('id, products!inner(department)', { count: 'exact', head: true })
-      .eq('is_available', true)
-      .neq('source', 'goma')
-      .not('normal_price', 'is', null)
-      .gt('normal_price', 0)
+    let offersQuery = applyDagligvarerSourceFilter(
+      supabase
+        .from('product_offers')
+        .select('id, products!inner(department)', { count: 'exact', head: true })
+        .eq('is_available', true)
+        .not('normal_price', 'is', null)
+        .gt('normal_price', 0),
+    )
 
     if (foodDepts) {
       totalQuery = totalQuery.in('products.department', foodDepts)
@@ -395,18 +414,22 @@ export class DatabaseService {
     // Tilbudsavis-kilder (tjek) har forhandlernavn som department og fanges ikke
     // af food-department-listen. Tæl dem separat og læg til (ingen overlap, da
     // deres department aldrig er en food-kategori).
-    const tjekTotalQuery = supabase
-      .from('product_offers')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_available', true)
-      .like('source', 'tjek%')
+    const tjekTotalQuery = applyDagligvarerTjekStoreFilter(
+      supabase
+        .from('product_offers')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_available', true)
+        .like('source', 'tjek%'),
+    )
 
-    const tjekOffersQuery = supabase
-      .from('product_offers')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_available', true)
-      .like('source', 'tjek%')
-      .gt('current_price', 0)
+    const tjekOffersQuery = applyDagligvarerTjekStoreFilter(
+      supabase
+        .from('product_offers')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_available', true)
+        .like('source', 'tjek%')
+        .gt('current_price', 0),
+    )
 
     const [
       { count: totalCount, error: totalError },
@@ -444,7 +467,10 @@ export class DatabaseService {
 
     try {
       const supabase = createSupabaseServiceClient()
-      const { data, error } = await supabase.rpc('get_product_counts_v2', { filter_food_only: foodOnly })
+      const { data, error } = await supabase.rpc('get_product_counts_v2', {
+        filter_food_only: foodOnly,
+        p_goma_primary: isGomaLegacyDataEnabled(),
+      })
       if (!error && data != null) {
         const parsed = this.parseProductCountsRpc(data)
         if (parsed) {
@@ -518,11 +544,12 @@ export class DatabaseService {
         return this.listFoodDepartmentOffers(supabase, page, limit, stores, offersOnly, organicOnly)
       }
 
-      let query = supabase
-        .from('product_offers')
-        .select(this.OFFER_SELECT_WITH_PRODUCT)
-        .eq('is_available', true)
-        .neq('source', 'goma')
+      let query = applyDagligvarerSourceFilter(
+        supabase
+          .from('product_offers')
+          .select(this.OFFER_SELECT_WITH_PRODUCT)
+          .eq('is_available', true),
+      )
 
       if (stores && stores.length > 0) {
         query = query.in('store_id', this.mapStoreFilterToIds(stores))
@@ -573,12 +600,13 @@ export class DatabaseService {
           
           if (search && search.trim()) {
             const term = search.trim()
-            let nameQuery = supabase
-              .from('product_offers')
-              .select('product_id')
-              .neq('source', 'goma')
-              .or(`name_store.ilike.%${term}%`)
-              .limit(1000)
+            let nameQuery = applyDagligvarerSourceFilter(
+              supabase
+                .from('product_offers')
+                .select('product_id')
+                .or(`name_store.ilike.%${term}%`)
+                .limit(1000),
+            )
 
             if (foodOnly) {
               nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
@@ -661,6 +689,7 @@ export class DatabaseService {
           normal_price: number | null
           sale_valid_to: string | null
           source: string | null
+          store_id: string | null
         }>()
         let chunkErrors = 0
 
@@ -671,12 +700,13 @@ export class DatabaseService {
         const CHUNK_CONCURRENCY = 8
         const chunkResults = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, async (chunk, idx) => {
           try {
-            let chunkQuery = supabase
-              .from('product_offers')
-              .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to, source')
-              .eq('is_available', true)
-              .neq('source', 'goma')
-              .in('product_id', chunk)
+            let chunkQuery = applyDagligvarerSourceFilter(
+              supabase
+                .from('product_offers')
+                .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to, source, store_id')
+                .eq('is_available', true)
+                .in('product_id', chunk),
+            )
 
             if (stores && stores.length > 0) {
               chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
@@ -718,6 +748,7 @@ export class DatabaseService {
             normal_price?: number | null
             sale_valid_to?: string | null
             source?: string | null
+            store_id?: string | null
           }>) {
             if (!offer?.id) continue
             allMatchingOffers.set(String(offer.id), {
@@ -729,6 +760,7 @@ export class DatabaseService {
               normal_price: offer.normal_price ?? null,
               sale_valid_to: offer.sale_valid_to ?? null,
               source: offer.source ?? null,
+              store_id: offer.store_id ?? null,
             })
           }
         }
@@ -782,10 +814,11 @@ export class DatabaseService {
           const offerChunk = pageOfferIds.slice(i, i + OFFER_CHUNK_SIZE)
           
           try {
-            const chunkQuery = supabase
-              .from('product_offers')
-              .select(
-                `
+            let chunkQuery = applyDagligvarerSourceFilter(
+              supabase
+                .from('product_offers')
+                .select(
+                  `
                 id,
                 product_id,
                 store_id,
@@ -816,11 +849,11 @@ export class DatabaseService {
                   image_url
                 )
               `,
-                { count: i === 0 ? 'exact' : undefined }
-              )
-              .in('id', offerChunk)
-              .eq('is_available', true)
-              .neq('source', 'goma')
+                  { count: i === 0 ? 'exact' : undefined },
+                )
+                .in('id', offerChunk)
+                .eq('is_available', true),
+            )
             
             if (stores && stores.length > 0) {
               chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
@@ -860,27 +893,8 @@ export class DatabaseService {
         }
         
         // Map the data first to determine which are actually on sale
-        const mapped = allPageData.map((row: any) => {
-          const p = row.products || {}
-          const pricing = resolveOfferDisplayPricing(row)
-          return {
-            id: row.id,
-            name: row.name_store || p.name_generic,
-            description: null,
-            category: p.category || p.department || null,
-            price: pricing.price,
-            original_price: pricing.original_price,
-            unit: p.unit || 'stk',
-            unit_price: row.price_per_unit || row.price_per_kilogram || null,
-            is_on_sale: pricing.is_on_sale,
-            is_offer_active: pricing.is_offer_active,
-            sale_end_date: row.sale_valid_to || null,
-            discount_percentage: pricing.discount_percentage,
-            image_url: p.image_url || this.getProductPlaceholderImage(),
-            store: this.mapStoreIdToDisplayName(row.store_id),
-            amount: p.amount ? String(p.amount) : null,
-          }
-        })
+        const imageLookup = await this.buildEanImageLookupForOfferRows(allPageData)
+        const mapped = allPageData.map((row: any) => this.mapOfferRowToProduct(row, imageLookup))
 
         const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
 
@@ -911,12 +925,13 @@ export class DatabaseService {
         const term = search.trim()
         
         // Find products matching the search term in name/brand fields
-        let nameQuery = supabase
-          .from('product_offers')
-          .select('product_id')
-          .neq('source', 'goma')
-          .or(`name_store.ilike.%${term}%`)
-          .limit(1000)
+        let nameQuery = applyDagligvarerSourceFilter(
+          supabase
+            .from('product_offers')
+            .select('product_id')
+            .or(`name_store.ilike.%${term}%`)
+            .limit(1000),
+        )
 
         if (foodOnly) {
           nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
@@ -998,29 +1013,8 @@ export class DatabaseService {
       }
       const hasMore = fetched.length > limit
       const pageRows = hasMore ? fetched.slice(0, limit) : fetched
-
-      const mapped = pageRows.map((row: any) => {
-        const p = row.products || {}
-        const pricing = resolveOfferDisplayPricing(row)
-
-        return {
-          id: row.id,
-          name: row.name_store || p.name_generic,
-          description: null,
-          category: p.category || p.department || null,
-          price: pricing.price,
-          original_price: pricing.original_price,
-          unit: p.unit || 'stk',
-          unit_price: row.price_per_unit || row.price_per_kilogram || null,
-          is_on_sale: pricing.is_on_sale,
-          is_offer_active: pricing.is_offer_active,
-          sale_end_date: row.sale_valid_to || null,
-          discount_percentage: pricing.discount_percentage,
-          image_url: p.image_url || this.getProductPlaceholderImage(),
-          store: this.mapStoreIdToDisplayName(row.store_id),
-          amount: p.amount ? String(p.amount) : null,
-        }
-      })
+      const imageLookup = await this.buildEanImageLookupForOfferRows(pageRows)
+      const mapped = pageRows.map((row: any) => this.mapOfferRowToProduct(row, imageLookup))
 
       const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
 
@@ -1079,10 +1073,28 @@ export class DatabaseService {
     return result
   }
 
+  private getProductPlaceholderImage(): string {
+    return '/images/recipe-placeholder.jpg'
+  }
+
+  /** EAN-baseret billed-fallback når kædens eget billede mangler (fx Goma uden packshot). */
+  private async buildEanImageLookupForOfferRows(
+    rows: Record<string, any>[],
+  ): Promise<Map<string, string>> {
+    const eans = collectEansNeedingImagesFromOfferRows(rows)
+    if (eans.length === 0) return new Map()
+    const supabase = createSupabaseServiceClient()
+    return buildEanImageLookup(supabase, eans)
+  }
+
   /** Map offer row → dagligvarer product shape. */
-  private mapOfferRowToProduct(row: Record<string, any>) {
+  private mapOfferRowToProduct(
+    row: Record<string, any>,
+    imageLookup?: Map<string, string>,
+  ) {
     const p = row.products || {}
     const pricing = resolveOfferDisplayPricing(row)
+    const productId = p.id || row.product_id
     return {
       id: row.id,
       name: row.name_store || p.name_generic,
@@ -1096,7 +1108,13 @@ export class DatabaseService {
       is_offer_active: pricing.is_offer_active,
       sale_end_date: row.sale_valid_to || null,
       discount_percentage: pricing.discount_percentage,
-      image_url: p.image_url || this.getProductPlaceholderImage(),
+      image_url: resolveProductImageUrl({
+        ownImageUrl: p.image_url,
+        ean: p.ean,
+        productId,
+        lookup: imageLookup,
+        placeholder: this.getProductPlaceholderImage(),
+      }),
       store: this.mapStoreIdToDisplayName(row.store_id),
       amount: p.amount ? String(p.amount) : null,
     }
@@ -1137,6 +1155,7 @@ export class DatabaseService {
         p_offset: offset,
         p_stores: storeIds,
         p_organic_only: !!organicOnly,
+        p_goma_primary: isGomaLegacyDataEnabled(),
       })
       if (error) {
         console.warn('get_food_offers_v2 RPC unavailable, using app-side fallback:', error.message)
@@ -1145,8 +1164,10 @@ export class DatabaseService {
       const rows = Array.isArray(data) ? data : []
       const hasMore = rows.length > limit
       const pageRows = hasMore ? rows.slice(0, limit) : rows
+      const normalizedRows = pageRows.map((row: any) => this.normalizeRpcOfferRow(row))
+      const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
       return {
-        products: pageRows.map((row: any) => this.mapOfferRowToProduct(this.normalizeRpcOfferRow(row))),
+        products: normalizedRows.map((row: any) => this.mapOfferRowToProduct(row, imageLookup)),
         total: offset + pageRows.length + (hasMore ? 1 : 0),
         hasMore,
       }
@@ -1162,6 +1183,7 @@ export class DatabaseService {
       ...row,
       products: {
         id: row.product_id,
+        ean: row.ean,
         name_generic: row.name_generic,
         brand: row.brand,
         category: row.category,
@@ -1215,13 +1237,14 @@ export class DatabaseService {
       // Pre-filter normal_price IS NOT NULL so sorting only touches the offer set (fast).
       // Over-fetch so the in-app food + proven-offer filter still fills the page.
       const fetchSize = Math.min((offset + limit) * 3 + 100, 1500)
-      let q = supabase
-        .from('product_offers')
-        .select(this.OFFER_SELECT_WITH_PRODUCT)
-        .eq('is_available', true)
-        .neq('source', 'goma')
-        // Bevist rabat (normal_price sat) ELLER tilbudsavis-kilde (fx tjek) uden førpris.
-        .or('normal_price.not.is.null,source.like.tjek*')
+      let q = applyDagligvarerSourceFilter(
+        supabase
+          .from('product_offers')
+          .select(this.OFFER_SELECT_WITH_PRODUCT)
+          .eq('is_available', true),
+      )
+        // Bevist rabat, tilbudsavis (Tjek), eller Goma offers-only uden førpris.
+        .or(dagligvarerOfferScanOrFilter())
         .order('discount_percentage', { ascending: false, nullsFirst: false })
         .order('current_price', { ascending: true })
         .limit(fetchSize)
@@ -1234,11 +1257,12 @@ export class DatabaseService {
         return { products: [], total: 0, hasMore: false }
       }
 
-      const products = (data || [])
+      const filteredRows = (data || [])
         .filter(isFoodRow)
         .filter(passesOrganic)
         .filter((row) => isRealOfferFields(row))
-        .map((row) => this.mapOfferRowToProduct(row))
+      const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
+      const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
 
       return {
         products: products.slice(offset, offset + limit),
@@ -1249,11 +1273,12 @@ export class DatabaseService {
 
     // Alle produkter: ingen tung sortering over 160k rækker — paginér rå og filtrér food i app.
     const fetchSize = (offset + limit) * 2 + 50
-    let q = supabase
-      .from('product_offers')
-      .select(this.OFFER_SELECT_WITH_PRODUCT)
-      .eq('is_available', true)
-      .neq('source', 'goma')
+    let q = applyDagligvarerSourceFilter(
+      supabase
+        .from('product_offers')
+        .select(this.OFFER_SELECT_WITH_PRODUCT)
+        .eq('is_available', true),
+    )
       .order('id', { ascending: true })
       .range(0, fetchSize - 1)
 
@@ -1265,10 +1290,11 @@ export class DatabaseService {
       return { products: [], total: 0, hasMore: false }
     }
 
-    const products = (data || [])
+    const filteredRows = (data || [])
       .filter(isFoodRow)
       .filter(passesOrganic)
-      .map((row) => this.mapOfferRowToProduct(row))
+    const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
+    const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
     products.sort((a, b) => {
       if (a.is_on_sale && !b.is_on_sale) return -1
       if (!a.is_on_sale && b.is_on_sale) return 1
@@ -1533,10 +1559,6 @@ export class DatabaseService {
 
   private getFoodOnlyCategories(): string[] {
     return [...this.FOOD_ONLY_CATEGORIES]
-  }
-
-  private getProductPlaceholderImage(): string {
-    return '/images/recipe-placeholder.jpg'
   }
 
 

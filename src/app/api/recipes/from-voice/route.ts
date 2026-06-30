@@ -7,6 +7,7 @@ import {
   VOICE_SYSTEM_PROMPT,
   parseVisionRecipe,
 } from '@/lib/provisional-recipes'
+import { nutritionForProvisionalMeal } from '@/lib/provisional-nutrition'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -130,6 +131,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const fridaNutrition = await nutritionForProvisionalMeal(
+      parsed.ingredients,
+      parsed.servings,
+      parsed.nutrition
+    )
+
     // 3) Opret foreløbig opskrift (draft). Transskriptionen gemmes i ai_notes til reference.
     const { data, error } = await supabase
       .from('provisional_recipes')
@@ -146,10 +153,10 @@ export async function POST(request: NextRequest) {
         difficulty: parsed.difficulty,
         ingredients: parsed.ingredients,
         instructions: parsed.instructions,
-        nutrition: parsed.nutrition,
+        nutrition: fridaNutrition.nutrition,
         dietary_categories: parsed.dietaryCategories,
         clarifying_questions: parsed.clarifyingQuestions,
-        ai_notes: `Genereret fra indtaling med Whisper + GPT-4o-mini.\nTransskription: "${transcript}"`,
+        ai_notes: `Genereret fra indtaling. Ernæring: ${fridaNutrition.source} (${fridaNutrition.matchedIngredients}/${fridaNutrition.totalIngredients}).\nTransskription: "${transcript}"`,
       })
       .select(PROVISIONAL_SELECT)
       .single()

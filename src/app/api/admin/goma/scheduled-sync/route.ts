@@ -29,7 +29,7 @@ function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
       stores = ['365discount']
       break
     case 4:
-      stores = ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'superbrugsen', 'Løvbjerg']
+      stores = ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
       break
     case 5:
       stores = ['Brugsen']

@@ -9,6 +9,7 @@ import {
   VISION_SYSTEM_PROMPT,
   parseVisionRecipe,
 } from '@/lib/provisional-recipes'
+import { nutritionForProvisionalMeal } from '@/lib/provisional-nutrition'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -123,7 +124,14 @@ export async function POST(request: NextRequest) {
       console.warn('from-photo image optimize', imgErr)
     }
 
-    // 3) Opret foreløbig opskrift (draft)
+    // 3) Frida-ernæring ud fra ingrediensliste (præcisere end AI-gæt).
+    const fridaNutrition = await nutritionForProvisionalMeal(
+      parsed.ingredients,
+      parsed.servings,
+      parsed.nutrition
+    )
+
+    // 4) Opret foreløbig opskrift (draft)
     const { data, error } = await supabase
       .from('provisional_recipes')
       .insert({
@@ -139,10 +147,10 @@ export async function POST(request: NextRequest) {
         difficulty: parsed.difficulty,
         ingredients: parsed.ingredients,
         instructions: parsed.instructions,
-        nutrition: parsed.nutrition,
+        nutrition: fridaNutrition.nutrition,
         dietary_categories: parsed.dietaryCategories,
         clarifying_questions: parsed.clarifyingQuestions,
-        ai_notes: 'Genereret fra billede med GPT-4o',
+        ai_notes: `Genereret fra billede med GPT-4o. Ernæring: ${fridaNutrition.source} (${fridaNutrition.matchedIngredients}/${fridaNutrition.totalIngredients} ingredienser matchet).`,
       })
       .select(PROVISIONAL_SELECT)
       .single()

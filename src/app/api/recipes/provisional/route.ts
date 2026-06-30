@@ -9,6 +9,7 @@ import {
   sanitizeNutrition,
   type ProvisionalStatus,
 } from '@/lib/provisional-recipes'
+import { nutritionForProvisionalMeal } from '@/lib/provisional-nutrition'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,10 @@ export async function POST(request: NextRequest) {
     if (!title) return NextResponse.json({ error: 'Mangler titel' }, { status: 400 })
 
     const submit = body.submit === true
+    const ingredients = sanitizeIngredients(body.ingredients)
+    const servings = Math.max(1, Number(body.servings) || 1)
+    const aiNutrition = sanitizeNutrition(body.nutrition)
+    const fridaNutrition = await nutritionForProvisionalMeal(ingredients, servings, aiNutrition)
 
     const { data, error } = await supabase
       .from('provisional_recipes')
@@ -75,13 +80,13 @@ export async function POST(request: NextRequest) {
         title,
         description: typeof body.description === 'string' ? body.description.trim().slice(0, 600) : null,
         image_url: typeof body.imageUrl === 'string' ? body.imageUrl : null,
-        servings: Math.max(1, Number(body.servings) || 1),
+        servings,
         prep_time: body.prepTime != null ? Math.max(0, Number(body.prepTime) || 0) : null,
         cook_time: body.cookTime != null ? Math.max(0, Number(body.cookTime) || 0) : null,
         difficulty: typeof body.difficulty === 'string' ? body.difficulty : null,
-        ingredients: sanitizeIngredients(body.ingredients),
+        ingredients,
         instructions: sanitizeInstructions(body.instructions),
-        nutrition: sanitizeNutrition(body.nutrition),
+        nutrition: fridaNutrition.nutrition,
         dietary_categories: Array.isArray(body.dietaryCategories)
           ? body.dietaryCategories.filter((c: unknown): c is string => typeof c === 'string').slice(0, 6)
           : [],
@@ -116,7 +121,7 @@ export async function PATCH(request: NextRequest) {
     // Hent eksisterende — må kun redigeres hvis den tilhører brugeren og ikke er godkendt.
     const { data: existing, error: fetchErr } = await supabase
       .from('provisional_recipes')
-      .select('id, user_id, status')
+      .select('id, user_id, status, ingredients, servings, nutrition')
       .eq('id', id)
       .eq('user_id', user.id)
       .maybeSingle()
@@ -154,6 +159,18 @@ export async function PATCH(request: NextRequest) {
       updates.review_notes = null
     } else if (body.status === 'draft' && existing.status === 'rejected') {
       updates.status = 'draft' as ProvisionalStatus
+    }
+
+    // Genberegn ernæring når ingredienser eller portioner ændres.
+    if (body.ingredients != null || body.servings != null) {
+      const nextIngredients =
+        body.ingredients != null ? sanitizeIngredients(body.ingredients) : sanitizeIngredients(existing.ingredients)
+      const nextServings =
+        body.servings != null ? Math.max(1, Number(body.servings) || 1) : Math.max(1, Number(existing.servings) || 1)
+      const aiFallback =
+        body.nutrition != null ? sanitizeNutrition(body.nutrition) : sanitizeNutrition(existing.nutrition)
+      const fridaNutrition = await nutritionForProvisionalMeal(nextIngredients, nextServings, aiFallback)
+      updates.nutrition = fridaNutrition.nutrition
     }
 
     const { data, error } = await supabase
