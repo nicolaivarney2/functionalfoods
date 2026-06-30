@@ -27,6 +27,65 @@ function parseWeekTarget(raw: unknown): MealPlanWeekTarget {
   return raw === 'next' ? 'next' : 'current'
 }
 
+/** App kan sende profil med i body hvis Supabase-gemning fejlede (fx wizard-race). */
+type FamilyProfilePayload = {
+  adults?: number
+  children?: number
+  childrenAges?: string[]
+  prioritizeOrganic?: boolean
+  prioritizeAnimalOrganic?: boolean
+  excludedIngredients?: string[]
+  includedRecipeCategories?: string[]
+  variationLevel?: number
+  selectedStores?: number[]
+  lunchboxConfig?: Record<string, unknown> | null
+}
+
+async function upsertFamilyProfileFromPayload(
+  supabase: Awaited<ReturnType<typeof import('@supabase/supabase-js').createClient>>,
+  userId: string,
+  payload: FamilyProfilePayload
+) {
+  const row: Record<string, unknown> = {
+    user_id: userId,
+    adults: payload.adults ?? 2,
+    children: payload.children ?? 0,
+    children_ages: payload.childrenAges ?? [],
+    prioritize_organic: payload.prioritizeOrganic === true,
+    prioritize_animal_organic: payload.prioritizeAnimalOrganic === true,
+    excluded_ingredients: payload.excludedIngredients ?? [],
+    selected_stores: payload.selectedStores ?? [],
+    variation_level: payload.variationLevel ?? 2,
+    updated_at: new Date().toISOString(),
+  }
+  if (payload.includedRecipeCategories != null) {
+    row.included_recipe_categories = payload.includedRecipeCategories
+  }
+  if (payload.lunchboxConfig != null) {
+    row.lunchbox_config = payload.lunchboxConfig
+  }
+
+  let { data, error } = await supabase
+    .from('family_profiles')
+    .upsert(row, { onConflict: 'user_id' })
+    .select('*')
+    .single()
+
+  // Kolonner kan mangle på ældre schema — gem uden dem.
+  if (error?.code === '42703') {
+    delete row.included_recipe_categories
+    delete row.lunchbox_config
+    ;({ data, error } = await supabase
+      .from('family_profiles')
+      .upsert(row, { onConflict: 'user_id' })
+      .select('*')
+      .single())
+  }
+
+  if (error) throw error
+  return data
+}
+
 /** Udled børnenes aldersbånd (fallback til '4-9' hvis ikke sat), så generatoren altid får et array. */
 function effectiveChildrenAges(children: number, raw: unknown): string[] {
   const arr = Array.isArray(raw) ? (raw as string[]) : []
@@ -113,8 +172,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const body = await request.json().catch(() => ({}))
+
     // Hent gemt familieprofil.
-    const { data: profile, error: profileError } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from('family_profiles')
       .select('*')
       .eq('user_id', user.id)
@@ -124,20 +185,47 @@ export async function POST(request: NextRequest) {
       console.error('generate: kunne ikke hente familieprofil:', profileError)
       return NextResponse.json({ error: 'Failed to load family profile' }, { status: 500 })
     }
+
+    if (!profile && body?.familyProfile && typeof body.familyProfile === 'object') {
+      try {
+        profile = await upsertFamilyProfileFromPayload(supabase, user.id, body.familyProfile)
+      } catch (upsertErr) {
+        console.error('generate: kunne ikke oprette familieprofil fra app-payload:', upsertErr)
+        return NextResponse.json({ error: 'Failed to save family profile' }, { status: 500 })
+      }
+    }
+
+    // Hent voksen-profiler tidligt — bruges til generering og som fallback hvis
+    // family_profiles mangler (appen viste profil lokalt, men DB-gemning fejlede).
+    const { data: adultRows } = await supabase
+      .from('adult_weight_loss_profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('adult_index')
+
+    if (!profile && (adultRows?.length ?? 0) > 0) {
+      const primaryDiet = adultRows![0]?.dietary_approach
+      try {
+        profile = await upsertFamilyProfileFromPayload(supabase, user.id, {
+          adults: adultRows!.length,
+          children: 0,
+          childrenAges: [],
+          selectedStores: [1, 2],
+          variationLevel: 2,
+          includedRecipeCategories: primaryDiet ? [String(primaryDiet)] : [],
+        })
+        console.warn('generate: oprettede manglende family_profiles fra adult_weight_loss_profiles')
+      } catch (upsertErr) {
+        console.error('generate: fallback familieprofil fejlede:', upsertErr)
+      }
+    }
+
     if (!profile) {
       return NextResponse.json(
         { error: 'No family profile', message: 'Opret en familieprofil før du genererer en madplan.' },
         { status: 400 }
       )
     }
-
-    // Hent voksen-profiler (kostretning/vægtmål pr. voksen). Tom liste = generatoren
-    // falder tilbage til standard-kostretning.
-    const { data: adultRows } = await supabase
-      .from('adult_weight_loss_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('adult_index')
 
     const adultsProfiles = (adultRows ?? []).map((p) => ({
       gender: p.gender,
@@ -151,7 +239,6 @@ export async function POST(request: NextRequest) {
       excludedFoods: Array.isArray(p.excluded_foods) ? p.excluded_foods : [],
     }))
 
-    const body = await request.json().catch(() => ({}))
     const variationLevel =
       typeof body?.variationLevel === 'number' ? body.variationLevel : profile.variation_level ?? 2
     const targetWeek = parseWeekTarget(body?.targetWeek)
