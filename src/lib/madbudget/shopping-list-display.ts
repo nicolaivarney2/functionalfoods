@@ -6,6 +6,7 @@
 import { resolveProductForDisplay } from '@/lib/madbudget/guide-prices'
 
 export { resolveProductForDisplay, productDisplayTotal } from '@/lib/madbudget/guide-prices'
+export { formatPurchaseHint } from '@/lib/smart-shopping-display'
 
 export type StorePriceProduct = {
   name?: string

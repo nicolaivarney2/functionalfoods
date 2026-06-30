@@ -16,6 +16,7 @@ type RecipeIngredient = {
   unit?: string
 }
 
+function cleanRecipeIngredientName(raw: string): string {
   let s = String(raw || '').toLowerCase().trim()
   s = s
     .replace(/^\d+[.,]?\d*\s*(stk|st|styk|stykker|dl|ml|l|g|gram|kg|mg|tsk|tesk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/i, '')

@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
-  EAN_IMAGE_SOURCE_PRIORITY,
   eanImageSourceRank,
   extractEanFromFfProductId,
   normalizeEan,

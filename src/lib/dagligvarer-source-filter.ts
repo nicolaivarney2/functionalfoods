@@ -31,22 +31,24 @@ type PostgrestFilterQuery = {
 }
 
 /** PostgREST-filter på product_offers (app-side queries + fallback counts). */
-export function applyDagligvarerSourceFilter<T extends PostgrestFilterQuery>(query: T): T {
+export function applyDagligvarerSourceFilter<T>(query: T): T {
+  const q = query as PostgrestFilterQuery
   if (!isGomaLegacyDataEnabled()) {
-    return query.neq('source', 'goma') as T
+    return q.neq('source', 'goma') as T
   }
   const salling = SALLING_FOODDATA_STORE_IDS.join(',')
-  return query.or(
+  return q.or(
     `source.eq.goma,not.source.like.tjek%,and(source.like.tjek%,store_id.in.(${salling}))`,
   ) as T
 }
 
 /** Begræns Tjek-tælling i fallback når Goma er primær (kun Salling har Tjek-relevans). */
-export function applyDagligvarerTjekStoreFilter<T extends { in(column: string, values: readonly string[]): T }>(
-  query: T,
-): T {
+export function applyDagligvarerTjekStoreFilter<T>(query: T): T {
   if (!isGomaLegacyDataEnabled()) return query
-  return query.in('store_id', SALLING_FOODDATA_STORE_IDS)
+  return (query as { in(column: string, values: readonly string[]): T }).in(
+    'store_id',
+    SALLING_FOODDATA_STORE_IDS,
+  )
 }
 
 export function isGomaOffersOnlyStoreId(storeId?: string | null): boolean {
