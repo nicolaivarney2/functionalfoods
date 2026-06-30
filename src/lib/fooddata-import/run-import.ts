@@ -18,7 +18,10 @@ import {
 } from '@/lib/product-match-queue'
 import { isFoodCatalogProduct } from '@/lib/product-food-classification'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
+import { extractEanFromFfProductId } from '@/lib/product-ean'
 import {
+  isGomaFullCatalogChain,
+  isGomaImportChain,
   shouldImportFooddataOfferSource,
   shouldImportFooddataProduct,
 } from '@/lib/goma-import-stores'
@@ -27,6 +30,9 @@ import {
 const BATCH_SIZE = 500
 const FETCH_PAGE_SIZE = 1000
 const MIN_UPSERT_BATCH = 25
+/** Daily import only needs recent snapshots; fooddata adds ~1 row/product/store/day. */
+const PRICE_HISTORY_IMPORT_WINDOW_DAYS = 7
+const PRICE_HISTORY_PRODUCT_CHUNK = 40
 
 function isStatementTimeout(message: string): boolean {
   const m = message.toLowerCase()
@@ -46,6 +52,8 @@ export interface RunImportOptions {
   pullCuration?: boolean
   curationOnly?: boolean
   pullQueue?: boolean
+  /** How many days of price_history to copy from fooddata (default: recent only). */
+  historyDays?: number
   /** Logger — defaults to console.log. Pass a no-op or accumulator for serverless. */
   log?: (msg: string) => void
 }
@@ -55,7 +63,7 @@ export interface RunImportResult {
   curationOnly: boolean
   stores: number
   products: { upserted: number; newlyImported: number }
-  offers: { upserted: number; dropped: number }
+  offers: { upserted: number; dropped: number; cleaned: number }
   history: { upserted: number; dropped: number; skipped: boolean }
   queue: EnqueueFooddataQueueResult | null
   curation: {
@@ -100,6 +108,47 @@ async function fetchGomaOfferProductUuids(fooddata: SupabaseClient): Promise<Set
 const PRODUCT_SELECT_COLS =
   'id, source_chain, source_id, gtin, name, brand, manufacturer, description, amount, unit, image_url, category_path, category_lvl0, category_lvl1, category_lvl2, last_seen_at, active'
 
+/** Salling/REMA-kæder må aldrig have source=goma offers i FF (kommer fra fooddata-native). */
+const SALLING_REMA_STORE_IDS = ['netto', 'bilka', 'foetex', 'rema-1000'] as const
+
+/**
+ * Ryd ophobede stale Goma-offers i FF. UPSERT-importen sletter aldrig rækker der
+ * forsvinder fra fooddata, så udløbne/forkerte Goma-offers hober sig op:
+ *   1. Goma-offers på Salling/REMA-kæder (gammelt eksperiment — skal aldrig være goma)
+ *   2. Udløbne Goma-offers (sale_valid_to i fortiden) — tilbudsavisen er slut
+ */
+async function cleanupStaleGomaOffers(
+  ff: SupabaseClient,
+  log: (msg: string) => void,
+): Promise<number> {
+  let cleaned = 0
+
+  const { count: sallingCount, error: sallingErr } = await ff
+    .from('product_offers')
+    .delete({ count: 'exact' })
+    .eq('source', 'goma')
+    .in('store_id', SALLING_REMA_STORE_IDS as unknown as string[])
+  if (sallingErr) {
+    log(`  ! cleanup (Salling goma) fejlede: ${sallingErr.message}`)
+  } else {
+    cleaned += sallingCount ?? 0
+  }
+
+  const { count: expiredCount, error: expiredErr } = await ff
+    .from('product_offers')
+    .delete({ count: 'exact' })
+    .eq('source', 'goma')
+    .not('sale_valid_to', 'is', null)
+    .lt('sale_valid_to', new Date().toISOString())
+  if (expiredErr) {
+    log(`  ! cleanup (udløbne goma) fejlede: ${expiredErr.message}`)
+  } else {
+    cleaned += expiredCount ?? 0
+  }
+
+  return cleaned
+}
+
 async function fetchAll<T = Record<string, unknown>>(
   client: SupabaseClient,
   table: string,
@@ -128,6 +177,64 @@ async function fetchAll<T = Record<string, unknown>>(
     if (limit && all.length >= limit) break
   }
   return limit ? all.slice(0, limit) : all
+}
+
+const PRICE_HISTORY_COLS =
+  'product_id, store_id, price_cents, before_price_cents, is_on_sale, snapshot_date'
+
+/**
+ * Fetch price_history in bounded chunks instead of a full-table scan.
+ * The fooddata table has grown large enough that ordering by id across all rows
+ * hits PostgREST's statement timeout even on the first page.
+ */
+async function fetchPriceHistoryForImport(
+  client: SupabaseClient,
+  fooddataProductIds: string[],
+  sinceDate: string,
+  log: (msg: string) => void,
+): Promise<Record<string, unknown>[]> {
+  if (fooddataProductIds.length === 0) return []
+
+  const all: Record<string, unknown>[] = []
+
+  for (let i = 0; i < fooddataProductIds.length; i += PRICE_HISTORY_PRODUCT_CHUNK) {
+    const chunk = fooddataProductIds.slice(i, i + PRICE_HISTORY_PRODUCT_CHUNK)
+    let from = 0
+    let pageSize = FETCH_PAGE_SIZE
+
+    while (true) {
+      const { data, error } = await client
+        .from('price_history')
+        .select(PRICE_HISTORY_COLS)
+        .in('product_id', chunk)
+        .gte('snapshot_date', sinceDate)
+        .order('id', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (error) {
+        if (isStatementTimeout(error.message) && pageSize > 100) {
+          pageSize = Math.floor(pageSize / 2)
+          log(
+            `  price_history: timeout på produkt-chunk ${i + 1}-${i + chunk.length}, prøver pageSize=${pageSize}`,
+          )
+          continue
+        }
+        throw new Error(`fetchPriceHistory failed: ${error.message}`)
+      }
+
+      if (!data?.length) break
+      all.push(...(data as Record<string, unknown>[]))
+      if (data.length < pageSize) break
+      from += pageSize
+    }
+
+    const done = Math.min(i + PRICE_HISTORY_PRODUCT_CHUNK, fooddataProductIds.length)
+    if (done % 2000 < PRICE_HISTORY_PRODUCT_CHUNK || done === fooddataProductIds.length) {
+      log(`  price_history fetch: ${all.length} rows (${done}/${fooddataProductIds.length} products)`)
+    }
+  }
+
+  return all
 }
 
 async function fetchAllFfMatchedProductIds(ff: SupabaseClient): Promise<string[]> {
@@ -265,7 +372,7 @@ function mapProduct(p: Record<string, any>) {
   const subcategory = p.category_lvl2 ?? null
   return {
     id,
-    ean: p.gtin ?? null,
+    ean: p.gtin ?? extractEanFromFfProductId(`${p.source_chain}-${p.source_id}`),
     name_generic: p.name,
     brand: p.brand ?? null,
     category,
@@ -376,12 +483,20 @@ function mapOffer(
   const currentKr = o.price_cents != null ? Number(o.price_cents) / 100 : 0
   const beforeKr = resolveBeforePriceKr(o as Parameters<typeof resolveBeforePriceKr>[0])
   const hasProvenDiscount = beforeKr != null
-  // Tilbudsavis-kilder (Tjek/Squid) har sjældent en førpris, men varen ER et
-  // tilbud i sit gyldighedsvindue — behandl dem som tilbud uden bevist rabat.
-  const isSaleOnlySource =
-    typeof o.source === 'string' &&
-    (o.source.toLowerCase().startsWith('tjek') || o.source === 'goma')
-  const isOfferActive = !!(fromOk && untilOk && (hasProvenDiscount || isSaleOnlySource || o.is_on_sale))
+  // Tilbudsavis (Tjek) og Goma offers-only: hele rækken er et tilbud uden bevist førpris.
+  // Goma fuldt katalog (MENY, Spar, …): kun reelle tilbud via førpris eller is_on_sale fra sync.
+  const isTjekSource =
+    typeof o.source === 'string' && o.source.toLowerCase().startsWith('tjek')
+  const isGomaOffersOnlySource =
+    o.source === 'goma' &&
+    isGomaImportChain(ref.source_chain) &&
+    !isGomaFullCatalogChain(ref.source_chain)
+  const isSaleOnlySource = isTjekSource || isGomaOffersOnlySource
+  const isOfferActive = !!(
+    fromOk &&
+    untilOk &&
+    (hasProvenDiscount || isSaleOnlySource || o.is_on_sale)
+  )
   return {
     product_id: ref.id,
     store_product_id: ref.id.includes('-') ? ref.id.split('-').slice(1).join('-') : ref.id,
@@ -447,6 +562,7 @@ export async function runFooddataImport(
     pullCuration = false,
     curationOnly = false,
     pullQueue = false,
+    historyDays = PRICE_HISTORY_IMPORT_WINDOW_DAYS,
     log = console.log,
   } = options
 
@@ -464,7 +580,7 @@ export async function runFooddataImport(
     curationOnly,
     stores: 0,
     products: { upserted: 0, newlyImported: 0 },
-    offers: { upserted: 0, dropped: 0 },
+    offers: { upserted: 0, dropped: 0, cleaned: 0 },
     history: { upserted: 0, dropped: 0, skipped: skipHistory },
     queue: null,
     curation: null,
@@ -651,18 +767,25 @@ export async function runFooddataImport(
         { log },
       )
     }
+    if (!dryRun && gomaImportEnabled) {
+      result.offers.cleaned = await cleanupStaleGomaOffers(ff, log)
+    }
     log(
-      `  offers: ${dryRun ? `${mapped.length} (dry-run)` : result.offers.upserted}, ${result.offers.dropped} dropped`,
+      `  offers: ${dryRun ? `${mapped.length} (dry-run)` : result.offers.upserted}, ${result.offers.dropped} dropped` +
+        (result.offers.cleaned ? `, ${result.offers.cleaned} cleaned` : ''),
     )
   }
 
   // ─── 4. Price history ───────────────────────────────────────────────────
   if (!skipHistory) {
     log('4/4 · PRICE_HISTORY')
-    const fooddataHistory = await fetchAll<Record<string, any>>(
+    const sinceDate = new Date(Date.now() - historyDays * 86400000).toISOString().slice(0, 10)
+    log(`  importing snapshots since ${sinceDate} (${historyDays} days)`)
+    const fooddataHistory = await fetchPriceHistoryForImport(
       fooddata,
-      'price_history',
-      'product_id, store_id, price_cents, before_price_cents, is_on_sale, snapshot_date',
+      Array.from(productLookup.keys()),
+      sinceDate,
+      log,
     )
     const mapped = fooddataHistory
       .map((h) => mapHistory(h, productLookup))

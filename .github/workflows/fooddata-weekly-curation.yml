@@ -9,6 +9,7 @@ on:
 jobs:
   fooddata-weekly-curation:
     runs-on: ubuntu-latest
+    environment: FF
     steps:
       - name: Call FF weekly curation endpoint
         env:

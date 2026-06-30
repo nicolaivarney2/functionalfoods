@@ -14,6 +14,8 @@ on:
 jobs:
   goma-scheduled-sync:
     runs-on: ubuntu-latest
+    # CRON_SECRET ligger på GitHub Environment "FF" (samme som fooddata-import).
+    environment: FF
     steps:
       - name: Call scheduled Goma sync endpoint
         env:

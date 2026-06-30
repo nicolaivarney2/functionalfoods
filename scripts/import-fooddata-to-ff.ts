@@ -9,6 +9,7 @@
  *   npx tsx scripts/import-fooddata-to-ff.ts            # full import
  *   npx tsx scripts/import-fooddata-to-ff.ts --dry-run  # show counts only
  *   npx tsx scripts/import-fooddata-to-ff.ts --skip-history  # skip price_history
+ *   npx tsx scripts/import-fooddata-to-ff.ts --history-days=90  # backfill (default: 7)
  *   npx tsx scripts/import-fooddata-to-ff.ts --limit=100    # smoke test
  *   npx tsx scripts/import-fooddata-to-ff.ts --enqueue-unmatched  # fill match queue (all unmatched)
  *   npx tsx scripts/import-fooddata-to-ff.ts --skip-queue   # no queue writes
@@ -27,7 +28,9 @@ import { runFooddataImport } from '../src/lib/fooddata-import/run-import'
 
 const args = new Set(process.argv.slice(2))
 const limitArg = process.argv.slice(2).find((a) => a.startsWith('--limit='))
+const historyDaysArg = process.argv.slice(2).find((a) => a.startsWith('--history-days='))
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : null
+const HISTORY_DAYS = historyDaysArg ? parseInt(historyDaysArg.split('=')[1], 10) : undefined
 
 function getFooddataClient(): SupabaseClient {
   const url = process.env.GROCERY_SUPABASE_URL
@@ -71,6 +74,7 @@ async function main() {
   console.log(`  dry-run      : ${dryRun}`)
   console.log(`  limit        : ${LIMIT ?? 'none'}`)
   console.log(`  skip-history : ${args.has('--skip-history')}`)
+  console.log(`  history-days : ${HISTORY_DAYS ?? '7 (default)'}`)
   console.log(`  pull-curation: ${args.has('--pull-curation') || args.has('--curation-only')}`)
   console.log(`  curation-only: ${args.has('--curation-only')}`)
 
@@ -82,6 +86,7 @@ async function main() {
     skipProducts: args.has('--skip-products'),
     skipOffers: args.has('--skip-offers'),
     skipHistory: args.has('--skip-history'),
+    historyDays: HISTORY_DAYS,
     skipQueue: args.has('--skip-queue'),
     enqueueUnmatched: args.has('--enqueue-unmatched'),
     pullCuration: args.has('--pull-curation'),
