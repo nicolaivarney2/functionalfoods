@@ -75,29 +75,15 @@ export function resolveOfferDisplayPricing(
   }
 }
 
-/**
- * Run async work over a list with bounded concurrency.
- * Used for chunked Supabase fetches so we don't fire dozens of sequential
- * roundtrips (slow) or hundreds in parallel (rate limit / connection storms).
- */
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  fn: (item: T, idx: number) => Promise<R>
-): Promise<R[]> {
-  if (items.length === 0) return []
-  const results: R[] = new Array(items.length)
-  let nextIndex = 0
-  const workerCount = Math.max(1, Math.min(concurrency, items.length))
-  const workers = Array.from({ length: workerCount }, async () => {
-    while (true) {
-      const idx = nextIndex++
-      if (idx >= items.length) return
-      results[idx] = await fn(items[idx], idx)
-    }
-  })
-  await Promise.all(workers)
-  return results
+type FoodOffersFetchOptions = {
+  page: number
+  limit: number
+  stores?: string[]
+  offersOnly?: boolean
+  organicOnly?: boolean
+  productIds?: string[]
+  categoryFilter?: string[]
+  search?: string
 }
 
 export class DatabaseService {
@@ -529,523 +515,212 @@ export class DatabaseService {
     _excludeSnacksAndDrinks?: boolean
   ): Promise<{products: any[]; total: number; hasMore: boolean}> {
     try {
-      const supabase = createSupabaseClient()
-
-      const offset = (page - 1) * limit
       const categoryFilter = this.buildCategoryFilterList(categories, foodOnly)
 
       if (foodOnly && this.hasUserCategorySelection(categories) && categoryFilter.length === 0) {
         return { products: [], total: 0, hasMore: false }
       }
 
-      const implicitFoodOnly = Boolean(foodOnly && !this.hasUserCategorySelection(categories))
-      const useFastFoodOfferScan =
-        implicitFoodOnly && !search?.trim() && categoryFilter.length === 0
-
-      if (useFastFoodOfferScan) {
-        return this.listFoodDepartmentOffers(supabase, page, limit, stores, offersOnly, organicOnly)
-      }
-
-      let query = applyDagligvarerSourceFilter(
-        supabase
-          .from('product_offers')
-          .select(this.OFFER_SELECT_WITH_PRODUCT)
-          .eq('is_available', true),
-      )
-
-      if (stores && stores.length > 0) {
-        query = query.in('store_id', this.mapStoreFilterToIds(stores))
-      }
-
-      // IMPORTANT: Do not pre-filter by DB sale flags here.
-      // We compute real offers later from (price drop OR sale flags) + valid date,
-      // because DB flags can be stale/inconsistent across sources.
-
-      // Filter by organic - find product IDs with organic labels first
-      let organicProductIds: string[] | undefined
-      if (organicOnly) {
-        const { data: organicProducts, error: organicError } = await supabase
-          .from('products')
-          .select('id')
-          .overlaps('organic_tags', ['organic-priority', 'organic-animal'])
-          .limit(20000) // Should be enough for all organic products
-        
-        if (organicError) {
-          console.error('Error fetching organic products:', organicError)
-        } else if (organicProducts) {
-          organicProductIds = organicProducts.map((p: any) => String(p.id))
-        }
-        
-        // If no organic products found, return empty result
-        if (!organicProductIds || organicProductIds.length === 0) {
-          return { products: [], total: 0, hasMore: false }
-        }
-      }
-
-      if (categoryFilter.length === 0 && implicitFoodOnly) {
-        query = this.applyFoodDepartmentFilterToOffersQuery(query, true)
-      }
-
+      let productIds: string[] | undefined
       if (categoryFilter.length > 0) {
-        // Efficient approach: Query products table first to get matching IDs
-        // Then filter product_offers by those IDs
-        // This is more reliable than trying to filter on joined tables
-        let productIds: string[] = []
-        
-        try {
-          productIds = await this.findProductIdsForCategories(categoryFilter)
-          
-          if (!productIds || productIds.length === 0) {
-            console.error(`[CATEGORY FILTER] No product IDs found for categories: ${categoryFilter.join(', ')}`)
-            return { products: [], total: 0, hasMore: false }
-          }
-          
-          if (search && search.trim()) {
-            const term = search.trim()
-            let nameQuery = applyDagligvarerSourceFilter(
-              supabase
-                .from('product_offers')
-                .select('product_id')
-                .or(`name_store.ilike.%${term}%`)
-                .limit(1000),
-            )
-
-            if (foodOnly) {
-              nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
-                nameQuery.select('product_id, products!inner(department)'),
-                true,
-              )
-            }
-
-            let categoryQuery = supabase
-              .from('products')
-              .select('id')
-              .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
-              .limit(1000)
-
-            if (foodOnly) {
-              categoryQuery = this.applyFoodDepartmentFilterToProductsQuery(categoryQuery, true)
-            }
-
-            if (organicOnly) {
-              categoryQuery = categoryQuery.overlaps('organic_tags', ['organic-priority', 'organic-animal'])
-            }
-
-            const { data: nameMatches, error: nameErr } = await nameQuery
-            const { data: categoryMatches, error: catSearchErr } = await categoryQuery
-
-            const matchingProductIds = new Set<string>()
-
-            if (!nameErr && nameMatches) {
-              nameMatches.forEach((m: any) => m?.product_id && matchingProductIds.add(String(m.product_id)))
-            }
-
-            if (!catSearchErr && categoryMatches) {
-              categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(String(m.id)))
-            }
-
-            if (matchingProductIds.size > 0) {
-              productIds = productIds.filter(id => matchingProductIds.has(String(id)))
-            } else {
-              return { products: [], total: 0, hasMore: false }
-            }
-          }
-
-          // If organic filter is active, intersect with organic product IDs
-          if (organicProductIds) {
-            const productIdsSet = new Set(productIds)
-            productIds = organicProductIds.filter(id => productIdsSet.has(id))
-            if (productIds.length === 0) {
-              console.warn(`[CATEGORY FILTER] No products after organic filter intersection`)
-              return { products: [], total: 0, hasMore: false }
-            }
-          }
-        } catch (error) {
-          console.error(`[CATEGORY FILTER] Error finding product IDs:`, error)
-          // Log full error details for Vercel debugging
-          if (error instanceof Error) {
-            console.error(`[CATEGORY FILTER] Error message: ${error.message}`)
-            console.error(`[CATEGORY FILTER] Error stack: ${error.stack}`)
-          }
+        productIds = await this.findProductIdsForCategories(categoryFilter)
+        if (productIds.length === 0) {
           return { products: [], total: 0, hasMore: false }
         }
-        
-        // Use the product IDs to filter offers
-        // Supabase has limits on IN clause size (typically 100 items max)
-        // We need to chunk the product IDs and fetch offers separately, then combine
-        const CHUNK_SIZE = 100 // Increased from 50 to reduce number of queries (Supabase supports up to 100)
-        const chunks: string[][] = []
-        
-        for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
-          chunks.push(productIds.slice(i, i + CHUNK_SIZE))
-        }
-        
-        // Fetch all matching offers metadata from chunks (with current filters applied)
-        // so we can sort globally BEFORE pagination.
-        const allMatchingOffers = new Map<string, {
-          id: string
-          is_on_sale: boolean
-          is_offer_active: boolean
-          discount_percentage: number | null
-          current_price: number | null
-          normal_price: number | null
-          sale_valid_to: string | null
-          source: string | null
-          store_id: string | null
-        }>()
-        let chunkErrors = 0
-
-        // Run chunks in parallel (with bounded concurrency) instead of
-        // sequentially. With ~50 chunks @ 100ms each, sequential = ~5s wait.
-        // Parallel-8 = ~700ms. We cap at 8 concurrent so we don't blow up
-        // Supabase's connection pool.
-        const CHUNK_CONCURRENCY = 8
-        const chunkResults = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, async (chunk, idx) => {
-          try {
-            let chunkQuery = applyDagligvarerSourceFilter(
-              supabase
-                .from('product_offers')
-                .select('id, is_on_sale, is_offer_active, discount_percentage, current_price, normal_price, sale_valid_to, source, store_id')
-                .eq('is_available', true)
-                .in('product_id', chunk),
-            )
-
-            if (stores && stores.length > 0) {
-              chunkQuery = chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
-            }
-
-            // IMPORTANT: do not pre-filter on sale flags here; evaluate real offer in-app.
-            // Organic filter already applied via productIds intersection above.
-
-            const { data: chunkOffers, error: chunkError } = await chunkQuery
-
-            if (chunkError) {
-              console.error(`[CATEGORY FILTER] Error fetching chunk ${idx + 1}/${chunks.length}:`, chunkError)
-              if (chunkError.message) console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
-              if (chunkError.code) console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
-              return null
-            }
-            return chunkOffers || []
-          } catch (error) {
-            console.error(`[CATEGORY FILTER] Exception in chunk ${idx + 1}/${chunks.length}:`, error)
-            if (error instanceof Error) {
-              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
-              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
-            }
-            return null
-          }
-        })
-
-        for (const rows of chunkResults) {
-          if (rows === null) {
-            chunkErrors++
-            continue
-          }
-          for (const offer of rows as Array<{
-            id?: string | number
-            is_on_sale?: boolean
-            is_offer_active?: boolean
-            discount_percentage?: number | null
-            current_price?: number | null
-            normal_price?: number | null
-            sale_valid_to?: string | null
-            source?: string | null
-            store_id?: string | null
-          }>) {
-            if (!offer?.id) continue
-            allMatchingOffers.set(String(offer.id), {
-              id: String(offer.id),
-              is_on_sale: !!offer.is_on_sale,
-              is_offer_active: !!offer.is_offer_active,
-              discount_percentage: offer.discount_percentage ?? null,
-              current_price: offer.current_price ?? null,
-              normal_price: offer.normal_price ?? null,
-              sale_valid_to: offer.sale_valid_to ?? null,
-              source: offer.source ?? null,
-              store_id: offer.store_id ?? null,
-            })
-          }
-        }
-
-        if (chunkErrors > 0) {
-          console.warn(`[CATEGORY FILTER] ${chunkErrors} out of ${chunks.length} chunks had errors`)
-        }
-        
-        let matchingOffersArray = Array.from(allMatchingOffers.values())
-        if (offersOnly) {
-          matchingOffersArray = matchingOffersArray.filter((o) => isRealOfferFields(o))
-        }
-
-        matchingOffersArray.sort((a, b) => {
-          const aOffer = isRealOfferFields(a)
-          const bOffer = isRealOfferFields(b)
-          if (aOffer && !bOffer) return -1
-          if (!aOffer && bOffer) return 1
-
-          const aDiscount = Number(a.discount_percentage || 0)
-          const bDiscount = Number(b.discount_percentage || 0)
-          if (bDiscount !== aDiscount) return bDiscount - aDiscount
-
-          return Number(a.current_price || 0) - Number(b.current_price || 0)
-        })
-
-        if (matchingOffersArray.length === 0) {
-          return { products: [], total: 0, hasMore: false }
-        }
-        
-        // Now we need to fetch the full offer data for the current page
-        // Since we have globally sorted offer IDs, we can paginate in memory.
-        const pageStart = offset
-        const pageEnd = Math.min(offset + limit, matchingOffersArray.length)
-        const pageOfferIds = matchingOffersArray.slice(pageStart, pageEnd).map((o) => o.id)
-        
-        if (pageOfferIds.length === 0) {
-          return { 
-            products: [], 
-            total: matchingOffersArray.length, 
-            hasMore: pageEnd < matchingOffersArray.length 
-          }
-        }
-        
-        // Fetch full data for this page's offer IDs
-        // Chunk the offer IDs if needed (shouldn't be more than limit, but be safe)
-        const OFFER_CHUNK_SIZE = 100
-        const allPageData: any[] = []
-        
-        for (let i = 0; i < pageOfferIds.length; i += OFFER_CHUNK_SIZE) {
-          const offerChunk = pageOfferIds.slice(i, i + OFFER_CHUNK_SIZE)
-          
-          try {
-            let chunkQuery = applyDagligvarerSourceFilter(
-              supabase
-                .from('product_offers')
-                .select(
-                  `
-                id,
-                product_id,
-                store_id,
-                store_product_id,
-                name_store,
-                product_url,
-                current_price,
-                normal_price,
-                currency,
-                is_on_sale,
-                is_offer_active,
-                discount_percentage,
-                price_per_unit,
-                price_per_kilogram,
-                is_available,
-                sale_valid_from,
-                sale_valid_to,
-                source,
-                products:product_id!inner (
-                  id,
-                  name_generic,
-                  brand,
-                  category,
-                  subcategory,
-                  department,
-                  unit,
-                  amount,
-                  image_url
-                )
-              `,
-                  { count: i === 0 ? 'exact' : undefined },
-                )
-                .in('id', offerChunk)
-                .eq('is_available', true),
-            )
-            
-            if (stores && stores.length > 0) {
-              chunkQuery.in('store_id', this.mapStoreFilterToIds(stores))
-            }
-            
-            // IMPORTANT: do not pre-filter on sale flags here; evaluate real offer in-app.
-            
-            // Organic filter already applied via productIds intersection above
-            
-            const { data: chunkData, error: chunkError } = await chunkQuery
-            
-            if (chunkError) {
-              console.error(`[CATEGORY FILTER] Error fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, chunkError)
-              // Log full error details for Vercel
-              if (chunkError.message) {
-                console.error(`[CATEGORY FILTER] Error message: ${chunkError.message}`)
-              }
-              if (chunkError.code) {
-                console.error(`[CATEGORY FILTER] Error code: ${chunkError.code}`)
-              }
-              if (chunkError.details) {
-                console.error(`[CATEGORY FILTER] Error details: ${chunkError.details}`)
-              }
-              continue
-            }
-            
-            if (chunkData && chunkData.length > 0) {
-              allPageData.push(...chunkData)
-            }
-          } catch (error) {
-            console.error(`[CATEGORY FILTER] Exception fetching offer data chunk ${i / OFFER_CHUNK_SIZE + 1}:`, error)
-            if (error instanceof Error) {
-              console.error(`[CATEGORY FILTER] Exception message: ${error.message}`)
-              console.error(`[CATEGORY FILTER] Exception stack: ${error.stack}`)
-            }
-          }
-        }
-        
-        // Map the data first to determine which are actually on sale
-        const imageLookup = await this.buildEanImageLookupForOfferRows(allPageData)
-        const mapped = allPageData.map((row: any) => this.mapOfferRowToProduct(row, imageLookup))
-
-        const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
-
-        // Sort the results
-        finalMapped.sort((a, b) => {
-          // Offers first
-          if (a.is_on_sale && !b.is_on_sale) return -1
-          if (!a.is_on_sale && b.is_on_sale) return 1
-          // Then by discount
-          if (a.is_on_sale && b.is_on_sale) {
-            const aDiscount = a.discount_percentage || 0
-            const bDiscount = b.discount_percentage || 0
-            if (bDiscount !== aDiscount) return bDiscount - aDiscount
-          }
-          // Then by price
-          return (a.price || 0) - (b.price || 0)
-        })
-        
-        return { 
-          products: finalMapped, 
-          total: matchingOffersArray.length, 
-          hasMore: pageEnd < matchingOffersArray.length 
-        }
       }
 
-      if (search && search.trim()) {
-        // Forbedret tekstsøgning i butiksnavn + globalt navn + brand + kategori-felter
-        const term = search.trim()
-        
-        // Find products matching the search term in name/brand fields
-        let nameQuery = applyDagligvarerSourceFilter(
-          supabase
-            .from('product_offers')
-            .select('product_id')
-            .or(`name_store.ilike.%${term}%`)
-            .limit(1000),
-        )
-
-        if (foodOnly) {
-          nameQuery = this.applyFoodDepartmentFilterToOffersQuery(
-            nameQuery.select('product_id, products!inner(department)'),
-            true,
-          )
-        }
-
-        let categoryQuery = supabase
-          .from('products')
-          .select('id')
-          .or(`department.ilike.%${term}%,category.ilike.%${term}%,subcategory.ilike.%${term}%,name_generic.ilike.%${term}%,brand.ilike.%${term}%`)
-          .limit(1000)
-
-        if (foodOnly) {
-          categoryQuery = this.applyFoodDepartmentFilterToProductsQuery(categoryQuery, true)
-        }
-        
-        // Apply organic filter to product search if needed
-        if (organicOnly) {
-          categoryQuery = categoryQuery.overlaps('organic_tags', ['organic-priority', 'organic-animal'])
-        }
-        
-        const { data: nameMatches, error: nameErr } = await nameQuery
-        const { data: categoryMatches, error: catSearchErr } = await categoryQuery
-        
-        const matchingProductIds = new Set<string>()
-        
-        if (!nameErr && nameMatches) {
-          nameMatches.forEach((m: any) => m?.product_id && matchingProductIds.add(m.product_id))
-        }
-        
-        if (!catSearchErr && categoryMatches) {
-          categoryMatches.forEach((m: any) => m?.id && matchingProductIds.add(m.id))
-        }
-        
-        let finalProductIds = Array.from(matchingProductIds)
-        
-        // If organic filter is active, intersect with organic product IDs
-        if (organicProductIds) {
-          const matchingSet = new Set(finalProductIds)
-          finalProductIds = organicProductIds.filter(id => matchingSet.has(id))
-        }
-        
-        if (finalProductIds.length > 0) {
-          query = query.in('product_id', finalProductIds)
-        } else {
-          // No matches found, return empty result
-          return { products: [], total: 0, hasMore: false }
-        }
-      } else if (organicProductIds) {
-        // No search, but organic filter is active - filter by organic product IDs
-        query = query.in('product_id', organicProductIds)
+      const fetchOpts: FoodOffersFetchOptions = {
+        page,
+        limit,
+        stores,
+        offersOnly,
+        organicOnly,
+        productIds,
+        categoryFilter: categoryFilter.length > 0 ? categoryFilter : undefined,
+        search: search?.trim() || undefined,
       }
 
-      // Proven tilbud filtreres i app — stol ikke på DB sale flags.
-      query = query
-        .order('discount_percentage', { ascending: false, nullsFirst: false })
-        .order('current_price', { ascending: true })
-        .range(offset, offset + (offersOnly ? limit * 8 : limit))
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching supermarket products (V2):', error)
-        return { products: [], total: 0, hasMore: false }
+      const rpc = await this.fetchFoodOffersViaRpc(fetchOpts)
+      if (rpc) {
+        console.log('[OFFERS RPC] ok')
+        return rpc
       }
 
-      let fetched = (data || []) as Array<Record<string, unknown>>
-      if (offersOnly) {
-        fetched = fetched.filter((row) =>
-          isRealOfferFields({
-            current_price: row.current_price as number | null,
-            normal_price: row.normal_price as number | null,
-            sale_valid_to: row.sale_valid_to as string | null,
-            source: row.source as string | null,
-          }),
-        )
-      }
-      const hasMore = fetched.length > limit
-      const pageRows = hasMore ? fetched.slice(0, limit) : fetched
-      const imageLookup = await this.buildEanImageLookupForOfferRows(pageRows)
-      const mapped = pageRows.map((row: any) => this.mapOfferRowToProduct(row, imageLookup))
-
-      const finalMapped = offersOnly ? mapped.filter((p) => p.is_on_sale) : mapped
-
-      // Sort the results
-      finalMapped.sort((a, b) => {
-        // Offers first
-        if (a.is_on_sale && !b.is_on_sale) return -1
-        if (!a.is_on_sale && b.is_on_sale) return 1
-        // Then by discount
-        if (a.is_on_sale && b.is_on_sale) {
-          const aDiscount = a.discount_percentage || 0
-          const bDiscount = b.discount_percentage || 0
-          if (bDiscount !== aDiscount) return bDiscount - aDiscount
-        }
-        // Then by price
-        return (a.price || 0) - (b.price || 0)
-      })
-      
-      // Approximate total: we no longer do an exact COUNT for performance.
-      // Consumers (dagligvarer page) only use hasMore; meal-plan generator
-      // logs `total` for diagnostics where exactness is not required.
-      const total = offset + finalMapped.length + (hasMore ? 1 : 0)
-
-      return { products: finalMapped, total, hasMore }
+      const direct = await this.fetchFoodOffersViaDirectQuery(fetchOpts)
+      console.log('[OFFERS DIRECT] ok')
+      return direct
     } catch (error) {
       console.error('Error in getSupermarketProductsV2:', error)
       return { products: [], total: 0, hasMore: false }
     }
   }
+
+  private getCategoryMatchPatterns(categories: string[]): string[] {
+    const patterns = new Set<string>()
+    for (const cat of categories) {
+      patterns.add(cat)
+      for (const alias of this.getDepartmentAliasesForCanonicalCategory(cat)) {
+        patterns.add(alias)
+      }
+    }
+    return Array.from(patterns)
+  }
+
+  private async fetchFoodOffersViaRpc(
+    opts: FoodOffersFetchOptions,
+  ): Promise<{ products: any[]; total: number; hasMore: boolean } | null> {
+    try {
+      const supabase = createSupabaseServiceClient()
+      const offset = (opts.page - 1) * opts.limit
+      const storeIds = opts.stores?.length ? this.mapStoreFilterToIds(opts.stores) : undefined
+
+      const params: Record<string, unknown> = {
+        p_offers_only: !!opts.offersOnly,
+        p_limit: opts.limit + 1,
+        p_offset: offset,
+        p_organic_only: !!opts.organicOnly,
+        p_goma_primary: isGomaImportEnabled(),
+      }
+      if (storeIds?.length) params.p_stores = storeIds
+      if (opts.productIds?.length) params.p_product_ids = opts.productIds
+      if (opts.search) params.p_search = opts.search
+
+      const { data, error } = await supabase.rpc('get_food_offers_v2', params)
+      if (error) {
+        console.warn('get_food_offers_v2 RPC unavailable, using direct query fallback:', error.message)
+        return null
+      }
+
+      const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[]
+      const hasMore = rows.length > opts.limit
+      const pageRows = hasMore ? rows.slice(0, opts.limit) : rows
+      const normalizedRows = pageRows.map((row) => this.normalizeRpcOfferRow(row))
+      const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
+      return {
+        products: normalizedRows.map((row) => this.mapOfferRowToProduct(row, imageLookup)),
+        total: offset + pageRows.length + (hasMore ? 1 : 0),
+        hasMore,
+      }
+    } catch (e) {
+      console.warn('get_food_offers_v2 RPC exception, using direct query fallback:', e)
+      return null
+    }
+  }
+
+  private offerRowMatchesSearch(row: Record<string, any>, term: string): boolean {
+    const p = row.products || {}
+    const haystack = [
+      row.name_store,
+      p.name_generic,
+      p.brand,
+      p.department,
+      p.category,
+      p.subcategory,
+    ]
+      .map((v) => String(v ?? '').toLowerCase())
+    const needle = term.toLowerCase()
+    return haystack.some((h) => h.includes(needle))
+  }
+
+  private async fetchFoodOffersViaDirectQuery(
+    opts: FoodOffersFetchOptions,
+  ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
+    const supabase = createSupabaseClient()
+    const offset = (opts.page - 1) * opts.limit
+    const storeIds = opts.stores?.length ? this.mapStoreFilterToIds(opts.stores) : null
+    const productIdSet = opts.productIds?.length
+      ? new Set(opts.productIds.map((id) => String(id)))
+      : null
+
+    const foodDeptSet = new Set(
+      this.getFoodOnlyDepartmentAllowList().map((d) => d.toLowerCase().trim()),
+    )
+
+    const isFoodRow = (row: Record<string, any>) => {
+      if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
+      const dept = String(row.products?.department ?? '').trim().toLowerCase()
+      return dept.length > 0 && foodDeptSet.has(dept)
+    }
+
+    let organicIdSet: Set<string> | null = null
+    if (opts.organicOnly) {
+      const { data: orgRows } = await supabase
+        .from('products')
+        .select('id')
+        .overlaps('organic_tags', ['organic-priority', 'organic-animal'])
+        .limit(20000)
+      organicIdSet = new Set((orgRows || []).map((r: any) => String(r.id)))
+      if (organicIdSet.size === 0) return { products: [], total: 0, hasMore: false }
+    }
+
+    const passesFilters = (row: Record<string, any>) => {
+      if (productIdSet && !productIdSet.has(String(row.product_id))) return false
+      if (opts.search && !this.offerRowMatchesSearch(row, opts.search)) return false
+      if (!productIdSet && !isFoodRow(row)) return false
+      if (organicIdSet && !organicIdSet.has(String(row.product_id))) return false
+      if (opts.offersOnly && !isRealOfferFields(row)) return false
+      return true
+    }
+
+    const sortProducts = (products: any[]) => {
+      products.sort((a, b) => {
+        if (a.is_on_sale && !b.is_on_sale) return -1
+        if (!a.is_on_sale && b.is_on_sale) return 1
+        if (a.is_on_sale && b.is_on_sale) {
+          const aDiscount = a.discount_percentage || 0
+          const bDiscount = b.discount_percentage || 0
+          if (bDiscount !== aDiscount) return bDiscount - aDiscount
+        }
+        return (a.price || 0) - (b.price || 0)
+      })
+    }
+
+    const fetchSize = Math.min((offset + opts.limit) * 3 + 100, 1500)
+    let q = applyDagligvarerSourceFilter(
+      supabase
+        .from('product_offers')
+        .select(this.OFFER_SELECT_WITH_PRODUCT)
+        .eq('is_available', true),
+    )
+
+    if (storeIds) q = q.in('store_id', storeIds)
+
+    if (opts.productIds?.length && opts.productIds.length <= 100) {
+      q = q.in('product_id', opts.productIds)
+    } else if (opts.categoryFilter?.length) {
+      q = q.in('products.department', this.getCategoryMatchPatterns(opts.categoryFilter))
+    } else if (!opts.search) {
+      q = this.applyFoodDepartmentFilterToOffersQuery(q, true)
+    }
+
+    if (opts.offersOnly) {
+      q = q
+        .or(dagligvarerOfferScanOrFilter())
+        .order('discount_percentage', { ascending: false, nullsFirst: false })
+        .order('current_price', { ascending: true })
+        .limit(fetchSize)
+    } else {
+      q = q.order('id', { ascending: true }).range(0, fetchSize - 1)
+    }
+
+    const { data, error } = await q
+    if (error) {
+      console.error('fetchFoodOffersViaDirectQuery error:', error)
+      return { products: [], total: 0, hasMore: false }
+    }
+
+    const filteredRows = (data || []).filter(passesFilters)
+    const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
+    const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
+    sortProducts(products)
+
+    return {
+      products: products.slice(offset, offset + opts.limit),
+      total: products.length,
+      hasMore: products.length > offset + opts.limit,
+    }
+  }
+
 
   /**
    * Helper: find product_ids whose department/category matches any of the provided categories.
@@ -1122,62 +797,6 @@ export class DatabaseService {
     }
   }
 
-  /** Food departments — default /dagligvarer scan (Planomo jun 2026). */
-  private async listFoodDepartmentOffers(
-    supabase: ReturnType<typeof createSupabaseClient>,
-    page: number,
-    limit: number,
-    stores?: string[],
-    offersOnly?: boolean,
-    organicOnly?: boolean,
-  ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
-    // Primær vej: RPC gør join + sort + pagination i Postgres (reliable, ingen cold timeout).
-    const rpc = await this.listFoodDepartmentOffersViaRpc(page, limit, stores, offersOnly, organicOnly)
-    if (rpc) return rpc
-
-    // Fallback hvis RPC ikke er deployet endnu.
-    return this.listFoodDepartmentOffersAppSide(supabase, page, limit, stores, offersOnly, organicOnly)
-  }
-
-  private async listFoodDepartmentOffersViaRpc(
-    page: number,
-    limit: number,
-    stores?: string[],
-    offersOnly?: boolean,
-    organicOnly?: boolean,
-  ): Promise<{ products: any[]; total: number; hasMore: boolean } | null> {
-    try {
-      const supabase = createSupabaseServiceClient()
-      const offset = (page - 1) * limit
-      const storeIds = stores && stores.length > 0 ? this.mapStoreFilterToIds(stores) : null
-      // Hent limit+1 for at kunne sige hasMore uden separat count.
-      const { data, error } = await supabase.rpc('get_food_offers_v2', {
-        p_offers_only: !!offersOnly,
-        p_limit: limit + 1,
-        p_offset: offset,
-        p_stores: storeIds,
-        p_organic_only: !!organicOnly,
-        p_goma_primary: isGomaImportEnabled(),
-      })
-      if (error) {
-        console.warn('get_food_offers_v2 RPC unavailable, using app-side fallback:', error.message)
-        return null
-      }
-      const rows = Array.isArray(data) ? data : []
-      const hasMore = rows.length > limit
-      const pageRows = hasMore ? rows.slice(0, limit) : rows
-      const normalizedRows = pageRows.map((row: any) => this.normalizeRpcOfferRow(row))
-      const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
-      return {
-        products: normalizedRows.map((row: any) => this.mapOfferRowToProduct(row, imageLookup)),
-        total: offset + pageRows.length + (hasMore ? 1 : 0),
-        hasMore,
-      }
-    } catch (e) {
-      console.warn('get_food_offers_v2 RPC exception, using app-side fallback:', e)
-      return null
-    }
-  }
 
   /** RPC returnerer flade kolonner — pak product-felter ind så mapOfferRowToProduct passer. */
   private normalizeRpcOfferRow(row: Record<string, any>): Record<string, any> {
@@ -1198,117 +817,6 @@ export class DatabaseService {
     }
   }
 
-  private async listFoodDepartmentOffersAppSide(
-    supabase: ReturnType<typeof createSupabaseClient>,
-    page: number,
-    limit: number,
-    stores?: string[],
-    offersOnly?: boolean,
-    organicOnly?: boolean,
-  ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
-    const offset = (page - 1) * limit
-    const foodDeptSet = new Set(
-      this.getFoodOnlyDepartmentAllowList().map((d) => d.toLowerCase().trim()),
-    )
-
-    // Tilbudsavis-kilder (tjek) har forhandlernavn som department og falder
-    // ellers ud af det department-baserede allow-list — vis hele tilbudsavisen.
-    const isFoodRow = (row: Record<string, any>) => {
-      if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
-      const dept = String(row.products?.department ?? '').trim().toLowerCase()
-      return dept.length > 0 && foodDeptSet.has(dept)
-    }
-
-    const storeIds = stores && stores.length > 0 ? this.mapStoreFilterToIds(stores) : null
-
-    // Øko (fallback): hent øko-produkt-IDs og begræns til dem.
-    let organicIdSet: Set<string> | null = null
-    if (organicOnly) {
-      const { data: orgRows } = await supabase
-        .from('products')
-        .select('id')
-        .overlaps('organic_tags', ['organic-priority', 'organic-animal'])
-        .limit(20000)
-      organicIdSet = new Set((orgRows || []).map((r: any) => String(r.id)))
-      if (organicIdSet.size === 0) return { products: [], total: 0, hasMore: false }
-    }
-    const passesOrganic = (row: Record<string, any>) =>
-      !organicIdSet || organicIdSet.has(String(row.product_id))
-
-    if (offersOnly) {
-      // Pre-filter normal_price IS NOT NULL so sorting only touches the offer set (fast).
-      // Over-fetch so the in-app food + proven-offer filter still fills the page.
-      const fetchSize = Math.min((offset + limit) * 3 + 100, 1500)
-      let q = applyDagligvarerSourceFilter(
-        supabase
-          .from('product_offers')
-          .select(this.OFFER_SELECT_WITH_PRODUCT)
-          .eq('is_available', true),
-      )
-        // Bevist rabat, tilbudsavis (Tjek), eller Goma offers-only uden førpris.
-        .or(dagligvarerOfferScanOrFilter())
-        .order('discount_percentage', { ascending: false, nullsFirst: false })
-        .order('current_price', { ascending: true })
-        .limit(fetchSize)
-
-      if (storeIds) q = q.in('store_id', storeIds)
-
-      const { data, error } = await q
-      if (error) {
-        console.error('listFoodDepartmentOffers (offers) error:', error)
-        return { products: [], total: 0, hasMore: false }
-      }
-
-      const filteredRows = (data || [])
-        .filter(isFoodRow)
-        .filter(passesOrganic)
-        .filter((row) => isRealOfferFields(row))
-      const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
-      const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
-
-      return {
-        products: products.slice(offset, offset + limit),
-        total: products.length,
-        hasMore: products.length > offset + limit,
-      }
-    }
-
-    // Alle produkter: ingen tung sortering over 160k rækker — paginér rå og filtrér food i app.
-    const fetchSize = (offset + limit) * 2 + 50
-    let q = applyDagligvarerSourceFilter(
-      supabase
-        .from('product_offers')
-        .select(this.OFFER_SELECT_WITH_PRODUCT)
-        .eq('is_available', true),
-    )
-      .order('id', { ascending: true })
-      .range(0, fetchSize - 1)
-
-    if (storeIds) q = q.in('store_id', storeIds)
-
-    const { data, error } = await q
-    if (error) {
-      console.error('listFoodDepartmentOffers (all) error:', error)
-      return { products: [], total: 0, hasMore: false }
-    }
-
-    const filteredRows = (data || [])
-      .filter(isFoodRow)
-      .filter(passesOrganic)
-    const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
-    const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
-    products.sort((a, b) => {
-      if (a.is_on_sale && !b.is_on_sale) return -1
-      if (!a.is_on_sale && b.is_on_sale) return 1
-      return (b.discount_percentage || 0) - (a.discount_percentage || 0)
-    })
-
-    return {
-      products: products.slice(offset, offset + limit),
-      total: products.length,
-      hasMore: products.length > offset + limit,
-    }
-  }
 
   private applyFoodDepartmentFilterToOffersQuery<T extends { in: (col: string, vals: string[]) => T }>(
     query: T,
@@ -1316,14 +824,6 @@ export class DatabaseService {
   ): T {
     if (!foodOnly) return query
     return query.in('products.department', this.getFoodOnlyDepartmentAllowList())
-  }
-
-  private applyFoodDepartmentFilterToProductsQuery<T extends { in: (col: string, vals: string[]) => T }>(
-    query: T,
-    foodOnly: boolean,
-  ): T {
-    if (!foodOnly) return query
-    return query.in('department', this.getFoodOnlyDepartmentAllowList())
   }
 
   private getFoodOnlyDepartmentAllowList(): string[] {
@@ -1358,6 +858,29 @@ export class DatabaseService {
       if (cached && cached.expiresAt > now) {
         return cached.data
       }
+    }
+
+    const patterns = this.getCategoryMatchPatterns(categories)
+    try {
+      const serviceClient = createSupabaseServiceClient()
+      const { data, error } = await serviceClient.rpc('find_product_ids_for_categories', {
+        p_patterns: patterns,
+      })
+      if (!error && Array.isArray(data)) {
+        const result = data.map(String)
+        if (cacheKey) {
+          this.categoryProductIdsCache.set(cacheKey, {
+            data: result,
+            expiresAt: now + this.CATEGORY_PRODUCT_IDS_TTL_MS,
+          })
+        }
+        return result
+      }
+      if (error) {
+        console.warn('find_product_ids_for_categories RPC failed, using app-side fallback:', error.message)
+      }
+    } catch (e) {
+      console.warn('find_product_ids_for_categories RPC exception, using app-side fallback:', e)
     }
 
     const supabase = createSupabaseClient()

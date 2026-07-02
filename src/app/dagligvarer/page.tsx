@@ -11,6 +11,7 @@ import {
   addToShoppingList,
   createPriceAlert,
 } from '@/lib/dagligvarer-actions'
+import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
 
 
 // Types
@@ -85,10 +86,7 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
     <div className="relative h-40 bg-white flex items-center justify-center p-3 cursor-pointer" onClick={() => onOpenModal(product)}>
       {product.image_url ? (
         <img 
-          src={product.image_url.startsWith('http') 
-            ? `/api/images/proxy?url=${encodeURIComponent(product.image_url)}`
-            : product.image_url
-          } 
+          src={resolveDagligvarerImageSrc(product.image_url)}
           alt={product.name}
           className="max-w-full max-h-full object-contain transition-transform duration-200 group-hover:scale-105"
           onError={(e) => {
@@ -1407,11 +1405,8 @@ export default function DagligvarerPage() {
               {/* Product Image */}
               <div className="relative h-56 bg-white rounded-xl mb-4 flex items-center justify-center p-4 border border-gray-100">
                 {selectedProduct.image_url ? (
-                  <img 
-                    src={selectedProduct.image_url.startsWith('http') 
-                      ? `/api/images/proxy?url=${encodeURIComponent(selectedProduct.image_url)}`
-                      : selectedProduct.image_url
-                    } 
+                  <img
+                    src={resolveDagligvarerImageSrc(selectedProduct.image_url)}
                     alt={selectedProduct.name}
                     className="max-w-full max-h-full object-contain"
                   />

@@ -150,3 +150,33 @@ export async function resolveProductImageUrlWithLookup(
   const lookup = await buildEanImageLookup(supabase, [ean])
   return resolveProductImageUrl({ ...input, lookup })
 }
+
+/** Hosts der kan loades direkte uden proxy (CDN / kæde-domæner). */
+const DIRECT_DAGLIGVARER_IMAGE_HOST_SUFFIXES = [
+  'netto.dk',
+  'rema1000.dk',
+  'bilka.dk',
+  'foetex.dk',
+  'nemlig.com',
+  'meny.dk',
+  'cloudinary.com',
+  'digitaloceanspaces.com',
+  'amazonaws.com',
+  'googleusercontent.com',
+  'gstatic.com',
+] as const
+
+export function resolveDagligvarerImageSrc(url: string | null | undefined): string {
+  if (!url || !String(url).trim()) return ''
+  const trimmed = String(url).trim()
+  if (!trimmed.startsWith('http')) return trimmed
+  try {
+    const host = new URL(trimmed).hostname.toLowerCase()
+    if (DIRECT_DAGLIGVARER_IMAGE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) {
+      return trimmed
+    }
+  } catch {
+    // fall through to proxy
+  }
+  return `/api/images/proxy?url=${encodeURIComponent(trimmed)}`
+}

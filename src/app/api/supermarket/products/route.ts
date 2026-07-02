@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { databaseService } from '@/lib/database-service'
 
+export const maxDuration = 60
+
 const MAX_PAGE = 10_000
 const MAX_LIMIT = 100
 const MAX_FILTER_VALUES = 20
