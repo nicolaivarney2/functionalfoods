@@ -1,0 +1,34 @@
+---
+description: Brug aldrig Supabase MCP til Functionalfoods — den peger på Fooddata
+alwaysApply: true
+---
+
+# Supabase MCP — brug IKKE i dette repo
+
+**Cursor's Supabase MCP-plugin er koblet til Fooddata-projektet, ikke Functionalfoods' app-database.**
+
+## Agent må ALDRIG
+
+- Kalde Supabase MCP-tools (`execute_sql`, `list_tables`, `apply_migration`, `list_migrations`, osv.) for at undersøge Functionalfoods' schema, kommentarer, brugere, opskrifter eller migration-status
+- Antage at SQL-resultater fra Supabase MCP gælder functionalfoods.dk eller FF-appen
+- Foreslå at køre migrationer via Supabase MCP mod "projektet" — det rammer forkert database
+
+## To separate databaser
+
+| Database | Formål | Env / adgang |
+|----------|--------|--------------|
+| **Functionalfoods (FF)** | Opskrifter, kommentarer, madbudget, brugere, auth | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| **Fooddata (grocery)** | Dagligvarer, tilbud, product matches | `GROCERY_SUPABASE_URL`, `GROCERY_SUPABASE_SERVICE_ROLE_KEY` |
+
+Se også [src/grocery/README.md](mdc:src/grocery/README.md).
+
+## Hvad agenten skal bruge i stedet
+
+- **Schema:** filer i `supabase/migrations/` og `scripts/fooddata-schema/` (læs kode, ikke live DB via MCP)
+- **API-adfærd:** kald functionalfoods.dk API-ruter eller læs `src/app/api/**`
+- **Fooddata-specifikke scripts:** `npm run` scripts med `--app=ff` / grocery-env som dokumenteret i handoff-docs
+- **Live FF-database:** brugeren tjekker i Functionalfoods' Supabase Dashboard — agenten gætter ikke via MCP
+
+## Hvis brugeren vil fjerne forvirringen helt
+
+Deaktiver Supabase MCP-plugin under **Cursor Settings → MCP** (marketplace-plugin, ikke projektets `.cursor/mcp.json`).

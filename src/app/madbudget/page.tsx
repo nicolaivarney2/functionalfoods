@@ -9,6 +9,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
 import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } from '@/lib/meal-plan-system'
+import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
@@ -2566,6 +2567,12 @@ export default function MadbudgetPage() {
       
       // Step 4: Check family factors
       setGenerationProgress(generationSteps[3])
+
+      const weekInfoForGen = getWeekInfo(targetWeek)
+      const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(
+        savedMealPlans,
+        weekInfoForGen.weekStartDate,
+      )
       
       // Actually generate the meal plan
       const weekPlan = await mealPlanGenerator.generateOneWeekMealPlan(
@@ -2592,6 +2599,7 @@ export default function MadbudgetPage() {
           selectedStores: familyProfile.selectedStores,
           prioritizeOrganic: familyProfile.prioritizeOrganic,
           prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
+          recentlyUsedRecipeIds,
         },
         variationLevel
       )

@@ -51,6 +51,7 @@ import {
 import { applyKetoShoppingListRules, isKetoDietaryApproach } from './keto-shopping-list';
 
 import { buildAcceptableDietKeys, recipeDietTagMatches, resolveFactoryDietId } from '../diet-tag-matching';
+import { madbudgetStoreIdsToSlugs } from '../madbudget-stores';
 
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
@@ -64,6 +65,25 @@ export class MealPlanGenerator {
 
   constructor() {
     this.recipesLoadPromise = this.initializeRealRecipes()
+  }
+
+  /** Nulstil tilstand mellem hver generering — singleton må ikke genbruge forrige uges valg. */
+  private resetGenerationState(): void {
+    this.usedRecipes.clear()
+    this.dailyUsedRecipes.clear()
+    this.recipeLastUsed.clear()
+    this.selectedIngredientIds.clear()
+    this.currentOffers.clear()
+  }
+
+  /** Undgå gentagne retter fra seneste madplaner (typisk forrige uge). */
+  public seedRecentlyUsedRecipeIds(recipeIds: string[]): void {
+    const now = new Date()
+    for (const id of recipeIds) {
+      if (!id) continue
+      this.usedRecipes.add(id)
+      this.recipeLastUsed.set(id, now)
+    }
   }
 
   /**
@@ -487,12 +507,18 @@ export class MealPlanGenerator {
        * vægttabsprofil med dietaryApproach — ellers ville planen altid falde til 'sense'.
        */
       includedRecipeCategories?: string[]
+      /** Recipe IDs fra seneste madplaner — undgås ved ny generering. */
+      recentlyUsedRecipeIds?: string[]
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
     const startTime = Date.now();
 
     await this.recipesLoadPromise
+    this.resetGenerationState()
+    if (familyProfile.recentlyUsedRecipeIds?.length) {
+      this.seedRecentlyUsedRecipeIds(familyProfile.recentlyUsedRecipeIds)
+    }
 
     const { createSupabaseClient } = await import('../supabase')
     await ingredientService.ensureLoadedFromDatabase(createSupabaseClient())
@@ -879,7 +905,7 @@ export class MealPlanGenerator {
     weekNumber: number,
     config: MealPlanConfig
   ): Promise<WeekPlan> {
-    // Reset selected ingredients tracking for new week
+    // Per-uge overlap mellem måltider — ikke kryds-generering.
     this.selectedIngredientIds.clear();
     
     const days: DayPlan[] = [];
@@ -1306,22 +1332,22 @@ export class MealPlanGenerator {
 
     const candidates = avoidRecentlyUsed.length > 0 ? avoidRecentlyUsed : unusedTodayRecipes
 
-    // Select from top 3 unused recipes today with some randomness
-    // But prioritize recipes with ingredient overlap (smaller shopping list)
-    const topRecipes = candidates.slice(0, Math.min(3, candidates.length));
-    
-    // Sort by overlap score (recipes with more shared ingredients first)
+    // Top 5 kandidater — variation først, overlap som tiebreaker (især aftensmad).
+    const poolSize = mealType === MealType.Dinner ? 5 : 3
+    const topRecipes = candidates.slice(0, Math.min(poolSize, candidates.length));
+
     topRecipes.sort((a, b) => {
-      const aOverlap = this.countIngredientOverlap(a.recipe);
-      const bOverlap = this.countIngredientOverlap(b.recipe);
-      if (aOverlap !== bOverlap) {
-        return bOverlap - aOverlap; // Higher overlap first
+      if (b.score !== a.score) return b.score - a.score
+      const aOverlap = this.countIngredientOverlap(a.recipe)
+      const bOverlap = this.countIngredientOverlap(b.recipe)
+      if (mealType === MealType.Dinner) {
+        // Aftensmad: undgå samme "kød + sauce"-ret gentaget — overlap mindre vigtigt.
+        return aOverlap - bOverlap
       }
-      return b.score - a.score; // Then by total score
+      return bOverlap - aOverlap
     });
-    
-    // Prefer recipes with overlap, but add some randomness
-    const randomIndex = Math.floor(Math.random() * Math.min(2, topRecipes.length)); // Top 2 instead of top 3
+
+    const randomIndex = Math.floor(Math.random() * Math.min(3, topRecipes.length));
     const selectedRecipe = topRecipes[randomIndex].recipe;
     
     // Track selected ingredients for overlap scoring
@@ -2320,8 +2346,13 @@ export class MealPlanGenerator {
         return;
       }
 
-      // Convert store IDs to strings for database query
-      const storeIds = selectedStores.map(id => id.toString());
+      // Convert store IDs to fooddata slugs (ikke numeriske "1","2"…)
+      const storeIds = madbudgetStoreIdsToSlugs(selectedStores);
+      if (storeIds.length === 0) {
+        console.log('⚠️ No valid store slugs, skipping offer loading');
+        this.currentOffers.clear();
+        return;
+      }
       
       // Get offers from database - only on sale items
       const { products, total } = await databaseService.getSupermarketProductsV2(
@@ -2330,7 +2361,7 @@ export class MealPlanGenerator {
         undefined, // All categories
         true, // offersOnly = true
         undefined, // No search filter
-        storeIds, // Filter by selected stores
+        storeIds, // Filter by selected stores (slugs)
         true, // foodOnly = true (exclude non-food departments)
         false, // organicOnly = false (we'll handle this separately)
         true // excludeSnacksAndDrinks for meal-plan offer matching

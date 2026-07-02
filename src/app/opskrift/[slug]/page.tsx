@@ -1,18 +1,21 @@
 import { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { databaseService } from '@/lib/database-service'
 import { generateRecipeStructuredData, generateBreadcrumbStructuredData } from '@/lib/structured-data'
 import RecipePageClient from '@/components/RecipePageClient'
 import RecipeHeaderActions from '@/components/RecipeHeaderActions'
 import { RecipeEngagementProvider } from '@/contexts/RecipeEngagementContext'
 import NutritionFactsBox from '@/components/NutritionFactsBox'
+import { isFfAppClient } from '@/lib/ff-app-client'
 
 // Dynamisk: så pageViews (besøgstæller) og andre DB-felter er friske ved refresh — ellers kan ISR vise samme tal i timevis.
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ slug: string }>
+  searchParams: Promise<{ ff_client?: string }>
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -69,8 +72,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default async function RecipePage({ params }: PageProps) {
+export default async function RecipePage({ params, searchParams }: PageProps) {
   const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  const headerStore = await headers()
+  const hideComments = isFfAppClient({
+    ffClientHeader: headerStore.get('x-ff-client'),
+    ffClientQuery: resolvedSearchParams.ff_client,
+    userAgent: headerStore.get('user-agent'),
+  })
   const recipe = await databaseService.getPublishedRecipeBySlug(resolvedParams.slug)
   const relatedRecipeCandidates = await databaseService.getRecentPublishedRecipes(80, resolvedParams.slug)
 
@@ -187,7 +197,7 @@ export default async function RecipePage({ params }: PageProps) {
                 </div>
                 
                 {/* Recipe Meta Information */}
-                <RecipeHeaderActions recipe={recipe} />
+                <RecipeHeaderActions recipe={recipe} hideComments={hideComments} />
                 
                 {/* Recipe Tags */}
                 {recipe.dietaryCategories && recipe.dietaryCategories.length > 0 && (
@@ -228,9 +238,10 @@ export default async function RecipePage({ params }: PageProps) {
         </section>
 
         {/* Client-side interactive components */}
-        <RecipePageClient 
-          recipe={recipe} 
-          allRecipes={relatedRecipeCandidates} 
+        <RecipePageClient
+          recipe={recipe}
+          allRecipes={relatedRecipeCandidates}
+          hideComments={hideComments}
         />
       </main>
       </RecipeEngagementProvider>

@@ -33,6 +33,8 @@ const USER_ID_TABLES = [
   'family_profiles',
   'user_meal_plans',
   'user_saved_recipes',
+  'user_price_alert_groups',
+  'user_price_alert_meta',
   'user_price_alerts',
   'user_manual_shopping_items',
   'user_savings_totals',

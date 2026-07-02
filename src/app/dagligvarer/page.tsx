@@ -10,6 +10,8 @@ import {
   addToBasisliste,
   addToShoppingList,
   createPriceAlert,
+  createPriceAlertGroup,
+  previewPriceAlertGroup,
 } from '@/lib/dagligvarer-actions'
 import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
 
@@ -454,6 +456,8 @@ const STORES = [
   { id: 'ABC Lavpris', name: 'ABC Lavpris', icon: '🔤' }
 ]
 
+const ALL_STORE_IDS = STORES.map((store) => store.id)
+
 export default function DagligvarerPage() {
   const { user } = useAuth()
   // State
@@ -480,6 +484,20 @@ export default function DagligvarerPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [groupPreview, setGroupPreview] = useState<{
+    matchCount: number
+    storeCount: number
+    canCreateGroup: boolean
+  } | null>(null)
+  const [groupPreviewLoading, setGroupPreviewLoading] = useState(false)
+
+  /** Tom liste = alle butikker valgt (Planomo-adfærd). */
+  const isStoreSelected = useCallback(
+    (storeId: string) => selectedStores.length === 0 || selectedStores.includes(storeId),
+    [selectedStores],
+  )
+
+  const effectiveStoreFilter = selectedStores.length === 0 ? ALL_STORE_IDS : selectedStores
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -513,6 +531,31 @@ export default function DagligvarerPage() {
       showToast(err instanceof Error ? err.message : 'Noget gik galt')
     }
   }, [requireAuth, showToast])
+
+  const handlePriceAlertGroup = useCallback(async (
+    thresholdType: 'any_sale' | 'min_discount' = 'any_sale',
+    minDiscountPct?: number,
+  ) => {
+    if (!requireAuth()) return
+    const q = searchQuery.trim()
+    if (q.length < 2) return
+    try {
+      const result = await createPriceAlertGroup({
+        searchQuery: q,
+        label: q,
+        storeIds: effectiveStoreFilter,
+        thresholdType,
+        minDiscountPct,
+      })
+      showToast(
+        result.type === 'group'
+          ? `Prisalarm oprettet på «${q}» (${result.type === 'group' ? 'gruppe' : 'enkelt'})`
+          : 'Prisalarm oprettet',
+      )
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Noget gik galt')
+    }
+  }, [requireAuth, searchQuery, effectiveStoreFilter, showToast])
 
   const handlePriceAlert = useCallback(async (
     product: Product,
@@ -593,7 +636,7 @@ export default function DagligvarerPage() {
       if (selectedCategories.length > 0) {
         params.append('categories', selectedCategories.join(','))
       }
-      if (selectedStores.length > 0) params.append('stores', selectedStores.join(','))
+      if (selectedStores.length > 0) params.append('stores', effectiveStoreFilter.join(','))
       if (searchQuery.trim()) {
         params.append('search', searchQuery.trim())
       }
@@ -638,7 +681,7 @@ export default function DagligvarerPage() {
         abortControllerRef.current = null
       }
     }
-  }, [selectedCategories, selectedStores, searchQuery, showOnlyOffers, showOnlyOrganic, sortBy])
+  }, [selectedCategories, effectiveStoreFilter, searchQuery, showOnlyOffers, showOnlyOrganic, sortBy])
 
   // Sort products function: tilbud først, derefter valgt sortering
   const sortProducts = (products: Product[], sortBy: string): Product[] => {
@@ -683,6 +726,31 @@ export default function DagligvarerPage() {
     setSearchQuery(value)
   }
 
+  // Preview grupperet prisalarm ved søgning (debounce ~400ms).
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 2) {
+      setGroupPreview(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setGroupPreviewLoading(true)
+      try {
+        const data = await previewPriceAlertGroup(q, effectiveStoreFilter)
+        setGroupPreview({
+          matchCount: data.matchCount ?? 0,
+          storeCount: data.storeCount ?? 0,
+          canCreateGroup: Boolean(data.canCreateGroup),
+        })
+      } catch {
+        setGroupPreview(null)
+      } finally {
+        setGroupPreviewLoading(false)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchQuery, effectiveStoreFilter])
+
   // Filter change handlers
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategories(prev => {
@@ -697,11 +765,15 @@ export default function DagligvarerPage() {
 
   const handleStoreToggle = (storeId: string) => {
     setSelectedStores(prev => {
-      if (prev.includes(storeId)) {
-        return prev.filter(id => id !== storeId)
-      } else {
-        return [...prev, storeId]
+      // "Alle valgt" (tom liste): klik på én → kun den butik
+      if (prev.length === 0) {
+        return [storeId]
       }
+      if (prev.includes(storeId)) {
+        const next = prev.filter(id => id !== storeId)
+        return next.length === 0 ? [] : next
+      }
+      return [...prev, storeId]
     })
     setCurrentPage(1)
   }
@@ -828,6 +900,8 @@ export default function DagligvarerPage() {
       } else {
         parts.push(`${selectedStores.length} butikker`)
       }
+    } else {
+      parts.push('Alle butikker')
     }
     return parts.length > 0 ? parts.join(' + ') : 'Alle produkter'
   }
@@ -880,6 +954,47 @@ export default function DagligvarerPage() {
               className="w-full pl-10 pr-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+
+          {searchQuery.trim().length >= 2 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Bell size={16} className="text-amber-600 shrink-0" />
+                <span className="font-medium text-amber-900">
+                  Prisalarm på «{searchQuery.trim()}»
+                </span>
+                {groupPreviewLoading ? (
+                  <span className="text-amber-700">Henter forhåndsvisning…</span>
+                ) : groupPreview ? (
+                  <span className="text-amber-800">
+                    {groupPreview.matchCount} varer · {groupPreview.storeCount} butikker
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePriceAlertGroup('any_sale')}
+                  className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                >
+                  Ved tilbud
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePriceAlertGroup('min_discount', 20)}
+                  className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  Min. 20% rabat
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePriceAlertGroup('min_discount', 30)}
+                  className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100"
+                >
+                  Min. 30% rabat
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1048,7 +1163,7 @@ export default function DagligvarerPage() {
                   onClick={() => setStoreAccordionOpen(!storeAccordionOpen)}
                   className="flex items-center justify-between w-full text-left text-sm font-medium text-gray-700 hover:text-gray-900"
                 >
-                  <span>Butikker ({selectedStores.length})</span>
+                  <span>Butikker ({selectedStores.length === 0 ? ALL_STORE_IDS.length : selectedStores.length})</span>
                   <ChevronDown size={16} className={`transform transition-transform ${storeAccordionOpen ? 'rotate-180' : ''}`} />
                 </button>
                 
@@ -1060,7 +1175,7 @@ export default function DagligvarerPage() {
                         <label key={store.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded text-sm group">
                           <input
                             type="checkbox"
-                            checked={selectedStores.includes(store.id)}
+                            checked={isStoreSelected(store.id)}
                             onChange={() => handleStoreToggle(store.id)}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
@@ -1187,7 +1302,7 @@ export default function DagligvarerPage() {
                   <div className="text-xs font-medium text-gray-500 mb-1.5 px-1">Butikker</div>
                   <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
                     {STORES.map(store => {
-                      const isSelected = selectedStores.includes(store.id)
+                      const isSelected = isStoreSelected(store.id)
                       const updateDay = STORE_UPDATE_SCHEDULE[store.name]
                       return (
                         <button

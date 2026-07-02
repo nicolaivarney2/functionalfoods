@@ -19,9 +19,14 @@ import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 interface RecipePageClientProps {
   recipe: Recipe
   allRecipes: Recipe[]
+  hideComments?: boolean
 }
 
-export default function RecipePageClient({ recipe, allRecipes }: RecipePageClientProps) {
+export default function RecipePageClient({
+  recipe,
+  allRecipes,
+  hideComments = false,
+}: RecipePageClientProps) {
   const [servings, setServings] = useState(recipe.servings || 2)
   const [currentRating, setCurrentRating] = useState(recipe.rating || 0)
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false)
@@ -101,12 +106,13 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
         </div>
       </section>
 
-      {/* Comment System */}
-      <section id="comments-section" className="bg-gray-50 py-12">
-        <div className="container">
-          <CommentSystem recipeSlug={recipe.slug} onCommentUpdate={handleCommentUpdate} />
-        </div>
-      </section>
+      {!hideComments && (
+        <section id="comments-section" className="bg-gray-50 py-12">
+          <div className="container">
+            <CommentSystem recipeSlug={recipe.slug} onCommentUpdate={handleCommentUpdate} />
+          </div>
+        </section>
+      )}
 
       {/* Social Sharing */}
       <section className="bg-white py-8">
@@ -149,16 +155,17 @@ export default function RecipePageClient({ recipe, allRecipes }: RecipePageClien
         </div>
       </div>
 
-      {/* Comment Scroll Button */}
-      <div className="fixed bottom-20 left-4 z-40">
-        <button
-          onClick={() => document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })}
-          className="flex items-center space-x-2 bg-white bg-opacity-90 backdrop-blur-sm rounded-lg p-2 shadow-lg text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <MessageCircle size={16} />
-          <span className="text-sm">Kommentarer ({commentCount})</span>
-        </button>
-      </div>
+      {!hideComments && (
+        <div className="fixed bottom-20 left-4 z-40">
+          <button
+            onClick={() => document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' })}
+            className="flex items-center space-x-2 bg-white bg-opacity-90 backdrop-blur-sm rounded-lg p-2 shadow-lg text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <MessageCircle size={16} />
+            <span className="text-sm">Kommentarer ({commentCount})</span>
+          </button>
+        </div>
+      )}
 
       {/* Floating Navigation */}
       <FloatingRecipeNavigation

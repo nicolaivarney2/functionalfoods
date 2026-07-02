@@ -115,7 +115,14 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Erstat tidligere madplan-entries i ugen (bevarer manuelle/opskrift-logninger).
+    // Erstat tidligere madplan-entries for denne plan + uge (bevarer manuelle logninger).
+    await supabase
+      .from('food_log_entries')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source', 'meal-plan')
+      .eq('meal_plan_id', plan.id)
+
     const { error: delErr } = await supabase
       .from('food_log_entries')
       .delete()
@@ -128,17 +135,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunne ikke rydde gamle madplan-entries', details: delErr.message }, { status: 500 })
     }
 
-    if (!rows.length) {
+    const dedupedRows: Record<string, unknown>[] = []
+    const seen = new Set<string>()
+    for (const row of rows) {
+      const key = `${row.logged_date}:${row.meal_type}:${row.recipe_id ?? row.title}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      dedupedRows.push(row)
+    }
+
+    if (!dedupedRows.length) {
       return NextResponse.json({ success: true, inserted: 0, weekStart, weekEnd })
     }
 
-    const { error: insErr } = await supabase.from('food_log_entries').insert(rows)
+    const { error: insErr } = await supabase.from('food_log_entries').insert(dedupedRows)
     if (insErr) {
       console.error('sync-meal-plan insert', insErr)
       return NextResponse.json({ error: 'Kunne ikke kopiere madplan til dagbog', details: insErr.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, inserted: rows.length, weekStart, weekEnd })
+    return NextResponse.json({ success: true, inserted: dedupedRows.length, weekStart, weekEnd })
   } catch (e) {
     console.error('diary/sync-meal-plan POST', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

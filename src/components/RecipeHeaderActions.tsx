@@ -8,9 +8,10 @@ import { useRecipeEngagementOptional } from '@/contexts/RecipeEngagementContext'
 
 interface RecipeHeaderActionsProps {
   recipe: Recipe
+  hideComments?: boolean
 }
 
-export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps) {
+export default function RecipeHeaderActions({ recipe, hideComments = false }: RecipeHeaderActionsProps) {
   const [displayedViews, setDisplayedViews] = useState(() => getDisplayedRecipeViewTotal(recipe))
 
   useEffect(() => {
@@ -112,14 +113,16 @@ export default function RecipeHeaderActions({ recipe }: RecipeHeaderActionsProps
         ) : null}
       </button>
       
-      <button
-        onClick={handleCommentsClick}
-        className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer min-w-0"
-        id="top-comments"
-      >
-        <MessageCircle size={14} />
-        <span className="truncate">Kommentarer ({commentCount})</span>
-      </button>
+      {!hideComments && (
+        <button
+          onClick={handleCommentsClick}
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer min-w-0"
+          id="top-comments"
+        >
+          <MessageCircle size={14} />
+          <span className="truncate">Kommentarer ({commentCount})</span>
+        </button>
+      )}
 
       {/* Simpel page counter */}
       <div className="flex items-center space-x-2 text-gray-600 shrink-0">

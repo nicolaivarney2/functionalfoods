@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
 import {
   getWeekInfo,
   getWeekInfoByOffset,
@@ -163,6 +164,15 @@ export async function POST(request: NextRequest) {
 
     const childrenAges = effectiveChildrenAges(profile.children ?? 0, profile.children_ages)
 
+    const { data: recentPlans } = await supabase
+      .from('user_meal_plans')
+      .select('week_start_date, meal_plan_data, updated_at')
+      .eq('user_id', user.id)
+      .order('week_start_date', { ascending: false })
+      .limit(4)
+
+    const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(recentPlans ?? [], weekInfo.weekStartDate)
+
     // Kør generatoren (samme input-form som web's klient-flow).
     const weekPlan = await mealPlanGenerator.generateOneWeekMealPlan(
       {
@@ -177,6 +187,7 @@ export async function POST(request: NextRequest) {
         includedRecipeCategories: Array.isArray(profile.included_recipe_categories)
           ? profile.included_recipe_categories
           : [],
+        recentlyUsedRecipeIds,
       },
       variationLevel
     )

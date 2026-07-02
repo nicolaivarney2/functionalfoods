@@ -41,6 +41,36 @@ export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
 /** Butikker brugeren kan vælge i madbudget/indkøbsundersøgelse. */
 export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG
 
+const MADBUDGET_NAME_TO_SLUG: Record<string, string> = {
+  'REMA 1000': 'rema-1000',
+  Netto: 'netto',
+  Føtex: 'foetex',
+  Bilka: 'bilka',
+  'Nemlig.com': 'nemlig',
+  MENY: 'meny',
+  Spar: 'spar',
+  Løvbjerg: 'loevbjerg',
+  'Min Købmand': 'min-koebmand',
+  Lidl: 'lidl',
+  '365 Discount': '365discount',
+  Kvickly: 'kvickly',
+  'Super Brugsen': 'superbrugsen',
+  Brugsen: 'brugsen',
+  'ABC Lavpris': 'abc-lavpris',
+}
+
+/** Map numeric madbudget store ids → fooddata store_id slugs. */
+export function madbudgetStoreIdsToSlugs(ids: number[]): string[] {
+  return [
+    ...new Set(
+      ids
+        .map((id) => MADBUDGET_STORE_CATALOG.find((s) => s.id === id)?.name)
+        .filter(Boolean)
+        .map((name) => MADBUDGET_NAME_TO_SLUG[name!] || name!.toLowerCase().replace(/\s+/g, '-')),
+    ),
+  ]
+}
+
 export function storesForSurvey(selectedStoreIds: number[] | null | undefined) {
   const ids = selectedStoreIds?.filter((n) => typeof n === 'number') ?? []
   if (ids.length === 0) return [...MADBUDGET_STORE_CATALOG]

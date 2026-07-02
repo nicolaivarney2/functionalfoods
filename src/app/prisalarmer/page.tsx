@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Bell, Trash2, ArrowLeft } from 'lucide-react'
+import { Bell, Trash2, ArrowLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { authFetch } from '@/lib/auth-fetch'
 
@@ -21,9 +21,19 @@ interface PriceAlert {
   triggered: boolean
 }
 
+interface PriceAlertGroup {
+  id: string
+  label: string
+  search_query: string
+  threshold_type: 'any_sale' | 'min_discount'
+  min_discount_pct: number | null
+  alertCount: number
+}
+
 export default function PrisalarmerPage() {
   const { user } = useAuth()
   const [alerts, setAlerts] = useState<PriceAlert[]>([])
+  const [groups, setGroups] = useState<PriceAlertGroup[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadAlerts = async () => {
@@ -33,6 +43,7 @@ export default function PrisalarmerPage() {
       if (res.ok) {
         const data = await res.json()
         setAlerts(data.alerts ?? [])
+        setGroups(data.groups ?? [])
       }
     } catch (err) {
       console.error('Failed to load price alerts:', err)
@@ -58,10 +69,25 @@ export default function PrisalarmerPage() {
     }
   }
 
-  const thresholdLabel = (alert: PriceAlert) => {
-    if (alert.threshold_type === 'any_sale') return 'Når varen er på tilbud'
-    return `Min. ${alert.min_discount_pct ?? 20}% rabat`
+  const removeGroup = async (id: string) => {
+    try {
+      const res = await authFetch(`/api/price-alerts/groups/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setGroups((prev) => prev.filter((g) => g.id !== id))
+      }
+    } catch (err) {
+      console.error('Failed to remove group:', err)
+    }
   }
+
+  const thresholdLabel = (type: 'any_sale' | 'min_discount', pct: number | null) => {
+    if (type === 'any_sale') return 'Når varen er på tilbud'
+    return `Min. ${pct ?? 20}% rabat`
+  }
+
+  const totalCount = alerts.length + groups.length
 
   if (!user) {
     return (
@@ -88,9 +114,9 @@ export default function PrisalarmerPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Prisalarmer</h1>
             <p className="text-gray-600">
-              {alerts.length === 0
+              {totalCount === 0
                 ? 'Du har ingen aktive alarmer'
-                : `${alerts.length} alarm${alerts.length === 1 ? '' : 'er'}`}
+                : `${totalCount} alarm${totalCount === 1 ? '' : 'er'}`}
             </p>
           </div>
         </div>
@@ -99,11 +125,11 @@ export default function PrisalarmerPage() {
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto" />
           </div>
-        ) : alerts.length === 0 ? (
+        ) : totalCount === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <Bell size={64} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-600 mb-4">
-              Opret en prisalarm fra et produktkort eller produktsiden under dagligvarer.
+              Opret en prisalarm fra et produktkort, produktsiden eller søgning under dagligvarer.
             </p>
             <Link
               href="/dagligvarer"
@@ -114,6 +140,41 @@ export default function PrisalarmerPage() {
           </div>
         ) : (
           <div className="space-y-4">
+            {groups.map((group) => (
+              <div
+                key={group.id}
+                className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4"
+              >
+                <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                  <Bell size={20} className="text-amber-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Link href={`/prisalarmer/gruppe/${group.id}`} className="block group">
+                    <h2 className="font-semibold text-gray-900 truncate group-hover:text-green-700">
+                      {group.label}
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      {group.alertCount} varer · {thresholdLabel(group.threshold_type, group.min_discount_pct)}
+                    </p>
+                  </Link>
+                </div>
+                <Link
+                  href={`/prisalarmer/gruppe/${group.id}`}
+                  className="p-2 text-gray-400 hover:text-green-600"
+                  aria-label="Se gruppe"
+                >
+                  <ChevronRight size={18} />
+                </Link>
+                <button
+                  onClick={() => removeGroup(group.id)}
+                  className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50"
+                  aria-label="Slet gruppe"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+
             {alerts.map((alert) => (
               <div
                 key={alert.id}
@@ -131,7 +192,7 @@ export default function PrisalarmerPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <h2 className="font-semibold text-gray-900 truncate">{alert.product_name}</h2>
-                      <p className="text-sm text-gray-500">{thresholdLabel(alert)}</p>
+                      <p className="text-sm text-gray-500">{thresholdLabel(alert.threshold_type, alert.min_discount_pct)}</p>
                     </div>
                     <button
                       onClick={() => removeAlert(alert.id)}

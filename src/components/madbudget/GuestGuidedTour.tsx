@@ -21,6 +21,7 @@ import {
   GUEST_DEMO_ADULT_PROFILES,
   GUEST_DEMO_DIETARY_OPTIONS,
 } from '@/lib/madbudget/guest-demo-data'
+import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
 import { ActivityLevel, WeightGoal } from '@/lib/dietary-system'
 
 export type GuestTourFamilyState = {
@@ -33,16 +34,29 @@ export type GuestTourFamilyState = {
   planDietaryApproach: string
 }
 
-const STORE_OPTIONS = [
-  { id: 1, name: 'REMA 1000', color: 'bg-blue-600' },
-  { id: 2, name: 'Netto', color: 'bg-yellow-500' },
-  { id: 3, name: 'Føtex', color: 'bg-blue-500' },
-  { id: 4, name: 'Bilka', color: 'bg-blue-700' },
-  { id: 6, name: 'MENY', color: 'bg-red-600' },
-  { id: 7, name: 'Spar', color: 'bg-red-500' },
-  { id: 9, name: 'Min Købmand', color: 'bg-orange-500' },
-  { id: 8, name: 'Løvbjerg', color: 'bg-green-600' },
+const STORE_COLORS = [
+  'bg-blue-600',
+  'bg-yellow-500',
+  'bg-blue-500',
+  'bg-blue-700',
+  'bg-purple-600',
+  'bg-red-600',
+  'bg-red-500',
+  'bg-green-600',
+  'bg-orange-500',
+  'bg-yellow-600',
+  'bg-teal-600',
+  'bg-rose-600',
+  'bg-indigo-600',
+  'bg-amber-600',
+  'bg-slate-600',
 ] as const
+
+const STORE_OPTIONS = MADBUDGET_SELECTABLE_STORES.map((store, index) => ({
+  id: store.id,
+  name: store.name,
+  color: STORE_COLORS[index % STORE_COLORS.length],
+}))
 
 const EXCLUDED_OPTIONS = [
   { id: 'red-meat', label: 'Rødt kød' },

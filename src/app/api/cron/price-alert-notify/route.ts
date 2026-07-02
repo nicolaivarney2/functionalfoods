@@ -61,21 +61,71 @@ async function run(): Promise<NextResponse> {
   for (const o of offers || []) offersByKey.set(`${o.product_id}:${o.store_id}`, o)
 
   // Find alarmer der er udløst OG har en ny pris siden sidste notifikation.
-  const toNotify: { alert: any; cents: number }[] = []
+  const triggeredAlerts: { alert: any; cents: number }[] = []
   for (const alert of alertList) {
     const offer = offersByKey.get(`${alert.product_id}:${alert.store_id}`)
     if (!isTriggered(alert, offer)) continue
     const cents = Math.round(Number(offer.current_price) * 100)
     if (alert.last_notified_price_cents === cents) continue
-    toNotify.push({ alert, cents })
+    triggeredAlerts.push({ alert, cents })
   }
 
-  if (toNotify.length === 0) {
+  if (triggeredAlerts.length === 0) {
     return NextResponse.json({ checked: alertList.length, notified: 0, sent: 0 })
   }
 
-  // Hent push-tokens for de berørte brugere.
-  const userIds = Array.from(new Set(toNotify.map((t) => t.alert.user_id)))
+  // Gruppe-id → label (én push pr. gruppe).
+  const groupIds = Array.from(
+    new Set(triggeredAlerts.map((t) => t.alert.group_id).filter(Boolean)),
+  ) as string[]
+  const groupLabels = new Map<string, string>()
+  if (groupIds.length > 0) {
+    const { data: groups } = await supabase
+      .from('user_price_alert_groups')
+      .select('id, label')
+      .in('id', groupIds)
+    for (const g of groups || []) groupLabels.set(g.id, g.label)
+  }
+
+  type NotifyItem =
+    | { kind: 'group'; userId: string; groupId: string; label: string; count: number; alertIds: string[]; centsByAlert: Map<string, number> }
+    | { kind: 'single'; alert: any; cents: number }
+
+  const notifyItems: NotifyItem[] = []
+  const groupedByKey = new Map<string, { alert: any; cents: number }[]>()
+  const singles: { alert: any; cents: number }[] = []
+
+  for (const item of triggeredAlerts) {
+    if (item.alert.group_id) {
+      const key = `${item.alert.user_id}:${item.alert.group_id}`
+      const arr = groupedByKey.get(key) ?? []
+      arr.push(item)
+      groupedByKey.set(key, arr)
+    } else {
+      singles.push(item)
+    }
+  }
+
+  for (const [key, items] of groupedByKey) {
+    const [userId, groupId] = key.split(':')
+    const label = groupLabels.get(groupId) || items[0]?.alert.product_name || 'Prisalarm'
+    const centsByAlert = new Map<string, number>()
+    for (const i of items) centsByAlert.set(i.alert.id, i.cents)
+    notifyItems.push({
+      kind: 'group',
+      userId,
+      groupId,
+      label,
+      count: items.length,
+      alertIds: items.map((i) => i.alert.id),
+      centsByAlert,
+    })
+  }
+  for (const item of singles) {
+    notifyItems.push({ kind: 'single', alert: item.alert, cents: item.cents })
+  }
+
+  const userIds = Array.from(new Set(notifyItems.map((n) => (n.kind === 'group' ? n.userId : n.alert.user_id))))
   const { data: tokens } = await supabase
     .from('user_push_tokens')
     .select('user_id, token')
@@ -89,33 +139,62 @@ async function run(): Promise<NextResponse> {
   }
 
   const messages: ExpoPushMessage[] = []
-  for (const { alert } of toNotify) {
-    const userTokens = tokensByUser.get(alert.user_id) ?? []
-    for (const token of userTokens) {
-      messages.push({
-        to: token,
-        title: 'Tilbud på din prisalarm 🔔',
-        body: `${alert.product_name} er på tilbud nu.`,
-        data: { type: 'price_alert', productId: alert.product_id, storeId: alert.store_id },
-      })
+  for (const item of notifyItems) {
+    if (item.kind === 'group') {
+      const userTokens = tokensByUser.get(item.userId) ?? []
+      const body =
+        item.count === 1
+          ? `${item.label} er på tilbud nu.`
+          : `${item.label}: ${item.count} varer er på tilbud nu.`
+      for (const token of userTokens) {
+        messages.push({
+          to: token,
+          title: 'Tilbud på din prisalarm 🔔',
+          body,
+          data: { type: 'price_alert_group', groupId: item.groupId },
+        })
+      }
+    } else {
+      const userTokens = tokensByUser.get(item.alert.user_id) ?? []
+      for (const token of userTokens) {
+        messages.push({
+          to: token,
+          title: 'Tilbud på din prisalarm 🔔',
+          body: `${item.alert.product_name} er på tilbud nu.`,
+          data: { type: 'price_alert', productId: item.alert.product_id, storeId: item.alert.store_id },
+        })
+      }
     }
   }
 
   const sent = await sendExpoPush(messages)
 
-  // Markér som notificeret (uanset om brugeren havde et token), så vi ikke
-  // gen-scanner samme pris hver kørsel.
   const now = new Date().toISOString()
-  await Promise.all(
-    toNotify.map(({ alert, cents }) =>
-      supabase
-        .from('user_price_alerts')
-        .update({ last_triggered_at: now, last_notified_price_cents: cents })
-        .eq('id', alert.id)
-    )
-  )
+  const updateTasks: PromiseLike<unknown>[] = []
+  for (const item of notifyItems) {
+    if (item.kind === 'group') {
+      for (const alertId of item.alertIds) {
+        const cents = item.centsByAlert.get(alertId)
+        if (cents == null) continue
+        updateTasks.push(
+          supabase
+            .from('user_price_alerts')
+            .update({ last_triggered_at: now, last_notified_price_cents: cents })
+            .eq('id', alertId),
+        )
+      }
+    } else {
+      updateTasks.push(
+        supabase
+          .from('user_price_alerts')
+          .update({ last_triggered_at: now, last_notified_price_cents: item.cents })
+          .eq('id', item.alert.id),
+      )
+    }
+  }
+  await Promise.all(updateTasks)
 
-  return NextResponse.json({ checked: alertList.length, notified: toNotify.length, sent })
+  return NextResponse.json({ checked: alertList.length, notified: notifyItems.length, sent })
 }
 
 export async function GET(request: NextRequest) {
