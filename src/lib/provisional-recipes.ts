@@ -203,6 +203,25 @@ Returnér KUN gyldig JSON i præcis dette format:
   "clarifyingQuestions": ["Hvor stor en portion var det?", "Var der sukker eller honning i?"]
 }`
 
+/** Trækker JSON-objekt ud af et LLM-svar (tåler markdown-fences og indlejret tekst). */
+function extractJsonObject(content: string): string | null {
+  const trimmed = content.trim()
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const candidate = fenced ? fenced[1].trim() : trimmed
+  const start = candidate.indexOf('{')
+  if (start === -1) return null
+  let depth = 0
+  for (let i = start; i < candidate.length; i++) {
+    const ch = candidate[i]
+    if (ch === '{') depth++
+    else if (ch === '}') {
+      depth--
+      if (depth === 0) return candidate.slice(start, i + 1)
+    }
+  }
+  return null
+}
+
 /** Trækker første JSON-objekt ud af et LLM-svar (tåler markdown-fences). */
 export function parseVisionRecipe(content: string): {
   title: string
@@ -217,9 +236,9 @@ export function parseVisionRecipe(content: string): {
   nutrition: ProvisionalNutrition
   clarifyingQuestions: ClarifyingQuestion[]
 } {
-  const match = content.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('Intet JSON i AI-svar')
-  const raw = JSON.parse(match[0]) as Record<string, unknown>
+  const jsonText = extractJsonObject(content)
+  if (!jsonText) throw new Error('Intet JSON i AI-svar')
+  const raw = JSON.parse(jsonText) as Record<string, unknown>
 
   return {
     title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim().slice(0, 150) : 'Foreløbig opskrift',

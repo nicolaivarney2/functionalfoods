@@ -84,12 +84,13 @@ export async function POST(request: NextRequest) {
             role: 'user',
             content: [
               { type: 'text', text: 'Analysér denne ret og lav en opskrift. Returnér kun JSON.' },
-              { type: 'image_url', image_url: { url: dataUrl, detail: 'low' } },
+              { type: 'image_url', image_url: { url: dataUrl, detail: 'auto' } },
             ],
           },
         ],
         temperature: 0.4,
         max_tokens: 1500,
+        response_format: { type: 'json_object' },
       })
       const content = completion.choices[0]?.message?.content
       if (!content) throw new Error('Tomt AI-svar')
