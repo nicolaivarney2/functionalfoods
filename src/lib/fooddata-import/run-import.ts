@@ -30,8 +30,8 @@ import {
 const BATCH_SIZE = 500
 const FETCH_PAGE_SIZE = 1000
 const MIN_UPSERT_BATCH = 25
-/** Daily import only needs recent snapshots; fooddata adds ~1 row/product/store/day. */
-const PRICE_HISTORY_IMPORT_WINDOW_DAYS = 7
+/** Daily import: ~1 new snapshot/product/store/day. FF already has older rows from prior runs. */
+const PRICE_HISTORY_IMPORT_WINDOW_DAYS = 3
 const PRICE_HISTORY_PRODUCT_CHUNK = 40
 
 function isStatementTimeout(message: string): boolean {
