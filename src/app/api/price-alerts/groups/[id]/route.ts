@@ -2,24 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
+import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
 
 export const dynamic = 'force-dynamic'
 
 type RouteContext = { params: Promise<{ id: string }> }
-
-function isTriggered(alert: Record<string, unknown>, offer: Record<string, unknown> | undefined): boolean {
-  if (!offer || !offer.is_on_sale) return false
-  if (alert.threshold_type === 'any_sale') return true
-  const discount =
-    offer.discount_percentage != null
-      ? Number(offer.discount_percentage)
-      : offer.normal_price && offer.current_price
-        ? Math.round(
-            ((Number(offer.normal_price) - Number(offer.current_price)) / Number(offer.normal_price)) * 100,
-          )
-        : 0
-  return discount >= Number(alert.min_discount_pct ?? 0)
-}
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
@@ -68,7 +55,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       const offer = offersByKey.get(`${alert.product_id}:${alert.store_id}`)
       const currentPrice = offer?.current_price != null ? Number(offer.current_price) : null
       const normalPrice = offer?.normal_price != null ? Number(offer.normal_price) : null
-      const isOnSale = Boolean(offer?.is_offer_active ?? offer?.is_on_sale)
+      const isOnSale = offerIsOnSale(offer)
       const discountPct = offer?.discount_percentage != null ? Number(offer.discount_percentage) : null
       return {
         ...alert,
@@ -77,7 +64,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         normalPrice,
         isOnSale,
         discountPct,
-        triggered: isTriggered(alert as Record<string, unknown>, offer),
+        triggered: isPriceAlertTriggered(alert as Record<string, unknown>, offer),
         productOfferId: offer?.id ?? alert.product_offer_id,
       }
     })

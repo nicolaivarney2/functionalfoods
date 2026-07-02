@@ -2,22 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
+import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
 
 export const dynamic = 'force-dynamic'
-
-function isTriggered(alert: Record<string, unknown>, offer: Record<string, unknown> | undefined): boolean {
-  if (!offer || !offer.is_on_sale) return false
-  if (alert.threshold_type === 'any_sale') return true
-  const discount =
-    offer.discount_percentage != null
-      ? Number(offer.discount_percentage)
-      : offer.normal_price && offer.current_price
-        ? Math.round(
-            ((Number(offer.normal_price) - Number(offer.current_price)) / Number(offer.normal_price)) * 100,
-          )
-        : 0
-  return discount >= Number(alert.min_discount_pct ?? 0)
-}
 
 async function enrichAlerts(
   supabase: ReturnType<typeof createSupabaseServiceClient>,
@@ -41,9 +28,9 @@ async function enrichAlerts(
         if (offer) {
           currentPrice = offer.current_price ?? null
           normalPrice = offer.normal_price ?? null
-          isOnSale = Boolean(offer.is_offer_active ?? offer.is_on_sale)
+          isOnSale = offerIsOnSale(offer as Record<string, unknown>)
           discountPct = offer.discount_percentage ?? null
-          triggered = isTriggered(alert, offer as Record<string, unknown>)
+          triggered = isPriceAlertTriggered(alert, offer as Record<string, unknown>)
         }
       }
 
@@ -58,6 +45,60 @@ async function enrichAlerts(
       }
     }),
   )
+}
+
+async function enrichGroups(
+  supabase: ReturnType<typeof createSupabaseServiceClient>,
+  groups: Record<string, unknown>[],
+  alertCounts: Map<string, number>,
+) {
+  if (groups.length === 0) return []
+
+  const groupIds = groups.map((g) => String(g.id))
+  const { data: groupAlerts } = await supabase
+    .from('user_price_alerts')
+    .select('group_id, product_id, store_id, threshold_type, min_discount_pct')
+    .in('group_id', groupIds)
+
+  const alertsByGroup = new Map<string, Record<string, unknown>[]>()
+  const productIds = new Set<string>()
+  for (const row of groupAlerts ?? []) {
+    if (!row.group_id) continue
+    const list = alertsByGroup.get(row.group_id) ?? []
+    list.push(row as Record<string, unknown>)
+    alertsByGroup.set(row.group_id, list)
+    if (row.product_id) productIds.add(String(row.product_id))
+  }
+
+  const offersByKey = new Map<string, Record<string, unknown>>()
+  if (productIds.size > 0) {
+    const { data: offers } = await supabase
+      .from('product_offers')
+      .select(
+        'product_id, store_id, current_price, normal_price, is_on_sale, discount_percentage, is_offer_active',
+      )
+      .in('product_id', Array.from(productIds))
+
+    for (const o of offers ?? []) {
+      offersByKey.set(`${o.product_id}:${o.store_id}`, o as Record<string, unknown>)
+    }
+  }
+
+  return groups.map((g) => {
+    const id = String(g.id)
+    const members = alertsByGroup.get(id) ?? []
+    let triggeredCount = 0
+    for (const alert of members) {
+      const offer = offersByKey.get(`${alert.product_id}:${alert.store_id}`)
+      if (isPriceAlertTriggered(alert, offer)) triggeredCount++
+    }
+    return {
+      ...g,
+      alertCount: alertCounts.get(id) ?? members.length,
+      triggeredCount,
+      triggered: triggeredCount > 0,
+    }
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -104,10 +145,11 @@ export async function GET(request: NextRequest) {
     }
 
     const enrichedAlerts = await enrichAlerts(supabase, (alerts ?? []) as Record<string, unknown>[])
-    const enrichedGroups = (groups ?? []).map((g) => ({
-      ...g,
-      alertCount: alertCounts.get(g.id) ?? 0,
-    }))
+    const enrichedGroups = await enrichGroups(
+      supabase,
+      (groups ?? []) as Record<string, unknown>[],
+      alertCounts,
+    )
 
     const lastSeenAt = meta?.last_seen_at ? new Date(meta.last_seen_at).getTime() : 0
     const unseenCount = enrichedAlerts.filter((a) => {

@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { sendExpoPush, type ExpoPushMessage } from '@/lib/push/send-expo-push'
+import { isPriceAlertTriggered } from '@/lib/price-alerts/trigger'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -18,18 +19,6 @@ function isAuthorized(request: Request): boolean {
   const bearer = (request.headers.get('authorization') ?? '').replace(/^Bearer\s+/i, '')
   const cronSecret = process.env.CRON_SECRET
   return Boolean(cronSecret && bearer === cronSecret)
-}
-
-function isTriggered(alert: any, offer: any): boolean {
-  if (!offer || !offer.is_on_sale) return false
-  if (alert.threshold_type === 'any_sale') return true
-  const discount =
-    offer.discount_percentage != null
-      ? Number(offer.discount_percentage)
-      : offer.normal_price && offer.current_price
-        ? Math.round(((offer.normal_price - offer.current_price) / offer.normal_price) * 100)
-        : 0
-  return discount >= (alert.min_discount_pct ?? 0)
 }
 
 async function run(): Promise<NextResponse> {
@@ -64,7 +53,7 @@ async function run(): Promise<NextResponse> {
   const triggeredAlerts: { alert: any; cents: number }[] = []
   for (const alert of alertList) {
     const offer = offersByKey.get(`${alert.product_id}:${alert.store_id}`)
-    if (!isTriggered(alert, offer)) continue
+    if (!isPriceAlertTriggered(alert, offer)) continue
     const cents = Math.round(Number(offer.current_price) * 100)
     if (alert.last_notified_price_cents === cents) continue
     triggeredAlerts.push({ alert, cents })
