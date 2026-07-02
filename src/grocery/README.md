@@ -123,27 +123,31 @@ through the server-side secret key. Public/anon traffic must go through our
 
 ## Data sources
 
-| Source | Chains | How | Products |
+| Source | Chains | How | Role |
 |---|---|---|---|
-| **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Direct queries to the public search index. Includes prices + campaign offers. | ~61k combined |
-| **REMA 1000 API** (`api.digital.rema1000.dk/api/v3`) | REMA 1000 | Public REST API, paginated by department. No GTIN (name-based cross-match only). | ~3.9k |
-| **Tjek/Squid API** (`squid-api.tjek.com/v2`) | Lidl, MENY, SPAR, Min Købmand, Løvbjerg, ABC Lavpris, Kvickly, SuperBrugsen, Brugsen, 365discount, Nemlig | Weekly leaflet offers (no full catalog, no GTIN). Skips Salling + REMA by default since we have their canonical sources. | ~3.4k offers across 11 chains |
-| **Nemlig (deferred)** | Nemlig.com full catalog | Stateful API — see `adapters/nemlig/TODO.md` | 0 |
-| **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Brugsen, 365discount, Løvbjerg, ABC Lavpris, Nemlig | Offers-only chains without Salling/REMA catalog. Writes to **this DB** (`source=goma`). FF + Planomo consume via fooddata-import / direct reads. Skips Netto/Bilka/Føtex/REMA. Tjek remains cold backup in DB. | varies |
+| **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Native scrape → fooddata | **Primary** — fuldt katalog + tilbud |
+| **REMA 1000 API** | REMA 1000 | Native scrape → fooddata | **Primary** — fuldt katalog |
+| **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Nemlig, Min Købmand, … | Goma cron → fooddata (`source=goma`) | **Primary** for all non-Salling/REMA chains |
+| ~~**Tjek/Squid**~~ | (alle ikke-native) | Udfaset jul 2026 | Legacy rækker i DB — **importeres ikke** når `GOMA_IMPORT_ENABLED=true` |
+
+Se også [PLANOMO_FOODDATA_GOMA_HANDOFF.md](../docs/PLANOMO_FOODDATA_GOMA_HANDOFF.md) for Planomo-spejl.
 
 ### Goma adapter (`adapters/goma/`)
 
-When `GOMA_IMPORT_ENABLED=true` on Vercel:
+When `GOMA_IMPORT_ENABLED=true` (påkrævet på Vercel + GitHub Actions):
 
-1. **Goma cron** → `syncGoma()` med **per-kæde strategi**:
-   - **Kun tilbud** (Lidl, Coop, Brugsen, …): `p_on_sale_only=true`, 8×200.
-   - **Fuldt katalog** (MENY, Spar, Nemlig, Min Købmand): `p_on_sale_only=false`, paginerer hele kataloget (150×250 max).
-2. **fooddata-import** (GitHub 05:00 UTC) copies `source=goma` rows to FF main DB for offers-only chains.
-3. **Planomo** reads from fooddata directly (same Supabase).
+1. **Goma cron** (02:00 + 14:00 UTC) → `syncGoma()` → fooddata (`source=goma`), deaktiverer legacy `tjek:*` per kæde
+2. **Native cron** (04:00 UTC) → Salling + REMA → fooddata (springer Tjek over)
+3. **fooddata-import** (GitHub 05:00 UTC) → kopierer `source=goma` + native til FF main DB
+4. **Planomo** → læser fooddata direkte (samme rækker)
 
-Fallback if Goma closes: set `GOMA_IMPORT_ENABLED=false` — fooddata-import switches to `tjek:*` offers for those chains (Tjek data already in DB from nightly scrape).
+Per-kæde Goma-strategi:
+- **Kun tilbud:** Lidl, Coop-kæder, Løvbjerg, ABC Lavpris, … (`p_on_sale_only=true`)
+- **Fuldt katalog:** MENY, Spar, Nemlig, Min Købmand (`p_on_sale_only=false`)
 
-Requires on Vercel: `GOMA_API_KEY`, `GOMA_IMPORT_ENABLED`, `GROCERY_SUPABASE_URL`, `GROCERY_SUPABASE_SECRET_KEY`.
+Nød-fallback: `GOMA_IMPORT_ENABLED=false` — importerer `tjek:*` igen (ikke anbefalet).
+
+Requires: `GOMA_API_KEY`, `GOMA_IMPORT_ENABLED=true`, `GROCERY_SUPABASE_*` på Vercel; `GOMA_IMPORT_ENABLED=true` i GitHub FF environment.
 
 ### Tjek adapter operational guardrails
 

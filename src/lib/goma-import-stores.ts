@@ -1,9 +1,10 @@
 /**
- * Which chains get tilbud via Goma vs fooddata primary adapters.
+ * Which chains get tilbud via Goma vs native fooddata scrapes.
  *
- * Policy (2026-06): Goma → fooddata (grocery DB) for offers-only kæder.
- * fooddata-import kopierer source=goma til FF når GOMA_IMPORT_ENABLED=true.
- * Tjek/Squid i grocery-DB er cold backup — importeres som tjek:* når Goma slås fra.
+ * Strategi (jul 2026):
+ *   Native scrape → fooddata: Netto, Bilka, Føtex, REMA 1000
+ *   Goma → fooddata: alle øvrige kæder (source=goma)
+ *   Tjek: udfaset — importeres ikke til FF når GOMA_IMPORT_ENABLED=true
  */
 
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'

@@ -88,6 +88,9 @@ export function mapGomaToOffer(
 
   const beforeCents = toCents(p.normal_price)
   const { isOnSale, isOfferActive, discountPct } = resolveSaleState(p)
+  // Shelf availability from Goma — NOT tied to sale state. Full-catalog chains
+  // (Nemlig, MENY, …) must stay visible even when not on sale.
+  const inStock = p.is_available !== false
 
   return {
     product_id: productUuid,
@@ -102,7 +105,7 @@ export function mapGomaToOffer(
     offer_description: null,
     multibuy: null,
     discount_percentage: isOfferActive ? discountPct : null,
-    in_stock: p.is_available && isOfferActive,
+    in_stock: inStock,
     source: SYNC_SOURCE,
     source_synced_at: syncedAt,
     raw_data: {

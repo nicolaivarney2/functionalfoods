@@ -169,6 +169,25 @@ async function upsertProductsAndOffers(
   return processed
 }
 
+/** Goma er primær — arkivér Tjek-tilbud for samme kæde i fooddata. */
+async function deactivateTjekOffersForChain(chain: SourceChain): Promise<void> {
+  const supabase = getGroceryServiceClient()
+  const { error } = await supabase
+    .from('product_offers')
+    .update({
+      in_stock: false,
+      is_on_sale: false,
+      discount_percentage: null,
+    })
+    .eq('store_id', chain)
+    .like('source', 'tjek%')
+  if (error) {
+    console.warn(`⚠️ Kunne ikke deaktivere Tjek-tilbud for ${chain}:`, error.message)
+  } else {
+    console.log(`🗑️ ${chain}: legacy Tjek-tilbud deaktiveret i fooddata (Goma er primær)`)
+  }
+}
+
 async function verifyAndDeactivateStaleOffers(
   chain: SourceChain,
   storeName: string,
@@ -366,6 +385,8 @@ async function syncGomaStore(
     syncedOfferSourceIds,
     params.useSyncedIdsForVerify,
   )
+
+  await deactivateTjekOffersForChain(chain)
 
   return totalImported
 }

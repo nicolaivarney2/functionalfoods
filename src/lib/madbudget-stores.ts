@@ -14,8 +14,7 @@ export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set([
 
 /**
  * Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores).
- * Id 5 (Nemlig.com) er bevidst bevaret for id-troskab mod gemte profiler, men udelades fra
- * vælgeren — vi har ikke data derfra.
+ * Id 5 (Nemlig.com) er fuldt katalog via Goma/fooddata (synk søndag).
  *
  * Id 1–9 er de oprindelige kæder. Id 10–15 tilføjet efter /dagligvarer-udvidelsen
  * (Lidl, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris) — alle tilbuds-only,
@@ -39,13 +38,8 @@ export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 15, name: 'ABC Lavpris' },
 ]
 
-/** Id'er bevaret i kataloget for troskab, men ikke valgbare (ingen data). */
-const MADBUDGET_HIDDEN_STORE_IDS = new Set([5]) // Nemlig.com
-
-/** Butikker brugeren faktisk kan vælge — kun kæder vi har data for. */
-export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG.filter(
-  (s) => !MADBUDGET_HIDDEN_STORE_IDS.has(s.id)
-)
+/** Butikker brugeren kan vælge i madbudget/indkøbsundersøgelse. */
+export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG
 
 export function storesForSurvey(selectedStoreIds: number[] | null | undefined) {
   const ids = selectedStoreIds?.filter((n) => typeof n === 'number') ?? []

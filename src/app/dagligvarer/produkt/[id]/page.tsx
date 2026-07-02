@@ -47,6 +47,7 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
   'Føtex': 'Torsdag',
+  'Nemlig.com': 'Søndag',
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
   'Min Købmand': 'Torsdag',
@@ -698,6 +699,7 @@ export default function ProductPage() {
                           product.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
                           product.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
                           product.store === 'Føtex' ? 'border-blue-600 bg-blue-100' :
+                          product.store === 'Nemlig.com' ? 'border-orange-600 bg-orange-100' :
                           product.store === 'MENY' ? 'border-red-800 bg-red-100' :
                           product.store === 'Spar' ? 'border-red-600 bg-red-100' :
                           product.store === 'Min Købmand' ? 'border-orange-500 bg-orange-100' :
@@ -733,6 +735,7 @@ export default function ProductPage() {
                               similarProduct.store === 'REMA 1000' ? 'border-blue-900 bg-blue-100' :
                               similarProduct.store === 'Bilka' ? 'border-blue-400 bg-blue-100' :
                               similarProduct.store === 'Føtex' ? 'border-blue-600 bg-blue-100' :
+                              similarProduct.store === 'Nemlig.com' ? 'border-orange-600 bg-orange-100' :
                               similarProduct.store === 'MENY' ? 'border-red-800 bg-red-100' :
                               similarProduct.store === 'Spar' ? 'border-red-600 bg-red-100' :
                               similarProduct.store === 'Min Købmand' ? 'border-orange-500 bg-orange-100' :

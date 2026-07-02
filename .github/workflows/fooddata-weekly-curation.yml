@@ -1,8 +1,11 @@
 name: Fooddata Weekly Curation (FF)
 
+# Pull kurering fra fooddata → FF. Kører på GitHub runner (ikke Vercel HTTP)
+# for at undgå 300s function timeout på /api/admin/fooddata/weekly-curation.
+
 on:
   schedule:
-    # Onsdag 06:00 UTC ≈ 07:00 dansk (vinter) / 08:00 (sommer) — efter morgenens katalog-sync
+    # Onsdag 06:00 UTC ≈ 07:00 dansk (vinter) / 08:00 (sommer)
     - cron: '0 6 * * 3'
   workflow_dispatch:
 
@@ -10,44 +13,35 @@ jobs:
   fooddata-weekly-curation:
     runs-on: ubuntu-latest
     environment: FF
+    timeout-minutes: 45
+    env:
+      GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
+      GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
-      - name: Call FF weekly curation endpoint
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify required secrets
         run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "SITE_URL GitHub variable is not set."
-            exit 1
-          fi
+          missing=0
+          for v in GROCERY_SUPABASE_URL GROCERY_SUPABASE_SECRET_KEY NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "Missing: $v"
+              missing=1
+            fi
+          done
+          [ "$missing" = "0" ] || exit 1
 
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET GitHub secret is not set."
-            exit 1
-          fi
-
-          FORCE_FLAG=""
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            FORCE_FLAG="?force=true"
-          fi
-
-          echo "Calling fooddata weekly-curation on $SITE_URL ..."
-          curl -fsS --max-time 300 --retry 3 --retry-delay 5 -X POST \
-            -H "Content-Type: application/json" \
-            -H "x-cron-secret: $CRON_SECRET" \
-            -o /tmp/fooddata-weekly-curation.json \
-            "$SITE_URL/api/admin/fooddata/weekly-curation$FORCE_FLAG" || {
-            echo "HTTP request failed."
-            exit 1
-          }
-          echo "Svar fra endpoint:"
-          cat /tmp/fooddata-weekly-curation.json
-          echo ""
-          if ! command -v jq >/dev/null 2>&1; then
-            echo "jq mangler — springer success-check over."
-            exit 0
-          fi
-          if ! jq -e '.success == true' /tmp/fooddata-weekly-curation.json >/dev/null 2>&1; then
-            echo "Fejl: success er false."
-            exit 1
-          fi
+      - name: Run weekly curation (FF)
+        run: npx tsx scripts/fooddata-weekly-curation.ts --app=ff

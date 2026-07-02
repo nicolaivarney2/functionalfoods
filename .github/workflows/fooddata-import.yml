@@ -4,12 +4,9 @@ name: Fooddata Daily Import (incl. price history)
 #
 # Why GitHub Actions and not a Vercel cron: the full import takes ~12 min
 # (price_history alone ~11 min), which blows past Vercel's 300s function limit.
-# GitHub-hosted runners allow up to 6 hours per job, so there is no timeout risk.
 #
-# The Vercel scrape cron (/api/grocery/sync/cron) still runs at 04:00 UTC and
-# only refreshes the separate fooddata DB; THIS job copies that data into the
-# main FF DB (products + offers + price_history + match-queue) so /dagligvarer
-# and the savings charts actually reflect it.
+# Schedule: 05:00 UTC daily — after native scrape (04:00) + Goma sync (02:00/14:00).
+# Requires GOMA_IMPORT_ENABLED=true so import copies source=goma (not legacy tjek:*).
 
 on:
   schedule:
@@ -32,6 +29,7 @@ jobs:
       GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOMA_IMPORT_ENABLED: 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -1,16 +1,15 @@
 /**
- * Goma som primær tilbudskilde for kæder uden fuldt fooddata-katalog.
+ * Goma som primær tilbudskilde for kæder uden native scrape.
  *
- * Netto/Bilka/Føtex/REMA synces via fooddata (Salling/REMA). Goma skriver til
- * **fooddata** (grocery Supabase); FF main + Planomo læser via fooddata-import /
- * direkte fooddata-adgang. Tjek i grocery-DB er cold backup.
+ * Native (fooddata direkte): Netto, Bilka, Føtex, REMA 1000.
+ * Goma (via fooddata): Lidl, Coop-kæder, MENY, Spar, Nemlig, Min Købmand, …
+ * Tjek: udfaset — kun nød-fallback når GOMA_IMPORT_ENABLED=false.
  *
  * Env:
- * - GOMA_IMPORT_ENABLED=true      — daglig Goma sync for offers-only kæder
- * - GOMA_SIMULATE_GONE=true       — dev: ignorer legacy Goma product IDs (som production)
- * - GOMA_LEGACY_DATA_ENABLED=true — nød: genaktiver legacy Goma på production
- *
- * Production: simulateGone=true som standard (ingen env nødvendig på Vercel).
+ * - GOMA_IMPORT_ENABLED=true      — påkrævet på Vercel + GitHub Actions import
+ * - GOMA_SIMULATE_GONE=true       — dev: simuler manglende Goma (som gammel prod)
+ * - GOMA_LEGACY_DATA_ENABLED=true — nød: genaktiver legacy Goma product IDs i prissøgning
+ * - GROCERY_TJEK_DISABLED=true    — stop Tjek-scrape i fooddata (anbefalet med Goma)
  */
 
 export const GOMA_SUNSET_MESSAGE =
@@ -32,7 +31,7 @@ export function isGomaSimulateGone(): boolean {
   if (isGomaImportEnabled()) return false
   if (process.env.GOMA_SIMULATE_GONE === 'true') return true
   if (process.env.GOMA_SIMULATE_GONE === 'false') return false
-  // Live uden Goma-import: fooddata cutover — legacy Goma bruges ikke til priser/matches.
+  // Uden GOMA_IMPORT_ENABLED: legacy cutover — Goma product IDs bruges ikke til priser.
   return process.env.NODE_ENV === 'production'
 }
 

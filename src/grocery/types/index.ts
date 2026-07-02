@@ -49,7 +49,8 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   bilka: 'full',
   'rema-1000': 'full',
 
-  // Tjek-only (no full catalog adapter yet)
+  // Tjek/Squid API — udfaset jul 2026. Goma dækker alle ikke-native kæder.
+  // Behold adapter til manuel nød-kørsel; cron springes over når Goma er aktiv.
   lidl: 'offers-only',
   meny: 'offers-only',
   spar: 'offers-only',
@@ -61,9 +62,8 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   '365discount': 'offers-only',
   'abc-lavpris': 'offers-only',
 
-  // Tjek has 0 offers for Nemlig (online-only chain, no tilbudsavis) and
-  // we haven't built the stateful Nemlig adapter — see adapters/nemlig/TODO.md.
-  nemlig: 'none',
+  // Fuldt katalog via Goma (ikke Tjek)
+  nemlig: 'offers-only',
 }
 
 /** Human-readable Danish label for the coverage status. */

@@ -149,6 +149,71 @@ async function cleanupStaleGomaOffers(
   return cleaned
 }
 
+/** Goma-kæder — Tjek skal ikke længere vises i FF når Goma er primær. */
+const GOMA_CHAIN_STORE_IDS = [
+  'lidl',
+  '365discount',
+  'kvickly',
+  'superbrugsen',
+  'brugsen',
+  'meny',
+  'spar',
+  'loevbjerg',
+  'abc-lavpris',
+  'min-koebmand',
+  'nemlig',
+] as const
+
+async function cleanupTjekOffersForGomaChains(
+  ff: SupabaseClient,
+  log: (msg: string) => void,
+): Promise<number> {
+  const { count, error } = await ff
+    .from('product_offers')
+    .delete({ count: 'exact' })
+    .like('source', 'tjek%')
+    .in('store_id', [...GOMA_CHAIN_STORE_IDS])
+  if (error) {
+    log(`  ! cleanup (Tjek på Goma-kæder) fejlede: ${error.message}`)
+    return 0
+  }
+  const n = count ?? 0
+  if (n > 0) log(`  cleaned ${n} legacy Tjek-offers på Goma-kæder`)
+  return n
+}
+
+/** Pagineret id-hentning med timeout-retry (FF products-tabellen er stor). */
+async function fetchAllFfProductIds(
+  ff: SupabaseClient,
+  log: (msg: string) => void,
+): Promise<Set<string>> {
+  const ids = new Set<string>()
+  let from = 0
+  let pageSize = FETCH_PAGE_SIZE
+
+  while (true) {
+    const { data, error } = await ff
+      .from('products')
+      .select('id')
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1)
+
+    if (error) {
+      if (isStatementTimeout(error.message) && pageSize > 100) {
+        pageSize = Math.floor(pageSize / 2)
+        log(`  FF product ids: timeout, prøver pageSize=${pageSize}`)
+        continue
+      }
+      throw new Error(`FF products fetch failed: ${error.message}`)
+    }
+    if (!data?.length) break
+    for (const r of data as { id: string }[]) ids.add(r.id)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return ids
+}
+
 async function fetchAll<T = Record<string, unknown>>(
   client: SupabaseClient,
   table: string,
@@ -731,20 +796,7 @@ export async function runFooddataImport(
   // ─── 3. Product offers ──────────────────────────────────────────────────
   let ffProductIds: Set<string> | null = null
   if (!skipOffers || !skipHistory) {
-    ffProductIds = new Set<string>()
-    let from = 0
-    while (true) {
-      const { data, error } = await ff
-        .from('products')
-        .select('id')
-        .order('id', { ascending: true })
-        .range(from, from + FETCH_PAGE_SIZE - 1)
-      if (error) throw new Error(`FF products fetch failed: ${error.message}`)
-      if (!data || data.length === 0) break
-      for (const r of data as { id: string }[]) ffProductIds.add(r.id)
-      if (data.length < FETCH_PAGE_SIZE) break
-      from += FETCH_PAGE_SIZE
-    }
+    ffProductIds = await fetchAllFfProductIds(ff, log)
   }
 
   if (!skipOffers) {
@@ -768,7 +820,8 @@ export async function runFooddataImport(
       )
     }
     if (!dryRun && gomaImportEnabled) {
-      result.offers.cleaned = await cleanupStaleGomaOffers(ff, log)
+      result.offers.cleaned += await cleanupStaleGomaOffers(ff, log)
+      result.offers.cleaned += await cleanupTjekOffersForGomaChains(ff, log)
     }
     log(
       `  offers: ${dryRun ? `${mapped.length} (dry-run)` : result.offers.upserted}, ${result.offers.dropped} dropped` +

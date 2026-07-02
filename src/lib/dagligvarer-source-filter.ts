@@ -1,13 +1,15 @@
 /**
  * Dagligvarer / Planomo: hvilke product_offers.source rækker der vises.
  *
- * Når Goma-import er aktiv: source=goma for offers-only kæder, skjul gammel
- * Tjek (tilbudsavis-klip). Salling/REMA beholder fooddata-kilder.
+ * Strategi (jul 2026):
+ *   - Native: Netto, Bilka, Føtex, REMA (Salling/REMA scrapes → fooddata)
+ *   - Goma: alle øvrige kæder (source=goma i fooddata)
+ *   - Tjek: udfaset — skjules når GOMA_IMPORT_ENABLED=true
  */
 
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 import { GOMA_FULL_CATALOG_CHAINS } from '@/lib/goma-import-stores'
-import { isGomaLegacyDataEnabled } from '@/lib/goma-sunset'
+import { isGomaImportEnabled } from '@/lib/goma-sunset'
 
 /** store_id hvor Goma erstatter Tjek som primær tilbudskilde. */
 export const GOMA_PRIMARY_STORE_IDS: SourceChain[] = (
@@ -27,24 +29,24 @@ export const SALLING_FOODDATA_STORE_IDS = ['netto', 'bilka', 'foetex', 'rema-100
 
 type PostgrestFilterQuery = {
   neq(column: string, value: string): PostgrestFilterQuery
+  not(column: string, operator: string, value: string): PostgrestFilterQuery
   or(filters: string): PostgrestFilterQuery
 }
 
 /** PostgREST-filter på product_offers (app-side queries + fallback counts). */
 export function applyDagligvarerSourceFilter<T>(query: T): T {
   const q = query as PostgrestFilterQuery
-  if (!isGomaLegacyDataEnabled()) {
-    return q.neq('source', 'goma') as T
+  if (isGomaImportEnabled()) {
+    // Goma-primary: ingen Tjek — kun native + source=goma
+    return q.not('source', 'like', 'tjek%') as T
   }
-  const salling = SALLING_FOODDATA_STORE_IDS.join(',')
-  return q.or(
-    `source.eq.goma,not.source.like.tjek%,and(source.like.tjek%,store_id.in.(${salling}))`,
-  ) as T
+  // Legacy/nød: skjul goma, behold Tjek + native
+  return q.neq('source', 'goma') as T
 }
 
-/** Begræns Tjek-tælling i fallback når Goma er primær (kun Salling har Tjek-relevans). */
+/** Begræns Tjek-tælling i fallback — kun relevant når Goma ikke er primær. */
 export function applyDagligvarerTjekStoreFilter<T>(query: T): T {
-  if (!isGomaLegacyDataEnabled()) return query
+  if (isGomaImportEnabled()) return query
   return (query as { in(column: string, values: readonly string[]): T }).in(
     'store_id',
     SALLING_FOODDATA_STORE_IDS,
@@ -56,8 +58,13 @@ export function isGomaOffersOnlyStoreId(storeId?: string | null): boolean {
   return (GOMA_OFFERS_ONLY_STORE_IDS as readonly string[]).includes(storeId)
 }
 
-/** PostgREST .or() til tilbuds-scan: bevist rabat, Tjek, eller Goma offers-only. */
+/** PostgREST .or() til tilbuds-scan. */
 export function dagligvarerOfferScanOrFilter(): string {
+  if (isGomaImportEnabled()) {
+    const gomaOffers = GOMA_OFFERS_ONLY_STORE_IDS.join(',')
+    const gomaFull = GOMA_FULL_CATALOG_STORE_IDS.join(',')
+    return `normal_price.not.is.null,and(source.eq.goma,store_id.in.(${gomaOffers})),and(source.eq.goma,store_id.in.(${gomaFull}),is_on_sale.eq.true)`
+  }
   const gomaStores = GOMA_OFFERS_ONLY_STORE_IDS.join(',')
   return `normal_price.not.is.null,source.like.tjek%,and(source.eq.goma,store_id.in.(${gomaStores}))`
 }

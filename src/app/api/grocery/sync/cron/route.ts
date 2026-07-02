@@ -24,6 +24,7 @@ import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 import { syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
 import type { SourceChain } from '@/grocery/types'
+import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   getScheduledSyncForNow,
   scheduledStepIds,
@@ -192,10 +193,12 @@ async function handle(request: Request) {
     )
   }
 
-  // Tjek (squid-api) — weekly leaflet offers for all DK chains that we don't
-  // have a primary-source adapter for. Skips Salling + REMA by default since
-  // we already pulled their canonical catalogs above. Takes ~45-60s.
-  if (shouldRun('tjek')) {
+  // Tjek (squid-api) — udfaset jul 2026. Goma dækker alle ikke-native kæder.
+  // Spring over når GOMA_IMPORT_ENABLED=true (sæt GROCERY_TJEK_DISABLED=true som ekstra sikkerhed).
+  const tjekDisabled =
+    isGomaImportEnabled() || process.env.GROCERY_TJEK_DISABLED === 'true'
+
+  if (shouldRun('tjek') && !tjekDisabled) {
     steps.push(
       await runStep('tjek', async () => ({
         ...(await syncTjek(

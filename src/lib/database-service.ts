@@ -9,7 +9,7 @@ import {
   dagligvarerOfferScanOrFilter,
   isGomaOffersOnlyStoreId,
 } from '@/lib/dagligvarer-source-filter'
-import { isGomaLegacyDataEnabled } from '@/lib/goma-sunset'
+import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   buildEanImageLookup,
   collectEansNeedingImagesFromOfferRows,
@@ -151,6 +151,7 @@ export class DatabaseService {
     'baby og familie': 'Baby og familie',
     'frost': 'Frost',
     'kiosk': 'Kiosk',
+    'mad fra hele verden': 'Mad fra hele verden',
     'dyr': 'Dyr'
   }
 
@@ -166,6 +167,7 @@ export class DatabaseService {
     'Slik og snacks',
     'Frost',
     'Kiosk',
+    'Mad fra hele verden',
   ] as const
 
   /** Ekstra department-strenge i DB uden egen UI-fane (Planomo FOOD_ONLY_DEPARTMENT_EXTRA). */
@@ -469,7 +471,7 @@ export class DatabaseService {
       const supabase = createSupabaseServiceClient()
       const { data, error } = await supabase.rpc('get_product_counts_v2', {
         filter_food_only: foodOnly,
-        p_goma_primary: isGomaLegacyDataEnabled(),
+        p_goma_primary: isGomaImportEnabled(),
       })
       if (!error && data != null) {
         const parsed = this.parseProductCountsRpc(data)
@@ -1155,7 +1157,7 @@ export class DatabaseService {
         p_offset: offset,
         p_stores: storeIds,
         p_organic_only: !!organicOnly,
-        p_goma_primary: isGomaLegacyDataEnabled(),
+        p_goma_primary: isGomaImportEnabled(),
       })
       if (error) {
         console.warn('get_food_offers_v2 RPC unavailable, using app-side fallback:', error.message)
@@ -1471,6 +1473,8 @@ export class DatabaseService {
         return 'Lidl'
       case 'bilka':
         return 'Bilka'
+      case 'nemlig':
+        return 'Nemlig.com'
       case 'foetex':
       case 'fotex':
       case 'føtex':
@@ -1513,6 +1517,8 @@ export class DatabaseService {
       'Føtex': 'foetex',
       'Foetex': 'foetex',
       'Bilka': 'bilka',
+      'Nemlig': 'nemlig',
+      'Nemlig.com': 'nemlig',
       'MENY': 'meny',
       'MENU': 'meny',
       'Spar': 'spar',

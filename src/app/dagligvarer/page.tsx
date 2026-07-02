@@ -124,6 +124,7 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
         product.store === 'REMA 1000' ? 'border-blue-900' :
         product.store === 'Bilka' ? 'border-blue-400' :
         product.store === 'Føtex' ? 'border-blue-600' :
+        product.store === 'Nemlig.com' ? 'border-orange-600' :
         product.store === 'MENY' ? 'border-red-800' :
         product.store === 'Spar' ? 'border-red-600' :
         product.store === 'Min Købmand' ? 'border-orange-500' :
@@ -306,6 +307,7 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
   'Føtex': 'Torsdag',
+  'Nemlig.com': 'Søndag',
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
   'Min Købmand': 'Torsdag',
@@ -407,6 +409,7 @@ const CATEGORIES = [
   { id: 'Slik og snacks', name: 'Slik og snacks', icon: '🍿' },
   { id: 'Frost', name: 'Frost', icon: '❄️' },
   { id: 'Kiosk', name: 'Kiosk', icon: '🏪' },
+  { id: 'Mad fra hele verden', name: 'Mad fra hele verden', icon: '🌍' },
 ]
 
 /**
@@ -423,6 +426,7 @@ const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   Lidl: 'lidl',
   Bilka: 'bilka',
   'Føtex': 'foetex',
+  Nemlig: 'nemlig',
   MENY: 'meny',
   Spar: 'spar',
   'min-koebmand': 'min-koebmand',
@@ -441,6 +445,7 @@ const STORES = [
   { id: 'Lidl', name: 'Lidl', icon: '🟡' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
   { id: 'Føtex', name: 'Føtex', icon: '🔵' },
+  { id: 'Nemlig', name: 'Nemlig.com', icon: '🟠' },
   { id: 'MENY', name: 'MENY', icon: '🔴' }, // Goma uses "MENY" (not "MENU")
   { id: 'Spar', name: 'Spar', icon: '🔺' },
   { id: 'min-koebmand', name: 'Min Købmand', icon: '🛒' }, // DB store_id "min-koebmand"
@@ -1422,6 +1427,7 @@ export default function DagligvarerPage() {
                   selectedProduct.store === 'REMA 1000' ? 'border-blue-900' :
                   selectedProduct.store === 'Bilka' ? 'border-blue-400' :
                   selectedProduct.store === 'Føtex' ? 'border-blue-600' :
+                  selectedProduct.store === 'Nemlig.com' ? 'border-orange-600' :
                   selectedProduct.store === 'MENY' ? 'border-red-800' :
                   selectedProduct.store === 'Spar' ? 'border-red-600' :
                   selectedProduct.store === 'Min Købmand' ? 'border-orange-500' :
