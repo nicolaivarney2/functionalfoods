@@ -582,9 +582,7 @@ export default function DagligvarerPage() {
   const fetchCounts = useCallback(async () => {
     setCountsLoading(true)
     try {
-      const response = await fetch('/api/supermarket/products?counts=true&foodOnly=true', {
-        cache: 'no-store',
-      })
+      const response = await fetch('/api/supermarket/products?counts=true&foodOnly=true')
       const data = await response.json()
       if (data.success && data.counts) {
         setCounts(data.counts)

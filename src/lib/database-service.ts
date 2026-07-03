@@ -521,13 +521,7 @@ export class DatabaseService {
         return { products: [], total: 0, hasMore: false }
       }
 
-      let productIds: string[] | undefined
-      if (categoryFilter.length > 0) {
-        productIds = await this.findProductIdsForCategories(categoryFilter)
-        if (productIds.length === 0) {
-          return { products: [], total: 0, hasMore: false }
-        }
-      }
+      const useDepartmentFilter = categoryFilter.length > 0
 
       const fetchOpts: FoodOffersFetchOptions = {
         page,
@@ -535,9 +529,15 @@ export class DatabaseService {
         stores,
         offersOnly,
         organicOnly,
-        productIds,
-        categoryFilter: categoryFilter.length > 0 ? categoryFilter : undefined,
+        productIds: useDepartmentFilter ? undefined : productIds,
+        categoryFilter: useDepartmentFilter ? categoryFilter : undefined,
         search: search?.trim() || undefined,
+      }
+
+      if (useDepartmentFilter) {
+        const direct = await this.fetchFoodOffersViaDirectQuery(fetchOpts)
+        console.log('[OFFERS DIRECT category] ok')
+        return direct
       }
 
       const rpc = await this.fetchFoodOffersViaRpc(fetchOpts)
@@ -591,7 +591,11 @@ export class DatabaseService {
         return null
       }
 
-      const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[]
+      const rows = this.parseFoodOffersRpcRows(data)
+      if (rows.length === 0 && data != null && !Array.isArray(data)) {
+        console.warn('get_food_offers_v2 RPC returned unexpected shape, using direct query fallback')
+        return null
+      }
       const hasMore = rows.length > opts.limit
       const pageRows = hasMore ? rows.slice(0, opts.limit) : rows
       const normalizedRows = pageRows.map((row) => this.normalizeRpcOfferRow(row))
@@ -625,7 +629,7 @@ export class DatabaseService {
   private async fetchFoodOffersViaDirectQuery(
     opts: FoodOffersFetchOptions,
   ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
-    const supabase = createSupabaseClient()
+    const supabase = createSupabaseServiceClient()
     const offset = (opts.page - 1) * opts.limit
     const storeIds = opts.stores?.length ? this.mapStoreFilterToIds(opts.stores) : null
     const productIdSet = opts.productIds?.length
@@ -797,6 +801,22 @@ export class DatabaseService {
     }
   }
 
+
+  /** RPC returnerer jsonb_agg — Supabase kan levere array eller andet parsed jsonb. */
+  private parseFoodOffersRpcRows(data: unknown): Record<string, unknown>[] {
+    if (Array.isArray(data)) {
+      return data as Record<string, unknown>[]
+    }
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data) as unknown
+        return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  }
 
   /** RPC returnerer flade kolonner — pak product-felter ind så mapOfferRowToProduct passer. */
   private normalizeRpcOfferRow(row: Record<string, any>): Record<string, any> {
