@@ -162,22 +162,26 @@ export async function POST(request: NextRequest) {
     let ingredientIds = ingredientIdsFromItems
     const ingredientIdSet = new Set(ingredientIds)
 
-    // Load ingredients once for all name-based fallbacks + grams_per_unit mapping
-    const { data: allIngredientsMeta } = await supabase
-      .from('ingredients')
-      .select('id, name, grams_per_unit')
-      .limit(5000)
+    // Lazy: kun hent alle ingredienser når navne-match er nødvendigt (dyrt).
+    let allIngredientsMeta: { id: string; name: string; grams_per_unit?: number | null }[] | null = null
+    const loadAllIngredientsMeta = async () => {
+      if (allIngredientsMeta) return allIngredientsMeta
+      const { data } = await supabase.from('ingredients').select('id, name, grams_per_unit').limit(5000)
+      allIngredientsMeta = data ?? []
+      return allIngredientsMeta
+    }
 
     const gramsPerUnitByNameMap = new Map<string, number>()
-    allIngredientsMeta?.forEach((row: { id: string; name: string; grams_per_unit?: number | null }) => {
-      if (row.grams_per_unit != null && Number(row.grams_per_unit) > 0) {
-        gramsPerUnitByNameMap.set(normalizeName(row.name), Number(row.grams_per_unit))
-      }
-    })
     
     console.log(`🔍 Step 1: Extracted ${ingredientIds.length} unique ingredientIds from ${shoppingListItems.length} items`)
     
     if (ingredientIds.length === 0) {
+      const meta = await loadAllIngredientsMeta()
+      meta.forEach((row) => {
+        if (row.grams_per_unit != null && Number(row.grams_per_unit) > 0) {
+          gramsPerUnitByNameMap.set(normalizeName(row.name), Number(row.grams_per_unit))
+        }
+      })
       // Fallback: try to match by name
       const ingredientNames = Array.from(
         new Set(shoppingListItems.map((item: any) => item.name?.toLowerCase().trim()).filter(Boolean))
@@ -197,11 +201,11 @@ export async function POST(request: NextRequest) {
         const normalizedItemName = normalizeName(itemName)
         
         // Try exact match first
-        let match = allIngredientsMeta?.find((ing: any) => ing.name.toLowerCase() === itemName)
+        let match = meta.find((ing: any) => ing.name.toLowerCase() === itemName)
         
         // Try normalized match
         if (!match) {
-          match = allIngredientsMeta?.find((ing: any) => {
+          match = meta.find((ing: any) => {
             const normalizedIngName = normalizeName(ing.name)
             return normalizedIngName === normalizedItemName || 
                    normalizedItemName.includes(normalizedIngName) ||
@@ -230,42 +234,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Per-item fallback (important): even when SOME items have ingredientId,
-    // individual items can still be missing/invalid. Resolve those by name as well.
-    const allIngredientsForItemFallback = allIngredientsMeta
+    // Per-item fallback kun for varer uden ingredientId.
+    const itemsMissingId = shoppingListItems.filter((item: any) => !item.ingredientId && item.name)
+    if (itemsMissingId.length > 0) {
+      const meta = await loadAllIngredientsMeta()
 
-    if (allIngredientsForItemFallback?.length) {
-      for (const item of shoppingListItems) {
-        const itemName = item.name?.toLowerCase().trim()
-        if (!itemName) continue
+      if (meta.length > 0) {
+        for (const item of itemsMissingId) {
+          const itemName = item.name?.toLowerCase().trim()
+          if (!itemName) continue
 
-        const normalizedItemName = normalizeName(itemName)
-        // Deterministic matching: normalized exact first, then closest partial match.
-        let match = allIngredientsForItemFallback.find((ing: any) => normalizeName(ing.name) === normalizedItemName)
-        if (!match) {
-          const candidates = allIngredientsForItemFallback
-            .map((ing: any) => ({ ing, normalized: normalizeName(ing.name) }))
-            .filter(({ normalized }) =>
-              normalized &&
-              (normalizedItemName.includes(normalized) || normalized.includes(normalizedItemName))
-            )
-            .sort((a, b) => {
-              const diffA = Math.abs(a.normalized.length - normalizedItemName.length)
-              const diffB = Math.abs(b.normalized.length - normalizedItemName.length)
-              return diffA - diffB
-            })
-          match = candidates[0]?.ing
-        }
+          const normalizedItemName = normalizeName(itemName)
+          let match = meta.find((ing: any) => normalizeName(ing.name) === normalizedItemName)
+          if (!match) {
+            const candidates = meta
+              .map((ing: any) => ({ ing, normalized: normalizeName(ing.name) }))
+              .filter(({ normalized }) =>
+                normalized &&
+                (normalizedItemName.includes(normalized) || normalized.includes(normalizedItemName))
+              )
+              .sort((a, b) => {
+                const diffA = Math.abs(a.normalized.length - normalizedItemName.length)
+                const diffB = Math.abs(b.normalized.length - normalizedItemName.length)
+                return diffA - diffB
+              })
+            match = candidates[0]?.ing
+          }
 
-        if (match) {
-          shoppingListNameToIngredientId.set(itemName, match.id)
-          if (!ingredientIdSet.has(match.id)) {
-            ingredientIdSet.add(match.id)
-            ingredientIds.push(match.id)
+          if (match) {
+            shoppingListNameToIngredientId.set(itemName, match.id)
+            if (!ingredientIdSet.has(match.id)) {
+              ingredientIdSet.add(match.id)
+              ingredientIds.push(match.id)
+            }
           }
         }
+        ingredientIds = Array.from(new Set(ingredientIds))
       }
-      ingredientIds = Array.from(new Set(ingredientIds))
     }
 
     // Load grams_per_unit for stk <-> g conversion (e.g. rødløg 80 g/stk)

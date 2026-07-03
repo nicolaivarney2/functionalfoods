@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
+import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-payload'
 import {
   getWeekInfo,
   getWeekInfoByOffset,
@@ -314,7 +315,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to save meal plan' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data: saved })
+    return NextResponse.json({ success: true, data: saved ? slimMealPlanRowForClient(saved) : saved })
   } catch (error) {
     console.error('Error in POST /api/madbudget/meal-plan/generate:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

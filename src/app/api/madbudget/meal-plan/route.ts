@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-payload'
 
 export const dynamic = 'force-dynamic'
+
+const PLAN_LIST_COLUMNS =
+  'id, name, week_number, week_start_date, week_end_date, meal_plan_data, shopping_list, total_cost, total_savings, is_active, updated_at'
+
+function slimResponseData(data: unknown, slim: boolean): unknown {
+  if (!slim || data == null) return data
+  if (Array.isArray(data)) return data.map((row) => slimMealPlanRowForClient(row))
+  return slimMealPlanRowForClient(data as Record<string, unknown>)
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,6 +83,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const mealPlanId = searchParams.get('id')
     const active = searchParams.get('active') === 'true'
+    const slim = searchParams.get('slim') !== 'false'
 
     let data: any = null
     let error: any = null
@@ -80,14 +91,14 @@ export async function GET(request: NextRequest) {
     if (mealPlanId) {
       ({ data, error } = await supabase
         .from('user_meal_plans')
-        .select('*')
+        .select(PLAN_LIST_COLUMNS)
         .eq('user_id', user.id)
         .eq('id', mealPlanId)
         .single())
     } else if (active) {
       ({ data, error } = await supabase
         .from('user_meal_plans')
-        .select('*')
+        .select(PLAN_LIST_COLUMNS)
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('week_start_date', { ascending: false })
@@ -95,7 +106,7 @@ export async function GET(request: NextRequest) {
     } else {
       ({ data, error } = await supabase
         .from('user_meal_plans')
-        .select('*')
+        .select(PLAN_LIST_COLUMNS)
         .eq('user_id', user.id)
         .order('week_start_date', { ascending: false })
         .limit(10))
@@ -106,7 +117,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch meal plans' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({ success: true, data: slimResponseData(data, slim) })
   } catch (error) {
     console.error('Error in GET /api/madbudget/meal-plan:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
