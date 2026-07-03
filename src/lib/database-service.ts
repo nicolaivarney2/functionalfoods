@@ -529,7 +529,7 @@ export class DatabaseService {
         stores,
         offersOnly,
         organicOnly,
-        productIds: useDepartmentFilter ? undefined : productIds,
+        productIds: undefined,
         categoryFilter: useDepartmentFilter ? categoryFilter : undefined,
         search: search?.trim() || undefined,
       }
