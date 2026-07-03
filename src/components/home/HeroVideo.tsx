@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { Play } from 'lucide-react'
+import { FF_INTRO_YOUTUBE_EMBED, FF_INTRO_YOUTUBE_URL } from '@/constants/brand-video'
 
 function youtubeIdFromUrl(raw: string): string | null {
   const url = raw.trim()
@@ -30,15 +31,16 @@ const POSTER =
  * Uden URL: pæn placeholder med plads til senere video.
  */
 export default function HeroVideo() {
-  const url = (process.env.NEXT_PUBLIC_HOME_HERO_VIDEO_URL || '').trim()
-  const yt = url ? youtubeIdFromUrl(url) : null
+  const envUrl = (process.env.NEXT_PUBLIC_HOME_HERO_VIDEO_URL || '').trim()
+  const url = envUrl || FF_INTRO_YOUTUBE_URL
+  const yt = youtubeIdFromUrl(url)
 
   if (yt) {
     return (
       <div className="relative w-full overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/15 aspect-video bg-black">
         <iframe
           title="Functional Foods - introduktion"
-          src={`https://www.youtube-nocookie.com/embed/${yt}?rel=0`}
+          src={`${FF_INTRO_YOUTUBE_EMBED}&modestbranding=1`}
           className="absolute inset-0 h-full w-full border-0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen

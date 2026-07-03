@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   ArrowRight,
+  BookOpen,
   Calculator,
   CheckCircle2,
   ChefHat,
@@ -24,6 +25,7 @@ import {
 } from '@/content/funktioner-landing'
 
 const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
+  BookOpen,
   Sparkles,
   PiggyBank,
   Calculator,

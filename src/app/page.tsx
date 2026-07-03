@@ -449,7 +449,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Byg tillid - video */}
+      {/* App & video */}
       <section className="border-b border-gray-100 bg-white pt-14 pb-16 lg:pt-20 lg:pb-20">
         <div className="container px-4">
           <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
@@ -457,19 +457,22 @@ export default function Home() {
               <HeroVideo />
             </div>
             <div className="order-1 lg:order-2">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Derfor de fleste fejler</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Appen i aktion</p>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
-                De fleste vægttabsrejser dør, før de er kommet i gang
+                Madplan <span className="text-emerald-600">og</span> madlog i samme app
               </h2>
               <p className="mt-4 text-lg leading-relaxed text-gray-600">
-                Det stopper ikke på grund af manglende viljestyrke - det stopper fordi planen er for besværlig,
-                for dyr og for langt fra hverdagen. Se hvad vi gør anderledes.
+                Lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Tag et billede af retten,
+                indtal hvad du har spist, eller vælg en opskrift — appen estimerer kalorier og næring (Frida) og viser
+                dig om du rammer dit mål.
               </p>
               <ul className="mt-6 flex flex-col gap-3">
                 {[
-                  'Du skal ikke gætte hvad du skal spise - hele ugen er planlagt',
-                  'Maden bygger på ugens tilbud, så det ikke koster en formue',
-                  'Tilpasset dit kalorimål, dine fravalg og dine vaner',
+                  'Maddagbog med kalorier, makro og mikro mod dit personlige mål',
+                  'Foto eller stemme: appen lægger måltidet ind for dig',
+                  'Madplan synkroniseres til dagbogen — log kun det ekstra',
+                  'Skridt fra Apple Sundhed eller Health Connect, vægttracker og ugentligt ernæringstilbageblik',
+                  'Indkøbsliste, dagligvarer, prisalarmer og personlig vejledning',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[15px] text-gray-700">
                     <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
@@ -477,6 +480,13 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
+              <Link
+                href="/funktioner/maddagbog-madlogger"
+                className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+              >
+                Læs om maddagbog og app-funktioner
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </Link>
             </div>
           </div>
         </div>

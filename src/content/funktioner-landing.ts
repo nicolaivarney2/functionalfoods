@@ -1,4 +1,5 @@
 export type FunktionSlug =
+  | 'maddagbog-madlogger'
   | 'madbudget-ai-madplaner'
   | 'madplaner-ud-fra-tilbud'
   | 'vaegttabsrejse'
@@ -10,6 +11,7 @@ export type FunktionSlug =
 
 /** Ikon-navne der mappes til lucide-react i funktionssiden (ingen komponenter i denne fil – undgår webpack-chunk fejl). */
 export type FunktionIconName =
+  | 'BookOpen'
   | 'Sparkles'
   | 'PiggyBank'
   | 'Calculator'
@@ -55,12 +57,57 @@ export interface FunktionLanding {
 }
 
 export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
+  'maddagbog-madlogger': {
+    slug: 'maddagbog-madlogger',
+    title: 'Maddagbog & madlogger (app) | Functional Foods',
+    shortTitle: 'Maddagbog & madlogger',
+    description:
+      'Log alt du spiser i appen: synk madplan, tag billede af retten, indtal måltidet eller vælg opskrift — kalorier, makro og mikro mod dit personlige mål.',
+    iconName: 'BookOpen',
+    heroEyebrow: 'App',
+    heroTitle: 'Maddagbog: log maden — ikke kun planen',
+    heroLeadParagraphs: [
+      'Den smarte kombination: lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Så ser du hele dagen og ugen — ikke kun aftensmaden fra planen.',
+      'Appen estimerer næring ud fra danske data (Frida). Tag et billede af maden, sig hvad du har spist, eller log en opskrift direkte — vi lægger det ind for dig.',
+    ],
+    bullets: [
+      {
+        title: 'Madplan → dagbog',
+        text: 'Når du genererer madplan, kan måltiderne synkroniseres til maddagbogen. Du logger kun det ekstra: snacks, frokost ude, weekendens kage.',
+      },
+      {
+        title: 'Log med billede',
+        text: 'Tag et foto af retten — appen genkender ingredienser og estimerer kalorier og næring, så du slipper for at taste alt manuelt.',
+      },
+      {
+        title: 'Log med stemme',
+        text: 'Sig fx «jeg spiste skyr med bær og nødder» — appen finder opskriften eller bygger et måltid og lægger det i dagbogen.',
+      },
+      {
+        title: 'Kalorier og makro mod dit mål',
+        text: 'Dit kaloriemål kommer fra diæt-profilen (keto, sense, kalorietælling osv.). Du ser indtag, tilbage og makroer for dagen.',
+      },
+      {
+        title: 'Mikronæring',
+        text: 'Vitaminer og mineraler summeres på ugen, så du kan se om kosten dækker det vigtigste — ikke kun protein og kulhydrat.',
+      },
+      {
+        title: 'Aktivitet fra Apple Sundhed og Health Connect',
+        text: 'På iPhone: Apple Sundhed. På Android: Health Connect. Skridt og aktiv forbrænding vises i dagbogen og i vægttrackerens ugeoversigt.',
+      },
+    ],
+    howItHelps:
+      'Brug maddagbogen når du vil have overblik over det du faktisk spiser — sammen med madplan, ikke i stedet for. Det er forskellen mellem en plan på papir og en vane der holder.',
+    ctaLabel: 'Kom i gang gratis',
+    ctaHref: '/kom-i-gang',
+    secondaryCta: { label: 'Se alle funktioner', href: '/funktioner' },
+  },
   'madbudget-ai-madplaner': {
     slug: 'madbudget-ai-madplaner',
     title: 'Madbudget (AI madplaner) | Functional Foods',
     shortTitle: 'Madbudget (AI madplaner)',
     description:
-      'AI-drevne madplaner med ugeoversigt, daglig ernæring og indkøbslister på tværs af dine butikker – skift opskrifter og byg lige så mange uger du vil.',
+      'AI-drevne madplaner med ugeoversigt, daglig ernæring og indkøbslister — synk til maddagbog i appen, skift opskrifter og byg lige så mange uger du vil.',
     iconName: 'Sparkles',
     heroEyebrow: 'Funktion',
     heroTitle: 'Madbudget: AI-madplaner der passer til din uge',
@@ -88,6 +135,10 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       {
         title: 'Personlig struktur',
         text: 'Planen tager udgangspunkt i hvor mange I er, hvad I kan lide, og hvordan ugen ser ud – ikke en generisk skabelon.',
+      },
+      {
+        title: 'Synk til maddagbog (app)',
+        text: 'Måltider fra madplanen kan lægges direkte i maddagbogen — så du ser hele dagens indtag uden dobbelt logning.',
       },
       {
         title: 'Koblet til danske råvarer',
@@ -377,39 +428,48 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
   },
   'vaegt-tracker': {
     slug: 'vaegt-tracker',
-    title: 'Vægt tracker | Functional Foods',
-    shortTitle: 'Vægt tracker',
+    title: 'Sundheds- og vægttracker (app) | Functional Foods',
+    shortTitle: 'Sundheds- & vægttracker',
     description:
-      'Log vægt, følg kurven over tid og kobl til din vægttabsrejse – med fokus på privatliv og sikker opbevaring.',
+      'Log vægt med valgfri dato, følg kurven, se skridt fra Apple Sundhed eller Health Connect og ugentligt ernæringstilbageblik — dag for dag i appen.',
     iconName: 'Scale',
-    heroEyebrow: 'Funktion',
-    heroTitle: 'Vægt tracker: se fremgang over tid',
+    heroEyebrow: 'App',
+    heroTitle: 'Vægt, skridt og ernæring — samlet ét sted',
     heroLeadParagraphs: [
-      'Vægt trackeren giver dig et sted at registrere vægt og følge udviklingen – uden regneark og uden at skulle huske tallene i hovedet.',
-      'Den er tænkt sammen med resten af Functional Foods: jo mere du bruger profilen og værktøjerne, jo lettere er det at se sammenhængen mellem vaner, mad og resultat.',
+      'Sundheds- og vægttrackeren kobler vægt, aktivitet og det du logger i maddagbogen. Du ser om ugen ser god ud — ikke kun ét tal på vægten.',
+      'Skridt hentes fra Apple Sundhed eller Health Connect. Ernæring kommer fra maddagbogen og madplanen, sammenholdt med dit personlige kalorie- og makromål.',
     ],
     bullets: [
       {
-        title: 'Kurve og historik',
-        text: 'Se udvikling over uger og måneder, så du kan skelne mellem dårlige dage og den reelle trend.',
+        title: 'Log vægt — også bagud i tiden',
+        text: 'Glemt at veje dig i går? Vælg dato når du logger, så historikken matcher virkeligheden.',
       },
       {
-        title: 'Koblet til din rejse',
-        text: 'Brug trackeren som supplement til vægttabsrejsen og dine mål – tal der understøtter beslutninger, ikke erstatter dem.',
+        title: 'Denne uge, dag for dag',
+        text: 'Klik på hver dag i ugen: indtag, aktivitet, makroer og hvor mange kalorier du har tilbage af dit mål.',
+      },
+      {
+        title: 'Ugentligt tilbageblik',
+        text: 'Sammenlign denne uge og sidste uge: makroer, mikronæring og gennemsnitligt kalorieunderskud pr. dag ift. ligevægt.',
+      },
+      {
+        title: 'Skridt og aktiv forbrænding',
+        text: 'Synkroniseres automatisk fra Apple Sundhed (iPhone) eller Health Connect (Android) — historik foldes ud når du vil se den.',
+      },
+      {
+        title: 'Fremskridtsbilleder',
+        text: 'Tag før/efter-billeder privat på kontoen — visuelt spor ved siden af tallene.',
       },
       {
         title: 'Privat og sikkert',
-        text: 'Data om din krop er følsomme: vi behandler dem med samme respekt som resten af din profil – krypteret og kun til dig og systemets funktioner.',
-      },
-      {
-        title: 'Mindre stress om tallene',
-        text: 'Én fast rutine for at logge vægt gør det lettere at slippe konstant mental regning og i stedet handle på det du ser over tid.',
+        text: 'Data om krop og vægt behandles fortroligt — krypteret lagring som resten af din profil.',
       },
     ],
     howItHelps:
-      'Brug vægt trackeren når du vil have ro omkring fremgang: ét sted at logge, ét sted at se om det du gør i hverdagen faktisk flytter dig.',
-    ctaLabel: 'Åbn vægt tracker',
-    ctaHref: '/vaegt-tracker',
+      'Brug trackeren når du vil se sammenhængen mellem mad, bevægelse og vægt — uge for uge, ikke kun når motivationen topper.',
+    ctaLabel: 'Kom i gang i appen',
+    ctaHref: '/kom-i-gang',
+    secondaryCta: { label: 'Åbn vægt tracker (web)', href: '/vaegt-tracker' },
     images: [
       {
         src: 'billeder/funktioner/functionalfoods-vaegttracker.png',
@@ -423,6 +483,7 @@ export const FUNKTION_SLUGS = Object.keys(FUNKTIONER) as FunktionSlug[]
 
 /** Rækkefølge på oversigtssiden /funktioner */
 export const FUNKTION_OVERVIEW_ORDER: FunktionSlug[] = [
+  'maddagbog-madlogger',
   'madbudget-ai-madplaner',
   'madplaner-ud-fra-tilbud',
   'vaegttabsrejse',

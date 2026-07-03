@@ -194,8 +194,8 @@ function OverblikContent() {
             </h1>
           )}
           <p className="text-slate-600 mt-2 max-w-2xl">
-            Madplaner der følger <strong>rigtige tilbud</strong>, din familie og dine mål – plus opskrifter,
-            dagligvarer og vægt tracker. Vælg hvor du vil starte.
+            Madplaner der følger <strong>rigtige tilbud</strong>, maddagbog i appen (foto, stemme, madplan-sync),
+            opskrifter, dagligvarer, prisalarmer og sundheds- og vægttracker. Vælg hvor du vil starte.
           </p>
         </header>
 

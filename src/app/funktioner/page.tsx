@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import {
   ArrowRight,
+  BookOpen,
   Calculator,
   ChefHat,
   LayoutGrid,
@@ -20,6 +21,7 @@ import {
 } from '@/content/funktioner-landing'
 
 const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
+  BookOpen,
   Sparkles,
   PiggyBank,
   Calculator,
@@ -33,7 +35,7 @@ const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
 export const metadata: Metadata = {
   title: 'Funktioner | Functional Foods',
   description:
-    'Oversigt over Madbudget, madplaner ud fra tilbud, vægttabsrejse, opskrifter med makro og mikro, smart indkøbsliste på sms og vægt tracker.',
+    'Maddagbog og madlogger i appen, madplaner ud fra tilbud, vægttabsrejse, ernæring, indkøbsliste og sundheds- og vægttracker.',
   alternates: {
     canonical: 'https://functionalfoods.dk/funktioner',
   },
@@ -59,9 +61,8 @@ export default function FunktionerOversigtPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/90">Functional Foods</p>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">Funktioner</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-emerald-50/95 sm:text-lg">
-            Én platform til madplaner ud fra tilbud, tusindvis af ernæringsberegnede opskrifter, personlig vægttabsrejse og
-            praktiske værktøjer som sms-indkøbsliste og vægt tracker. Her får du overblikket - med dybdegående sider for hver
-            del.
+            Appen samler madplan, maddagbog, indkøb og sundhed: log med foto eller stemme, synk ugens plan til dagbogen,
+            følg kalorier mod dit mål og se tilbud fra dine butikker — med dybdegående sider for hver del herunder.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
