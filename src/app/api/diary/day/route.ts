@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
 import { computeDailyTargets } from '@/lib/diary/targets'
+import { aggregateEntryMicros } from '@/lib/diary-food-log-micro'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     const [{ data: entries, error }, target] = await Promise.all([
       supabase
         .from('food_log_entries')
-        .select('id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, created_at')
+        .select('id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, vitamins, minerals, created_at')
         .eq('user_id', user.id)
         .eq('logged_date', date)
         .order('created_at', { ascending: true }),
@@ -69,7 +70,15 @@ export async function GET(request: NextRequest) {
     totals.fat = Math.round(totals.fat)
     totals.fiber = Math.round(totals.fiber)
 
-    return NextResponse.json({ success: true, date, target, totals, entries: entries ?? [] })
+    const microTotals = aggregateEntryMicros(entries ?? [])
+
+    return NextResponse.json({
+      success: true,
+      date,
+      target,
+      totals: { ...totals, vitamins: microTotals.vitamins, minerals: microTotals.minerals },
+      entries: entries ?? [],
+    })
   } catch (e) {
     console.error('diary/day GET', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

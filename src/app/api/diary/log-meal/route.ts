@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
+import { prepareStoredMicros } from '@/lib/diary-food-log-micro'
 import { nutritionForProvisionalMeal } from '@/lib/provisional-nutrition'
 import { sanitizeIngredients } from '@/lib/provisional-recipes'
 
@@ -90,6 +91,11 @@ export async function POST(request: NextRequest) {
     const carbs = perPortion.carbs != null ? round1(perPortion.carbs * portionsLogged) : null
     const fat = perPortion.fat != null ? round1(perPortion.fat * portionsLogged) : null
     const fiber = perPortion.fiber != null ? round1(perPortion.fiber * portionsLogged) : null
+    const { vitamins, minerals } = prepareStoredMicros(
+      nutrition.vitamins,
+      nutrition.minerals,
+      portionsLogged
+    )
 
     const provisionalId = typeof body.provisionalId === 'string' ? body.provisionalId : null
 
@@ -110,9 +116,11 @@ export async function POST(request: NextRequest) {
         carbs,
         fat,
         fiber,
+        vitamins,
+        minerals,
       })
       .select(
-        'id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, created_at'
+        'id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, vitamins, minerals, created_at'
       )
       .single()
 
@@ -126,7 +134,7 @@ export async function POST(request: NextRequest) {
       data,
       nutrition: {
         perPortion,
-        logged: { calories, protein, carbs, fat, fiber },
+        logged: { calories, protein, carbs, fat, fiber, vitamins, minerals },
         matchedIngredients,
         totalIngredients,
         source,

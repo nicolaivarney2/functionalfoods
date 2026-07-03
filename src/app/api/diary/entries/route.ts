@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
+import {
+  normalizeMineralMap,
+  normalizeVitaminMap,
+  parseMicroMap,
+  prepareStoredMicros,
+  scaleMicroMap,
+} from '@/lib/diary-food-log-micro'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +38,31 @@ function getServiceClient() {
   return createClient(supabaseUrl, serviceKey)
 }
 
+async function microFromRecipe(
+  supabase: ReturnType<typeof createClient>,
+  opts: { recipeId?: string | null; recipeSlug?: string | null; servings: number }
+): Promise<{ vitamins: Record<string, number>; minerals: Record<string, number> }> {
+  const { recipeId, recipeSlug, servings } = opts
+  if (!recipeId && !recipeSlug) return { vitamins: {}, minerals: {} }
+
+  let query = supabase.from('recipes').select('vitamins, minerals').limit(1)
+  if (recipeSlug) query = query.eq('slug', recipeSlug)
+  else if (recipeId) query = query.eq('id', recipeId)
+
+  const { data } = await query.maybeSingle()
+  if (!data) return { vitamins: {}, minerals: {} }
+
+  const perPortionV = normalizeVitaminMap(parseMicroMap(data.vitamins))
+  const perPortionM = normalizeMineralMap(parseMicroMap(data.minerals))
+  return {
+    vitamins: scaleMicroMap(perPortionV, servings),
+    minerals: scaleMicroMap(perPortionM, servings),
+  }
+}
+
+const ENTRY_SELECT =
+  'id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, vitamins, minerals, created_at'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = getServiceClient()
@@ -45,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('food_log_entries')
-      .select('id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, created_at')
+      .select(ENTRY_SELECT)
       .eq('user_id', user.id)
       .eq('logged_date', date)
       .order('created_at', { ascending: true })
@@ -91,6 +123,27 @@ export async function POST(request: NextRequest) {
     const fat = body.fat != null ? round1(num(body.fat) * servings) : null
     const fiber = body.fiber != null ? round1(num(body.fiber) * servings) : null
 
+    let vitamins: Record<string, number> = {}
+    let minerals: Record<string, number> = {}
+
+    const bodyMicro = prepareStoredMicros(
+      parseMicroMap(body.vitamins),
+      parseMicroMap(body.minerals),
+      servings
+    )
+    if (Object.keys(bodyMicro.vitamins).length || Object.keys(bodyMicro.minerals).length) {
+      vitamins = bodyMicro.vitamins
+      minerals = bodyMicro.minerals
+    } else if (source === 'recipe') {
+      const fromRecipe = await microFromRecipe(supabase, {
+        recipeId: body.recipeId != null ? String(body.recipeId) : null,
+        recipeSlug: body.recipeSlug != null ? String(body.recipeSlug) : null,
+        servings,
+      })
+      vitamins = fromRecipe.vitamins
+      minerals = fromRecipe.minerals
+    }
+
     const { data, error } = await supabase
       .from('food_log_entries')
       .insert({
@@ -108,8 +161,10 @@ export async function POST(request: NextRequest) {
         carbs,
         fat,
         fiber,
+        vitamins,
+        minerals,
       })
-      .select('id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, created_at')
+      .select(ENTRY_SELECT)
       .single()
 
     if (error) {

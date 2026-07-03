@@ -9,6 +9,8 @@ export type ProvisionalNutritionJson = {
   carbs?: number
   fat?: number
   fiber?: number
+  vitamins?: Record<string, number>
+  minerals?: Record<string, number>
 }
 
 /** Frida-baseret ernæring pr. portion; falder tilbage til AI-estimat hvis intet matcher. */
@@ -35,7 +37,11 @@ export async function nutritionForProvisionalMeal(
   const calc = await calculateNutritionFromIngredientLines(lines, servings)
   if (calc.matchedIngredients > 0) {
     return {
-      nutrition: calc.perPortion,
+      nutrition: {
+        ...calc.perPortion,
+        vitamins: calc.vitamins,
+        minerals: calc.minerals,
+      },
       matchedIngredients: calc.matchedIngredients,
       totalIngredients: calc.totalIngredients,
       source: 'frida',

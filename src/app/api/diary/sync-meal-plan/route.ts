@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
+import { prepareStoredMicros } from '@/lib/diary-food-log-micro'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,8 @@ type Cell = {
   carbs?: number
   fat?: number
   fiber?: number
+  vitamins?: Record<string, number>
+  minerals?: Record<string, number>
 }
 
 function getServiceClient() {
@@ -94,6 +97,7 @@ export async function POST(request: NextRequest) {
       for (const meal of PLAN_MEALS) {
         const cell = dayObj[meal] as Cell | null
         if (!cell || !cell.title) continue
+        const micro = prepareStoredMicros(cell.vitamins, cell.minerals, 1)
         rows.push({
           user_id: user.id,
           logged_date: loggedDate,
@@ -111,6 +115,8 @@ export async function POST(request: NextRequest) {
           carbs: cell.carbs != null ? round1(num(cell.carbs)) : null,
           fat: cell.fat != null ? round1(num(cell.fat)) : null,
           fiber: cell.fiber != null ? round1(num(cell.fiber)) : null,
+          vitamins: micro.vitamins,
+          minerals: micro.minerals,
         })
       }
     })
