@@ -117,6 +117,11 @@ export async function POST(request: NextRequest) {
         max_tokens: 1500,
         response_format: { type: 'json_object' },
       })
+      const content = completion.choices[0]?.message?.content
+      if (!content) throw new Error('Tomt AI-svar')
+      parsed = parseVisionRecipe(content)
+    } catch (aiErr) {
+      console.error('from-voice AI', aiErr)
       return NextResponse.json(
         {
           error: 'AI kunne ikke tolke det du sagde',

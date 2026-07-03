@@ -26,7 +26,7 @@ export function datesInRange(start: string, count: number): string[] {
 }
 
 export function sumMacroTotals(entries: Array<Record<string, unknown>>): MacroTotals {
-  const acc = entries.reduce(
+  const acc = entries.reduce<MacroTotals>(
     (a, e) => {
       a.calories += Number(e.calories) || 0
       a.protein += Number(e.protein) || 0

@@ -39,11 +39,12 @@ function getServiceClient() {
 }
 
 async function microFromRecipe(
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof getServiceClient>,
   opts: { recipeId?: string | null; recipeSlug?: string | null; servings: number }
 ): Promise<{ vitamins: Record<string, number>; minerals: Record<string, number> }> {
   const { recipeId, recipeSlug, servings } = opts
   if (!recipeId && !recipeSlug) return { vitamins: {}, minerals: {} }
+  if (!supabase) return { vitamins: {}, minerals: {} }
 
   let query = supabase.from('recipes').select('vitamins, minerals').limit(1)
   if (recipeSlug) query = query.eq('slug', recipeSlug)
@@ -52,8 +53,9 @@ async function microFromRecipe(
   const { data } = await query.maybeSingle()
   if (!data) return { vitamins: {}, minerals: {} }
 
-  const perPortionV = normalizeVitaminMap(parseMicroMap(data.vitamins))
-  const perPortionM = normalizeMineralMap(parseMicroMap(data.minerals))
+  const row = data as { vitamins?: unknown; minerals?: unknown }
+  const perPortionV = normalizeVitaminMap(parseMicroMap(row.vitamins))
+  const perPortionM = normalizeMineralMap(parseMicroMap(row.minerals))
   return {
     vitamins: scaleMicroMap(perPortionV, servings),
     minerals: scaleMicroMap(perPortionM, servings),
