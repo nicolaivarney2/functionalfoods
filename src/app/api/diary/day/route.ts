@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
 import { computeDailyTargets } from '@/lib/diary/targets'
-import { aggregateEntryMicros } from '@/lib/diary-food-log-micro'
+import {
+  FOOD_LOG_ENTRY_SELECT,
+  buildDiaryDayPayload,
+  isValidIsoDate,
+} from '@/lib/diary-day-aggregate'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +15,7 @@ function todayUtc(): string {
 }
 
 function isValidDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+  return isValidIsoDate(value)
 }
 
 function getServiceClient() {
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
     const [{ data: entries, error }, target] = await Promise.all([
       supabase
         .from('food_log_entries')
-        .select('id, logged_date, meal_type, source, recipe_id, recipe_slug, title, image_url, servings, calories, protein, carbs, fat, fiber, vitamins, minerals, created_at')
+        .select(FOOD_LOG_ENTRY_SELECT)
         .eq('user_id', user.id)
         .eq('logged_date', date)
         .order('created_at', { ascending: true }),
@@ -53,32 +57,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Kunne ikke hente dag', details: error.message }, { status: 500 })
     }
 
-    const totals = (entries ?? []).reduce(
-      (acc: { calories: number; protein: number; carbs: number; fat: number; fiber: number }, e: any) => {
-        acc.calories += Number(e.calories) || 0
-        acc.protein += Number(e.protein) || 0
-        acc.carbs += Number(e.carbs) || 0
-        acc.fat += Number(e.fat) || 0
-        acc.fiber += Number(e.fiber) || 0
-        return acc
-      },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-    )
-    totals.calories = Math.round(totals.calories)
-    totals.protein = Math.round(totals.protein)
-    totals.carbs = Math.round(totals.carbs)
-    totals.fat = Math.round(totals.fat)
-    totals.fiber = Math.round(totals.fiber)
+    const payload = buildDiaryDayPayload(date, (entries ?? []) as Record<string, unknown>[], target)
 
-    const microTotals = aggregateEntryMicros(entries ?? [])
-
-    return NextResponse.json({
-      success: true,
-      date,
-      target,
-      totals: { ...totals, vitamins: microTotals.vitamins, minerals: microTotals.minerals },
-      entries: entries ?? [],
-    })
+    return NextResponse.json({ success: true, ...payload })
   } catch (e) {
     console.error('diary/day GET', e)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
