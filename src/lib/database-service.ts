@@ -83,6 +83,7 @@ type FoodOffersFetchOptions = {
   organicOnly?: boolean
   productIds?: string[]
   categoryFilter?: string[]
+  departmentPatterns?: string[]
   search?: string
 }
 
@@ -523,13 +524,10 @@ export class DatabaseService {
         organicOnly,
         productIds: undefined,
         categoryFilter: useDepartmentFilter ? categoryFilter : undefined,
+        departmentPatterns: useDepartmentFilter
+          ? this.getCategoryMatchPatterns(categoryFilter)
+          : undefined,
         search: search?.trim() || undefined,
-      }
-
-      if (useDepartmentFilter) {
-        const direct = await this.fetchFoodOffersViaDirectQuery(fetchOpts)
-        console.log('[OFFERS DIRECT category] ok')
-        return direct
       }
 
       const rpc = await this.fetchFoodOffersViaRpc(fetchOpts)
@@ -576,6 +574,7 @@ export class DatabaseService {
       if (storeIds?.length) params.p_stores = storeIds
       if (opts.productIds?.length) params.p_product_ids = opts.productIds
       if (opts.search) params.p_search = opts.search
+      if (opts.departmentPatterns?.length) params.p_department_patterns = opts.departmentPatterns
 
       const { data, error } = await supabase.rpc('get_food_offers_v2', params)
       if (error) {

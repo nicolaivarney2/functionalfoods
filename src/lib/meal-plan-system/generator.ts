@@ -1133,18 +1133,23 @@ export class MealPlanGenerator {
     mealDistribution: any, 
     config: MealPlanConfig
   ): Promise<RecipeScore[]> {
-    const scoredRecipes = await Promise.all(recipes.map(async recipe => {
-      const compatibility = this.calculateRecipeCompatibility(recipe, mealDistribution, config);
-      const baseScore = this.calculateOverallScore(compatibility);
-      
-      // Add offer-based scoring (async)
-      let offerScore = await this.calculateOfferScore(recipe);
+    // Cap async work: score top candidates by compatibility first, then apply offer bonus.
+    const preRanked = recipes
+      .map((recipe) => ({
+        recipe,
+        baseScore: this.calculateOverallScore(
+          this.calculateRecipeCompatibility(recipe, mealDistribution, config),
+        ),
+      }))
+      .sort((a, b) => b.baseScore - a.baseScore)
+      .slice(0, 50)
 
-      // Add ingredient overlap scoring (bonus for shared ingredients)
+    const scoredRecipes = preRanked.map(({ recipe, baseScore }) => {
+      const compatibility = this.calculateRecipeCompatibility(recipe, mealDistribution, config);
+      const offerScore = this.calculateOfferScoreFromCache(recipe);
       const overlapScore = this.calculateIngredientOverlapScore(recipe);
-      
       const totalScore = baseScore + offerScore + overlapScore;
-      
+
       const reasons = this.generateScoreReasons(compatibility);
       if (offerScore > 0) {
         reasons.push(`Ingredienser på tilbud (+${Math.round(offerScore)} point)`);
@@ -1152,15 +1157,15 @@ export class MealPlanGenerator {
       if (overlapScore > 0) {
         reasons.push(`Deler ingredienser med andre opskrifter (+${Math.round(overlapScore)} point)`);
       }
-      
+
       return {
         recipe,
         score: totalScore,
         reasons,
-        compatibility
+        compatibility,
       };
-    }));
-    
+    });
+
     return scoredRecipes.sort((a, b) => b.score - a.score);
   }
 
@@ -2417,210 +2422,77 @@ export class MealPlanGenerator {
   }
 
   /**
-   * Calculate offer-based score for a recipe
-   * Uses product_ingredient_matches table for accurate matching
+   * Calculate offer-based score for a recipe using pre-loaded offer cache only.
+   * Avoids per-recipe DB round-trips during generation (major perf win).
    */
-  private async calculateOfferScore(recipe: Recipe): Promise<number> {
+  private calculateOfferScoreFromCache(recipe: Recipe): number {
     if (this.currentOffers.size === 0) {
-      return 0; // No offers available
+      return 0;
     }
 
     let totalScore = 0;
     const expensiveCategories = ['kød', 'fisk', 'ost', 'mælkeprodukter', 'nødder', 'frø'];
     let matchedIngredients = 0;
-    
-    // Get ingredient IDs from recipe ingredients
-    const ingredientIds: string[] = [];
-    const ingredientNameMap = new Map<string, string>(); // Map ingredientId -> name
-    
+
     for (const ingredient of recipe.ingredients) {
-      const ingredientId = ingredient.ingredientId;
-      const ingredientName = (ingredient as any).name || ingredientId;
-      
-      if (ingredientId && ingredientId !== ingredientName) {
-        ingredientIds.push(ingredientId);
-        ingredientNameMap.set(ingredientId, ingredientName);
-      }
-    }
+      const ingredientName = (ingredient as any).name || ingredient.ingredientId;
+      if (!ingredientName) continue;
 
-    // If we have ingredient IDs, try to match via product_ingredient_matches table
-    if (ingredientIds.length > 0) {
-      try {
-        const { createSupabaseClient } = await import('../supabase');
-        const supabase = createSupabaseClient();
-        
-        // Get product matches for these ingredients via product_ingredient_matches
-        // Then join with product_offers to get current offers
-        const { data: matches, error } = await supabase
-          .from('product_ingredient_matches')
-          .select(`
-            ingredient_id,
-            product_external_id,
-            confidence,
-            product_offers!inner(
-              id,
-              product_id,
-              store_id,
-              name_store,
-              current_price,
-              normal_price,
-              is_on_sale,
-              is_offer_active,
-              discount_percentage,
-              products:product_id (
-                id,
-                name_generic,
-                category,
-                department
-              )
-            )
-          `)
-          .in('ingredient_id', ingredientIds)
-          .eq('product_offers.is_offer_active', true)
-          .eq('product_offers.is_available', true);
+      const normalizedName = this.normalizeIngredientName(ingredientName);
+      let offers = this.currentOffers.get(normalizedName);
 
-        if (!error && matches && matches.length > 0) {
-          // Group matches by ingredient_id
-          const matchesByIngredient = new Map<string, any[]>();
-          for (const match of matches) {
-            const ingId = match.ingredient_id;
-            if (!matchesByIngredient.has(ingId)) {
-              matchesByIngredient.set(ingId, []);
-            }
-            matchesByIngredient.get(ingId)!.push(match);
-          }
-
-          // Score each matched ingredient
-          for (const [, ingredientMatches] of matchesByIngredient.entries()) {
-            
-            // Find best offer (highest discount) from selected stores
-            let bestOffer: any = null;
-            let bestDiscount = 0;
-            
-            for (const match of ingredientMatches) {
-              const offer = match.product_offers;
-              if (offer && offer.is_offer_active) {
-                // Check if offer is from a selected store (if we have that info)
-                const discount = offer.discount_percentage || 
-                  (offer.normal_price && offer.current_price
-                    ? ((offer.normal_price - offer.current_price) / offer.normal_price) * 100
-                    : 0);
-                
-                if (discount > bestDiscount) {
-                  bestDiscount = discount;
-                  const productData = Array.isArray(offer.products) ? offer.products[0] : offer.products;
-                  bestOffer = {
-                    category: (productData?.category || productData?.department || '').toLowerCase(),
-                    discountPercentage: discount,
-                    currentPrice: offer.current_price,
-                    normalPrice: offer.normal_price,
-                    savings: (offer.normal_price || 0) - (offer.current_price || 0)
-                  };
-                }
-              }
-            }
-
-            if (bestOffer) {
-              matchedIngredients++;
-              const category = bestOffer.category;
-              const isExpensive = expensiveCategories.some(cat => category.includes(cat));
-              const discount = bestOffer.discountPercentage || 0;
-              
-              // Base score: 10-30 points based on discount percentage
-              let score = Math.min(30, Math.max(10, discount));
-              
-              // PRIORITY: Extra bonus for "Kød og fisk" category offers
-              // This ensures recipes with meat/fish on sale get prioritized significantly
-              const isMeatOrFish = category.includes('kød') || category.includes('fisk') || 
-                                   category.includes('kød og fisk') || category.includes('fjerkræ') ||
-                                   category.includes('kylling') || category.includes('oksekød') ||
-                                   category.includes('svinekød') || category.includes('laks') ||
-                                   category.includes('torsk') || category.includes('tun');
-              
-              // Bonus for expensive categories (especially meat/fish)
-              if (isExpensive) {
-                score *= 2.5; // Increased multiplier for expensive items
-                if (isMeatOrFish) {
-                  score *= 3; // TRIPLE bonus for meat/fish (very high priority)
-                  // Additional bonus for high discounts on meat/fish
-                  if (discount > 15) {
-                    score += 50; // Big bonus for >15% discount on meat/fish
-                  } else if (discount > 10) {
-                    score += 30; // Medium bonus for >10% discount on meat/fish
-                  }
-                }
-              } else if (isMeatOrFish) {
-                // Even if not in expensive categories list, prioritize meat/fish
-                score *= 2.5; // High priority for meat/fish offers
-                if (discount > 15) {
-                  score += 40; // Bonus for good discounts
-                }
-              }
-              
-              totalScore += score;
-            }
+      if (!offers || offers.length === 0) {
+        for (const [offerName, offerList] of this.currentOffers.entries()) {
+          if (offerName.includes(normalizedName) || normalizedName.includes(offerName)) {
+            offers = offerList;
+            break;
           }
         }
-      } catch (error) {
-        console.error('❌ Error matching ingredients with products:', error);
       }
-    }
 
-    // Fallback: If no matches found via database, try fuzzy matching with cached offers
-    if (matchedIngredients === 0) {
-      for (const ingredient of recipe.ingredients) {
-        const ingredientName = (ingredient as any).name || ingredient.ingredientId;
-        if (!ingredientName) continue;
+      if (!offers || offers.length === 0) continue;
 
-        const normalizedName = this.normalizeIngredientName(ingredientName);
-        let offers = this.currentOffers.get(normalizedName);
-        
-        if (!offers || offers.length === 0) {
-          // Try fuzzy matching
-          for (const [offerName, offerList] of this.currentOffers.entries()) {
-            if (offerName.includes(normalizedName) || normalizedName.includes(offerName)) {
-              offers = offerList;
-              break;
-            }
-          }
+      matchedIngredients++;
+      const bestOffer = offers.reduce((best, current) =>
+        (current.discountPercentage || 0) > (best.discountPercentage || 0) ? current : best
+      );
+
+      const category = bestOffer.category?.toLowerCase() || '';
+      const isExpensive = expensiveCategories.some((cat) => category.includes(cat));
+      const discount = bestOffer.discountPercentage || 0;
+
+      let score = Math.min(30, Math.max(10, discount));
+      const isMeatOrFish =
+        category.includes('kød') ||
+        category.includes('fisk') ||
+        category.includes('kød og fisk') ||
+        category.includes('fjerkræ') ||
+        category.includes('kylling') ||
+        category.includes('oksekød') ||
+        category.includes('svinekød') ||
+        category.includes('laks') ||
+        category.includes('torsk') ||
+        category.includes('tun');
+
+      if (isExpensive) {
+        score *= 2.5;
+        if (isMeatOrFish) {
+          score *= 3;
+          if (discount > 15) score += 50;
+          else if (discount > 10) score += 30;
         }
-        
-        if (offers && offers.length > 0) {
-          matchedIngredients++;
-          const bestOffer = offers.reduce((best, current) => 
-            (current.discountPercentage || 0) > (best.discountPercentage || 0) ? current : best
-          );
-          
-          const category = bestOffer.category?.toLowerCase() || '';
-          const isExpensive = expensiveCategories.some(cat => category.includes(cat));
-          const discount = bestOffer.discountPercentage || 0;
-          
-          let score = Math.min(30, Math.max(10, discount));
-          const isMeatOrFish = category.includes('kød') || category.includes('fisk') || 
-                               category.includes('kød og fisk') || category.includes('fjerkræ');
-          if (isExpensive) {
-            score *= 2;
-            if (isMeatOrFish) {
-              score *= 2.5; // High priority for meat/fish in fallback matching too
-            }
-          } else if (isMeatOrFish) {
-            score *= 2; // Prioritize meat/fish even if not in expensive list
-          }
-          
-          totalScore += score;
-        }
+      } else if (isMeatOrFish) {
+        score *= 2.5;
+        if (discount > 15) score += 40;
       }
+
+      totalScore += score;
     }
 
-    // Bonus if multiple ingredients are on offer
-    if (matchedIngredients >= 2) {
-      totalScore += 20;
-    }
-    if (matchedIngredients >= 3) {
-      totalScore += 30;
-    }
+    if (matchedIngredients >= 2) totalScore += 20;
+    if (matchedIngredients >= 3) totalScore += 30;
 
-    return Math.min(300, totalScore); // Increased cap to allow more offer influence
+    return Math.min(300, totalScore);
   }
   
   /**

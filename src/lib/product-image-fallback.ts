@@ -9,6 +9,9 @@ import {
 
 const PLACEHOLDER_MARKERS = ['recipe-placeholder.jpg', 'recipe-placeholder']
 
+const eanImageCache = new Map<string, { url: string; expiresAt: number }>()
+const EAN_IMAGE_CACHE_TTL_MS = 60 * 60 * 1000
+
 export function isUsableProductImage(url: string | null | undefined): boolean {
   if (!url || !String(url).trim()) return false
   const normalized = String(url).trim().toLowerCase()
@@ -57,13 +60,26 @@ export async function buildEanImageLookup(
   eans: string[],
 ): Promise<Map<string, string>> {
   const unique = [...new Set(eans.map((e) => normalizeEan(e)).filter(Boolean) as string[])]
-  const candidates = new Map<string, ImageCandidate>()
-  if (unique.length === 0) return new Map()
+  const result = new Map<string, string>()
+  if (unique.length === 0) return result
 
+  const now = Date.now()
+  const toFetch: string[] = []
+  for (const ean of unique) {
+    const cached = eanImageCache.get(ean)
+    if (cached && cached.expiresAt > now) {
+      result.set(ean, cached.url)
+    } else {
+      toFetch.push(ean)
+    }
+  }
+  if (toFetch.length === 0) return result
+
+  const candidates = new Map<string, ImageCandidate>()
   const CHUNK = 150
 
-  for (let i = 0; i < unique.length; i += CHUNK) {
-    const chunk = unique.slice(i, i + CHUNK)
+  for (let i = 0; i < toFetch.length; i += CHUNK) {
+    const chunk = toFetch.slice(i, i + CHUNK)
     const { data, error } = await supabase
       .from('products')
       .select('id, ean, image_url')
@@ -82,7 +98,7 @@ export async function buildEanImageLookup(
     }
   }
 
-  const unresolved = unique.filter((ean) => !candidates.has(ean))
+  const unresolved = toFetch.filter((ean) => !candidates.has(ean))
   if (unresolved.length > 0) {
     const siblingIds = unresolved.flatMap((ean) => siblingFfProductIdsForEan(ean))
     for (let i = 0; i < siblingIds.length; i += 500) {
@@ -106,9 +122,10 @@ export async function buildEanImageLookup(
     }
   }
 
-  const result = new Map<string, string>()
+  const expiresAt = now + EAN_IMAGE_CACHE_TTL_MS
   for (const [ean, candidate] of candidates) {
     result.set(ean, candidate.url)
+    eanImageCache.set(ean, { url: candidate.url, expiresAt })
   }
   return result
 }

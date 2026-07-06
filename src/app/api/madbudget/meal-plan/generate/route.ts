@@ -117,12 +117,22 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
 
-    // Hent gemt familieprofil.
-    const { data: profile, error: profileError } = await supabase
-      .from('family_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
+    const [profileResult, adultResult, recentResult] = await Promise.all([
+      supabase.from('family_profiles').select('*').eq('user_id', user.id).single(),
+      supabase
+        .from('adult_weight_loss_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('adult_index'),
+      supabase
+        .from('user_meal_plans')
+        .select('week_start_date, meal_plan_data, updated_at')
+        .eq('user_id', user.id)
+        .order('week_start_date', { ascending: false })
+        .limit(4),
+    ])
+
+    const { data: profile, error: profileError } = profileResult
 
     if (profileError && profileError.code !== 'PGRST116') {
       console.error('generate: kunne ikke hente familieprofil:', profileError)
@@ -137,11 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Hent voksen-profiler (kostretning/vægtmål pr. voksen). Tom liste = generatoren
     // falder tilbage til standard-kostretning.
-    const { data: adultRows } = await supabase
-      .from('adult_weight_loss_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('adult_index')
+    const { data: adultRows } = adultResult
 
     const adultsProfiles = (adultRows ?? []).map((p) => ({
       gender: p.gender,
@@ -165,12 +171,7 @@ export async function POST(request: NextRequest) {
 
     const childrenAges = effectiveChildrenAges(profile.children ?? 0, profile.children_ages)
 
-    const { data: recentPlans } = await supabase
-      .from('user_meal_plans')
-      .select('week_start_date, meal_plan_data, updated_at')
-      .eq('user_id', user.id)
-      .order('week_start_date', { ascending: false })
-      .limit(4)
+    const { data: recentPlans } = recentResult
 
     const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(recentPlans ?? [], weekInfo.weekStartDate)
 

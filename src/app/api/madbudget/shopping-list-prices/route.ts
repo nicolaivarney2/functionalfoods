@@ -24,6 +24,22 @@ import {
   selectMatchesForStore,
 } from '@/lib/madbudget/shopping-list-pricing'
 
+const priceResponseCache = new Map<string, { body: object; expiresAt: number }>()
+const PRICE_RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000
+
+function buildShoppingPricesCacheKey(
+  items: Array<{ ingredientId?: string; name?: string; amount?: unknown; unit?: string; isBasis?: boolean }>,
+  storeIds: number[],
+  organic: OrganicPreferenceInput,
+): string {
+  const itemSig = items
+    .filter((i) => !i.isBasis)
+    .map((i) => `${i.ingredientId ?? i.name ?? ''}:${i.amount ?? ''}:${i.unit ?? ''}`)
+    .sort()
+    .join('|')
+  return `${storeIds.join(',')}:${organic.prioritizeOrganic}:${organic.prioritizeAnimalOrganic}:${itemSig}`
+}
+
 /**
  * API endpoint to fetch best matching products with prices for shopping list items
  * per selected store.
@@ -126,6 +142,12 @@ export async function POST(request: NextRequest) {
         { success: false, message: 'No valid store IDs found' },
         { status: 400 }
       )
+    }
+
+    const cacheKey = buildShoppingPricesCacheKey(shoppingListItems, selectedStoreIds, organicPrefs)
+    const cachedResponse = priceResponseCache.get(cacheKey)
+    if (cachedResponse && cachedResponse.expiresAt > Date.now()) {
+      return NextResponse.json(cachedResponse.body)
     }
 
     // Extract ingredient IDs directly from shopping list items
@@ -419,28 +441,34 @@ export async function POST(request: NextRequest) {
     const productOffersMap = new Map<string, any[]>()
     let totalOffersFound = 0
 
+    const offerChunks: string[][] = []
     for (let i = 0; i < productExternalIds.length; i += chunkSize) {
-      const chunk = productExternalIds.slice(i, i + chunkSize)
+      offerChunks.push(productExternalIds.slice(i, i + chunkSize))
+    }
 
-      // Fooddata-style: products.id = {chain}-{source_id}
-      const { data: productsById, error: productsByIdError } = await supabase
-        .from('products')
-        .select('id, amount, unit')
-        .in('id', chunk)
+    const chunkOfferResults = await Promise.all(
+      offerChunks.map(async (chunk) => {
+        const localMap = new Map<string, any[]>()
+        let localTotal = 0
 
-      if (!productsByIdError && productsById && productsById.length > 0) {
-        const productIdToExternalId = new Map<string, string>()
-        const productIdToAmount = new Map<string, { amount: string | null, unit: string | null }>()
-        productsById.forEach(p => {
-          productIdToExternalId.set(p.id, p.id)
-          productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
-        })
+        const { data: productsById, error: productsByIdError } = await supabase
+          .from('products')
+          .select('id, amount, unit')
+          .in('id', chunk)
 
-        const productIds = Array.from(productIdToExternalId.keys())
-        if (productIds.length > 0) {
-          const { data: offers, error: offersError } = await supabase
-            .from('product_offers')
-            .select(`
+        if (!productsByIdError && productsById && productsById.length > 0) {
+          const productIdToExternalId = new Map<string, string>()
+          const productIdToAmount = new Map<string, { amount: string | null; unit: string | null }>()
+          productsById.forEach((p) => {
+            productIdToExternalId.set(p.id, p.id)
+            productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
+          })
+
+          const productIds = Array.from(productIdToExternalId.keys())
+          if (productIds.length > 0) {
+            const { data: offers, error: offersError } = await supabase
+              .from('product_offers')
+              .select(`
               id,
               product_id,
               store_id,
@@ -454,58 +482,56 @@ export async function POST(request: NextRequest) {
               amount,
               unit
             `)
-            .in('product_id', productIds)
-            .in('store_id', dbStoreIds)
-            .eq('is_available', true)
+              .in('product_id', productIds)
+              .in('store_id', dbStoreIds)
+              .eq('is_available', true)
 
-          if (!offersError && offers) {
-            totalOffersFound += offers.length
-            offers.forEach(offer => {
-              const externalId = productIdToExternalId.get(offer.product_id)
-              if (!externalId) return
+            if (!offersError && offers) {
+              localTotal += offers.length
+              offers.forEach((offer) => {
+                const externalId = productIdToExternalId.get(offer.product_id)
+                if (!externalId) return
 
-              if (!productOffersMap.has(externalId)) {
-                productOffersMap.set(externalId, [])
-              }
+                if (!localMap.has(externalId)) {
+                  localMap.set(externalId, [])
+                }
 
-              const amountInfo = productIdToAmount.get(offer.product_id)
-              productOffersMap.get(externalId)!.push({
-                ...offer,
-                product_external_id: externalId,
-                store_id: canonicalStoreKey(String(offer.store_id || '')),
-                amount: amountInfo?.amount ?? offer.amount,
-                unit: amountInfo?.unit ?? offer.unit
+                const amountInfo = productIdToAmount.get(offer.product_id)
+                localMap.get(externalId)!.push({
+                  ...offer,
+                  product_external_id: externalId,
+                  store_id: canonicalStoreKey(String(offer.store_id || '')),
+                  amount: amountInfo?.amount ?? offer.amount,
+                  unit: amountInfo?.unit ?? offer.unit,
+                })
               })
-            })
+            }
           }
         }
-      }
 
-      // Legacy Goma: products.external_id (only when match id is not a fooddata key)
-      const legacyChunk = isGomaLegacyDataEnabled()
-        ? chunk.filter((id) => !isFooddataProductExternalId(id))
-        : []
-      const { data: products, error: productsError } = legacyChunk.length > 0
-        ? await supabase
-            .from('products')
-            .select('id, external_id, amount, unit')
-            .in('external_id', legacyChunk)
-        : { data: [], error: null }
+        const legacyChunk = isGomaLegacyDataEnabled()
+          ? chunk.filter((id) => !isFooddataProductExternalId(id))
+          : []
+        const { data: products, error: productsError } = legacyChunk.length > 0
+          ? await supabase
+              .from('products')
+              .select('id, external_id, amount, unit')
+              .in('external_id', legacyChunk)
+          : { data: [], error: null }
 
-      if (!productsError && products && products.length > 0) {
-        // New structure: use products + product_offers
-        const productIdToExternalId = new Map<string, string>()
-        const productIdToAmount = new Map<string, { amount: string | null, unit: string | null }>()
-        products.forEach(p => {
-          productIdToExternalId.set(p.id, p.external_id)
-          productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
-        })
+        if (!productsError && products && products.length > 0) {
+          const productIdToExternalId = new Map<string, string>()
+          const productIdToAmount = new Map<string, { amount: string | null; unit: string | null }>()
+          products.forEach((p) => {
+            productIdToExternalId.set(p.id, p.external_id)
+            productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
+          })
 
-        const productIds = Array.from(productIdToExternalId.keys())
-        if (productIds.length > 0) {
-          const { data: offers, error: offersError } = await supabase
-            .from('product_offers')
-            .select(`
+          const productIds = Array.from(productIdToExternalId.keys())
+          if (productIds.length > 0) {
+            const { data: offers, error: offersError } = await supabase
+              .from('product_offers')
+              .select(`
               id,
               product_id,
               store_id,
@@ -519,42 +545,39 @@ export async function POST(request: NextRequest) {
               amount,
               unit
             `)
-            .in('product_id', productIds)
-            .in('store_id', dbStoreIds)
-            .eq('is_available', true)
+              .in('product_id', productIds)
+              .in('store_id', dbStoreIds)
+              .eq('is_available', true)
 
-          if (!offersError && offers) {
-            totalOffersFound += offers.length
-            offers.forEach(offer => {
-              const externalId = productIdToExternalId.get(offer.product_id)
-              if (!externalId) return
+            if (!offersError && offers) {
+              localTotal += offers.length
+              offers.forEach((offer) => {
+                const externalId = productIdToExternalId.get(offer.product_id)
+                if (!externalId) return
 
-              if (!productOffersMap.has(externalId)) {
-                productOffersMap.set(externalId, [])
-              }
+                if (!localMap.has(externalId)) {
+                  localMap.set(externalId, [])
+                }
 
-              const amountInfo = productIdToAmount.get(offer.product_id)
-              productOffersMap.get(externalId)!.push({
-                ...offer,
-                product_external_id: externalId,
-                store_id: canonicalStoreKey(String(offer.store_id || '')),
-                amount: amountInfo?.amount ?? offer.amount,
-                unit: amountInfo?.unit ?? offer.unit
+                const amountInfo = productIdToAmount.get(offer.product_id)
+                localMap.get(externalId)!.push({
+                  ...offer,
+                  product_external_id: externalId,
+                  store_id: canonicalStoreKey(String(offer.store_id || '')),
+                  amount: amountInfo?.amount ?? offer.amount,
+                  unit: amountInfo?.unit ?? offer.unit,
+                })
               })
-            })
-          } else if (offersError) {
-            console.error('❌ Error fetching product_offers:', offersError)
+            }
           }
         }
-      }
 
-      // Goma: product_offers.store_product_id — skip under GOMA_SIMULATE_GONE
-      if (isGomaLegacyDataEnabled()) {
-        const legacyStoreProductChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
-        if (legacyStoreProductChunk.length > 0) {
-      const { data: offersByStoreProductId, error: offersByStoreProductIdError } = await supabase
-        .from('product_offers')
-        .select(`
+        if (isGomaLegacyDataEnabled()) {
+          const legacyStoreProductChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
+          if (legacyStoreProductChunk.length > 0) {
+            const { data: offersByStoreProductId, error: offersByStoreProductIdError } = await supabase
+              .from('product_offers')
+              .select(`
           id,
           product_id,
           store_id,
@@ -569,48 +592,43 @@ export async function POST(request: NextRequest) {
           amount,
           unit
         `)
-        .in('store_product_id', legacyStoreProductChunk)
-        .in('store_id', dbStoreIds)
-        .eq('is_available', true)
+              .in('store_product_id', legacyStoreProductChunk)
+              .in('store_id', dbStoreIds)
+              .eq('is_available', true)
 
-      if (!offersByStoreProductIdError && offersByStoreProductId) {
-        totalOffersFound += offersByStoreProductId.length
-        const externalIdToProductIds = new Map<string, Set<string>>()
+            if (!offersByStoreProductIdError && offersByStoreProductId) {
+              localTotal += offersByStoreProductId.length
+              const externalIdToProductIds = new Map<string, Set<string>>()
 
-        offersByStoreProductId.forEach(offer => {
-          const externalId = offer.store_product_id
-          if (!externalId) return
+              offersByStoreProductId.forEach((offer) => {
+                const externalId = offer.store_product_id
+                if (!externalId) return
 
-          if (!productOffersMap.has(externalId)) {
-            productOffersMap.set(externalId, [])
-          }
+                if (!localMap.has(externalId)) {
+                  localMap.set(externalId, [])
+                }
 
-           if (offer.product_id) {
-            const existing = externalIdToProductIds.get(externalId) || new Set<string>()
-            existing.add(String(offer.product_id))
-            externalIdToProductIds.set(externalId, existing)
-          }
+                if (offer.product_id) {
+                  const existing = externalIdToProductIds.get(externalId) || new Set<string>()
+                  existing.add(String(offer.product_id))
+                  externalIdToProductIds.set(externalId, existing)
+                }
 
-          productOffersMap.get(externalId)!.push({
-            ...offer,
-            product_external_id: externalId,
-            store_id: canonicalStoreKey(String(offer.store_id || '')),
-          })
-        })
+                localMap.get(externalId)!.push({
+                  ...offer,
+                  product_external_id: externalId,
+                  store_id: canonicalStoreKey(String(offer.store_id || '')),
+                })
+              })
 
-        // Critical: product_ingredient_matches often stores a store-specific external id.
-        // Resolve that id to product_id and then load offers for the same product across
-        // all selected stores, so Føtex/Løvbjerg can participate in cross-store pricing.
-        const linkedProductIds = Array.from(
-          new Set(
-            Array.from(externalIdToProductIds.values()).flatMap((ids) => Array.from(ids))
-          )
-        )
+              const linkedProductIds = Array.from(
+                new Set(Array.from(externalIdToProductIds.values()).flatMap((ids) => Array.from(ids))),
+              )
 
-        if (linkedProductIds.length > 0) {
-          const { data: linkedOffers, error: linkedOffersError } = await supabase
-            .from('product_offers')
-            .select(`
+              if (linkedProductIds.length > 0) {
+                const { data: linkedOffers, error: linkedOffersError } = await supabase
+                  .from('product_offers')
+                  .select(`
               id,
               product_id,
               store_id,
@@ -625,53 +643,60 @@ export async function POST(request: NextRequest) {
               amount,
               unit
             `)
-            .in('product_id', linkedProductIds)
-            .in('store_id', dbStoreIds)
-            .eq('is_available', true)
+                  .in('product_id', linkedProductIds)
+                  .in('store_id', dbStoreIds)
+                  .eq('is_available', true)
 
-          if (!linkedOffersError && linkedOffers) {
-            totalOffersFound += linkedOffers.length
-            const offersByProductId = new Map<string, any[]>()
-            linkedOffers.forEach((offer) => {
-              const pid = String(offer.product_id || '')
-              if (!pid) return
-              const list = offersByProductId.get(pid)
-              if (list) list.push(offer)
-              else offersByProductId.set(pid, [offer])
-            })
-
-            for (const [externalId, productIds] of externalIdToProductIds.entries()) {
-              if (!productOffersMap.has(externalId)) {
-                productOffersMap.set(externalId, [])
-              }
-              const target = productOffersMap.get(externalId)!
-              const seenOfferIds = new Set(target.map((o: any) => String(o.id || '')))
-
-              for (const pid of productIds) {
-                const offersForPid = offersByProductId.get(pid) || []
-                for (const offer of offersForPid) {
-                  const offerId = String(offer.id || '')
-                  if (offerId && seenOfferIds.has(offerId)) continue
-                  if (offerId) seenOfferIds.add(offerId)
-
-                  target.push({
-                    ...offer,
-                    product_external_id: externalId,
-                    store_id: canonicalStoreKey(String(offer.store_id || '')),
+                if (!linkedOffersError && linkedOffers) {
+                  localTotal += linkedOffers.length
+                  const offersByProductId = new Map<string, any[]>()
+                  linkedOffers.forEach((offer) => {
+                    const pid = String(offer.product_id || '')
+                    if (!pid) return
+                    const list = offersByProductId.get(pid)
+                    if (list) list.push(offer)
+                    else offersByProductId.set(pid, [offer])
                   })
+
+                  for (const [externalId, productIds] of externalIdToProductIds.entries()) {
+                    if (!localMap.has(externalId)) {
+                      localMap.set(externalId, [])
+                    }
+                    const target = localMap.get(externalId)!
+                    const seenOfferIds = new Set(target.map((o: any) => String(o.id || '')))
+
+                    for (const pid of productIds) {
+                      const offersForPid = offersByProductId.get(pid) || []
+                      for (const offer of offersForPid) {
+                        const offerId = String(offer.id || '')
+                        if (offerId && seenOfferIds.has(offerId)) continue
+                        if (offerId) seenOfferIds.add(offerId)
+
+                        target.push({
+                          ...offer,
+                          product_external_id: externalId,
+                          store_id: canonicalStoreKey(String(offer.store_id || '')),
+                        })
+                      }
+                    }
+                  }
                 }
               }
             }
-          } else if (linkedOffersError) {
-            console.error('❌ Error fetching linked product_offers by product_id:', linkedOffersError)
           }
         }
-      } else if (offersByStoreProductIdError) {
-        console.error('❌ Error fetching product_offers by store_product_id:', offersByStoreProductIdError)
-      }
-        }
-      }
 
+        return { localMap, localTotal }
+      }),
+    )
+
+    for (const { localMap, localTotal } of chunkOfferResults) {
+      totalOffersFound += localTotal
+      for (const [externalId, offers] of localMap.entries()) {
+        const existing = productOffersMap.get(externalId)
+        if (existing) existing.push(...offers)
+        else productOffersMap.set(externalId, offers)
+      }
     }
 
     console.log(`🔍 Step 5: Found ${totalOffersFound} total offers from product_offers table`)
@@ -923,13 +948,20 @@ export async function POST(request: NextRequest) {
         : 'No products found - check if product_ingredient_matches exist for these ingredients',
     } : undefined
 
-    return NextResponse.json({
+    const responseBody = {
       success: true,
       data: result,
       guideCount,
       gomaSunset,
       ...(debugInfo && { debug: debugInfo }),
+    }
+
+    priceResponseCache.set(cacheKey, {
+      body: responseBody,
+      expiresAt: Date.now() + PRICE_RESPONSE_CACHE_TTL_MS,
     })
+
+    return NextResponse.json(responseBody)
   } catch (error: any) {
     console.error('Error in shopping-list-prices API:', error)
     return NextResponse.json(
