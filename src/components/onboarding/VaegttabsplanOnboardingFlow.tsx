@@ -23,14 +23,21 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
 import SubscriptionTierCards from '@/components/subscription/SubscriptionTierCards'
+import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
 import type { SubscriptionTier } from '@/lib/subscription-tiers'
+import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
+import {
+  clearOAuthSignupPending,
+  hasOAuthSignupPending,
+  loadOAuthSignupPending,
+  saveOAuthSignupPending,
+} from '@/lib/oauth-signup-pending'
 import {
   ACTIVITY_OPTIONS,
   EXCLUDED_FOOD_OPTIONS,
   ONBOARDING_DIETARY_OPTIONS,
   MEAL_PLAN_SCOPE_OPTIONS,
   WEIGHT_GOAL_OPTIONS,
-  applyPendingOnboarding,
   calculateOnboardingEnergy,
   defaultOnboardingData,
   loadOnboardingData,
@@ -150,6 +157,7 @@ function VaegttabsplanOnboardingInner() {
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
   const turnstileElRef = useRef<HTMLDivElement | null>(null)
   const turnstileWidgetIdRef = useRef<string | null>(null)
+  const oauthCompletionStartedRef = useRef(false)
 
   const [data, setData] = useState<VaegttabsplanOnboardingData>(defaultOnboardingData)
   const [hydrated, setHydrated] = useState(false)
@@ -176,8 +184,52 @@ function VaegttabsplanOnboardingInner() {
 
   useEffect(() => {
     if (authLoading || !user) return
+    if (hasOAuthSignupPending()) return
     router.replace('/madbudget')
   }, [authLoading, user, router])
+
+  useEffect(() => {
+    if (authLoading || !user || !session?.access_token) return
+    const pending = loadOAuthSignupPending()
+    if (!pending) return
+    if (oauthCompletionStartedRef.current) return
+    oauthCompletionStartedRef.current = true
+
+    let cancelled = false
+    setSubmitting(true)
+    setError('')
+
+    const run = async () => {
+      const result = await completeSignupAfterAuth(
+        session.access_token,
+        pending.tier,
+        pending.productUpdatesConsent
+      )
+      if (cancelled) return
+
+      clearOAuthSignupPending()
+      trackEvent('sign_up', { method: 'oauth', tier: pending.tier })
+
+      if (!result.ok) {
+        oauthCompletionStartedRef.current = false
+        setError(result.error)
+        setSubmitting(false)
+        return
+      }
+
+      if (result.external) {
+        window.location.href = result.redirectUrl
+        return
+      }
+
+      router.replace(result.redirectUrl)
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [authLoading, user, session, router, trackEvent])
 
   const patch = useCallback((updates: Partial<VaegttabsplanOnboardingData>) => {
     setData((prev) => ({ ...prev, ...updates }))
@@ -376,45 +428,22 @@ function VaegttabsplanOnboardingInner() {
         return
       }
 
-      const prefRes = await fetch('/api/user/signup-preferences', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ productUpdatesConsent }),
-      })
+      const result = await completeSignupAfterAuth(accessToken, selectedTier, productUpdatesConsent)
 
-      if (!prefRes.ok) {
-        const j = await prefRes.json().catch(() => ({}))
-        setError(j.error || 'Kunne ikke gemme dine valg.')
+      if (!result.ok) {
+        setError(result.error)
         return
       }
-
-      await applyPendingOnboarding(accessToken)
 
       trackEvent('sign_up', { method: 'guidet_plan', tier: selectedTier })
 
-      if (selectedTier === 'plus' || selectedTier === 'premium') {
-        const payRes = await fetch('/api/stripe/create-subscription-checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ tier: selectedTier }),
-        })
-        const payJson = await payRes.json().catch(() => ({}))
-        if (!payRes.ok || !payJson.url) {
-          setError(payJson.error || 'Kunne ikke starte betaling — din profil er gemt, gå til Madbudget.')
-          return
-        }
+      if (result.external) {
         skipReset = true
-        window.location.href = payJson.url
+        window.location.href = result.redirectUrl
         return
       }
 
-      router.push('/madbudget?ny=1')
+      router.push(result.redirectUrl)
     } catch {
       setError('Noget gik galt. Prøv igen om lidt.')
     } finally {
@@ -1013,6 +1042,28 @@ function VaegttabsplanOnboardingInner() {
 
                 {turnstileSiteKey && <div ref={turnstileElRef} className="min-h-[65px]" />}
               </form>
+
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-white/15" />
+                <span className="text-xs font-medium text-emerald-100/60">eller</span>
+                <div className="h-px flex-1 bg-white/15" />
+              </div>
+
+              <OAuthProviderButtons
+                mode="signup"
+                tier={selectedTier}
+                redirectPath="/lav-din-plan"
+                disabled={!acceptTerms || submitting}
+                variant="dark"
+                onBeforeRedirect={() => {
+                  saveOAuthSignupPending({
+                    tier: selectedTier,
+                    productUpdatesConsent,
+                    source: 'onboarding',
+                  })
+                }}
+                onError={(message) => setError(message)}
+              />
 
               <div className="flex items-center gap-2 text-xs text-emerald-100/60">
                 <Lock className="h-3.5 w-3.5" />

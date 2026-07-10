@@ -5,6 +5,7 @@ import { User, Session, AuthError } from '@supabase/supabase-js'
 import { createSupabaseClient } from '@/lib/supabase'
 
 export type SignUpResult = { error: AuthError | null; session: Session | null }
+export type OAuthProvider = 'apple' | 'google'
 
 interface AuthContextType {
   user: User | null
@@ -12,6 +13,7 @@ interface AuthContextType {
   loading: boolean
   signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: any }>
   signUp: (email: string, password: string, name: string, captchaToken?: string) => Promise<SignUpResult>
+  signInWithOAuth: (provider: OAuthProvider, redirectPath?: string) => Promise<{ error: AuthError | null }>
   signOut: () => Promise<void>
 }
 
@@ -140,6 +142,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error, session: data.session ?? null }
   }
 
+  const signInWithOAuth = async (provider: OAuthProvider, redirectPath = '/madbudget') => {
+    const supabase = supabaseRef.current || createSupabaseClient()
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    const safePath = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`
+    const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(safePath)}`
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        ...(provider === 'apple' ? { scopes: 'name email' } : {}),
+      },
+    })
+    return { error }
+  }
+
   const signOut = async () => {
     const supabase = supabaseRef.current || createSupabaseClient()
     await supabase.auth.signOut()
@@ -151,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     signIn,
     signUp,
+    signInWithOAuth,
     signOut,
   }
 

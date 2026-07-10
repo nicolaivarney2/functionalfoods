@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { X, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -47,6 +48,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
   const { signIn, signUp } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   // Turnstile kun ved oprettelse. Kræver at Supabase kun kræver CAPTCHA ved signup (ikke ved password-login) – se env.example.
   useEffect(() => {
@@ -304,7 +306,21 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           </button>
         </form>
 
-        {/* Toggle sign up/login */}
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-xs font-medium text-gray-500">eller</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        <OAuthProviderButtons
+          mode={isSignUp ? 'signup' : 'login'}
+          redirectPath={pathname || '/madbudget'}
+          disabled={loading}
+          variant="light"
+          onError={(message) => setError(message)}
+        />
+
+        {/* Toggle sign up/login — moved below OAuth */}
         <div className="mt-6 text-center space-y-2">
           <p className="text-gray-600">
             {isSignUp ? 'Har du allerede en konto?' : 'Har du ikke en konto?'}
