@@ -7,12 +7,12 @@ import { ExternalLink, Loader2, MessageCircle, UserRound, X } from 'lucide-react
 import { useAuth } from '@/contexts/AuthContext'
 import { FF_OPEN_MESSENGER_GUIDANCE } from '@/lib/messenger-guidance-events'
 import { createSupabaseClient } from '@/lib/supabase'
+import type { SubscriptionTier } from '@/lib/subscription-tiers'
 
 const PAGE_ID = process.env.NEXT_PUBLIC_MESSENGER_PAGE_ID
 
 /**
- * Logget ind: widget med menneskelig vejledning + direkte til Messenger (ManyChat).
- * Henter personlig m.me-URL med engangstoken når API og DB er klar; ellers ff_logged_in.
+ * Logget ind + Premium: widget med menneskelig vejledning + direkte til Messenger (ManyChat).
  */
 export default function MessengerHumanGuidanceWidget() {
   const pathname = usePathname()
@@ -20,9 +20,41 @@ export default function MessengerHumanGuidanceWidget() {
   const [messengerUrl, setMessengerUrl] = useState<string | null>(null)
   const [linkLoading, setLinkLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [tier, setTier] = useState<SubscriptionTier | null>(null)
 
   useEffect(() => {
-    if (!user?.id || !PAGE_ID?.trim()) return
+    if (!user?.id) {
+      setTier(null)
+      return
+    }
+
+    let cancelled = false
+    const supabase = createSupabaseClient()
+
+    const loadTier = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
+        const headers: Record<string, string> = {}
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+        const res = await fetch('/api/subscription/status', { credentials: 'include', headers })
+        if (!res.ok) return
+        const data = (await res.json()) as { tier?: SubscriptionTier }
+        if (!cancelled && data.tier) setTier(data.tier)
+      } catch {
+        if (!cancelled) setTier('free')
+      }
+    }
+
+    void loadTier()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id || !PAGE_ID?.trim() || tier !== 'premium') return
 
     let cancelled = false
     setLinkLoading(true)
@@ -68,7 +100,7 @@ export default function MessengerHumanGuidanceWidget() {
     return () => window.removeEventListener(FF_OPEN_MESSENGER_GUIDANCE, openPanel)
   }, [])
 
-  if (!PAGE_ID?.trim() || loading || !user) {
+  if (!PAGE_ID?.trim() || loading || !user || tier !== 'premium') {
     return null
   }
 

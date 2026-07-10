@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getStripe } from '@/lib/stripe-server'
 import Stripe from 'stripe'
 
+import { getStripe } from '@/lib/stripe-server'
+import { normalizeSubscriptionTier, tierFromMonthlyAmountKr } from '@/lib/subscription-tiers'
+import { setUserSubscriptionTier } from '@/lib/subscription-entitlements'
+
 export const dynamic = 'force-dynamic'
+
+function tierFromSubscription(sub: Stripe.Subscription): 'free' | 'plus' | 'premium' {
+  const meta = sub.metadata?.subscription_tier
+  if (meta === 'plus' || meta === 'premium') return meta
+
+  const item = sub.items.data[0]
+  const unitAmount = item?.price?.unit_amount
+  if (typeof unitAmount === 'number') {
+    return tierFromMonthlyAmountKr(Math.round(unitAmount / 100))
+  }
+  return 'free'
+}
 
 export async function POST(request: NextRequest) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
@@ -35,37 +50,60 @@ export async function POST(request: NextRequest) {
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     const userId =
-      session.metadata?.supabase_user_id ||
-      (session.client_reference_id as string | undefined)
+      session.metadata?.supabase_user_id || (session.client_reference_id as string | undefined)
     const customerId =
       typeof session.customer === 'string' ? session.customer : session.customer?.id
-    const amountTotal = session.amount_total
 
-    if (userId && customerId && typeof amountTotal === 'number') {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
-          stripe_customer_id: customerId,
-          last_contribution_amount_ore: amountTotal,
-          last_contribution_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId)
-
-      if (error) {
-        console.error('user_profiles update after checkout', error)
-        const { error: insertErr } = await supabase.from('user_profiles').insert({
-          id: userId,
-          role: 'user',
-          stripe_customer_id: customerId,
-          last_contribution_amount_ore: amountTotal,
-          last_contribution_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        if (insertErr) {
-          console.error('user_profiles insert after checkout', insertErr)
-        }
+    if (userId && customerId) {
+      const patch: Record<string, unknown> = {
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
       }
+
+      if (session.mode === 'subscription') {
+        const tier = normalizeSubscriptionTier(session.metadata?.subscription_tier)
+        if (tier === 'plus' || tier === 'premium') {
+          await setUserSubscriptionTier(supabase, userId, tier, {
+            stripeSubscriptionId:
+              typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+            monthlyAmountOre:
+              tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
+          })
+        }
+      } else if (typeof session.amount_total === 'number') {
+        // Legacy engangsbetaling → tier ud fra beløb
+        const tier = tierFromMonthlyAmountKr(Math.round(session.amount_total / 100))
+        patch.last_contribution_amount_ore = session.amount_total
+        patch.last_contribution_at = new Date().toISOString()
+        patch.subscription_tier = tier
+        await supabase.from('user_profiles').update(patch).eq('id', userId)
+      }
+    }
+  }
+
+  if (
+    event.type === 'customer.subscription.updated' ||
+    event.type === 'customer.subscription.created'
+  ) {
+    const sub = event.data.object as Stripe.Subscription
+    const userId = sub.metadata?.supabase_user_id
+    if (userId && ['active', 'trialing'].includes(sub.status)) {
+      const tier = tierFromSubscription(sub)
+      await setUserSubscriptionTier(supabase, userId, tier, {
+        stripeSubscriptionId: sub.id,
+        monthlyAmountOre: tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
+      })
+    }
+  }
+
+  if (event.type === 'customer.subscription.deleted') {
+    const sub = event.data.object as Stripe.Subscription
+    const userId = sub.metadata?.supabase_user_id
+    if (userId) {
+      await setUserSubscriptionTier(supabase, userId, 'free', {
+        stripeSubscriptionId: null,
+        monthlyAmountOre: null,
+      })
     }
   }
 

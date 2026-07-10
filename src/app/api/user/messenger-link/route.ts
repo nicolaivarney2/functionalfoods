@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { createClient } from '@supabase/supabase-js'
+
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
+import {
+  SubscriptionLimitError,
+  assertMessengerGuidanceAllowed,
+} from '@/lib/subscription-entitlements'
 
 export const dynamic = 'force-dynamic'
 
 const TOKEN_TTL_MS = 15 * 60 * 1000
 
 /**
- * Logget ind: generér m.me-URL med engangstoken (ref=ff_link--…) til ManyChat-kobling.
+ * Logget ind + Premium: generér m.me-URL med engangstoken (ref=ff_link--…) til ManyChat-kobling.
  */
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request)
@@ -28,6 +33,18 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = createClient(url, serviceKey)
+
+  try {
+    await assertMessengerGuidanceAllowed(supabase, user.id)
+  } catch (err) {
+    if (err instanceof SubscriptionLimitError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code, tier: err.tier, status: err.status },
+        { status: 402 },
+      )
+    }
+    throw err
+  }
 
   const fallbackUrl = `https://m.me/${pageId}?ref=ff_logged_in`
 

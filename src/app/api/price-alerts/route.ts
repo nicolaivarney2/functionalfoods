@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import {
+  SubscriptionLimitError,
+  assertMealPlanGenerationAllowed,
+  assertPriceAlertCreationAllowed,
+  logMealPlanGeneration,
+} from '@/lib/subscription-entitlements'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
 import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
 
@@ -187,6 +193,19 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSupabaseServiceClient()
+
+    try {
+      await assertPriceAlertCreationAllowed(supabase, user.id, 1)
+    } catch (err) {
+      if (err instanceof SubscriptionLimitError) {
+        return NextResponse.json(
+          { error: err.message, code: err.code, tier: err.tier, status: err.status },
+          { status: 402 },
+        )
+      }
+      throw err
+    }
+
     const offerId = Number(productOfferId)
 
     const { data: offer, error: offerError } = await supabase

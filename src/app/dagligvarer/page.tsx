@@ -401,7 +401,6 @@ function formatOfferEndDate(dateString: string | null): string {
 const CATEGORIES = [
   { id: 'Frugt og grønt', name: 'Frugt og grønt', icon: '🍎' },
   { id: 'Brød og kager', name: 'Brød og kager', icon: '🍞' },
-  { id: 'Drikkevarer', name: 'Drikkevarer', icon: '🥤' },
   { id: 'Kød og fisk', name: 'Kød og fisk', icon: '🥩' },
   { id: 'Kolonial', name: 'Kolonial', icon: '🌾' },
   { id: 'Mejeri og køl', name: 'Mejeri og køl', icon: '🥛' },

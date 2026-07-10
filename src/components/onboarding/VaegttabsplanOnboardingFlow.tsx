@@ -22,6 +22,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
+import SubscriptionTierCards from '@/components/subscription/SubscriptionTierCards'
+import type { SubscriptionTier } from '@/lib/subscription-tiers'
 import {
   ACTIVITY_OPTIONS,
   EXCLUDED_FOOD_OPTIONS,
@@ -39,13 +41,6 @@ import {
   type VaegttabsplanOnboardingData,
 } from '@/lib/onboarding/vaegttabsplan-onboarding'
 
-const PRESETS = [
-  { kr: 0, label: '0 kr' },
-  { kr: 60, label: '60 kr' },
-  { kr: 100, label: '100 kr' },
-  { kr: 200, label: '200 kr' },
-] as const
-
 const STEP = {
   INTRO: 0,
   HOUSEHOLD: 1,
@@ -60,11 +55,12 @@ const STEP = {
   DIETARY: 10,
   MEAL_SCOPE: 11,
   EXCLUDED: 12,
-  SUMMARY: 13,
-  SIGNUP: 14,
+  PRICING: 13,
+  SUMMARY: 14,
+  SIGNUP: 15,
 } as const
 
-const TOTAL_STEPS = 15
+const TOTAL_STEPS = 16
 const ALMOST_DONE_FROM_STEP = STEP.AGE
 
 const USP_INTRO = {
@@ -159,9 +155,7 @@ function VaegttabsplanOnboardingInner() {
   const [hydrated, setHydrated] = useState(false)
 
   const [password, setPassword] = useState('')
-  const [amountKr, setAmountKr] = useState(60)
-  const [customAmount, setCustomAmount] = useState('')
-  const [useCustom, setUseCustom] = useState(false)
+  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('free')
   const [acceptTerms, setAcceptTerms] = useState(true)
   const [productUpdatesConsent, setProductUpdatesConsent] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -251,6 +245,8 @@ function VaegttabsplanOnboardingInner() {
         return Boolean(data.mealPlanScope)
       case STEP.EXCLUDED:
         return true
+      case STEP.PRICING:
+        return true
       case STEP.SUMMARY:
         return onboardingProfileComplete(data)
       case STEP.SIGNUP:
@@ -331,14 +327,6 @@ function VaegttabsplanOnboardingInner() {
     }
   }, [step, turnstileSiteKey])
 
-  const resolvedAmountKr = (): number => {
-    if (useCustom) {
-      const n = parseInt(customAmount.replace(',', '.').trim(), 10)
-      return Number.isFinite(n) ? n : 0
-    }
-    return amountKr
-  }
-
   const finishSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -354,16 +342,6 @@ function VaegttabsplanOnboardingInner() {
     }
     if (password.length < 8) {
       setError('Adgangskode skal være mindst 8 tegn.')
-      return
-    }
-
-    const payKr = resolvedAmountKr()
-    if (useCustom && (payKr < 0 || payKr > 50_000)) {
-      setError('Vælg et beløb mellem 0 og 50.000 kr.')
-      return
-    }
-    if (useCustom && payKr > 0 && payKr < 5) {
-      setError('Valgfri støtte under 5 kr kan ikke betales online – vælg 0 kr eller mindst 5 kr.')
       return
     }
     if (turnstileSiteKey && !captchaToken) {
@@ -415,16 +393,16 @@ function VaegttabsplanOnboardingInner() {
 
       await applyPendingOnboarding(accessToken)
 
-      trackEvent('sign_up', { method: 'guidet_plan', paid: payKr > 0 })
+      trackEvent('sign_up', { method: 'guidet_plan', tier: selectedTier })
 
-      if (payKr > 0) {
-        const payRes = await fetch('/api/stripe/create-checkout-session', {
+      if (selectedTier === 'plus' || selectedTier === 'premium') {
+        const payRes = await fetch('/api/stripe/create-subscription-checkout', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ amountKr: payKr }),
+          body: JSON.stringify({ tier: selectedTier }),
         })
         const payJson = await payRes.json().catch(() => ({}))
         if (!payRes.ok || !payJson.url) {
@@ -881,6 +859,28 @@ function VaegttabsplanOnboardingInner() {
             </motion.div>
           )}
 
+          {step === STEP.PRICING && (
+            <motion.div
+              key="pricing"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -16 }}
+              className="space-y-5"
+            >
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Vælg plan</p>
+                <h2 className="mt-1 text-2xl font-bold">Hvad passer til dig?</h2>
+                <p className="mt-2 text-sm text-emerald-100/85">
+                  Start gratis — opgrader når du vil have ubegrænset madplan og prisalarmer, eller personlig vejledning.
+                </p>
+              </div>
+              <SubscriptionTierCards selected={selectedTier} onSelect={setSelectedTier} compact />
+              <p className="rounded-xl bg-white/10 px-4 py-3 text-xs leading-relaxed text-emerald-50/95 ring-1 ring-white/15">
+                Abonnement kan opsiges når som helst. Betaling først efter du har oprettet konto i næste trin.
+              </p>
+            </motion.div>
+          )}
+
           {step === STEP.SUMMARY && (
             <motion.div key="summary" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
               <div>
@@ -930,7 +930,11 @@ function VaegttabsplanOnboardingInner() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Sidste trin</p>
                 <h2 className="mt-1 text-2xl font-bold">Opret din konto</h2>
                 <p className="mt-2 text-sm text-emerald-100/85">
-                  Gratis at starte — vælg 0 kr eller støt os med et valgfrit beløb.
+                  {selectedTier === 'free'
+                    ? 'Du starter på gratis-planen med 3 madplaner og 3 prisalarmer om ugen.'
+                    : selectedTier === 'plus'
+                      ? 'Du valgte Madbudget (29 kr/md) — vi sender dig til betaling efter oprettelse.'
+                      : 'Du valgte Premium (249 kr/md) — vi sender dig til betaling efter oprettelse.'}
                 </p>
               </div>
 
@@ -981,49 +985,6 @@ function VaegttabsplanOnboardingInner() {
                     placeholder="Mindst 8 tegn"
                   />
                 </label>
-
-                <div className="border-t border-white/10 pt-4">
-                  <p className="mb-2 text-sm font-medium">Betal det du kan — eller 0 kr</p>
-                  <div className="flex flex-wrap gap-2">
-                    {PRESETS.map(({ kr, label }) => (
-                      <button
-                        key={kr}
-                        type="button"
-                        onClick={() => {
-                          setUseCustom(false)
-                          setAmountKr(kr)
-                        }}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium ring-1 transition ${
-                          !useCustom && amountKr === kr
-                            ? 'bg-amber-300 text-emerald-950 ring-amber-200'
-                            : 'bg-white/10 text-white ring-white/20'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setUseCustom(true)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium ring-1 transition ${
-                        useCustom ? 'bg-amber-300 text-emerald-950 ring-amber-200' : 'bg-white/10 text-white ring-white/20'
-                      }`}
-                    >
-                      Andet
-                    </button>
-                  </div>
-                  {useCustom && (
-                    <input
-                      type="number"
-                      min={0}
-                      max={50000}
-                      value={customAmount}
-                      onChange={(e) => setCustomAmount(e.target.value)}
-                      className="mt-2 w-full max-w-xs rounded-xl border-0 bg-white/10 px-3 py-2 text-white ring-1 ring-white/20"
-                      placeholder="Beløb i kr"
-                    />
-                  )}
-                </div>
 
                 <label className="flex cursor-pointer items-start gap-3">
                   <input

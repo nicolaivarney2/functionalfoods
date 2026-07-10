@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import {
+  SubscriptionLimitError,
+  assertPriceAlertCreationAllowed,
+} from '@/lib/subscription-entitlements'
 import { MAX_GROUP_ALERTS, MIN_GROUP_MATCHES, PREVIEW_CACHE_TTL_MS } from '@/lib/price-alerts/constants'
 import {
   matchOffersForPriceAlertQuery,
@@ -120,6 +124,18 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSupabaseServiceClient()
+
+    try {
+      await assertPriceAlertCreationAllowed(supabase, user.id, matches.length)
+    } catch (err) {
+      if (err instanceof SubscriptionLimitError) {
+        return NextResponse.json(
+          { error: err.message, code: err.code, tier: err.tier, status: err.status },
+          { status: 402 },
+        )
+      }
+      throw err
+    }
 
     if (matches.length < MIN_GROUP_MATCHES) {
       const alert = await createSingleAlert(

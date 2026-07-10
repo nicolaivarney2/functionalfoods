@@ -2553,6 +2553,24 @@ export default function MadbudgetPage() {
     setGenerationProgress(generationSteps[0])
     
     try {
+      const consumeRes = await fetch('/api/subscription/consume-meal-plan', {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!consumeRes.ok) {
+        const j = await consumeRes.json().catch(() => ({}))
+        if (consumeRes.status === 402) {
+          setGuestSignupPrompt(
+            j.error ||
+              'Du har brugt dine gratis madplaner denne uge. Opgrader til Madbudget (29 kr/md) for ubegrænset.',
+          )
+          setIsGeneratingMealPlan(false)
+          setGenerationProgress('')
+          return
+        }
+        throw new Error(j.error || 'Kunne ikke tjekke abonnement')
+      }
+
       // Step 1: Match recipes
       setGenerationProgress(generationSteps[0])
       await new Promise(resolve => setTimeout(resolve, 1500))

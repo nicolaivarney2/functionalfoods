@@ -109,7 +109,7 @@ export default function CommentCTA({ onLoginClick }: CommentCTAProps) {
               Opret konto – kom i gang
             </Link>
             <p className="text-xs text-gray-500 text-center mt-2">
-              Pris? Betal det du kan – også 0 kr
+              Pris? Gratis at starte – Madbudget 29 kr/md, Premium 249 kr/md
             </p>
           </div>
         </div>

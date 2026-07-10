@@ -36,6 +36,9 @@ export const NON_FOOD_CATALOG_LABELS = [
   'Baby og småbørn',
   'Baby og familie',
   'Dyr',
+  // Skjult fra /dagligvarer — vin, øl, sodavand dominerer ellers tilbudslisten
+  'Drikkevarer',
+  'Drikke',
 ] as const
 
 /** Raw department/category labels in DB that are food (whitelist for /dagligvarer). */
@@ -55,8 +58,6 @@ export const FOOD_CATALOG_LABELS = [
   'Køl',
   'Ost m.v.',
   'Frost',
-  'Drikkevarer',
-  'Drikke',
   'Slik og snacks',
   'Slik & snacks',
   'Slik',

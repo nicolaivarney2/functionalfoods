@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 
-/** Tidligere medlemsside – samme flow som kom-i-gang (signup + valgfri støtte). */
+/** Tidligere medlemsside — samme flow som lav-din-plan. */
 export default function MedlemRedirectPage() {
-  redirect('/kom-i-gang')
+  redirect('/lav-din-plan')
 }

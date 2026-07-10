@@ -245,7 +245,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        'Opskrifter og meget indhold er gratis. Madplaner, favoritter og personlige beregninger kræver en gratis profil. Ingen skjult abonnement - vi har “betal hvad du kan/vil”, hvis du vil støtte siden.',
+        'Opskrifter og meget indhold er gratis. Med en gratis profil får du 3 madplaner og 3 prisalarmer om ugen. Madbudget (29 kr/md) giver ubegrænset madplaner og prisalarmer. Premium (249 kr/md) tilføjer personlig vejledning 24/7 på Messenger.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',

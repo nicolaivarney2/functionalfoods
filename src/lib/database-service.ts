@@ -2,7 +2,7 @@ import { createSupabaseClient, createSupabaseServiceClient } from './supabase'
 import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
-import { getFoodCatalogLabelsForFilter } from '@/lib/product-food-classification'
+import { getFoodCatalogLabelsForFilter, isFoodCatalogProduct } from '@/lib/product-food-classification'
 import {
   applyDagligvarerSourceFilter,
   applyDagligvarerTjekStoreFilter,
@@ -141,7 +141,6 @@ export class DatabaseService {
     'Kød og fisk',
     'Kolonial',
     'Mejeri og køl',
-    'Drikkevarer',
     'Nemt og hurtigt',
     'Slik og snacks',
     'Frost',
@@ -160,7 +159,6 @@ export class DatabaseService {
     'Frugt & grønt',
     'Ost m.v.',
     'Mad fra hele verden',
-    'Drikke',
     'Slik & snacks',
     'Slik',
     'Nemt & hurtigt',
@@ -589,7 +587,16 @@ export class DatabaseService {
       }
       const hasMore = rows.length > opts.limit
       const pageRows = hasMore ? rows.slice(0, opts.limit) : rows
-      const normalizedRows = pageRows.map((row) => this.normalizeRpcOfferRow(row))
+      const normalizedRows = pageRows
+        .map((row) => this.normalizeRpcOfferRow(row))
+        .filter((row) =>
+          isFoodCatalogProduct({
+            department: row.products?.department,
+            category: row.products?.category,
+            subcategory: row.products?.subcategory,
+            name: row.products?.name_generic ?? row.name_store,
+          }),
+        )
       const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
       return {
         products: normalizedRows.map((row) => this.mapOfferRowToProduct(row, imageLookup)),
@@ -728,7 +735,6 @@ export class DatabaseService {
       'Mejeri og køl': ['Køl', 'Mejeri', 'Ost m.v.'],
       'Brød og kager': ['Brød', 'Kager', 'Brød & Bavinchi'],
       'Frugt og grønt': ['Frugt & grønt'],
-      'Drikkevarer': ['Drikke'],
       'Slik og snacks': ['Slik & snacks', 'Slik'],
       'Nemt og hurtigt': ['Nemt & hurtigt'],
     }
@@ -740,6 +746,7 @@ export class DatabaseService {
     const result: { [key: string]: number } = {}
     for (const [raw, count] of Object.entries(categories)) {
       const canonical = this.normalizeCategoryInput(raw) || raw
+      if (canonical === 'Drikkevarer') continue
       result[canonical] = (result[canonical] || 0) + count
     }
     return result

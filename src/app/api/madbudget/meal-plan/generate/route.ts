@@ -115,6 +115,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const {
+      assertMealPlanGenerationAllowed,
+      logMealPlanGeneration,
+      SubscriptionLimitError,
+    } = await import('@/lib/subscription-entitlements')
+
+    try {
+      await assertMealPlanGenerationAllowed(supabase, user.id)
+    } catch (err) {
+      if (err instanceof SubscriptionLimitError) {
+        return NextResponse.json(
+          { error: err.message, code: err.code, tier: err.tier, status: err.status },
+          { status: 402 },
+        )
+      }
+      throw err
+    }
+
     const body = await request.json().catch(() => ({}))
 
     const [profileResult, adultResult, recentResult] = await Promise.all([
@@ -315,6 +333,8 @@ export async function POST(request: NextRequest) {
       console.error('generate: kunne ikke gemme madplan:', saveError)
       return NextResponse.json({ error: 'Failed to save meal plan' }, { status: 500 })
     }
+
+    await logMealPlanGeneration(supabase, user.id)
 
     return NextResponse.json({ success: true, data: saved ? slimMealPlanRowForClient(saved) : saved })
   } catch (error) {
