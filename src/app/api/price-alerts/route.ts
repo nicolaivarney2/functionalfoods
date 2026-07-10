@@ -3,9 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import {
   SubscriptionLimitError,
-  assertMealPlanGenerationAllowed,
   assertPriceAlertCreationAllowed,
-  logMealPlanGeneration,
 } from '@/lib/subscription-entitlements'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
 import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
