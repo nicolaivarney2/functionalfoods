@@ -64,6 +64,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}))
     const mealPlanId = typeof body.mealPlanId === 'string' ? body.mealPlanId : null
+    /** Kun opdatér dagbog fra denne dato (YYYY-MM-DD) — bruges ved swap/fjern fremad i ugen. */
+    const fromDate =
+      typeof body.fromDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.fromDate)
+        ? body.fromDate
+        : null
 
     // Hent planen (specifik eller aktiv).
     let query = supabase
@@ -94,6 +99,7 @@ export async function POST(request: NextRequest) {
       const dayObj = grid[day]
       if (!dayObj || typeof dayObj !== 'object') return
       const loggedDate = addDays(weekStart, dayIdx)
+      if (fromDate && loggedDate < fromDate) return
       for (const meal of PLAN_MEALS) {
         const cell = dayObj[meal] as Cell | null
         if (!cell || !cell.title) continue
@@ -121,21 +127,34 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Erstat tidligere madplan-entries for denne plan + uge (bevarer manuelle logninger).
-    await supabase
-      .from('food_log_entries')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('source', 'meal-plan')
-      .eq('meal_plan_id', plan.id)
+    // Erstat tidligere madplan-entries (bevarer manuelle logninger).
+    const deleteFrom = fromDate && fromDate > weekStart ? fromDate : weekStart;
+    let delErr;
+    if (fromDate) {
+      ({ error: delErr } = await supabase
+        .from('food_log_entries')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'meal-plan')
+        .eq('meal_plan_id', plan.id)
+        .gte('logged_date', deleteFrom)
+        .lte('logged_date', weekEnd));
+    } else {
+      await supabase
+        .from('food_log_entries')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'meal-plan')
+        .eq('meal_plan_id', plan.id);
 
-    const { error: delErr } = await supabase
-      .from('food_log_entries')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('source', 'meal-plan')
-      .gte('logged_date', weekStart)
-      .lte('logged_date', weekEnd)
+      ({ error: delErr } = await supabase
+        .from('food_log_entries')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'meal-plan')
+        .gte('logged_date', weekStart)
+        .lte('logged_date', weekEnd));
+    }
     if (delErr) {
       console.error('sync-meal-plan delete', delErr)
       return NextResponse.json({ error: 'Kunne ikke rydde gamle madplan-entries', details: delErr.message }, { status: 500 })
