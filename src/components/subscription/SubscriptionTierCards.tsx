@@ -4,6 +4,8 @@ import { Check } from 'lucide-react'
 import {
   FREE_MEAL_PLANS_PER_WEEK,
   FREE_PRICE_ALERTS_MAX,
+  PREMIUM_CONSIDERATION_NOTE,
+  PREMIUM_GUIDANCE_HOURS,
   TIER_LABELS,
   TIER_PRICES_KR,
   type SubscriptionTier,
@@ -16,6 +18,7 @@ export type SubscriptionPlanOption = {
   description: string
   features: string[]
   recommended?: boolean
+  considerationNote?: string
 }
 
 export const SUBSCRIPTION_PLAN_OPTIONS: SubscriptionPlanOption[] = [
@@ -51,10 +54,10 @@ export const SUBSCRIPTION_PLAN_OPTIONS: SubscriptionPlanOption[] = [
     description: 'Alt inkl. personlig vejledning.',
     features: [
       'Alt i Madbudget',
-      'Personlig vejledning på Messenger',
-      'Svar fra et menneske — 24/7',
-      'Sparring om madplan og vægttab',
+      PREMIUM_GUIDANCE_HOURS,
+      'Messenger med teamet',
     ],
+    considerationNote: PREMIUM_CONSIDERATION_NOTE,
   },
 ]
 
@@ -96,6 +99,11 @@ export default function SubscriptionTierCards({ selected, onSelect, compact }: P
                 </li>
               ))}
             </ul>
+            {plan.considerationNote ? (
+              <p className="mt-3 rounded-lg bg-amber-300/15 px-3 py-2 text-xs leading-relaxed text-amber-100 ring-1 ring-amber-300/25">
+                {plan.considerationNote}
+              </p>
+            ) : null}
           </button>
         )
       })}

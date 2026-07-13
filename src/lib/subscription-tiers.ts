@@ -14,9 +14,17 @@ export const TIER_PRICES_KR: Record<SubscriptionTier, number> = {
   premium: 249,
 }
 
-/** Gratis: 3 madplaner/uge, 3 prisalarmer. Plus/Premium: ubegrænset. */
+/** Gratis: vist som 3 madplaner/uge i UI — faktisk grænse er højere (buffer ved onboarding). */
 export const FREE_MEAL_PLANS_PER_WEEK = 3
+/** Faktisk ugentlig grænse for gratis (API). Brugeren ser FREE_MEAL_PLANS_PER_WEEK i copy. */
+export const FREE_MEAL_PLANS_PER_WEEK_LIMIT = 5
 export const FREE_PRICE_ALERTS_MAX = 3
+
+export const PREMIUM_GUIDANCE_HOURS =
+  'Personlig vejledning i dagstimerne 7.30–21.30'
+
+export const PREMIUM_CONSIDERATION_NOTE =
+  '87% har brug for personlig vejledning for at lykkes med vægttab'
 
 export type TierEntitlements = {
   tier: SubscriptionTier
@@ -31,7 +39,7 @@ export function entitlementsForTier(tier: SubscriptionTier): TierEntitlements {
   const isPaid = tier === 'plus' || tier === 'premium'
   return {
     tier,
-    mealPlansPerWeek: isPaid ? null : FREE_MEAL_PLANS_PER_WEEK,
+    mealPlansPerWeek: isPaid ? null : FREE_MEAL_PLANS_PER_WEEK_LIMIT,
     priceAlertsMax: isPaid ? null : FREE_PRICE_ALERTS_MAX,
     messengerGuidance: tier === 'premium',
     unlimitedMealPlans: isPaid,

@@ -22,7 +22,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
-import SubscriptionTierCards from '@/components/subscription/SubscriptionTierCards'
+import OnboardingPricingStep from '@/components/subscription/OnboardingPricingStep'
 import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
 import type { SubscriptionTier } from '@/lib/subscription-tiers'
 import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
@@ -535,26 +535,42 @@ function VaegttabsplanOnboardingInner() {
                     Antal voksne (inkl. dig)
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={1}
                     max={10}
-                    value={data.adults ?? 1}
-                    onChange={(e) =>
-                      patch({ adults: Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)) })
-                    }
+                    value={data.adults ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '')
+                      if (!raw) {
+                        patch({ adults: undefined })
+                        return
+                      }
+                      const n = parseInt(raw, 10)
+                      if (!Number.isFinite(n)) return
+                      patch({ adults: Math.min(10, Math.max(1, n)) })
+                    }}
                     className={fieldInputClass}
                   />
                 </div>
                 <div>
                   <label className="mb-2 block text-sm font-medium text-emerald-100/90">Antal børn</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     max={10}
-                    value={data.children ?? 0}
-                    onChange={(e) =>
-                      patch({ children: Math.max(0, Math.min(10, parseInt(e.target.value, 10) || 0)) })
-                    }
+                    value={data.children ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '')
+                      if (!raw) {
+                        patch({ children: undefined })
+                        return
+                      }
+                      const n = parseInt(raw, 10)
+                      if (!Number.isFinite(n)) return
+                      patch({ children: Math.min(10, Math.max(0, n)) })
+                    }}
                     className={fieldInputClass}
                   />
                 </div>
@@ -627,18 +643,23 @@ function VaegttabsplanOnboardingInner() {
             <ProfileFieldStep key="age" eyebrow="Om dig" title="Hvor gammel er du?">
               <label className="block">
                 <span className="sr-only">Alder</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  autoFocus
-                  value={data.age ?? ''}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10)
-                    patch({ age: Number.isFinite(v) ? v : undefined })
-                  }}
-                  placeholder="år"
-                  className={fieldInputClass}
-                />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus
+                    value={data.age ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '')
+                      if (!raw) {
+                        patch({ age: undefined })
+                        return
+                      }
+                      const v = parseInt(raw, 10)
+                      patch({ age: Number.isFinite(v) ? v : undefined })
+                    }}
+                    placeholder="fx 30"
+                    className={fieldInputClass}
+                  />
               </label>
             </ProfileFieldStep>
           )}
@@ -647,18 +668,23 @@ function VaegttabsplanOnboardingInner() {
             <ProfileFieldStep key="height" eyebrow="Om dig" title="Hvor høj er du?">
               <label className="block">
                 <span className="sr-only">Højde</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  autoFocus
-                  value={data.height ?? ''}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10)
-                    patch({ height: Number.isFinite(v) ? v : undefined })
-                  }}
-                  placeholder="cm"
-                  className={fieldInputClass}
-                />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus
+                    value={data.height ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '')
+                      if (!raw) {
+                        patch({ height: undefined })
+                        return
+                      }
+                      const v = parseInt(raw, 10)
+                      patch({ height: Number.isFinite(v) ? v : undefined })
+                    }}
+                    placeholder="fx 175"
+                    className={fieldInputClass}
+                  />
               </label>
             </ProfileFieldStep>
           )}
@@ -667,18 +693,23 @@ function VaegttabsplanOnboardingInner() {
             <ProfileFieldStep key="weight" eyebrow="Om dig" title="Hvad vejer du?">
               <label className="block">
                 <span className="sr-only">Vægt</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  autoFocus
-                  value={data.weight ?? ''}
-                  onChange={(e) => {
-                    const v = parseFloat(e.target.value)
-                    patch({ weight: Number.isFinite(v) ? v : undefined })
-                  }}
-                  placeholder="kg"
-                  className={fieldInputClass}
-                />
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoFocus
+                    value={data.weight ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '')
+                      if (!raw) {
+                        patch({ weight: undefined })
+                        return
+                      }
+                      const v = parseFloat(raw)
+                      patch({ weight: Number.isFinite(v) ? v : undefined })
+                    }}
+                    placeholder="fx 80"
+                    className={fieldInputClass}
+                  />
               </label>
             </ProfileFieldStep>
           )}
@@ -894,19 +925,8 @@ function VaegttabsplanOnboardingInner() {
               initial={{ opacity: 0, x: 16 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -16 }}
-              className="space-y-5"
             >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Vælg plan</p>
-                <h2 className="mt-1 text-2xl font-bold">Hvad passer til dig?</h2>
-                <p className="mt-2 text-sm text-emerald-100/85">
-                  Start gratis — opgrader når du vil have ubegrænset madplan og prisalarmer, eller personlig vejledning.
-                </p>
-              </div>
-              <SubscriptionTierCards selected={selectedTier} onSelect={setSelectedTier} compact />
-              <p className="rounded-xl bg-white/10 px-4 py-3 text-xs leading-relaxed text-emerald-50/95 ring-1 ring-white/15">
-                Abonnement kan opsiges når som helst. Betaling først efter du har oprettet konto i næste trin.
-              </p>
+              <OnboardingPricingStep selected={selectedTier} onSelect={setSelectedTier} />
             </motion.div>
           )}
 
