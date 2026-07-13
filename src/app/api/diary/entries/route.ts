@@ -181,6 +181,60 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = getServiceClient()
+    if (!supabase) return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+
+    const user = await getSupabaseRouteUser(request)
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const body = await request.json().catch(() => ({}))
+    const id = typeof body.id === 'string' ? body.id : ''
+    if (!id) return NextResponse.json({ error: 'Mangler id' }, { status: 400 })
+
+    const updates: { logged_date?: string; meal_type?: MealType } = {}
+
+    if (body.mealType != null) {
+      const mealType = String(body.mealType) as MealType
+      if (!MEAL_TYPES.includes(mealType)) {
+        return NextResponse.json({ error: 'Ugyldigt måltid' }, { status: 400 })
+      }
+      updates.meal_type = mealType
+    }
+
+    if (body.date != null) {
+      const date = String(body.date)
+      if (!isValidDate(date)) return NextResponse.json({ error: 'Ugyldig dato' }, { status: 400 })
+      updates.logged_date = date
+    }
+
+    if (!Object.keys(updates).length) {
+      return NextResponse.json({ error: 'Angiv dato og/eller måltid' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('food_log_entries')
+      .update(updates)
+      .eq('user_id', user.id)
+      .eq('id', id)
+      .select(ENTRY_SELECT)
+      .single()
+
+    if (error) {
+      console.error('food_log_entries PATCH', error)
+      return NextResponse.json({ error: 'Kunne ikke flytte', details: error.message }, { status: 500 })
+    }
+
+    if (!data) return NextResponse.json({ error: 'Post ikke fundet' }, { status: 404 })
+
+    return NextResponse.json({ success: true, data })
+  } catch (e) {
+    console.error('diary/entries PATCH', e)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = getServiceClient()

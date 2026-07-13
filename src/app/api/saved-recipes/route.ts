@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
           id,
           title,
           slug,
-          image_url,
-          short_description
+          imageUrl,
+          shortDescription
         )
       `)
       .eq('user_id', user.id)
@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
         recipeId: row.recipe_id,
         title: recipe?.title ?? 'Ukendt opskrift',
         slug: recipe?.slug ?? row.recipe_id,
-        imageUrl: recipe?.image_url ?? null,
-        shortDescription: recipe?.short_description ?? null,
+        imageUrl: recipe?.imageUrl ?? null,
+        shortDescription: recipe?.shortDescription ?? null,
         savedAt: row.created_at,
       }
     })
