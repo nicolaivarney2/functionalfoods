@@ -8,11 +8,21 @@ const citeColors = {
 
 export type CiteColor = keyof typeof citeColors
 
-/** Superscript kildehenvisning med link til #kilde-n i bunden af siden */
-export function Cite({ n, color = 'purple' }: { n: number; color?: CiteColor }) {
+/** Superscript kildehenvisning med link til #kilde-n (lokal side) eller angivet URL. */
+export function Cite({
+  n,
+  color = 'purple',
+  href,
+}: {
+  n: number
+  color?: CiteColor
+  /** Standard: #kilde-n på samme side. Brug fx /metode/kalorier-og-vaegttab#kilde-n i app-flow. */
+  href?: string
+}) {
+  const target = href ?? `#kilde-${n}`
   return (
     <sup className={`text-[0.65em] font-semibold ml-0.5 align-super ${citeColors[color]}`}>
-      <a href={`#kilde-${n}`} className="hover:underline underline-offset-2">
+      <a href={target} className="hover:underline underline-offset-2">
         {n}
       </a>
     </sup>

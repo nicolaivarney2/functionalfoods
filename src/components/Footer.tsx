@@ -21,6 +21,7 @@ const columns = [
     title: 'Vægttab & guides',
     links: [
       { label: 'Vægttabsoverblik', href: '/vaegttab' },
+      { label: 'Kilder & beregningsmetode', href: '/metode/kalorier-og-vaegttab' },
       { label: 'Succeshistorier', href: '/succeshistorier' },
       { label: 'Mentalt (adfærd & vaner)', href: '/blog/mentalt' },
       { label: 'Keto vægttab', href: '/keto/vaegttab' },

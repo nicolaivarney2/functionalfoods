@@ -23,6 +23,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
 import OnboardingPricingStep from '@/components/subscription/OnboardingPricingStep'
+import HealthInformationNotice from '@/components/HealthInformationNotice'
+import { Cite } from '@/components/Cite'
+import { healthMethodologyAnchor } from '@/lib/health-sources'
 import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
 import type { SubscriptionTier } from '@/lib/subscription-tiers'
 import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
@@ -744,10 +747,13 @@ function VaegttabsplanOnboardingInner() {
           {step === STEP.CALORIES && energy && (
             <motion.div key="calories" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Effektivt vægttab</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Estimeret energimål</p>
                 <h2 className="mt-1 text-2xl font-bold">Dit daglige kalorietarget</h2>
                 <p className="mt-2 text-sm text-emerald-100/85">
-                  Beregnet til dig — madplanen bygger videre på dette tal.
+                  Vejledende estimat ud fra din profil
+                  <Cite n={1} color="amber" href={healthMethodologyAnchor(1)} />
+                  <Cite n={5} color="amber" href={healthMethodologyAnchor(5)} />
+                  — madplanen bygger videre på dette tal.
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -781,6 +787,7 @@ function VaegttabsplanOnboardingInner() {
                   vægttabsplan til dig — tilpasset dit target og det, der er på tilbud i dine butikker.
                 </p>
               </div>
+              <HealthInformationNotice variant="dark" />
             </motion.div>
           )}
 

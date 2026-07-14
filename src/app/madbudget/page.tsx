@@ -49,6 +49,19 @@ import {
 import { FF_GUEST_TOUR_STEPS, FF_GUEST_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-guest-tour-steps'
 import { FF_USER_TOUR_STEPS, FF_USER_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-user-tour-steps'
 import { hasPendingOnboardingData } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { Cite } from '@/components/Cite'
+import HealthInformationNotice from '@/components/HealthInformationNotice'
+import { healthMethodologyAnchor } from '@/lib/health-sources'
+import {
+  getPlanOwnerSettings,
+  mealPlanScopeFromMeals,
+  setDietaryApproachOnProfiles,
+  setMealPlanScopeOnProfiles,
+  setPlannerMealIncludedOnProfiles,
+  syncPlanSettingsAcrossAdults,
+  type MealPlanScope,
+} from '@/lib/adult-plan-profile'
+import { MEAL_PLAN_SCOPE_OPTIONS, mealPlanScopeLabel } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 import {
@@ -428,7 +441,7 @@ function buildAdultsProfilesForFamily(adultsCount: number, rows: any[] | undefin
     const idx = typeof r?.adult_index === 'number' ? r.adult_index : 0
     byIndex.set(idx, r)
   }
-  return Array.from({ length: n }, (_, i) => {
+  const profiles = Array.from({ length: n }, (_, i) => {
     const p = byIndex.get(i)
     if (!p) {
       return {
@@ -439,6 +452,7 @@ function buildAdultsProfilesForFamily(adultsCount: number, rows: any[] | undefin
     }
     return adultProfileFromApiRow(p)
   })
+  return syncPlanSettingsAcrossAdults(profiles)
 }
 
 export default function MadbudgetPage() {
@@ -2261,14 +2275,19 @@ export default function MadbudgetPage() {
   }
 
   const plannerMealToggles = useMemo(() => {
-    const src = familyProfile.adultsProfiles[0]
-    const set = new Set(src?.mealsPerDay || ['dinner'])
+    const { mealsPerDay } = getPlanOwnerSettings(familyProfile.adultsProfiles)
+    const set = new Set(mealsPerDay)
     return {
       breakfast: set.has('breakfast'),
       lunch: set.has('lunch'),
       dinner: true,
     }
   }, [familyProfile.adultsProfiles])
+
+  const selectedMealPlanScope = useMemo(
+    (): MealPlanScope => mealPlanScopeFromMeals(getPlanOwnerSettings(familyProfile.adultsProfiles).mealsPerDay),
+    [familyProfile.adultsProfiles]
+  )
 
   const setPlannerMealIncluded = (meal: 'breakfast' | 'lunch', checked: boolean) => {
     if (isGuest) {
@@ -2279,42 +2298,28 @@ export default function MadbudgetPage() {
     }
     setFamilyProfile((prev) => ({
       ...prev,
-      adultsProfiles: prev.adultsProfiles.map((p) => {
-        const cur = new Set(p.mealsPerDay || ['dinner'])
-        cur.add('dinner')
-        if (checked) cur.add(meal)
-        else cur.delete(meal)
-        return { ...p, mealsPerDay: Array.from(cur) }
-      }),
+      adultsProfiles: setPlannerMealIncludedOnProfiles(prev.adultsProfiles, meal, checked),
     }))
   }
 
-  const selectedPlanDietaryApproach = useMemo(() => {
-    const firstWithApproach = familyProfile.adultsProfiles.find((p) => Boolean(p?.dietaryApproach))
-    return firstWithApproach?.dietaryApproach || ''
-  }, [familyProfile.adultsProfiles])
+  const selectedPlanDietaryApproach = useMemo(
+    () => getPlanOwnerSettings(familyProfile.adultsProfiles).dietaryApproach || '',
+    [familyProfile.adultsProfiles]
+  )
 
   const syncDietaryApproachAcrossAdults = (dietaryApproach: string) => {
     if (!dietaryApproach) return
-    setFamilyProfile((prev) => {
-      const profiles = Array.from({ length: prev.adults }, (_, i) => {
-        const existing = prev.adultsProfiles[i]
-        if (existing) {
-          return {
-            ...existing,
-            mealsPerDay: existing.mealsPerDay?.length ? existing.mealsPerDay : ['dinner'],
-            dietaryApproach,
-          } as AdultProfile
-        }
-        return {
-          id: `adult-${Date.now()}-${i}`,
-          mealsPerDay: ['dinner'],
-          dietaryApproach,
-          isComplete: false,
-        } as AdultProfile
-      })
-      return { ...prev, adultsProfiles: profiles }
-    })
+    setFamilyProfile((prev) => ({
+      ...prev,
+      adultsProfiles: setDietaryApproachOnProfiles(prev.adultsProfiles, dietaryApproach),
+    }))
+  }
+
+  const syncMealPlanScopeAcrossAdults = (scope: MealPlanScope) => {
+    setFamilyProfile((prev) => ({
+      ...prev,
+      adultsProfiles: setMealPlanScopeOnProfiles(prev.adultsProfiles, scope),
+    }))
   }
 
   const openRecipeDetail = (recipe: any) => {
@@ -2419,32 +2424,27 @@ export default function MadbudgetPage() {
   // Save weight loss profile
   const saveWeightLossProfile = async () => {
     if (editingAdultIndex === null) return
+    const planSettings = getPlanOwnerSettings(familyProfile.adultsProfiles)
     const candidate = {
       ...currentWeightLossProfile,
       dietaryApproach:
-        currentWeightLossProfile.dietaryApproach ||
+        planSettings.dietaryApproach ||
         selectedPlanDietaryApproach ||
-        familyProfile.adultsProfiles[0]?.dietaryApproach,
-      mealsPerDay: currentWeightLossProfile.mealsPerDay?.length
-        ? currentWeightLossProfile.mealsPerDay
-        : ['dinner'],
+        currentWeightLossProfile.dietaryApproach,
+      mealsPerDay: planSettings.mealsPerDay,
     } as AdultProfile
     const complete = adultProfileHasRequiredFieldsForMealPlan(candidate)
     if (!complete) {
-      alert('Udfyld køn, alder, højde, vægt, aktivitet, kostretning og mål før du gemmer.')
+      alert('Udfyld køn, alder, højde, vægt, aktivitet og mål før du gemmer. Kostretning og måltider sættes under familieindstillinger.')
       return
     }
-    
+
     const updatedProfiles = [...familyProfile.adultsProfiles]
     updatedProfiles[editingAdultIndex] = {
       ...candidate,
-      isComplete: complete
+      isComplete: complete,
     } as AdultProfile
-    const syncedProfiles = updatedProfiles.map((p, idx) =>
-      idx === editingAdultIndex
-        ? p
-        : ({ ...p, dietaryApproach: candidate.dietaryApproach || p.dietaryApproach } as AdultProfile)
-    )
+    const syncedProfiles = syncPlanSettingsAcrossAdults(updatedProfiles)
     
     setFamilyProfile(prev => ({
       ...prev,
@@ -3095,6 +3095,10 @@ export default function MadbudgetPage() {
                 {isGuest
                   ? 'Demo: vægttabsplan med morgenmad, frokost og aftensmad fra ugens tilbud — opret bruger for din egen plan.'
                   : 'Din ugentlige madplan til vægttab — morgenmad, frokost og aftensmad. Ernæringsberegnet og personlig.'}
+                {' '}
+                <Link href="/metode/kalorier-og-vaegttab" className="text-green-700 hover:text-green-800 underline underline-offset-2 font-medium">
+                  Se kilder og metode
+                </Link>
               </p>
             </div>
             <div className="flex w-full min-w-0 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -3889,11 +3893,23 @@ export default function MadbudgetPage() {
                     <strong>
                       Husk, at når du spiser, så spis til du er mæt – Ikke mindre og IKKE mere.
                     </strong>
+                    <Cite n={3} href={healthMethodologyAnchor(3)} />
                   </li>
-                  <li>Jo mere du bevæger dig, jo mere forbrænder du. En simpel gåtur i frokostpausen eller efter aftensmad GØR en forskel.</li>
+                  <li>
+                    Jo mere du bevæger dig, jo mere forbrænder du. En simpel gåtur i frokostpausen eller efter aftensmad GØR en forskel.
+                    <Cite n={6} href={healthMethodologyAnchor(6)} />
+                  </li>
                   <li>Hold øje med, om du snacker for meget rundt om dine måltider. Få hjælp til bedre vaner under <Link href="/blog/mentalt" className="text-green-600 hover:text-green-700 underline font-medium">Mentalt</Link>.</li>
-                  <li>Periodisk faste hjælper på vægttab. Fx. ved at undgå snacking eller springe ét måltid over.</li>
+                  <li>
+                    Periodisk faste kan for nogle understøtte vægttab — fx ved at undgå snacking eller springe ét måltid over. Effekt og egnethed varierer.
+                    <Cite n={7} href={healthMethodologyAnchor(7)} />
+                  </li>
                 </ul>
+                <p className="mt-2 text-xs text-gray-500">
+                  <Link href="/metode/kalorier-og-vaegttab" className="text-green-700 hover:text-green-800 underline underline-offset-2 font-medium">
+                    Se alle kilder og beregningsmetode
+                  </Link>
+                </p>
               </div>
 
                 {/* Næringsboks (uge-gennemsnit i uge-view, dagens tal i dag-view) */}
@@ -4192,7 +4208,14 @@ export default function MadbudgetPage() {
                                   <div>
                                     <h4 className="text-xs font-medium text-gray-900 mb-1">Vitaminer (gennemsnit pr. dag)</h4>
                                     <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
-                                      Sammenlignet med vejledende daglige referenceværdier for voksne (nordiske/nationale udgangspunkter). Tallene er vejledende — ikke individuelle medicinske mål. Kun ét måltid i planen giver ofte lavere dækning end 100%.
+                                      Sammenlignet med vejledende daglige referenceværdier for voksne (nordiske/nationale udgangspunkter)
+                                      <Cite n={8} href={healthMethodologyAnchor(8)} />
+                                      <Cite n={4} href={healthMethodologyAnchor(4)} />
+                                      . Tallene er vejledende — ikke individuelle medicinske mål. Kun ét måltid i planen giver ofte lavere dækning end 100%.
+                                      {' '}
+                                      <Link href="/metode/kalorier-og-vaegttab" className="text-green-700 hover:text-green-800 underline underline-offset-2 font-medium">
+                                        Se kilder
+                                      </Link>
                                     </p>
                                     <div className="space-y-2">
                                       {mergedVitamins.map((row) => {
@@ -4241,8 +4264,10 @@ export default function MadbudgetPage() {
                           {primaryAdult && targetCal > 0 && (
                             <p className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
                               Mål baseret på {primaryAdult.dietaryApproach || 'sense'}-profil for voksen {activeIndex + 1}.
+                              <Cite n={2} href={healthMethodologyAnchor(2)} />
                             </p>
                           )}
+                          <HealthInformationNotice variant="inline" className="mt-4" />
                         </>
                       )}
                       </div>
@@ -5467,6 +5492,42 @@ export default function MadbudgetPage() {
                           </label>
                         ))}
                       </div>
+                      <label className="mb-2 mt-6 block text-sm font-medium text-gray-700">
+                        Måltider i madplanen
+                      </label>
+                      <p className="mb-3 text-xs text-gray-500">
+                        Voksen 1 (primær profil) styrer om du får fuld plan eller kun aftensmad. Gælder hele
+                        familien.
+                      </p>
+                      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {MEAL_PLAN_SCOPE_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.id}
+                            className={`flex cursor-pointer items-start rounded-lg border p-3 transition-all ${
+                              selectedMealPlanScope === opt.id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="familyPlanMealScope"
+                              className="mr-3 mt-1"
+                              checked={selectedMealPlanScope === opt.id}
+                              onChange={() => syncMealPlanScopeAcrossAdults(opt.id)}
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {opt.icon} {opt.label}
+                              </div>
+                              <div className="text-xs text-gray-600">{opt.desc}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mb-4 text-xs text-gray-500">
+                        Aktuelt: {mealPlanScopeLabel(selectedMealPlanScope)}
+                      </p>
                       <label className="mb-3 block text-sm font-medium text-gray-700">
                         Vægttabsprofiler for voksne
                       </label>
@@ -5937,12 +5998,16 @@ export default function MadbudgetPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Alder</label>
                         <input
-                          type="number"
-                          value={currentWeightLossProfile.age || ''}
-                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
-                            ...prev,
-                            age: parseInt(e.target.value)
-                          }))}
+                          type="text"
+                          inputMode="numeric"
+                          value={currentWeightLossProfile.age ?? ''}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, '')
+                            setCurrentWeightLossProfile((prev) => ({
+                              ...prev,
+                              age: raw ? parseInt(raw, 10) : undefined,
+                            }))
+                          }}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
                           placeholder="År"
                         />
@@ -5950,12 +6015,16 @@ export default function MadbudgetPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Højde (cm)</label>
                         <input
-                          type="number"
-                          value={currentWeightLossProfile.height || ''}
-                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
-                            ...prev,
-                            height: parseInt(e.target.value)
-                          }))}
+                          type="text"
+                          inputMode="numeric"
+                          value={currentWeightLossProfile.height ?? ''}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/\D/g, '')
+                            setCurrentWeightLossProfile((prev) => ({
+                              ...prev,
+                              height: raw ? parseInt(raw, 10) : undefined,
+                            }))
+                          }}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
                           placeholder="cm"
                         />
@@ -5963,12 +6032,16 @@ export default function MadbudgetPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Vægt (kg)</label>
                         <input
-                          type="number"
-                          value={currentWeightLossProfile.weight || ''}
-                          onChange={(e) => setCurrentWeightLossProfile(prev => ({
-                            ...prev,
-                            weight: parseFloat(e.target.value)
-                          }))}
+                          type="text"
+                          inputMode="decimal"
+                          value={currentWeightLossProfile.weight ?? ''}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '')
+                            setCurrentWeightLossProfile((prev) => ({
+                              ...prev,
+                              weight: raw ? parseFloat(raw) : undefined,
+                            }))
+                          }}
                           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1B365D] focus:border-transparent"
                           placeholder="kg"
                         />
@@ -6069,6 +6142,13 @@ export default function MadbudgetPage() {
                               <div className="text-center">
                                 <p className="text-sm text-gray-500">
                                   Disse tal vil blive brugt til at tilpasse din madplan præcist til dine behov.
+                                  <Cite n={1} href={healthMethodologyAnchor(1)} />
+                                  <Cite n={5} href={healthMethodologyAnchor(5)} />
+                                </p>
+                                <p className="mt-2 text-xs">
+                                  <Link href="/metode/kalorier-og-vaegttab" className="text-green-700 hover:text-green-800 underline underline-offset-2 font-medium">
+                                    Se kilder og beregningsmetode
+                                  </Link>
                                 </p>
                               </div>
                             </>

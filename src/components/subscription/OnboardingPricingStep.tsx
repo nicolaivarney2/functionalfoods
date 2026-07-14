@@ -1,6 +1,7 @@
 'use client'
 
 import { Check } from 'lucide-react'
+import HealthInformationNotice from '@/components/HealthInformationNotice'
 import {
   PREMIUM_CONSIDERATION_NOTE,
   TIER_LABELS,
@@ -105,6 +106,8 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
       <p className="text-xs leading-relaxed text-emerald-100/70">
         Abonnement kan opsiges når som helst. Betaling først efter du har oprettet konto i næste trin.
       </p>
+
+      <HealthInformationNotice variant="dark" />
     </div>
   )
 }

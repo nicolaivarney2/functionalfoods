@@ -1,6 +1,7 @@
 import { ActivityLevel, DietaryCalculator, UserProfile, WeightGoal } from '@/lib/dietary-system'
 import { DIETARY_APPROACH_OPTIONS } from '@/lib/dietary-approach-options'
 import { MADBUDGET_STORE_CATALOG } from '@/lib/madbudget-stores'
+import { mealsPerDayFromScope } from '@/lib/adult-plan-profile'
 
 export const ONBOARDING_STORAGE_KEY = 'ff_vaegttabsplan_onboarding_v1'
 
@@ -36,6 +37,8 @@ export const EXCLUDED_FOOD_OPTIONS = [
 
 export type MealPlanScope = 'full' | 'dinner-only'
 
+export { mealsPerDayFromScope, mealPlanScopeFromMeals, normalizeMealsPerDay } from '@/lib/adult-plan-profile'
+
 export const MEAL_PLAN_SCOPE_OPTIONS = [
   {
     id: 'full' as const,
@@ -50,10 +53,6 @@ export const MEAL_PLAN_SCOPE_OPTIONS = [
     icon: '🌙',
   },
 ] as const
-
-export function mealsPerDayFromScope(scope: MealPlanScope): string[] {
-  return scope === 'full' ? ['breakfast', 'lunch', 'dinner'] : ['dinner']
-}
 
 export function mealPlanScopeLabel(scope?: MealPlanScope): string {
   if (scope === 'full') return 'Morgenmad, frokost og aftensmad'

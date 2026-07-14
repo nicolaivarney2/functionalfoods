@@ -24,7 +24,7 @@ export const PREMIUM_GUIDANCE_HOURS =
   'Personlig vejledning i dagstimerne 7.30–21.30'
 
 export const PREMIUM_CONSIDERATION_NOTE =
-  '87% har brug for personlig vejledning for at lykkes med vægttab'
+  'Mange oplever at struktur og personlig støtte gør det lettere at holde fast i en vægttabsplan'
 
 export type TierEntitlements = {
   tier: SubscriptionTier

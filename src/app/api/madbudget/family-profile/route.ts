@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { syncPlanSettingsAcrossAdults } from '@/lib/adult-plan-profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: {
         familyProfile: familyProfile || null,
-        adultProfiles: adultProfiles || []
+        adultProfiles: syncPlanSettingsAcrossAdults(adultProfiles || []),
       }
     })
   } catch (error) {
@@ -204,6 +205,8 @@ export async function POST(request: NextRequest) {
 
     // Upsert adult profiles (gem også når alle felter er udfyldt, selv hvis klienten ikke satte isComplete)
     if (adultProfiles && Array.isArray(adultProfiles)) {
+      const syncedAdultProfiles = syncPlanSettingsAcrossAdults(adultProfiles)
+
       const fieldsComplete = (p: Record<string, unknown>) =>
         Boolean(
           p.gender &&
@@ -218,7 +221,7 @@ export async function POST(request: NextRequest) {
           String(p.weightGoal).trim() !== ''
         )
 
-      for (const [index, profile] of adultProfiles.entries()) {
+      for (const [index, profile] of syncedAdultProfiles.entries()) {
         const p = profile as Record<string, unknown>
         const derivedComplete = fieldsComplete(p)
         if (!derivedComplete && !p.isComplete) continue
