@@ -46,7 +46,7 @@ const columns = [
     title: 'Om FunctionalFoods',
     links: [
       { label: 'Om os', href: '/bag-om-ff' },
-      { label: 'Cookies og privatliv', href: '/cookies-og-privatliv' },
+      { label: 'Privatlivspolitik', href: '/cookies-og-privatliv' },
       { label: 'Opret dig', href: '/kom-i-gang' },
       { label: 'Opskrifter', href: '/opskriftsoversigt' },
       { label: 'Dagligvarer', href: '/dagligvarer' },
@@ -116,7 +116,7 @@ export default function Footer() {
               Succeshistorier
             </Link>
             <Link href="/cookies-og-privatliv" className="hover:text-white/80 transition-colors">
-              Cookies og privatliv
+              Privatlivspolitik
             </Link>
             <CookieSettingsFooterLink />
           </div>

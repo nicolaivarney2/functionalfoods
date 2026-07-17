@@ -25,7 +25,7 @@ export default function CookieConsentBanner() {
               href="/cookies-og-privatliv"
               className="font-medium text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
             >
-              Cookies og privatliv
+              Privatlivspolitik
             </Link>
             {' · '}Du kan ændre valget under «Cookie-indstillinger» i bunden af siden.
           </p>
