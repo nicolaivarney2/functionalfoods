@@ -218,27 +218,36 @@ async function fetchAll<T = Record<string, unknown>>(
   client: SupabaseClient,
   table: string,
   selectCols: string,
-  options: { activeOnly?: boolean; limit?: number | null } = {},
+  options: { activeOnly?: boolean; limit?: number | null; log?: (msg: string) => void } = {},
 ): Promise<T[]> {
   const all: T[] = []
   let from = 0
+  let pageSize = FETCH_PAGE_SIZE
   const limit = options.limit ?? null
+  const log = options.log ?? (() => {})
 
   while (true) {
     let q = client
       .from(table)
       .select(selectCols)
       .order('id', { ascending: true })
-      .range(from, from + FETCH_PAGE_SIZE - 1)
+      .range(from, from + pageSize - 1)
     if (options.activeOnly) q = q.eq('active', true)
 
     const { data, error } = await q
-    if (error) throw new Error(`fetchAll(${table}) failed: ${error.message}`)
+    if (error) {
+      if (isStatementTimeout(error.message) && pageSize > 100) {
+        pageSize = Math.floor(pageSize / 2)
+        log(`  fetchAll(${table}): timeout, prøver pageSize=${pageSize}`)
+        continue
+      }
+      throw new Error(`fetchAll(${table}) failed: ${error.message}`)
+    }
     if (!data || data.length === 0) break
 
     all.push(...(data as T[]))
-    if (data.length < FETCH_PAGE_SIZE) break
-    from += FETCH_PAGE_SIZE
+    if (data.length < pageSize) break
+    from += pageSize
     if (limit && all.length >= limit) break
   }
   return limit ? all.slice(0, limit) : all
@@ -678,7 +687,7 @@ export async function runFooddataImport(
 
   // ─── 1. Stores ────────────────────────────────────────────────────────
   log('1/4 · STORES')
-  const fooddataStores = await fetchAll(fooddata, 'stores', '*')
+  const fooddataStores = await fetchAll(fooddata, 'stores', '*', { log })
   const mappedStores = fooddataStores.map(mapStore)
   if (!dryRun) {
     result.stores = await upsertBatched(ff, 'stores', mappedStores, 'id')
@@ -691,19 +700,8 @@ export async function runFooddataImport(
   const ffIdsBeforeProducts = new Set<string>()
 
   if (!skipProducts && !dryRun) {
-    let from = 0
-    while (true) {
-      const { data, error } = await ff
-        .from('products')
-        .select('id')
-        .order('id')
-        .range(from, from + FETCH_PAGE_SIZE - 1)
-      if (error) throw error
-      if (!data?.length) break
-      for (const r of data as { id: string }[]) ffIdsBeforeProducts.add(r.id)
-      if (data.length < FETCH_PAGE_SIZE) break
-      from += FETCH_PAGE_SIZE
-    }
+    const existing = await fetchAllFfProductIds(ff, log)
+    for (const id of existing) ffIdsBeforeProducts.add(id)
   }
 
   if (!skipProducts) {
@@ -712,7 +710,7 @@ export async function runFooddataImport(
       fooddata,
       'products',
       PRODUCT_SELECT_COLS,
-      { activeOnly: true, limit },
+      { activeOnly: true, limit, log },
     )
 
     const matchedFfIds = await fetchAllFfMatchedProductIds(ff)
@@ -766,7 +764,7 @@ export async function runFooddataImport(
       fooddata,
       'products',
       'id, source_chain, source_id, name, amount, unit',
-      { activeOnly: true, limit },
+      { activeOnly: true, limit, log },
     )
     productLookup = new Map(
       fooddataProducts
@@ -805,6 +803,7 @@ export async function runFooddataImport(
       fooddata,
       'product_offers',
       'product_id, store_id, price_cents, before_price_cents, unit_price_cents, unit_price_unit, is_on_sale, offer_from, offer_until, discount_percentage, in_stock, source, source_synced_at, raw_data',
+      { log },
     )
     const mapped = fooddataOffers
       .map((o) => mapOffer(o, productLookup, gomaImportEnabled))
@@ -861,21 +860,29 @@ export async function runFooddataImport(
   }
 
   // ─── 5. Match queue ─────────────────────────────────────────────────────
+  // Non-fatal: katalog + price history er allerede skrevet. En queue-timeout
+  // må ikke markere hele daily import som failed (GH Action / cron).
   if (!dryRun && !skipQueue) {
     log('5/5 · MATCH QUEUE')
-    if (enqueueUnmatched) {
-      result.queue = await enqueueUnmatchedFooddataProducts(ff)
-    } else if (newlyImportedProductIds.length > 0) {
-      result.queue = await enqueueUnmatchedFooddataProducts(ff, {
-        productIds: newlyImportedProductIds,
-      })
-    }
-    if (result.queue) {
-      log(
-        `  queue: ${result.queue.inserted} new, ${result.queue.skippedAlreadyMatched} matched, ${result.queue.skippedAlreadyQueued} queued, ${result.queue.skippedNonFood} non-food`,
-      )
-    } else {
-      log('  queue: no new product ids — skipped')
+    try {
+      if (enqueueUnmatched) {
+        result.queue = await enqueueUnmatchedFooddataProducts(ff)
+      } else if (newlyImportedProductIds.length > 0) {
+        result.queue = await enqueueUnmatchedFooddataProducts(ff, {
+          productIds: newlyImportedProductIds,
+        })
+      }
+      if (result.queue) {
+        log(
+          `  queue: ${result.queue.inserted} new, ${result.queue.skippedAlreadyMatched} matched, ${result.queue.skippedAlreadyQueued} queued, ${result.queue.skippedNonFood} non-food`,
+        )
+      } else {
+        log('  queue: no new product ids — skipped')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      log(`  queue: SKIPPED after error (import otherwise OK): ${msg}`)
+      console.warn('[fooddata-import] match queue failed (non-fatal):', err)
     }
   }
 

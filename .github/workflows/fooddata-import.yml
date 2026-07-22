@@ -37,7 +37,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -57,5 +57,7 @@ jobs:
             exit 1
           fi
 
+      # Match-queue er non-fatal i scriptet: katalog + price_history tæller som success
+      # selv hvis enqueue timeout'er. Scope: kun nye product ids (ikke fuld offers-scan).
       - name: Run full fooddata import (incl. price history)
         run: npx tsx scripts/import-fooddata-to-ff.ts
