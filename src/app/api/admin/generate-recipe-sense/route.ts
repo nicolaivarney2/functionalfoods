@@ -490,6 +490,9 @@ function parseGeneratedRecipe(content: string): any {
     }
   } catch (error) {
     console.error('Error parsing generated Sense recipe:', error)
-    throw new Error('Failed to parse generated recipe')
+    const detail = error instanceof Error ? error.message : 'Unknown parse error'
+    throw new Error(
+      detail.startsWith('Failed to parse') ? detail : `Failed to parse generated recipe (${detail})`
+    )
   }
 }
