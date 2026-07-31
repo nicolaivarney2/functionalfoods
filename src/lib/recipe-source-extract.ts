@@ -171,14 +171,14 @@ export function extractStructuredRecipeFromHtml(html: string, url: string) {
     /Endelig vurdering af retten\s+([\s\S]{20,400}?)(?:Chaffel|Ingredienser|##)/i
   )
   // Sense: kort blurb under H1 før tid/antal
-  const senseSummaryMatch =
-    !summaryMatch &&
-    readable.match(
-      new RegExp(
-        `${title ? title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '[^\\n]{8,120}'}\\s*\\n+([\\s\\S]{40,500}?)(?:Tid i alt|Arbejdstid|Antal|Det skal du bruge)`,
-        'i'
+  const senseSummaryMatch = summaryMatch
+    ? null
+    : readable.match(
+        new RegExp(
+          `${title ? title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '[^\\n]{8,120}'}\\s*\\n+([\\s\\S]{40,500}?)(?:Tid i alt|Arbejdstid|Antal|Det skal du bruge)`,
+          'i'
+        )
       )
-    )
   const summary = (summaryMatch?.[1] || senseSummaryMatch?.[1] || '').trim() || undefined
 
   const formattedSource = [
