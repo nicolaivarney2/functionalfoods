@@ -6,6 +6,86 @@ import { flattenRecipeIngredientsForMj } from '@/lib/recipe-ingredients-flatten'
 /** Flere ingredienser + mængder så MJ ser hvad der dominerer (fx spidskål i salat). */
 const MJ_INGREDIENT_MAX = 14
 
+/** Fast Midjourney-wrapper — realistisk 90° flatlay uden AI-glans. */
+const MJ_PREFIX = 'Flatlay photograph from directly above of'
+const MJ_STYLE =
+  'editorial food photography, slight imperfections, candid shot, authentic homecooked meal look, matte lighting, real life texture'
+const MJ_PARAMS =
+  '--ar 4:3 --style raw --no 3d render, glossy, plastic, tilt, side angle, close-up, depth of field, blur, studio lights, fake look, hyperrealistic, commercial lighting, text, macro, bokeh'
+
+/** Tallerken + bordflade varierer pr. opskrift, så billederne ikke ser identiske ud. */
+const MJ_TABLE_SETTINGS = [
+  'Dark grey matte ceramic plate on a textured slate surface',
+  'Off-white stoneware plate with uneven glaze on a weathered oak table',
+  'Deep green speckled ceramic plate on a pale concrete worktop',
+  'Plain white porcelain plate with a thin rim on a dark walnut table',
+  'Sand-coloured handmade ceramic plate on a wrinkled linen tablecloth',
+  'Charcoal stoneware shallow bowl on a scratched grey kitchen worktop',
+  'Warm terracotta-toned plate on a raw pine board',
+  'Pale blue-grey ceramic plate on a worn white-painted wooden table',
+]
+
+const MJ_LIGHTS = [
+  'Soft natural window light',
+  'Soft overcast daylight from the side',
+  'Diffused late afternoon daylight with long soft shadows',
+  'Even soft daylight from a north-facing window',
+]
+
+/** Neutrale ting ved siden af tallerkenen — aldrig krydderi/peberkværn. */
+const MJ_NEUTRAL_PROPS = [
+  'a crumpled beige linen napkin',
+  'a folded grey cotton napkin with a fork on top',
+  'a worn stainless steel fork and knife placed loosely',
+  'a used cloth napkin with a knife resting at an angle',
+  'a half-full glass of water at the edge of the frame',
+  'an empty ceramic side plate partly in frame',
+  'a small wooden serving spoon',
+  'a stack of two small side plates at the edge of the frame',
+  'a striped tea towel bunched up at the edge',
+  'a wooden cutting board partly in frame',
+]
+
+/**
+ * Ting der hører til retten. Mønstrene matches mod ASCII-translittereret tekst
+ * (æ→ae, ø→oe, å→aa), så \b virker på danske ord.
+ */
+const MJ_RECIPE_PROPS: { match: RegExp; prop: string }[] = [
+  { match: /\b(citron|lemon)/, prop: 'two lemon wedges on the surface' },
+  { match: /\blimes?\b/, prop: 'a halved lime on the surface' },
+  { match: /\b(persille|parsley)/, prop: 'a few sprigs of fresh parsley on the surface' },
+  { match: /\b(basilikum|basil)/, prop: 'a small bunch of fresh basil on the surface' },
+  { match: /\b(koriander|coriander|cilantro)/, prop: 'a few loose coriander leaves on the surface' },
+  { match: /\b(dild|dill)/, prop: 'a small bunch of fresh dill on the surface' },
+  { match: /\b(mynte|mint)/, prop: 'a few fresh mint leaves on the surface' },
+  { match: /\b(timian|thyme|rosmarin|rosemary|oregano)/, prop: 'a sprig of fresh herbs on the surface' },
+  { match: /\b(chili|jalape)/, prop: 'one whole fresh chili on the surface' },
+  { match: /\b(cherrytomat|tomat|tomato)/, prop: 'two loose cherry tomatoes on the surface' },
+  { match: /\boliven(?!olie)|\bolives?\b/, prop: 'a few olives in a tiny dish' },
+  { match: /\b(parmesan|revet ost|grated cheese)/, prop: 'a small bowl of grated cheese' },
+  { match: /\bfeta/, prop: 'a small piece of feta on a scrap of baking paper' },
+  { match: /\b(yoghurt|yogurt|skyr|creme fraiche|cremefraiche|tzatziki|hummus)/, prop: 'a small bowl of yogurt dressing' },
+  { match: /\bpesto/, prop: 'a small bowl of pesto with a spoon in it' },
+  { match: /\b(dressing|vinaigrette)/, prop: 'a small jug of dressing' },
+  { match: /\b(soja|soy sauce|sesam)/, prop: 'a small dish of soy sauce' },
+  { match: /\b(rugbroed|broed|bread|flute|tortilla|pita|naan)/, prop: 'a slice of bread on a small wooden board' },
+  { match: /noedder\b|\bmandler\b|\b(walnut|almond|nuts|cashew)/, prop: 'a small handful of nuts on the surface' },
+  { match: /\b(spinat|spinach|rucola|rocket|salatblade)/, prop: 'a few loose green leaves on the surface' },
+  { match: /\bavocado/, prop: 'half an avocado on the surface' },
+  { match: /\b(agurk|cucumber)/, prop: 'a couple of cucumber slices on the surface' },
+  { match: /\b(gulerod|guleroedder|carrot)/, prop: 'one unpeeled carrot on the surface' },
+  { match: /(?<!hvid)loeg\b|\b(red onion|onion|skalotte|shallot)/, prop: 'half a red onion on a small board' },
+  { match: /\b(hvidloeg|garlic)/, prop: 'a whole garlic bulb on the surface' },
+  { match: /\b(kartof|potato)/, prop: 'two unpeeled potatoes on the surface' },
+  { match: /(?<!g)ris\b|\b(rice|risotto)/, prop: 'a small bowl of extra rice' },
+  { match: /\b(pasta|spaghetti|nudler|noodle)/, prop: 'a small bowl of extra pasta' },
+  { match: /\b(boenner|beans|kikaerter|chickpea|linser|lentil)/, prop: 'a small bowl of beans' },
+  { match: /\baeg\b|\begg/, prop: 'two whole eggs on the surface' },
+  { match: /\b(smoer|butter)/, prop: 'a small dish of butter' },
+  { match: /\b(honning|honey)/, prop: 'a small jar of honey with a spoon beside it' },
+  { match: /baer\b|\b(blueberr|berries|berry)/, prop: 'a small bowl of fresh berries' },
+]
+
 function formatIngredientsForMjPrompt(ingredients: unknown): { numbered: string; csv: string } {
   if (!Array.isArray(ingredients)) return { numbered: '', csv: '' }
   const lines: string[] = []
@@ -47,6 +127,7 @@ function formatInstructionsForMjPrompt(instructions: unknown): string {
 
 /**
  * Centralized Midjourney prompt: English-only food description (Midjourney forstår bedst ensartet engelsk).
+ * V6+ realistisk flatlay — ingen hyperrealistic/beautifully plated-hype.
  */
 export type MidjourneyPromptMeta = {
   prompt: string
@@ -60,14 +141,11 @@ export async function generateMidjourneyPrompt(recipe: any): Promise<string> {
 }
 
 export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<MidjourneyPromptMeta> {
-  const baseSuffix =
-    'served on a dark gray ceramic plate on a rustic dark textured matte surface, garnished with fresh herbs, soft natural daylight, high detail --ar 4:3'
-
   const recipeForMj = flattenRecipeIngredientsForMj(recipe)
 
   if (!recipeForMj || !recipeForMj.title) {
     return {
-      prompt: buildFinalPrompt('a well-composed home-cooked meal', baseSuffix),
+      prompt: buildFinalPrompt('a simple home-cooked plated meal'),
       source: 'heuristic',
     }
   }
@@ -75,6 +153,7 @@ export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<Mid
   const normalizedTitle = normalizeDanishRecipeTitle(String(recipeForMj.title))
   const ingredientsForPrompt = formatIngredientsForMjPrompt(recipeForMj.ingredients)
   const instructionsForPrompt = formatInstructionsForMjPrompt(recipeForMj.instructions)
+  const scene: MjSceneInput = { seedKey: normalizedTitle, ingredientsCsv: ingredientsForPrompt.csv }
 
   const apiKey = resolveOpenAIApiKey()
   if (!apiKey) {
@@ -82,7 +161,7 @@ export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<Mid
     return {
       prompt: buildFinalPrompt(
         heuristicEnglishFoodScene(normalizedTitle, ingredientsForPrompt.csv),
-        baseSuffix
+        scene
       ),
       source: 'heuristic',
       error: 'No OpenAI API key available for Midjourney prompt generation',
@@ -100,14 +179,14 @@ export async function generateMidjourneyPromptWithMeta(recipe: any): Promise<Mid
       instructionsForPrompt
     )
     return {
-      prompt: buildFinalPrompt(finalPhrase, baseSuffix),
+      prompt: buildFinalPrompt(finalPhrase, scene),
       source: 'openai',
     }
   } catch (error) {
     console.error('Error generating Midjourney prompt:', error)
     const heuristic = heuristicEnglishFoodScene(normalizedTitle, ingredientsForPrompt.csv)
     return {
-      prompt: buildFinalPrompt(stripBannedMjPhrases(heuristic), baseSuffix),
+      prompt: buildFinalPrompt(stripBannedMjPhrases(heuristic), scene),
       source: 'heuristic',
       error: error instanceof Error ? error.message : 'Unknown Midjourney prompt error',
     }
@@ -126,17 +205,19 @@ async function composeMidjourneyFoodPhrase(
     messages: [
       {
         role: 'system',
-        content: `You write ONE English phrase for Midjourney v6 food photography of the finished plated dish.
+        content: `You write ONE plain English food phrase for Midjourney v6+ flatlay photography of the finished plated dish.
 
 OUTPUT RULES (strict):
-1. One flowing phrase, 24–55 words. Describe the finished food on the plate, not raw ingredients.
+1. One flowing phrase, 18–40 words. Name only what is visibly on the plate.
 2. 100% English. Translate every Danish/Nordic word fully.
-3. Mention the true centerpiece from the title and instructions. If the recipe is a fish dish, the fish must be named. If the recipe is a turkey dish, name turkey breast. If the recipe is hakkebøf, say minced beef patty / beef patty.
-4. Use ingredient amounts to understand visual weight. Large-volume vegetables (for example cabbage, salad greens, potatoes, pasta, rice) should appear as major visible parts of the dish, not tiny garnish.
-5. Do NOT mention low-visibility pantry items or cooking agents unless clearly visible in the finished dish. Usually omit olive oil, lemon juice, salt, pepper, garlic, and similar ingredients unless the instructions make them a visible sauce, dressing, glaze, or topping.
-6. Do NOT output broken word lists. Use complete food phrases like "pan-fried plaice fillet with shredded pointed cabbage slaw and edamame" or "grilled turkey breast over a generous pointed cabbage and edamame salad with red bell pepper".
-7. Do NOT add camera/meta words: no "overhead", "top-down", "photo", "hyperrealistic", "beautifully plated", "natural colors", or "sharp food detail". Those are added elsewhere.
-8. No quotes. No markdown.`,
+3. Mention the true centerpiece from the title and instructions. If fish → name the fish. If turkey → turkey breast. If hakkebøf → minced beef patty.
+4. Use ingredient amounts for visual weight. Large-volume vegetables (cabbage, salad, potatoes, pasta, rice) should appear as major visible parts — not tiny garnish.
+5. Omit low-visibility pantry items unless they form a visible sauce, glaze, or topping (usually skip olive oil, lemon juice, salt, pepper, garlic alone).
+6. STRIP ALL marketing / AI hype words. Never use: juicy, tender, vibrant, delicious, satisfying, perfect for, colorful, mouthwatering, gourmet, restaurant-quality, beautifully, crispy golden, melt-in-your-mouth, family meal, weeknight, busy.
+7. Do NOT output broken word lists. Prefer plain food phrases like "chicken breast with ginger garlic glaze over whole grain noodles, broccoli and edamame" or "two spinach feta chicken patties with a side salad of cherry tomatoes and cucumber".
+8. Do NOT add camera/meta words: no flatlay, overhead, top-down, photo, hyperrealistic, high detail, sharp, beautifully plated, natural colors. Those are added elsewhere.
+9. Do NOT describe the surroundings: no plate colour, table, surface, napkin, cutlery, glass, or bowls of seasoning next to the dish. Those are added elsewhere.
+10. No quotes. No markdown. No lifestyle story ("perfect for busy weeknights").`,
       },
       {
         role: 'user',
@@ -149,10 +230,10 @@ ${ingredientsNumbered || 'not listed'}
 Instructions preview:
 ${instructionsNumbered || 'not listed'}
 
-Write the final plated dish phrase now.`,
+Write the plain plated dish phrase now.`,
       },
     ],
-    max_tokens: 320,
+    max_tokens: 220,
     temperature: 0.2,
   })
 
@@ -168,7 +249,10 @@ function stripCameraAndMetaWords(s: string): string {
   return s
     .replace(/\boverhead\s+view\s+of\s+a\s+plated\s+dish\s+featuring\b/gi, '')
     .replace(/\boverhead\s+view\s+of\b/gi, '')
+    .replace(/\bflatlay\s+photograph\s+from\s+directly\s+above\s+of\b/gi, '')
+    .replace(/\b90-degree\s+overhead\s+flatlay\s+photo\s+of\b/gi, '')
     .replace(/\boverhead\b/gi, '')
+    .replace(/\bflatlay\b/gi, '')
     .replace(/\bplated\s+dish\s+featuring\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -182,11 +266,75 @@ function resolveOpenAIApiKey(): string | null {
   return cfg?.apiKey?.trim() || null
 }
 
-/** Indre *…* = madbeskrivelse + fast stil — derefter servering/lys som før. */
-function buildFinalPrompt(foodPhrase: string, baseSuffix: string): string {
-  const clean = foodPhrase.replace(/\s+/g, ' ').trim()
-  const style = 'natural colors, sharp food detail, beautifully plated'
-  return `top-down hyperrealistic photo of *${clean}, ${style}*, ${baseSuffix}`
+export type MjSceneInput = {
+  /** Stabil nøgle (typisk titlen) så samme opskrift altid får samme opsætning. */
+  seedKey: string
+  ingredientsCsv: string
+}
+
+/** FNV-1a — deterministisk variation pr. opskrift uden at gemme state. */
+function sceneHash(input: string): number {
+  let h = 2166136261
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function pickVariant<T>(pool: T[], seedKey: string, salt: string): T {
+  return pool[sceneHash(`${salt}|${seedKey}`) % pool.length]
+}
+
+/** æ/ø/å → ae/oe/aa og alt andet end bogstaver/tal til mellemrum, så \b-mønstre virker. */
+function toAsciiWords(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/æ/g, 'ae')
+    .replace(/ø/g, 'oe')
+    .replace(/å/g, 'aa')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+/** Vælger én ting der hører til retten, fx citronskiver eller en skål dressing. */
+function pickRecipeProp(scene: MjSceneInput): string | null {
+  const haystack = toAsciiWords(`${scene.seedKey} ${scene.ingredientsCsv}`)
+  const matches = MJ_RECIPE_PROPS.filter((entry) => entry.match.test(haystack)).map((entry) => entry.prop)
+  if (matches.length === 0) return null
+  return pickVariant(matches, scene.seedKey, 'recipe-prop')
+}
+
+/** 1 neutral ting + 1 ting fra opskriften (eller 2 neutrale hvis intet matcher). */
+function buildSideProps(scene: MjSceneInput | undefined): string {
+  if (!scene?.seedKey) return MJ_NEUTRAL_PROPS[0]
+
+  const recipeProp = pickRecipeProp(scene)
+  // Undgå fx "cutting board" + "bread on a small wooden board" i samme billede
+  const neutralPool = recipeProp?.includes('board')
+    ? MJ_NEUTRAL_PROPS.filter((prop) => !prop.includes('board'))
+    : MJ_NEUTRAL_PROPS
+  const neutral = pickVariant(neutralPool, scene.seedKey, 'neutral-prop')
+  if (recipeProp) return `${neutral} and ${recipeProp}`
+
+  const rest = neutralPool.filter((prop) => prop !== neutral)
+  return `${neutral} and ${pickVariant(rest, scene.seedKey, 'neutral-prop-2')}`
+}
+
+/**
+ * Samler endelig Midjourney-prompt:
+ * Flatlay above + plain food + props ved siden af + matte setting + --style raw + --no …
+ * Tallerken, lys og props varierer pr. opskrift, men er ens ved regenerering af samme opskrift.
+ */
+function buildFinalPrompt(foodPhrase: string, scene?: MjSceneInput): string {
+  const clean = stripBannedMjPhrases(foodPhrase.replace(/\s+/g, ' ').trim())
+  const seedKey = scene?.seedKey || clean
+  const table = pickVariant(MJ_TABLE_SETTINGS, seedKey, 'table')
+  const light = pickVariant(MJ_LIGHTS, seedKey, 'light')
+  return `${MJ_PREFIX} ${clean}. Next to the plate: ${buildSideProps(scene)}. ${table}. ${light}, ${MJ_STYLE} ${MJ_PARAMS}`
 }
 
 function stripBannedMjPhrases(s: string): string {
@@ -194,10 +342,26 @@ function stripBannedMjPhrases(s: string): string {
     .replace(/\bbeautifully plated\b/gi, '')
     .replace(/\bhyperrealistic\b/gi, '')
     .replace(/\btop-?down\b/gi, '')
-    .replace(/\bnatural colors\b/gi, '')
+    .replace(/\bnatural colors?\b/gi, '')
     .replace(/\bsharp food detail\b/gi, '')
+    .replace(/\bhigh detail\b/gi, '')
     .replace(/\bsteam(?:\s+rising)?\b/gi, '')
+    .replace(/\bjuicy\b/gi, '')
+    .replace(/\btender\b/gi, '')
+    .replace(/\bvibrant\b/gi, '')
+    .replace(/\bdelicious\b/gi, '')
+    .replace(/\bsatisfying\b/gi, '')
+    .replace(/\bmouthwatering\b/gi, '')
+    .replace(/\bgourmet\b/gi, '')
+    .replace(/\bcolorful\b/gi, '')
+    .replace(/\bperfect for\b[^.!,]*/gi, '')
+    .replace(/\bcreating a\b[^.!,]*/gi, '')
+    .replace(/\bdelightful balance[^.!,]*/gi, '')
+    .replace(/\bfamily meal\b/gi, '')
+    .replace(/\bbusy weeknights?\b/gi, '')
+    .replace(/\s*,\s*,+/g, ',')
     .replace(/\s+/g, ' ')
+    .replace(/^[,.\s]+|[,.\s]+$/g, '')
     .trim()
 }
 
@@ -380,9 +544,7 @@ function heuristicEnglishFoodScene(title: string, ingredientsCsv: string): strin
       ? uniq.join(', ')
       : strippedTitle.length > 0
         ? strippedTitle
-        : 'seasoned home-cooked food'
+        : 'simple home-cooked plated food'
 
-  // Stil (natural colors, beautifully plated) sættes i buildFinalPrompt — kun mad her
-  const scene = core
-  return scene.length > 380 ? scene.slice(0, 377) + '...' : scene
+  return core.length > 380 ? core.slice(0, 377) + '...' : core
 }
