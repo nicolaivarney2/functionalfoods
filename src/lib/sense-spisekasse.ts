@@ -146,55 +146,56 @@ type FlatIngInput = { name: string; amount: number; unit: string; notes?: string
 
 /**
  * Lowercase + æ/ø/å → ae/oe/aa, så `\b` og ASCII-mønstre virker på danske navne.
- * (NFD fjerner ikke æ/ø/å — de er egne codepoints.)
+ * æ/ø/å SKAL mappes før NFD: ellers bliver å → a (ring-diacritic strippes) i stedet for aa.
  */
 function foldIngredientName(s: string): string {
   return String(s || '')
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
     .replace(/æ/g, 'ae')
     .replace(/ø/g, 'oe')
     .replace(/å/g, 'aa')
     .replace(/ä/g, 'ae')
     .replace(/ö/g, 'oe')
     .replace(/ü/g, 'ue')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
 }
 
 function isFedtToken(n: string): boolean {
   // «olie» alene (og sesam-/solsikkeolie …) — ikke kun olivenolie/rapsolie.
-  return /(olivenolie|rapsolie|kokosolie|sesamolie|solsikkeolie|majsolie|\bolie\b|smoer\b|floede|creme fraiche|cremefraiche|mayonnaise|ghee|bearnaise|tahin|peanutbutter|noeddesmoer|avocado|\bnoedder\b|mandler|valnoed|cashew|pinjekerner|solsikkekerner|graskarfr|chiafr|hoerkerne|sesamfr)/.test(
+  return /(olivenolie|rapsolie|kokosolie|sesamolie|solsikkeolie|majsolie|\bolie\b|smoer\b|floede|creme fraiche|cremefraiche|mayonnaise|ghee|bearnaise|tahin|tahini|peanutbutter|noeddesmoer|avocado|\bnoedder\b|mandler|valnoed|cashew|pinjekerner|solsikkekerner|graeskarkerner|graeskarfr|chiafr|hoerfroe|hoerfr|sesamfr|kokosmaelk|kokosfloede|\bpesto\b|dressing)/.test(
     n
   )
 }
 
 function isSmagToken(n: string): boolean {
   // Vigtigt: `\bpeber\b` — ikke bare `peber`, ellers bliver peberfrugt smagsgiver.
-  // `soja` kun som sauce (ikke sojabønner).
-  return /(\bsalt\b|\bpeber\b|bouillon|bouillontern|eddike|edikk|\bcitron\b|\blime\b|limesaft|citronsaft|hvidloeg|ingefaer|sennep|honning|karry|\bpaprika\b|\bchili\b|dild|persille|timian|oregano|basilikum|koriander|estragon|sojasauce|soy\s*sauce|mirin|balsam|sirup|\bfond\b|\bstock\b|krydderi|krydderur|fish sauce|fiskesauce|worcestersauce|sriracha)/.test(
+  // `soja` kun som sauce (ikke sojabønner). Tomatpuré/passata = smag; hakkede tomater er grønt.
+  return /(\bsalt\b|\bpeber\b|bouillon|bouillontern|eddike|edikk|\bcitron\b|\blime\b|limesaft|citronsaft|hvidloeg|ingefaer|sennep|honning|karry|\bpaprika\b|\bchili\b|chiliflager|dild|persille|timian|oregano|basilikum|koriander|estragon|\bmynte\b|rosmarin|kanel|kommen|spidskommen|gurkemeje|safran|muskat|nellike|sojasauce|soy\s*sauce|mirin|balsam|sirup|\bfond\b|\bstock\b|krydderi|krydderur|fish sauce|fiskesauce|worcestersauce|sriracha|tomatpure|tomatpuree|tomatpasta|passata|passeata|harissa|miso)/.test(
     n
   )
 }
 
 /**
- * Stivelse / Håndfuld 4.
- * Dansk flertal «nudler» (uden e) matcher ikke substring «nudel» — begge skal med.
+ * Stivelse / Håndfuld 4 — inkl. frugt (Sense: 0–1 håndfuld stivelse eller frugt).
+ * `ris\b` fanger jasminris/basmatiris; blomkålsris fanget tidligere som tvunget grønt.
  */
 function isStivelseToken(n: string): boolean {
-  return /(kartoffel|kartofler|kartoffeler|kartoffelmos|batat|soedkartoffel|\bris\b|risnudel|pasta|spaghetti|penne|fusilli|farfalle|tagliatelle|fettuccine|macaroni|lasagne|couscous|bulgur|quinoa|perlespelt|hirse|polenta|nudler|nudel|udon|soba|ramen|mie\b|vermicelli|orzo|\bbroed\b|\bbrot\b|rugbroed|knaekkebroed|pita|naan|wrap|tortilla|flatbroed|groed|havre|gryn|majs\b|popcorn)/.test(
+  return /(kartoffel|kartofler|kartoffeler|kartoffelmos|bagekartoffel|batat|soed\s*kartoffel|soedkartoffel|ris\b|risotto|risnudel|pasta|spaghetti|penne|fusilli|farfalle|tagliatelle|fettuccine|macaroni|lasagne|couscous|bulgur|quinoa|perlespelt|hirse|polenta|nudler|nudel|udon|soba|ramen|mie\b|vermicelli|orzo|broed|brot\b|rugbroed|knaekkebroed|pita|naan|wrap|tortilla|flatbroed|groed|havre|gryn|majs\b|popcorn|\bbaer\b|blaabaer|jordbaer|hindbaer|solbaer|banan|\baeble\b|\bpaere\b|appelsin|mandarin|clementin|mango|ananas|vindruer|\bdruer\b|kiwi|melon|vandmelon|honningmelon|fersken|nektarin|blomme|kirsebaer|rosiner|dadler)/.test(
     n
   )
 }
 
 function isProteinToken(n: string): boolean {
-  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksekoed|oksek|svine|flaesk|skinke|fars|\bboef\b|hakkeboef|poelse|medister|lamm|tofu|tempeh|edamame|sojabonne|\baeg\b|skink|tun|boenner|boenne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage)/.test(
+  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksekoed|oksek|svine|flaesk|bacon|skinke|fars|\bboef\b|hakkeboef|poelse|medister|lamm|tofu|tempeh|edamame|sojabonne|\baeg\b|aeggehvide|skink|tun|boenner|boenne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage|hytteost|hummus|humus)/.test(
     n
   )
 }
 
 /** Grønt der ellers kan falde forkert pga. delstreng — tving Håndfuld 1+2. */
 function isForcedGronToken(n: string): boolean {
-  return /(peberfrugt|foraarsloeg|porre|spidskaal|hvidkaal|roedkaal|kinakaal|broccoli|blomkaal|squash|zucchini|aubergine|agurk|tomat|spinat|rucola|\bsalat\b|selleri|fennikel|asparges|groenne boenner|boennespidser|sukkeraerter)/.test(
+  // tomat: kun hele ord (ikke tomatpuré). blomkaal fanger blomkålsris før ris-stivelse.
+  return /(peberfrugt|foraarsloeg|porre|spidskaal|hvidkaal|roedkaal|kinakaal|groenkaal|broccoli|blomkaal|squash|zucchini|courgette|aubergine|agurk|cherrytomat|\btomater?\b|spinat|rucola|iceberg|bladsalat|\bsalat\b|selleri|fennikel|asparges|groenne boenner|boennespidser|sukkeraerter|\baerter\b|champignon|svampe|portobello|radise|roedbede|pastinak|kaalroe|gulerod)/.test(
     n
   )
 }
