@@ -13,13 +13,10 @@ import {
   normalizeAiRecipeIngredients,
   type AiIngredientInput,
 } from '@/lib/ai-recipe-ingredient-normalize'
-import type { Ingredient, IngredientGroup } from '@/types/recipe'
 import {
   SENSE_SPISEKASSE_GROUP_TITLES,
-  buildIngredientGroupsWithIds,
   inferSenseIngredientGroupsFromFlat,
   orderSenseGroupsFromAi,
-  senseGroupSizesMatchFlatLength,
   type SenseGroupFromAi,
 } from '@/lib/sense-spisekasse'
 
@@ -395,11 +392,11 @@ RETNAVNE OG KVALITET (vigtigt):
 
 INGREDIENSREGLER — SPISEKASSE (obligatorisk):
 - Du SKAL udfylde **ingredientGroups** med præcis disse gruppenavne (stavemåde og rækkefølge): ${SENSE_SPISEKASSE_GROUP_TITLES.map((t) => `"${t}"`).join(', ')}.
-- **Håndfuld 1+2:** ikke-stivelsesholdigt grønt (salat, tomater, broccoli, løg, peberfrugt …). Ingen pasta/kartoffel her.
+- **Håndfuld 1+2:** ikke-stivelsesholdigt grønt (salat, tomater, broccoli, løg, **peberfrugt**, blomkål, grønne bønner …). Ingen pasta/nudler/kartoffel/ris her. Peberfrugt er GRØNT — aldrig smagsgiver.
 - **Håndfuld 3:** primær protein (kød, fisk, æg eller mejeri efter retten). Undgå at gøre bælgfrugt til eneste hovedprotein medmindre retten naturligt er fx chili, gryderet eller vegetar-aften.
-- **Håndfuld 4:** stivelse eller frugt (kartoffel, ris, **pasta/lasagneplader**, brød, couscous, bær til måltid …). Ved lasagne/pastaret: pastaen ligger her med realistisk mængde.
-- **Fedt:** olie, smør, fløde, dressing-base — det der tæller på fedt-spsk i Sense.
-- **Smagsgivere:** bouillon, hvidløg, krydderier, citron, soyasauce, chili uden at flytte hovedingredienserne væk fra de rigtige håndfulde. Undgå at **hver** ret får samme sur-søde trio (honning + dijonsennep + citron) — varier som i en rigtig køkkenskuffe.
+- **Håndfuld 4:** stivelse eller frugt (kartoffel, ris, **pasta/nudler/lasagneplader**, brød, couscous, bær til måltid …). Ved wok/pastaret: **nudler og pasta ligger HER**, aldrig under grønt.
+- **Fedt:** olie (også bare «olie»), smør, fløde, avocado, nødder, dressing-base — det der tæller på fedt-spsk i Sense. Olie hører IKKE under grønt.
+- **Smagsgivere:** bouillon, hvidløg, krydderier, citron/lime, soyasauce, **sort peber** (krydderi — ikke peberfrugt), chili. Undgå at **hver** ret får samme sur-søde trio (honning + dijonsennep + citron) — varier som i en rigtig køkkenskuffe.
 - Hver ingrediens kun **ét sted** (ét håndfuld-/fedt-/smagsgiver-felt). Tom undergruppe: brug tom array [ ].
 - Alle mængder med tal; primært **g** (undtagen når det giver bedre mening med spsk/ml — men hold det enkelt).
 - Portioner: altid **2** personer som udgangspunkt.
@@ -443,38 +440,22 @@ function parseGeneratedRecipe(content: string): any {
       },
     }
 
+    // AI lægger ofte pasta/nudler i grønt og peberfrugt i smagsgivere — stol ikke på
+    // dens gruppeplacering. Tag ingredienserne, klassificér med Sense-heuristik.
+    let flatSource: AiIngredientInput[] | null = null
     if (Array.isArray(recipe.ingredientGroups) && recipe.ingredientGroups.length > 0) {
       const ordered = orderSenseGroupsFromAi(recipe.ingredientGroups as SenseGroupFromAi[])
       const flatRaw = ordered.flatMap((g) => (Array.isArray(g.ingredients) ? g.ingredients : []))
-      if (flatRaw.length > 0 && senseGroupSizesMatchFlatLength(ordered, flatRaw.length)) {
-        const flatNorm = normalizeAiRecipeIngredients(flatRaw as AiIngredientInput[])
-        const flatWithIds: Ingredient[] = flatNorm.map((ing, i) => ({
-          id: `temp-sense-ing-${i + 1}`,
-          name: ing.name,
-          amount: ing.amount,
-          unit: ing.unit,
-          notes: ing.notes ?? undefined,
-        }))
-        const groupSizes = ordered.map((g) => ({
-          name: g.name,
-          count: Array.isArray(g.ingredients) ? g.ingredients.length : 0,
-        }))
-        const ingredientGroups: IngredientGroup[] = buildIngredientGroupsWithIds(flatWithIds, groupSizes)
-        if (ingredientGroups.length > 0) {
-          return {
-            ...base,
-            ingredients: flatWithIds,
-            ingredientGroups,
-          }
-        }
-      }
+      if (flatRaw.length > 0) flatSource = flatRaw as AiIngredientInput[]
     }
-
-    if (!Array.isArray(recipe.ingredients) || recipe.ingredients.length === 0) {
+    if (!flatSource && Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0) {
+      flatSource = recipe.ingredients as AiIngredientInput[]
+    }
+    if (!flatSource || flatSource.length === 0) {
       throw new Error('Missing ingredientGroups or ingredients')
     }
 
-    const flatNorm = normalizeAiRecipeIngredients(recipe.ingredients as AiIngredientInput[])
+    const flatNorm = normalizeAiRecipeIngredients(flatSource)
     const inferred = inferSenseIngredientGroupsFromFlat(flatNorm)
     if (inferred && inferred.length > 0) {
       return {
@@ -486,7 +467,13 @@ function parseGeneratedRecipe(content: string): any {
 
     return {
       ...base,
-      ingredients: recipe.ingredients || [],
+      ingredients: flatNorm.map((ing, i) => ({
+        id: `temp-sense-ing-${i + 1}`,
+        name: ing.name,
+        amount: ing.amount,
+        unit: ing.unit,
+        notes: ing.notes ?? undefined,
+      })),
     }
   } catch (error) {
     console.error('Error parsing generated Sense recipe:', error)

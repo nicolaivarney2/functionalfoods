@@ -144,42 +144,68 @@ export function orderSenseGroupsFromAi(groups: SenseGroupFromAi[]): SenseGroupFr
 
 type FlatIngInput = { name: string; amount: number; unit: string; notes?: string | null }
 
+/**
+ * Lowercase + æ/ø/å → ae/oe/aa, så `\b` og ASCII-mønstre virker på danske navne.
+ * (NFD fjerner ikke æ/ø/å — de er egne codepoints.)
+ */
 function foldIngredientName(s: string): string {
   return String(s || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
+    .replace(/æ/g, 'ae')
+    .replace(/ø/g, 'oe')
+    .replace(/å/g, 'aa')
+    .replace(/ä/g, 'ae')
+    .replace(/ö/g, 'oe')
+    .replace(/ü/g, 'ue')
 }
 
 function isFedtToken(n: string): boolean {
-  return /(olivenolie|rapsolie|kokosolie|smor\b|flode|mayonnaise|ghee|bearnaise)/.test(n)
-}
-
-function isSmagToken(n: string): boolean {
-  return /(salt|peber|bouillon|tern|eddike|edikk|citron|lime|hvidl|ingefaer|sennep|honning|karry|paprika|chili|dild|persille|timian|oregano|basilikum|koriander|estragon|sojasauce|soja|mirin|balsam|sirup|fond|stock|krydder)/.test(
+  // «olie» alene (og sesam-/solsikkeolie …) — ikke kun olivenolie/rapsolie.
+  return /(olivenolie|rapsolie|kokosolie|sesamolie|solsikkeolie|majsolie|\bolie\b|smoer\b|floede|creme fraiche|cremefraiche|mayonnaise|ghee|bearnaise|tahin|peanutbutter|noeddesmoer|avocado|\bnoedder\b|mandler|valnoed|cashew|pinjekerner|solsikkekerner|graskarfr|chiafr|hoerkerne|sesamfr)/.test(
     n
   )
 }
 
-/** Stivelse / Håndfuld 4 — inkl. flertal «kartofler» (én f), som ikke matcher «kartoffel». */
+function isSmagToken(n: string): boolean {
+  // Vigtigt: `\bpeber\b` — ikke bare `peber`, ellers bliver peberfrugt smagsgiver.
+  // `soja` kun som sauce (ikke sojabønner).
+  return /(\bsalt\b|\bpeber\b|bouillon|bouillontern|eddike|edikk|\bcitron\b|\blime\b|limesaft|citronsaft|hvidloeg|ingefaer|sennep|honning|karry|\bpaprika\b|\bchili\b|dild|persille|timian|oregano|basilikum|koriander|estragon|sojasauce|soy\s*sauce|mirin|balsam|sirup|\bfond\b|\bstock\b|krydderi|krydderur|fish sauce|fiskesauce|worcestersauce|sriracha)/.test(
+    n
+  )
+}
+
+/**
+ * Stivelse / Håndfuld 4.
+ * Dansk flertal «nudler» (uden e) matcher ikke substring «nudel» — begge skal med.
+ */
 function isStivelseToken(n: string): boolean {
-  return /(kartoffel|kartofler|kartoffeler|kartoffelmos|\bris\b|pasta|spaghetti|penne|lasagne|couscous|bulgur|quinoa|perlespelt|hirse|polenta|nudel|brod\b|brot\b|wrap|tortilla|flatbrod|grod|havre|gryn)/.test(
+  return /(kartoffel|kartofler|kartoffeler|kartoffelmos|batat|soedkartoffel|\bris\b|risnudel|pasta|spaghetti|penne|fusilli|farfalle|tagliatelle|fettuccine|macaroni|lasagne|couscous|bulgur|quinoa|perlespelt|hirse|polenta|nudler|nudel|udon|soba|ramen|mie\b|vermicelli|orzo|\bbroed\b|\bbrot\b|rugbroed|knaekkebroed|pita|naan|wrap|tortilla|flatbroed|groed|havre|gryn|majs\b|popcorn)/.test(
     n
   )
 }
 
 function isProteinToken(n: string): boolean {
-  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksek|svine|flaesk|skinke|fars|bof|pølse|medister|lamm|tofu|aeg|skink|tun|bonne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage)/.test(
+  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksekoed|oksek|svine|flaesk|skinke|fars|\bboef\b|hakkeboef|poelse|medister|lamm|tofu|tempeh|edamame|sojabonne|\baeg\b|skink|tun|boenner|boenne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage)/.test(
+    n
+  )
+}
+
+/** Grønt der ellers kan falde forkert pga. delstreng — tving Håndfuld 1+2. */
+function isForcedGronToken(n: string): boolean {
+  return /(peberfrugt|foraarsloeg|porre|spidskaal|hvidkaal|roedkaal|kinakaal|broccoli|blomkaal|squash|zucchini|aubergine|agurk|tomat|spinat|rucola|\bsalat\b|selleri|fennikel|asparges|groenne boenner|boennespidser|sukkeraerter)/.test(
     n
   )
 }
 
 /**
  * Én linjes Sense-spisekasse-rubrik ud fra navn (heuristik).
- * Rækkefølge: fedt → smag → stivelse → protein → grønt (1+2).
+ * Rækkefølge: tvunget grønt → fedt → smag → stivelse → protein → grønt (1+2).
  */
 export function classifySenseIngredientLine(name: string): SenseSpisekasseGroupTitle {
   const n = foldIngredientName(name)
+  if (isForcedGronToken(n)) return 'Håndfuld 1+2'
   if (isFedtToken(n)) return 'Fedt'
   if (isSmagToken(n)) return 'Smagsgivere'
   if (isStivelseToken(n)) return 'Håndfuld 4'

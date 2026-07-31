@@ -8,11 +8,7 @@ import {
 } from '@/lib/ai-recipe-ingredient-normalize'
 import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
 import {
-  buildIngredientGroupsWithIds,
   inferSenseIngredientGroupsFromFlat,
-  orderSenseGroupsFromAi,
-  senseGroupSizesMatchFlatLength,
-  type SenseGroupFromAi,
 } from '@/lib/sense-spisekasse'
 
 interface GeneratedRecipe {
@@ -83,43 +79,13 @@ export async function POST(request: NextRequest) {
     }))
     let ingredientGroupsForDb: IngredientGroup[] | null = null
 
-    if (category === 'sense') {
-      let senseGroupsResolved = false
-      if (Array.isArray(recipe.ingredientGroups) && recipe.ingredientGroups.length > 0) {
-        const ordered = orderSenseGroupsFromAi(recipe.ingredientGroups as SenseGroupFromAi[])
-        const sizes = ordered.map((g) => ({
-          name: g.name,
-          count: Array.isArray(g.ingredients) ? g.ingredients.length : 0,
-        }))
-        if (senseGroupSizesMatchFlatLength(ordered, ingredientsNormalized.length)) {
-          const withIds: Ingredient[] = ingredientsNormalized.map((ingredient) => ({
-            id: crypto.randomUUID(),
-            name: ingredient.name,
-            amount: ingredient.amount,
-            unit: ingredient.unit,
-            ...(ingredient.notes != null && ingredient.notes !== ''
-              ? { notes: ingredient.notes }
-              : {}),
-          }))
-          const built = buildIngredientGroupsWithIds(withIds, sizes)
-          if (built.length > 0) {
-            ingredientsForDb = built.flatMap((g) => g.ingredients)
-            ingredientGroupsForDb = built
-            senseGroupsResolved = true
-          }
-        } else {
-          console.warn(
-            '⚠️ Sense: ingredientGroups matcher ikke antal ingredienser — forsøger heuristisk fordeling'
-          )
-        }
-      }
-      if (!senseGroupsResolved && ingredientsNormalized.length > 0) {
-        const inferred = inferSenseIngredientGroupsFromFlat(ingredientsNormalized)
-        if (inferred && inferred.length > 0) {
-          ingredientsForDb = inferred.flatMap((g) => g.ingredients)
-          ingredientGroupsForDb = inferred
-          console.log('Sense: gemt med heuristisk spisekasse-fordeling (ingredientGroups)')
-        }
+    if (category === 'sense' && ingredientsNormalized.length > 0) {
+      // Altid heuristik — AI's egen fordeling i håndfulde er upålidelig (nudler→grønt, peberfrugt→smag).
+      const inferred = inferSenseIngredientGroupsFromFlat(ingredientsNormalized)
+      if (inferred && inferred.length > 0) {
+        ingredientsForDb = inferred.flatMap((g) => g.ingredients)
+        ingredientGroupsForDb = inferred
+        console.log('Sense: gemt med heuristisk spisekasse-fordeling (ingredientGroups)')
       }
     }
 
