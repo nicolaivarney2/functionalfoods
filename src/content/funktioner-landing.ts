@@ -59,16 +59,16 @@ export interface FunktionLanding {
 export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
   'maddagbog-madlogger': {
     slug: 'maddagbog-madlogger',
-    title: 'Maddagbog & madlogger (app) | Functional Foods',
+    title: 'Maddagbog & madlogger | Functional Foods',
     shortTitle: 'Maddagbog & madlogger',
     description:
-      'Log alt du spiser i appen: synk madplan, tag billede af retten, indtal måltidet eller vælg opskrift — kalorier, makro og mikro mod dit personlige mål.',
+      'Log alt du spiser på web eller i appen: synk madplan, indtal måltidet, importer fra link eller vælg opskrift — kalorier, makro og mikro mod dit personlige mål.',
     iconName: 'BookOpen',
-    heroEyebrow: 'App',
+    heroEyebrow: 'Funktion',
     heroTitle: 'Maddagbog: log maden — ikke kun planen',
     heroLeadParagraphs: [
       'Den smarte kombination: lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Så ser du hele dagen og ugen — ikke kun aftensmaden fra planen.',
-      'Appen estimerer næring ud fra danske data (Frida). Tag et billede af maden, sig hvad du har spist, eller log en opskrift direkte — vi lægger det ind for dig.',
+      'Vi estimerer næring ud fra danske data (Frida). På web: opskrift, link, stemme eller manuel logning. I appen kan du også tage et foto af maden.',
     ],
     bullets: [
       {
@@ -76,12 +76,12 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
         text: 'Når du genererer madplan, kan måltiderne synkroniseres til maddagbogen. Du logger kun det ekstra: snacks, frokost ude, weekendens kage.',
       },
       {
-        title: 'Log med billede',
-        text: 'Tag et foto af retten — appen genkender ingredienser og estimerer kalorier og næring, så du slipper for at taste alt manuelt.',
+        title: 'Log med stemme eller link',
+        text: 'Sig fx «jeg spiste skyr med bær og nødder», eller indsæt et opskriftslink — vi bygger måltidet og lægger det i dagbogen.',
       },
       {
-        title: 'Log med stemme',
-        text: 'Sig fx «jeg spiste skyr med bær og nødder» — appen finder opskriften eller bygger et måltid og lægger det i dagbogen.',
+        title: 'Log med billede (app)',
+        text: 'I appen: tag et foto af retten — vi genkender ingredienser og estimerer kalorier og næring, så du slipper for at taste alt manuelt.',
       },
       {
         title: 'Kalorier og makro mod dit mål',
@@ -93,13 +93,13 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
       {
         title: 'Aktivitet fra Apple Sundhed og Health Connect',
-        text: 'På iPhone: Apple Sundhed. På Android: Health Connect. Skridt og aktiv forbrænding vises i dagbogen og i vægttrackerens ugeoversigt.',
+        text: 'På iPhone: Apple Sundhed. På Android: Health Connect. Skridt og aktiv forbrænding vises i appens dagbog og i vægttrackerens ugeoversigt.',
       },
     ],
     howItHelps:
       'Brug maddagbogen når du vil have overblik over det du faktisk spiser — sammen med madplan, ikke i stedet for. Det er forskellen mellem en plan på papir og en vane der holder.',
-    ctaLabel: 'Kom i gang gratis',
-    ctaHref: '/kom-i-gang',
+    ctaLabel: 'Åbn maddagbog',
+    ctaHref: '/dagbog',
     secondaryCta: { label: 'Se alle funktioner', href: '/funktioner' },
   },
   'madbudget-ai-madplaner': {
@@ -107,7 +107,7 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
     title: 'Madbudget (AI madplaner) | Functional Foods',
     shortTitle: 'Madbudget (AI madplaner)',
     description:
-      'AI-drevne madplaner med ugeoversigt, daglig ernæring og indkøbslister — synk til maddagbog i appen, skift opskrifter og byg lige så mange uger du vil.',
+      'AI-drevne madplaner med ugeoversigt, daglig ernæring og indkøbslister — synk til maddagbog, skift opskrifter og byg lige så mange uger du vil.',
     iconName: 'Sparkles',
     heroEyebrow: 'Funktion',
     heroTitle: 'Madbudget: AI-madplaner der passer til din uge',
@@ -137,7 +137,7 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
         text: 'Planen tager udgangspunkt i hvor mange I er, hvad I kan lide, og hvordan ugen ser ud – ikke en generisk skabelon.',
       },
       {
-        title: 'Synk til maddagbog (app)',
+        title: 'Synk til maddagbog',
         text: 'Måltider fra madplanen kan lægges direkte i maddagbogen — så du ser hele dagens indtag uden dobbelt logning.',
       },
       {

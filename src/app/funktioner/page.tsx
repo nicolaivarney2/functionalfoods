@@ -35,7 +35,7 @@ const ICON_BY_NAME: Record<FunktionIconName, LucideIcon> = {
 export const metadata: Metadata = {
   title: 'Funktioner | Functional Foods',
   description:
-    'Maddagbog og madlogger i appen, madplaner ud fra tilbud, vægttabsrejse, ernæring, indkøbsliste og sundheds- og vægttracker.',
+    'Maddagbog og madlogger, madplaner ud fra tilbud, vægttabsrejse, ernæring, indkøbsliste og sundheds- og vægttracker.',
   alternates: {
     canonical: 'https://functionalfoods.dk/funktioner',
   },
@@ -61,8 +61,8 @@ export default function FunktionerOversigtPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200/90">Functional Foods</p>
           <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">Funktioner</h1>
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-emerald-50/95 sm:text-lg">
-            Appen samler madplan, maddagbog, indkøb og sundhed: log med foto eller stemme, synk ugens plan til dagbogen,
-            følg kalorier mod dit mål og se tilbud fra dine butikker — med dybdegående sider for hver del herunder.
+            Functional Foods samler madplan, maddagbog, indkøb og sundhed: log med opskrift, link, stemme eller foto (app),
+            synk ugens plan til dagbogen, følg kalorier mod dit mål og se tilbud fra dine butikker.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
@@ -85,8 +85,7 @@ export default function FunktionerOversigtPage() {
       <section className="container mx-auto max-w-6xl px-4 py-14 sm:py-16">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">Alle funktioner</h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-slate-600">
-          Klik ind for forklaring, fordele og konkrete eksempler - hver side er skrevet til at matche den rigtige oplevelse i
-          appen.
+          Klik ind for forklaring, fordele og konkrete eksempler — hver side matcher oplevelsen på web og i appen.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FUNKTION_OVERVIEW_ORDER.map((slug) => {

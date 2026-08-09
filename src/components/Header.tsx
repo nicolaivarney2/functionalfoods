@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect, useRef } from 'react'
-import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid, ChevronDown } from 'lucide-react'
+import { Search, Menu, X, User, UserPlus, LogOut, Settings, Heart, Shield, LayoutGrid, ChevronDown, BookOpen } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
 import LoginModal from './LoginModal'
@@ -182,6 +182,15 @@ export default function Header() {
                         </Link>
 
                         <Link
+                          href="/dagbog"
+                          className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          <BookOpen size={16} />
+                          <span>Maddagbog</span>
+                        </Link>
+
+                        <Link
                           href="/profil"
                           className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setIsUserMenuOpen(false)}
@@ -347,6 +356,15 @@ export default function Header() {
                       >
                         <LayoutGrid size={16} />
                         <span>Dit overblik</span>
+                      </Link>
+
+                      <Link
+                        href="/dagbog"
+                        className="flex items-center space-x-2 text-gray-700 hover:text-gray-900"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <BookOpen size={16} />
+                        <span>Maddagbog</span>
                       </Link>
 
                       <Link

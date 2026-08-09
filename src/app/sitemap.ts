@@ -76,6 +76,7 @@ const staticPages: Array<{
   { path: '/kalorietaelling/teori', changeFrequency: 'monthly', priority: 0.78 },
   { path: '/familie/opskrifter', changeFrequency: 'daily', priority: 0.78 },
   { path: '/vaegt-tracker', changeFrequency: 'monthly', priority: 0.72 },
+  { path: '/dagbog', changeFrequency: 'weekly', priority: 0.8 },
   { path: '/reddit-communities', changeFrequency: 'monthly', priority: 0.45 },
 ]
 

@@ -245,7 +245,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        'Opskrifter og meget indhold er gratis. Med en gratis profil får du 3 madplaner og 3 prisalarmer om ugen. Madbudget (29 kr/md) giver ubegrænset madplaner og prisalarmer. Premium (249 kr/md) tilføjer personlig vejledning 24/7 på Messenger.',
+        'Opskrifter og meget indhold er gratis. Med en gratis profil får du 3 madplaner og 3 prisalarmer om ugen. Madbudget (29 kr/md) giver ubegrænset madplaner og prisalarmer. Premium (249 kr/md) tilføjer personlig vejledning i dagstimerne 7.30–21.30 på Messenger.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',
@@ -457,21 +457,21 @@ export default function Home() {
               <HeroVideo />
             </div>
             <div className="order-1 lg:order-2">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Appen i aktion</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Madplan og madlog</p>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
-                Madplan <span className="text-emerald-600">og</span> madlog i samme app
+                Madplan <span className="text-emerald-600">og</span> madlog — samme sted
               </h2>
               <p className="mt-4 text-lg leading-relaxed text-gray-600">
-                Lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Tag et billede af retten,
-                indtal hvad du har spist, eller vælg en opskrift — appen estimerer kalorier og næring (Frida) og viser
-                dig om du rammer dit mål.
+                Lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Indtal hvad du har spist,
+                importer fra link, eller vælg en opskrift — vi estimerer kalorier og næring (Frida) og viser dig om du
+                rammer dit mål. Foto-logning findes i appen.
               </p>
               <ul className="mt-6 flex flex-col gap-3">
                 {[
                   'Maddagbog med kalorier, makro og mikro mod dit personlige mål',
-                  'Foto eller stemme: appen lægger måltidet ind for dig',
+                  'Stemme, link eller opskrift — måltidet lægges ind for dig',
                   'Madplan synkroniseres til dagbogen — log kun det ekstra',
-                  'Skridt fra Apple Sundhed eller Health Connect, vægttracker og ugentligt ernæringstilbageblik',
+                  'Vægttracker på web; skridt fra Apple Sundhed / Health Connect i appen',
                   'Indkøbsliste, dagligvarer, prisalarmer og personlig vejledning',
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-[15px] text-gray-700">
@@ -480,13 +480,21 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/funktioner/maddagbog-madlogger"
-                className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-              >
-                Læs om maddagbog og app-funktioner
-                <ChevronRight className="h-4 w-4" aria-hidden />
-              </Link>
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/dagbog"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
+                >
+                  Åbn maddagbog
+                </Link>
+                <Link
+                  href="/funktioner/maddagbog-madlogger"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                >
+                  Læs om maddagbog
+                  <ChevronRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </div>
             </div>
           </div>
         </div>

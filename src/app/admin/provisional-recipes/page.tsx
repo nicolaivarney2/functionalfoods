@@ -242,7 +242,13 @@ export default function AdminProvisionalRecipesPage() {
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
                   <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 mr-2">
-                    {r.source === 'ai-photo' ? '📷 AI fra billede' : '✍️ Byg selv'}
+                    {r.source === 'ai-photo'
+                      ? '📷 AI fra billede'
+                      : r.source === 'ai-voice'
+                        ? '🎙️ AI fra stemme'
+                        : r.source === 'from-link'
+                          ? '🔗 Fra link'
+                          : '✍️ Byg selv'}
                   </span>
                   <span className="inline-block text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
                     {r.status}

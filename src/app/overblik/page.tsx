@@ -52,6 +52,15 @@ const TOOLS: Tool[] = [
     badge: 'Kerne',
   },
   {
+    href: '/dagbog',
+    title: 'Maddagbog',
+    description:
+      'Log måltider med opskrift, link, stemme eller manuelt — synk madplanen og se kalorier og makro mod dit mål.',
+    icon: BookOpen,
+    accent: 'from-teal-600 to-cyan-600',
+    badge: 'Ny',
+  },
+  {
     href: '/dagligvarer',
     title: 'Dagligvarer & tilbud',
     description: 'Søg og filtrér varer, se tilbudspriser og sammenlign på tværs af butikker.',
@@ -194,7 +203,7 @@ function OverblikContent() {
             </h1>
           )}
           <p className="text-slate-600 mt-2 max-w-2xl">
-            Madplaner der følger <strong>rigtige tilbud</strong>, maddagbog i appen (foto, stemme, madplan-sync),
+            Madplaner der følger <strong>rigtige tilbud</strong>, maddagbog (opskrift, link, stemme, madplan-sync),
             opskrifter, dagligvarer, prisalarmer og sundheds- og vægttracker. Vælg hvor du vil starte.
           </p>
         </header>

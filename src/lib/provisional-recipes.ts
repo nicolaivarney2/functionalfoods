@@ -1,11 +1,11 @@
 /**
  * Fase 5 — foreløbige opskrifter (AI-fra-billede + byg-selv).
- * Delte typer og hjælpere for /api/recipes/from-photo, /api/recipes/provisional
+ * Delte typer og hjælpere for /api/recipes/from-photo, /api/recipes/from-link, /api/recipes/provisional
  * og admin-godkendelse. Holder format på linje med save-ai-draft (FF/Frida).
  */
 
 export type ProvisionalStatus = 'draft' | 'pending' | 'approved' | 'rejected'
-export type ProvisionalSource = 'ai-photo' | 'ai-voice' | 'manual'
+export type ProvisionalSource = 'ai-photo' | 'ai-voice' | 'manual' | 'from-link'
 
 export interface ProvisionalIngredient {
   name: string
