@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 }) : null
@@ -134,7 +134,9 @@ OPPSKRIFT FORMAT (returner kun JSON):
     "fat": 12.0,
     "fiber": 5.0
   }
-}`
+}
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}`
 
   // Add category-specific instructions
   switch (category) {

@@ -8,6 +8,10 @@ import {
 } from '@/lib/ai-recipe-ingredient-normalize'
 import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
 import { PROVISIONAL_SELECT, type ProvisionalRecipeRow } from '@/lib/provisional-recipes'
+import {
+  ensureIngredientRowIds,
+  linkIngredientTagsInInstructions,
+} from '@/lib/recipe-ingredient-tags'
 
 export const dynamic = 'force-dynamic'
 
@@ -201,6 +205,20 @@ export async function POST(request: NextRequest) {
       author = submitter ? `Indsendt af ${submitter}` : 'Bruger (foreløbig opskrift)'
     }
 
+    const ingredientsForDb = ensureIngredientRowIds(
+      ingredientsNormalized.map((ing) => ({
+        id: crypto.randomUUID(),
+        name: ing.name,
+        amount: ing.amount,
+        unit: ing.unit,
+        ...(ing.notes != null && ing.notes !== '' ? { notes: ing.notes } : {}),
+      }))
+    )
+    const instructionsForDb = linkIngredientTagsInInstructions(
+      instructionsNormalized,
+      ingredientsForDb
+    )
+
     const recipeData = {
       id: recipeId,
       title,
@@ -225,14 +243,8 @@ export async function POST(request: NextRequest) {
       mainCategory,
       subCategories: null,
       dietaryCategories: prov.dietary_categories || [],
-      ingredients: ingredientsNormalized.map((ing) => ({
-        id: crypto.randomUUID(),
-        name: ing.name,
-        amount: ing.amount,
-        unit: ing.unit,
-        ...(ing.notes != null && ing.notes !== '' ? { notes: ing.notes } : {}),
-      })),
-      instructions: instructionsNormalized.map((ins, i) => ({
+      ingredients: ingredientsForDb,
+      instructions: instructionsForDb.map((ins, i) => ({
         id: `${crypto.randomUUID()}-${i + 1}`,
         stepNumber: ins.stepNumber ?? i + 1,
         instruction: ins.instruction,

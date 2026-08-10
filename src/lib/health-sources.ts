@@ -9,8 +9,13 @@ export type HealthSource = {
 
 export const HEALTH_METHODOLOGY_PATH = '/metode/kalorier-og-vaegttab'
 
+/** Kort note i app-flows (madbudget, onboarding, dagbog). */
 export const HEALTH_DISCLAIMER =
-  'Functional Foods giver generel ernæringsinformation og værktøjer til planlægning. Det erstatter ikke individuel rådgivning fra læge, diætist eller anden sundhedsfaglig. Tal og anbefalinger er vejledende estimater — tal med din læge ved sygdom, graviditet eller medicin.'
+  'Tallene er vejledende estimater — ikke personlig sundhedsrådgivning.'
+
+/** Lidt mere kontekst på metode-/kildesiden. */
+export const HEALTH_DISCLAIMER_FULL =
+  'Functional Foods er til information og inspiration. Tal og anbefalinger er vejledende og erstatter ikke professionel sundhedsrådgivning.'
 
 /** Nummererede kilder — id matcher #kilde-n på metode-siden og Cite-komponenten. */
 export const HEALTH_SOURCES: HealthSource[] = [

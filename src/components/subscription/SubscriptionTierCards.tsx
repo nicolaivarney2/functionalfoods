@@ -1,10 +1,10 @@
 'use client'
 
 import { Check } from 'lucide-react'
+import PremiumConsiderationNote from '@/components/subscription/PremiumConsiderationNote'
 import {
   FREE_MEAL_PLANS_PER_WEEK,
   FREE_PRICE_ALERTS_MAX,
-  PREMIUM_CONSIDERATION_NOTE,
   PREMIUM_GUIDANCE_HOURS,
   TIER_LABELS,
   TIER_PRICES_KR,
@@ -18,7 +18,7 @@ export type SubscriptionPlanOption = {
   description: string
   features: string[]
   recommended?: boolean
-  considerationNote?: string
+  showPremiumResearchNote?: boolean
 }
 
 export const SUBSCRIPTION_PLAN_OPTIONS: SubscriptionPlanOption[] = [
@@ -57,7 +57,7 @@ export const SUBSCRIPTION_PLAN_OPTIONS: SubscriptionPlanOption[] = [
       PREMIUM_GUIDANCE_HOURS,
       'Messenger med teamet',
     ],
-    considerationNote: PREMIUM_CONSIDERATION_NOTE,
+    showPremiumResearchNote: true,
   },
 ]
 
@@ -99,10 +99,8 @@ export default function SubscriptionTierCards({ selected, onSelect, compact }: P
                 </li>
               ))}
             </ul>
-            {plan.considerationNote ? (
-              <p className="mt-3 rounded-lg bg-amber-300/15 px-3 py-2 text-xs leading-relaxed text-amber-100 ring-1 ring-amber-300/25">
-                {plan.considerationNote}
-              </p>
+            {plan.showPremiumResearchNote ? (
+              <PremiumConsiderationNote variant="dark" className="mt-3" />
             ) : null}
           </button>
         )

@@ -8,6 +8,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -173,6 +174,8 @@ FLEKSITARISK KOST PRINCIPPER:
 - Mange forskellige grøntsager
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "Fleksitarisk opskrift titel",
   "description": "Kort beskrivelse med fokus på plantebaseret kost",

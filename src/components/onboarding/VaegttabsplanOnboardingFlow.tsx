@@ -43,6 +43,7 @@ import {
   WEIGHT_GOAL_OPTIONS,
   calculateOnboardingEnergy,
   defaultOnboardingData,
+  hasPendingOnboardingData,
   loadOnboardingData,
   mealPlanScopeLabel,
   onboardingProfileComplete,
@@ -188,8 +189,11 @@ function VaegttabsplanOnboardingInner() {
   useEffect(() => {
     if (authLoading || !user) return
     if (hasOAuthSignupPending()) return
+    // Undgå at smide brugeren væk midt i signup (signUp sætter user før completeSignup er færdig).
+    if (submitting) return
+    if (hasPendingOnboardingData()) return
     router.replace('/madbudget')
-  }, [authLoading, user, router])
+  }, [authLoading, user, router, submitting])
 
   useEffect(() => {
     if (authLoading || !user || !session?.access_token) return

@@ -8,6 +8,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -166,6 +167,8 @@ FÆLLES FOR 5:2 DIÆTEN (kontekst):
 - 5:2 handler om **mønster** og ikke om at alle opskrifter er lavkalorie.
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "kort beskrivende titel (på dansk, sætningscase)",
   "description": "2-4 sætninger",

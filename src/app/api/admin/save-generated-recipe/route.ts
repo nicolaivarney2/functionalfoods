@@ -6,6 +6,10 @@ import {
   normalizeAiRecipeInstructions,
 } from '@/lib/ai-recipe-ingredient-normalize'
 import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
+import {
+  ensureIngredientRowIds,
+  linkIngredientTagsInInstructions,
+} from '@/lib/recipe-ingredient-tags'
 
 interface GeneratedRecipe {
   title: string
@@ -104,6 +108,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare recipe data for database
+    const ingredientsForDb = ensureIngredientRowIds(
+      ingredientsNormalized.map((ingredient, i) => ({
+        id: `temp-${i + 1}`,
+        name: ingredient.name,
+        amount: ingredient.amount,
+        unit: ingredient.unit,
+        notes: ingredient.notes,
+      }))
+    )
+    const instructionsForDb = linkIngredientTagsInInstructions(
+      instructionsNormalized,
+      ingredientsForDb
+    )
+
     const recipeData = {
       id: crypto.randomUUID(),
       title: recipe.title,
@@ -128,14 +146,8 @@ export async function POST(request: NextRequest) {
       mainCategory: getMainCategory(category),
       subCategories: [getMainCategory(category)],
       dietaryCategories: recipe.dietaryCategories || [],
-      ingredients: ingredientsNormalized.map((ingredient, i) => ({
-        id: `temp-${i + 1}`,
-        name: ingredient.name,
-        amount: ingredient.amount,
-        unit: ingredient.unit,
-        notes: ingredient.notes
-      })),
-      instructions: instructionsNormalized.map((instruction, i) => ({
+      ingredients: ingredientsForDb,
+      instructions: instructionsForDb.map((instruction, i) => ({
         id: `temp-${i + 1}`,
         stepNumber: instruction.stepNumber,
         instruction: instruction.instruction,

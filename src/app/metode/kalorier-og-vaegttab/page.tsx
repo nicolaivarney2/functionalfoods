@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, BookOpen } from 'lucide-react'
 import { Cite } from '@/components/Cite'
-import { HEALTH_DISCLAIMER, HEALTH_SOURCES } from '@/lib/health-sources'
+import { HEALTH_DISCLAIMER_FULL, HEALTH_SOURCES } from '@/lib/health-sources'
 
 export const metadata = {
   title: 'Kilder og beregningsmetode | Functional Foods',
@@ -37,8 +37,8 @@ export default function HealthMethodologyPage() {
 
       <section className="py-10 sm:py-12">
         <div className="container max-w-3xl space-y-10 text-gray-700 leading-relaxed">
-          <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-5 py-4 text-sm text-amber-950">
-            {HEALTH_DISCLAIMER}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-600">
+            {HEALTH_DISCLAIMER_FULL}
           </div>
 
           <article className="space-y-4">

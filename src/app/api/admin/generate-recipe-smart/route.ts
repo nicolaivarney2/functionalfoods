@@ -3,7 +3,7 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 interface ExistingRecipe {
   id: string
   title: string
@@ -153,7 +153,9 @@ OPPSKRIFT FORMAT (returner kun JSON):
     "fat": 12.0,
     "fiber": 5.0
   }
-}`
+}
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}`
 
   // Add category-specific instructions
   switch (category) {

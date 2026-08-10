@@ -24,7 +24,12 @@ export const PREMIUM_GUIDANCE_HOURS =
   'Personlig vejledning i dagstimerne 7.30–21.30'
 
 export const PREMIUM_CONSIDERATION_NOTE =
-  'Mange oplever at struktur og personlig støtte gør det lettere at holde fast i en vægttabsplan'
+  'Forskning viser, at du har op til tre gange så stor chance for at nå dit mål og holde vægten, når du får personlig rådgivning frem for at kæmpe alene.'
+
+export const PREMIUM_CONSIDERATION_CITATION =
+  'Anderson, J. W., et al. (2001). "Long-term weight-loss maintenance: a meta-analysis of US studies." The American Journal of Clinical Nutrition, 74(5), 579–584.'
+
+export const PREMIUM_CONSIDERATION_SOURCE_URL = 'https://doi.org/10.1093/ajcn/74.5.579'
 
 export type TierEntitlements = {
   tier: SubscriptionTier

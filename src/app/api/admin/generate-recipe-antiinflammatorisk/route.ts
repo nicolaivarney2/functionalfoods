@@ -8,6 +8,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -170,6 +171,8 @@ ANTIINFLAMMATORISK KOST REGLER:
 - Brug: fisk, nødder, bær, grøntsager, krydderier
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "Antiinflammatorisk opskrift titel",
   "description": "Kort beskrivelse med fokus på antiinflammatoriske fordele",

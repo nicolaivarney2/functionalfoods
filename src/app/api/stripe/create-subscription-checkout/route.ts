@@ -4,7 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServerClient } from '@/lib/supabaseServer'
 import { ensureStripeCustomerForUser } from '@/lib/stripe-customers'
 import { getStripe } from '@/lib/stripe-server'
-import { TIER_PRICES_KR, type SubscriptionTier } from '@/lib/subscription-tiers'
+import { TIER_PRICES_KR, PREMIUM_GUIDANCE_HOURS, type SubscriptionTier } from '@/lib/subscription-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +26,7 @@ const TIER_PRODUCT: Record<'plus' | 'premium', { name: string; description: stri
   },
   premium: {
     name: 'Functional Foods Premium',
-    description: 'Alt i Madbudget + personlig vejledning på Messenger 24/7.',
+    description: `Alt i Madbudget + ${PREMIUM_GUIDANCE_HOURS.toLowerCase()} på Messenger.`,
   },
 }
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
         },
       },
       line_items: lineItems,
-      success_url: `${origin}/overblik?betaling=ok&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/madbudget?ny=1&betaling=ok&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/lav-din-plan?betaling=annulleret`,
       automatic_tax: { enabled: false },
     })

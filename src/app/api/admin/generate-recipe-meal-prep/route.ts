@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 // import { generateMidjourneyPrompt } from '@/lib/midjourney-generator' // Not used
-
 interface ExistingRecipe {
   id: string
   title: string
@@ -123,6 +123,8 @@ PROTEINRIG KOST PRINCIPPER:
 - Balanceret med sunde kulhydrater og fedtstoffer
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "Proteinrig kost opskrift titel",
   "description": "Kort beskrivelse med fokus på proteinindhold og næring",

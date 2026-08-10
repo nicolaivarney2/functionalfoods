@@ -88,7 +88,7 @@ export default function RecipePageClient({
             <DynamicIngredientsList recipe={recipe} servings={servings} onServingsChange={setServings} />
 
             {/* Instructions */}
-            <InstructionsList recipe={recipe} />
+            <InstructionsList recipe={recipe} servings={servings} />
           </div>
         </div>
       </section>

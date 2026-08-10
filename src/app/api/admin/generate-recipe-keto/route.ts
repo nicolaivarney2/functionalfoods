@@ -10,6 +10,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -394,6 +395,8 @@ OPPSKRIFT FORMAT (returner kun JSON):
     "fiber": 5.0
   }
 }
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 
 INGREDIENS REGLER:
 - ALT skal være i gram (g) - aldrig kg eller stk

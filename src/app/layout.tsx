@@ -10,6 +10,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import MessengerHumanGuidanceWidget from '@/components/MessengerHumanGuidanceWidget'
 import SoftLaunchBanner from '@/components/SoftLaunchBanner'
+import AppLaunchTopBar from '@/components/AppLaunchTopBar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -60,6 +61,7 @@ export default function RootLayout({
           <div className="min-h-screen bg-white">
             <AnalyticsProvider>
               <AuthProvider>
+                <AppLaunchTopBar />
                 <Header />
                 <SoftLaunchBanner />
                 {children}

@@ -162,6 +162,29 @@ export function clearOnboardingData(): void {
   }
 }
 
+/** Efter onboarding: Madbudget skal auto-generere første madplan (+ user tour). */
+export const FF_AUTO_FIRST_PLAN_KEY = 'ff_auto_generate_first_plan'
+
+export function markAutoFirstPlanPending(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(FF_AUTO_FIRST_PLAN_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
+export function consumeAutoFirstPlanPending(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    if (window.localStorage.getItem(FF_AUTO_FIRST_PLAN_KEY) !== '1') return false
+    window.localStorage.removeItem(FF_AUTO_FIRST_PLAN_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function hasPendingOnboardingData(): boolean {
   const data = loadOnboardingData()
   return Boolean(data && onboardingProfileComplete(data))
@@ -248,6 +271,7 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
 
   if (!res.ok) return false
   clearOnboardingData()
+  markAutoFirstPlanPending()
   return true
 }
 

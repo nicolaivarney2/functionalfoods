@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw, Loader2, BookOpen } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -48,7 +48,8 @@ import {
 } from '@/lib/madbudget/guest-demo-data'
 import { FF_GUEST_TOUR_STEPS, FF_GUEST_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-guest-tour-steps'
 import { FF_USER_TOUR_STEPS, FF_USER_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-user-tour-steps'
-import { hasPendingOnboardingData } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { hasPendingOnboardingData, consumeAutoFirstPlanPending, FF_AUTO_FIRST_PLAN_KEY } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { syncMealPlanToDiary } from '@/lib/diary-client'
 import { Cite } from '@/components/Cite'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
 import { healthMethodologyAnchor } from '@/lib/health-sources'
@@ -71,6 +72,7 @@ import {
   storeNeedsGuidePrices,
   stripGuidePricesFromStoreMap,
 } from '@/lib/madbudget/guide-prices'
+import { expandIngredientTagsInInstruction } from '@/lib/recipe-ingredient-tags'
 
 // Use the same Supabase client as the rest of the app
 const supabase = createSupabaseClient()
@@ -518,6 +520,9 @@ export default function MadbudgetPage() {
   const [activePlanRef, setActivePlanRef] = useState<any>(null)
   const [selectedWeekNumber, setSelectedWeekNumber] = useState<number | null>(null)
   const [currentWeekNumber, setCurrentWeekNumber] = useState<number>(0)
+  const [mealPlansReady, setMealPlansReady] = useState(false)
+  const [familyProfileReady, setFamilyProfileReady] = useState(false)
+  const autoFirstPlanStartedRef = useRef(false)
 
   const currentWeekInfo = useMemo(() => getWeekInfo('current'), [])
   const nextWeekInfo = useMemo(() => getWeekInfo('next'), [])
@@ -1178,7 +1183,10 @@ export default function MadbudgetPage() {
     const loadFamilyProfile = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        if (!session) {
+          setFamilyProfileReady(true)
+          return
+        }
 
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
         if (session) {
@@ -1223,6 +1231,8 @@ export default function MadbudgetPage() {
         }
       } catch (error) {
         console.error('Error loading family profile:', error)
+      } finally {
+        setFamilyProfileReady(true)
       }
     }
     loadFamilyProfile()
@@ -1590,7 +1600,10 @@ export default function MadbudgetPage() {
     const loadMealPlans = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        if (!session) {
+          setMealPlansReady(true)
+          return
+        }
 
         const headers: HeadersInit = { 'Content-Type': 'application/json' }
         headers['Authorization'] = `Bearer ${session.access_token}`
@@ -1621,6 +1634,8 @@ export default function MadbudgetPage() {
         }
       } catch (error) {
         console.error('Error loading meal plans:', error)
+      } finally {
+        setMealPlansReady(true)
       }
     }
     
@@ -2553,9 +2568,15 @@ export default function MadbudgetPage() {
     setGenerationProgress(generationSteps[0])
     
     try {
+      const { data: { session: consumeSession } } = await supabase.auth.getSession()
+      const consumeHeaders: HeadersInit = { 'Content-Type': 'application/json' }
+      if (consumeSession?.access_token) {
+        consumeHeaders.Authorization = `Bearer ${consumeSession.access_token}`
+      }
       const consumeRes = await fetch('/api/subscription/consume-meal-plan', {
         method: 'POST',
         credentials: 'include',
+        headers: consumeHeaders,
       })
       if (!consumeRes.ok) {
         const j = await consumeRes.json().catch(() => ({}))
@@ -2776,6 +2797,16 @@ export default function MadbudgetPage() {
                 }
                 return [result.data, ...prev]
               })
+
+              // Auto-synk ny madplan til dagbogen (best-effort — må ikke fejle generering)
+              try {
+                await syncMealPlanToDiary({
+                  mealPlanId: result.data.id,
+                  preferDate: weekInfo.weekStartDate,
+                })
+              } catch (syncErr) {
+                console.error('Auto-sync madplan → dagbog fejlede:', syncErr)
+              }
             }
           } else {
             console.error('Failed to save meal plan:', await response.text())
@@ -2813,6 +2844,67 @@ export default function MadbudgetPage() {
     }
     setShowWeekTargetPicker(true)
   }
+
+  // Efter onboarding (?ny=1 / localStorage-flag): generér første madplan automatisk → eksisterende user tour.
+  useEffect(() => {
+    if (isGuest || authLoading) return
+    if (!mealPlansReady || !familyProfileReady) return
+    if (hasPendingOnboardingData()) return // vent til profil er gemt fra onboarding
+    if (autoFirstPlanStartedRef.current) return
+    if (isGeneratingMealPlan) return
+    if (typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const fromQuery = params.get('ny') === '1' || params.get('autoGenerate') === '1'
+    let flagSet = false
+    try {
+      flagSet = window.localStorage.getItem(FF_AUTO_FIRST_PLAN_KEY) === '1'
+    } catch {
+      flagSet = false
+    }
+    if (!fromQuery && !flagSet) return
+
+    // Vent til diæt-profil er klar (kan lande et tick efter applyPendingOnboarding)
+    if (!allAdultsHaveProfiles() || !validateDietaryApproaches()) return
+
+    autoFirstPlanStartedRef.current = true
+    consumeAutoFirstPlanPending()
+
+    if (fromQuery) {
+      const next = new URLSearchParams(params)
+      next.delete('ny')
+      next.delete('autoGenerate')
+      const qs = next.toString()
+      router.replace(qs ? `/madbudget?${qs}` : '/madbudget', { scroll: false })
+    }
+
+    const planHasMeals = Object.values(mealPlan).some((day) =>
+      Object.values(day).some((cell) => Boolean(cell?.title))
+    )
+    if (activePlanRef || planHasMeals || savedMealPlans.length > 0) {
+      try {
+        if (window.localStorage.getItem(FF_USER_TOUR_STORAGE_KEY) !== '1') {
+          window.setTimeout(() => setShowUserTour(true), 800)
+        }
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+
+    void generateMealPlan('current')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- én auto-start efter signup når data er klar
+  }, [
+    isGuest,
+    authLoading,
+    mealPlansReady,
+    familyProfileReady,
+    familyProfile.adults,
+    familyProfile.adultsProfiles,
+    activePlanRef,
+    savedMealPlans.length,
+    isGeneratingMealPlan,
+  ])
 
   const _calculateSavings = () => {
     // Calculate total savings logic will go here
@@ -3143,6 +3235,15 @@ export default function MadbudgetPage() {
                     <span className="hidden sm:inline">{shareCopied ? 'Kopieret!' : 'Del'}</span>
                   </button>
                 )}
+                <Link
+                  href="/dagbog"
+                  className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+                  title="Maddagbog"
+                  aria-label="Maddagbog"
+                >
+                  <BookOpen size={18} className="shrink-0" aria-hidden />
+                  <span className="hidden sm:inline">Dagbog</span>
+                </Link>
                 <Link
                   href="/vaegt-tracker"
                   className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
@@ -5205,9 +5306,18 @@ export default function MadbudgetPage() {
                     <div>
                       <h4 className="text-sm font-semibold text-gray-900 mb-2">Fremgangsmåde</h4>
                       <ol className="space-y-2 list-decimal list-inside text-sm text-gray-700">
-                        {recipeViewData.instructions.map((step: any, i: number) => (
-                          <li key={i}>{step.instruction ?? step.step ?? step}</li>
-                        ))}
+                        {recipeViewData.instructions.map((step: any, i: number) => {
+                          const raw = step.instruction ?? step.step ?? step
+                          const text =
+                            typeof raw === 'string'
+                              ? expandIngredientTagsInInstruction(
+                                  raw,
+                                  recipeViewData.ingredients || [],
+                                  1
+                                )
+                              : String(raw ?? '')
+                          return <li key={i}>{text}</li>
+                        })}
                       </ol>
                     </div>
                   )}

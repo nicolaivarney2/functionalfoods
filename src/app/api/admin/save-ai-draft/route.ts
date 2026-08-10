@@ -10,6 +10,10 @@ import { syncIngredientsToRegistry } from '@/lib/ingredient-registry-sync'
 import {
   inferSenseIngredientGroupsFromFlat,
 } from '@/lib/sense-spisekasse'
+import {
+  ensureIngredientRowIds,
+  linkIngredientTagsInInstructions,
+} from '@/lib/recipe-ingredient-tags'
 
 interface GeneratedRecipe {
   title: string
@@ -89,6 +93,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    ingredientsForDb = ensureIngredientRowIds(ingredientsForDb)
+    if (ingredientGroupsForDb && ingredientGroupsForDb.length > 0) {
+      let idx = 0
+      ingredientGroupsForDb = ingredientGroupsForDb.map((group) => ({
+        ...group,
+        ingredients: group.ingredients.map(() => ingredientsForDb[idx++]).filter(Boolean),
+      }))
+    }
+
+    const instructionsForDb = linkIngredientTagsInInstructions(
+      instructionsNormalized,
+      ingredientsForDb
+    )
+
     const supabase = createSupabaseClient()
     const slug = generateSlug(recipe.title)
 
@@ -151,7 +169,7 @@ export async function POST(request: NextRequest) {
       ...(ingredientGroupsForDb && ingredientGroupsForDb.length > 0
         ? { ingredientGroups: ingredientGroupsForDb }
         : {}),
-      instructions: instructionsNormalized.map((instruction, i) => ({
+      instructions: instructionsForDb.map((instruction, i) => ({
         id: `${crypto.randomUUID()}-${i + 1}`,
         stepNumber: instruction.stepNumber,
         instruction: instruction.instruction,

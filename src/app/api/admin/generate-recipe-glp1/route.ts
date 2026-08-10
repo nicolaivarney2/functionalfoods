@@ -10,6 +10,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -324,7 +325,9 @@ VIGTIGT:
 - Opskriften skal tydeligt afspejle GLP-1 kost som beskrevet ovenfor, ikke paleo, ikke klassisk LCHF og ikke ren keto.
 - Beskrivelsen skal nævne mæthed, protein, fibre eller stabil energi på en naturlig måde.
 - Opskriften skal være hverdagsrealistisk; smag og køkken må gerne være internationale (karry, urter, citrus, miso i små mængder …) så længe GLP-1-principperne overholdes.
-- Returner kun gyldig JSON.`
+- Returner kun gyldig JSON.
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}`
 }
 
 function buildGLP1ParameterInstructions(params: GLP1Parameters): string {

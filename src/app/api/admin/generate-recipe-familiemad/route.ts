@@ -8,6 +8,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -192,6 +193,8 @@ INGREDIENS FORMATERING - VIGTIGT:
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
+
 MÆNGDER TIL 2 PERSONER - KRITISK:
 Opskriften er ALTID til 2 personer. Brug REALISTISKE mængder - ikke for meget!
 - Hakket oksekød/svinekød: 300-400 g (IKKE 500g eller mere - det er for meget!)
@@ -301,6 +304,8 @@ INGREDIENS FORMATERING - FØLG DISSE REGLER:
 - Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
 - Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 
 MÆNGDER TIL 2 PERSONER - KRITISK:
 Opskriften er ALTID til 2 personer. Brug REALISTISKE mængder - ikke for meget!

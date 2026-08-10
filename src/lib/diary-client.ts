@@ -209,6 +209,8 @@ export async function logMealToDiary(input: LogMealInput): Promise<DiaryEntry> {
 export async function syncMealPlanToDiary(opts?: {
   mealPlanId?: string
   fromDate?: string
+  /** Find plan der dækker denne dato (eller falder tilbage til aktiv/nyeste med mad). */
+  preferDate?: string
 }): Promise<{ inserted: number; weekStart?: string; weekEnd?: string }> {
   const res = await authFetch('/api/diary/sync-meal-plan', {
     method: 'POST',

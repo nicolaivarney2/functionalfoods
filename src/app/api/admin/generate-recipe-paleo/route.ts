@@ -4,7 +4,7 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPrompt } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 interface ExistingRecipe {
   id: string
   title: string
@@ -159,6 +159,8 @@ PALEO KOST PRINCIPPER:
 - Ingen processerede fødevarer
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "Paleo opskrift titel",
   "description": "Kort beskrivelse med fokus på naturlige ingredienser",

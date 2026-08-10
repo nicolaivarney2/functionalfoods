@@ -1,4 +1,8 @@
 import { Recipe } from '@/types/recipe'
+import {
+  collectRecipeIngredients,
+  expandIngredientTagsInInstruction,
+} from '@/lib/recipe-ingredient-tags'
 
 type RecipeInstructionStep = {
   instruction: string
@@ -42,16 +46,22 @@ function getRecipeDurations(recipe: Recipe): RecipeDurations {
 }
 
 function getRecipeInstructionSteps(recipe: Recipe): RecipeInstructionStep[] {
+  const ingredients = collectRecipeIngredients(recipe)
+  const expand = (instruction: string) =>
+    expandIngredientTagsInInstruction(instruction, ingredients, 1)
+
   const groupedSteps = recipe.instructionGroups?.flatMap((group) =>
     group.steps.map((step) => ({
-      instruction: step.instruction,
+      instruction: expand(step.instruction),
       groupName: group.name,
     }))
   ) || []
 
   const steps = groupedSteps.length > 0
     ? groupedSteps
-    : recipe.instructions?.map((step) => ({ instruction: step.instruction })) || []
+    : recipe.instructions?.map((step) => ({
+        instruction: expand(step.instruction),
+      })) || []
 
   return steps.filter((step) => step.instruction?.trim())
 }

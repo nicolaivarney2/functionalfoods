@@ -1,5 +1,10 @@
 export interface Ingredient {
   id: string;
+  /**
+   * Unik linje-id i opskriften (til {{ing:rowId}} i fremgangsmåde).
+   * Katalog-`id` må gerne gentages; `rowId` må ikke.
+   */
+  rowId?: string;
   name: string;
   amount: number;
   unit: string;

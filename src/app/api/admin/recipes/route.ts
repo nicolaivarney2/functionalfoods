@@ -3,6 +3,10 @@ import { revalidatePath } from 'next/cache'
 import { createServerClient } from '@supabase/ssr'
 import { databaseService } from '@/lib/database-service'
 import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
+import {
+  ensureIngredientRowIds,
+  linkIngredientTagsInInstructions,
+} from '@/lib/recipe-ingredient-tags'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -138,13 +142,53 @@ export async function PUT(request: NextRequest) {
       updateData.subCategories = subCategoriesArray
     }
     if (ingredients !== undefined) {
-      updateData.ingredients = Array.isArray(ingredients) ? ingredients : []
+      updateData.ingredients = ensureIngredientRowIds(
+        Array.isArray(ingredients) ? ingredients : []
+      )
     }
     if (ingredientGroups !== undefined) {
-      updateData.ingredientGroups = Array.isArray(ingredientGroups) ? ingredientGroups : []
+      const groups = Array.isArray(ingredientGroups) ? ingredientGroups : []
+      updateData.ingredientGroups = groups.map((group: { ingredients?: unknown[] }) => ({
+        ...group,
+        ingredients: ensureIngredientRowIds(
+          (Array.isArray(group?.ingredients) ? group.ingredients : []) as Array<{
+            id?: string | null
+            rowId?: string | null
+          }>
+        ),
+      }))
     }
     if (instructions !== undefined) {
-      updateData.instructions = Array.isArray(instructions) ? instructions : []
+      const steps = Array.isArray(instructions) ? instructions : []
+      let linkIngredients =
+        updateData.ingredients ??
+        (Array.isArray(updateData.ingredientGroups)
+          ? updateData.ingredientGroups.flatMap(
+              (g: { ingredients?: unknown[] }) => g.ingredients || []
+            )
+          : null)
+
+      if (!linkIngredients) {
+        const { data: existing } = await supabase
+          .from('recipes')
+          .select('ingredients, ingredientGroups')
+          .eq('id', recipeId)
+          .maybeSingle()
+        const groups = Array.isArray(existing?.ingredientGroups)
+          ? existing.ingredientGroups
+          : []
+        linkIngredients =
+          groups.length > 0
+            ? groups.flatMap((g: { ingredients?: unknown[] }) => g.ingredients || [])
+            : Array.isArray(existing?.ingredients)
+              ? existing.ingredients
+              : []
+      }
+
+      updateData.instructions = linkIngredientTagsInInstructions(
+        steps,
+        Array.isArray(linkIngredients) ? linkIngredients : []
+      )
     }
     if (servings !== undefined) {
       const parsedServings = Number(servings)

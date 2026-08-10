@@ -1,4 +1,4 @@
-import { applyPendingOnboarding } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { applyPendingOnboarding, markAutoFirstPlanPending } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import type { SubscriptionTier } from '@/lib/subscription-tiers'
 
 export type CompleteSignupResult =
@@ -25,6 +25,7 @@ export async function completeSignupAfterAuth(
   }
 
   await applyPendingOnboarding(accessToken)
+  markAutoFirstPlanPending()
 
   if (tier === 'plus' || tier === 'premium') {
     const payRes = await fetch('/api/stripe/create-subscription-checkout', {

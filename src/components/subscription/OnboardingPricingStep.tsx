@@ -2,8 +2,8 @@
 
 import { Check } from 'lucide-react'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
+import PremiumConsiderationNote from '@/components/subscription/PremiumConsiderationNote'
 import {
-  PREMIUM_CONSIDERATION_NOTE,
   TIER_LABELS,
   TIER_PRICES_KR,
   type SubscriptionTier,
@@ -99,9 +99,7 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
         })}
       </div>
 
-      <p className="rounded-xl bg-amber-400/15 px-4 py-3 text-sm leading-relaxed text-emerald-50/95 ring-1 ring-amber-300/25">
-        {PREMIUM_CONSIDERATION_NOTE}
-      </p>
+      {selected === 'premium' ? <PremiumConsiderationNote variant="dark" /> : null}
 
       <p className="text-xs leading-relaxed text-emerald-100/70">
         Abonnement kan opsiges når som helst. Betaling først efter du har oprettet konto i næste trin.

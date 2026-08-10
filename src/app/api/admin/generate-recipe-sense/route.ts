@@ -19,6 +19,7 @@ import {
   orderSenseGroupsFromAi,
   type SenseGroupFromAi,
 } from '@/lib/sense-spisekasse'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -368,6 +369,8 @@ VIKTIGT — DET HER ER IKKE:
 - Smag og køkken: må gerne være tydeligt internationale; undgå ikke krydderier eller retninger for at holde det «vestligt». Sense-spisekassen og måltidstype gælder stadig.
 
 OPPSKRIFT — JSON (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 {
   "title": "Titel på dansk i sætningscase",
   "description": "2–4 sætninger: hvad retten er, hvordan den mætter, og i et kort afsnit hvordan den passer til Sense-spisekassen (uden at liste kalorier).",

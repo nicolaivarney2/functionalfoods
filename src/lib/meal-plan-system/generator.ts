@@ -523,39 +523,9 @@ export class MealPlanGenerator {
     const { createSupabaseClient } = await import('../supabase')
     await ingredientService.ensureLoadedFromDatabase(createSupabaseClient())
 
-    // Determine primary dietary approach from actually completed profiles.
-    // This avoids one stale keto value hijacking all generated plans.
+    // Planindstillinger (kostretning + måltids-scope) ejes af voksen 0.
     const hasChildren = familyProfile.children > 0
-    const completedAdults = familyProfile.adultsProfiles.filter((p) => {
-      const age = Number((p as any).age)
-      const h = Number((p as any).height)
-      const w = Number((p as any).weight)
-      return Boolean(
-        p.dietaryApproach &&
-        String(p.dietaryApproach).trim() !== '' &&
-        Number.isFinite(age) && age > 0 &&
-        Number.isFinite(h) && h > 0 &&
-        Number.isFinite(w) && w > 0 &&
-        p.weightGoal &&
-        String(p.weightGoal).trim() !== '' &&
-        (p as any).activityLevel != null &&
-        String((p as any).activityLevel) !== ''
-      )
-    })
-    const completedApproaches = completedAdults
-      .map((p) => String(p.dietaryApproach || '').trim())
-      .filter(Boolean)
-
-    // Hvis ingen voksne er "fully completed" (fx fordi UI'et kun sender
-    // dietaryApproach/mealsPerDay/weightGoal videre), så brug alle voksne
-    // der har en valgt kostretning som fallback. Dette sikrer at fx
-    // proteinrig faktisk slår igennem, også når height/weight ikke følger
-    // med i payloadet.
-    const approachesForSelection = completedApproaches.length > 0
-      ? completedApproaches
-      : familyProfile.adultsProfiles
-          .map((p) => String(p.dietaryApproach || '').trim())
-          .filter(Boolean)
+    const planOwner = familyProfile.adultsProfiles[0]
 
     // Familiens valgte FF-kostretning (fx 'keto'/'sense') bruges som fallback før
     // den hårdkodede 'sense', så familieindstillingernes kategori-valg faktisk
@@ -565,18 +535,14 @@ export class MealPlanGenerator {
       .find(Boolean)
 
     let primaryDietaryApproach =
-      approachesForSelection[0] ||
-      familyProfile.adultsProfiles[0]?.dietaryApproach ||
+      String(planOwner?.dietaryApproach || '').trim() ||
       familyDietFallback ||
       'sense'
 
-    if (hasChildren && approachesForSelection.includes('familiemad')) {
+    if (hasChildren && primaryDietaryApproach === 'familiemad') {
       primaryDietaryApproach = 'familiemad'
-    } else if (hasChildren && approachesForSelection.length > 0) {
-      const allKeto = approachesForSelection.every((d) => d === 'keto')
-      if (allKeto) {
-        primaryDietaryApproach = 'keto'
-      }
+    } else if (hasChildren && primaryDietaryApproach === 'keto') {
+      primaryDietaryApproach = 'keto'
     }
 
     const resolvedPrimaryId = resolveFactoryDietId(primaryDietaryApproach)
@@ -592,14 +558,9 @@ export class MealPlanGenerator {
       ...familyProfile.adultsProfiles.flatMap(p => p.excludedFoods || [])
     ]
 
-    // Determine which meals to generate based on adults' preferences
-    // If any adult has breakfast/lunch selected, include them
-    const mealsToGenerate = new Set<string>(['dinner']) // Always include dinner
-    familyProfile.adultsProfiles.forEach(profile => {
-      if (profile.mealsPerDay) {
-        profile.mealsPerDay.forEach(meal => mealsToGenerate.add(meal))
-      }
-    })
+    // Måltids-scope fra voksen 0 (fuld plan vs kun aftensmad)
+    const { normalizeMealsPerDay } = await import('../adult-plan-profile')
+    const mealsToGenerate = new Set<string>(normalizeMealsPerDay(planOwner?.mealsPerDay))
 
     // Antal personer der spiser hvert måltid – bruges til portionsstørrelse og indkøbsliste
     const peoplePerMeal = getPeoplePerMealFromAdultsProfiles(

@@ -25,6 +25,25 @@ import {
 
 type Tab = 'recipe' | 'link' | 'manual' | 'voice'
 
+/** Hovedkategorier der matcher diary-måltidet — bruges til at sortere kataloget. */
+const MEAL_MAIN_CATEGORIES: Record<MealType, string[]> = {
+  breakfast: ['morgenmad'],
+  lunch: ['frokost', 'salater', 'madpakke opskrifter', 'madpakke'],
+  dinner: ['aftensmad', 'simre retter', 'fisk', 'verden rundt'],
+  snack: ['tilbehør', 'fatbombs', 'desserter', 'bagværk', 'dip og dressinger', 'is og sommer'],
+}
+
+function recipeMatchesMealCategory(recipe: Recipe, meal: MealType): boolean {
+  const cats = MEAL_MAIN_CATEGORIES[meal]
+  const main = (recipe.mainCategory || '').trim().toLowerCase()
+  if (main && cats.some((c) => main === c || main.includes(c))) return true
+  const subs = Array.isArray(recipe.subCategories) ? recipe.subCategories : []
+  return subs.some((s) => {
+    const v = String(s).trim().toLowerCase()
+    return cats.some((c) => v === c || v.includes(c))
+  })
+}
+
 type Props = {
   open: boolean
   meal: MealType
@@ -118,15 +137,46 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return recipes.slice(0, 40)
-    return recipes
-      .filter(
-        (r) =>
-          r.title.toLowerCase().includes(q) ||
-          (r.description && r.description.toLowerCase().includes(q))
-      )
-      .slice(0, 40)
-  }, [recipes, query])
+
+    const recipeHasIngredient = (r: Recipe, needle: string) => {
+      const inList = (list: unknown) =>
+        Array.isArray(list) &&
+        list.some((ing) => {
+          if (!ing || typeof ing !== 'object') return false
+          const name = String((ing as { name?: string }).name || '').toLowerCase()
+          return name.includes(needle)
+        })
+      if (inList(r.ingredients)) return true
+      if (Array.isArray(r.ingredientGroups)) {
+        return r.ingredientGroups.some((g) => inList(g?.ingredients))
+      }
+      return false
+    }
+
+    const searched = q
+      ? recipes.filter(
+          (r) =>
+            r.title.toLowerCase().includes(q) ||
+            (r.description && r.description.toLowerCase().includes(q)) ||
+            (r.mainCategory && r.mainCategory.toLowerCase().includes(q)) ||
+            recipeHasIngredient(r, q)
+        )
+      : recipes
+
+    const matched: Recipe[] = []
+    const rest: Recipe[] = []
+    for (const r of searched) {
+      if (recipeMatchesMealCategory(r, meal)) matched.push(r)
+      else rest.push(r)
+    }
+    // Matchende kategori først — så morgenmad viser morgenmadsopskrifter øverst
+    return [...matched, ...rest].slice(0, 60)
+  }, [recipes, query, meal])
+
+  const matchedCount = useMemo(
+    () => filtered.filter((r) => recipeMatchesMealCategory(r, meal)).length,
+    [filtered, meal]
+  )
 
   if (!open) return null
 
@@ -303,15 +353,15 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
   ]
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4">
+    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4 lg:p-8">
       <button type="button" className="absolute inset-0 bg-black/50" aria-label="Luk" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl">
-        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-xl sm:rounded-2xl lg:max-h-[85vh] lg:max-w-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 lg:px-6 lg:py-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
               Tilføj {MEAL_LABELS[meal].toLowerCase()}
             </p>
-            <h2 className="text-lg font-semibold text-gray-900">Log måltid</h2>
+            <h2 className="text-lg font-semibold text-gray-900 lg:text-xl">Log måltid</h2>
           </div>
           <button
             type="button"
@@ -323,13 +373,13 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
           </button>
         </div>
 
-        <div className="flex gap-1 border-b border-gray-100 px-2 py-2">
+        <div className="flex gap-1 border-b border-gray-100 px-2 py-2 lg:px-4 lg:gap-2">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition ${
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition lg:py-2.5 lg:text-sm ${
                 tab === id
                   ? 'bg-emerald-50 text-emerald-800'
                   : 'text-gray-600 hover:bg-gray-50'
@@ -341,7 +391,7 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="flex-1 overflow-y-auto px-4 py-4 lg:px-6 lg:py-5">
           {error ? (
             <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -355,17 +405,27 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Søg efter en ret…"
+                  placeholder={`Søg ret eller ingrediens…`}
                   className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
+              {!recipesLoading && matchedCount > 0 ? (
+                <p className="text-xs text-emerald-800">
+                  Viser {MEAL_LABELS[meal].toLowerCase()}-opskrifter først
+                  {matchedCount < filtered.length ? ` (${matchedCount} match)` : ''}
+                </p>
+              ) : !recipesLoading && !query ? (
+                <p className="text-xs text-gray-500">
+                  Ingen opskrifter markeret som {MEAL_LABELS[meal].toLowerCase()} — viser alle.
+                </p>
+              ) : null}
               {recipesLoading ? (
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500">
                   <Loader2 className="animate-spin" size={18} />
                   Henter opskrifter…
                 </div>
               ) : (
-                <ul className="space-y-2">
+                <ul className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                   {filtered.map((r) => {
                     const kcal = Number(r.calories ?? r.nutritionalInfo?.calories ?? 0)
                     return (
@@ -374,7 +434,7 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
                           type="button"
                           disabled={busy}
                           onClick={() => void logCatalog(r)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-2 text-left hover:border-emerald-200 hover:bg-emerald-50/40 disabled:opacity-60"
+                          className="flex w-full items-center gap-3 rounded-xl border border-gray-100 p-2 text-left hover:border-emerald-200 hover:bg-emerald-50/40 disabled:opacity-60 lg:p-2.5"
                         >
                           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-gray-100">
                             {r.imageUrl ? (
@@ -393,7 +453,7 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
                     )
                   })}
                   {!filtered.length ? (
-                    <p className="py-6 text-center text-sm text-gray-500">Ingen opskrifter matcher.</p>
+                    <p className="col-span-full py-6 text-center text-sm text-gray-500">Ingen opskrifter matcher.</p>
                   ) : null}
                 </ul>
               )}

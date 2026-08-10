@@ -69,22 +69,79 @@ export async function POST(request: NextRequest) {
       typeof body.fromDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.fromDate)
         ? body.fromDate
         : null
+    /** Foretræk plan der dækker denne dato (fx den uge brugeren kigger på i dagbogen). */
+    const preferDate =
+      typeof body.preferDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.preferDate)
+        ? body.preferDate
+        : null
 
-    // Hent planen (specifik eller aktiv).
-    let query = supabase
-      .from('user_meal_plans')
-      .select('id, week_start_date, week_end_date, meal_plan_data')
-      .eq('user_id', user.id)
-    query = mealPlanId
-      ? query.eq('id', mealPlanId)
-      : query.eq('is_active', true).order('week_start_date', { ascending: false }).limit(1)
-
-    const { data: planRows, error: planErr } = await query
-    if (planErr) {
-      console.error('sync-meal-plan load', planErr)
-      return NextResponse.json({ error: 'Kunne ikke hente madplan', details: planErr.message }, { status: 500 })
+    type PlanRow = {
+      id: string
+      week_start_date: string
+      week_end_date: string | null
+      meal_plan_data: unknown
+      is_active?: boolean
     }
-    const plan = Array.isArray(planRows) ? planRows[0] : planRows
+
+    const countMealsInPlan = (raw: unknown): number => {
+      const grid = extractGrid(raw)
+      let n = 0
+      for (const day of PLAN_DAYS) {
+        const dayObj = grid[day]
+        if (!dayObj) continue
+        for (const meal of PLAN_MEALS) {
+          const cell = dayObj[meal] as Cell | null
+          if (cell?.title) n += 1
+        }
+      }
+      return n
+    }
+
+    let plan: PlanRow | null = null
+
+    if (mealPlanId) {
+      const { data, error: planErr } = await supabase
+        .from('user_meal_plans')
+        .select('id, week_start_date, week_end_date, meal_plan_data, is_active')
+        .eq('user_id', user.id)
+        .eq('id', mealPlanId)
+        .maybeSingle()
+      if (planErr) {
+        console.error('sync-meal-plan load', planErr)
+        return NextResponse.json({ error: 'Kunne ikke hente madplan', details: planErr.message }, { status: 500 })
+      }
+      plan = data
+    } else {
+      // Hent seneste planer og vælg smart: 1) dækker preferDate, 2) aktiv med mad, 3) nyeste med mad.
+      const { data: planRows, error: planErr } = await supabase
+        .from('user_meal_plans')
+        .select('id, week_start_date, week_end_date, meal_plan_data, is_active')
+        .eq('user_id', user.id)
+        .order('week_start_date', { ascending: false })
+        .limit(20)
+      if (planErr) {
+        console.error('sync-meal-plan load', planErr)
+        return NextResponse.json({ error: 'Kunne ikke hente madplan', details: planErr.message }, { status: 500 })
+      }
+      const plans = (planRows ?? []) as PlanRow[]
+      const withEnd = plans.map((p) => ({
+        ...p,
+        week_end_date: p.week_end_date || addDays(p.week_start_date, 6),
+      }))
+
+      if (preferDate) {
+        plan =
+          withEnd.find(
+            (p) => p.week_start_date <= preferDate && preferDate <= (p.week_end_date as string)
+          ) ?? null
+      }
+      if (!plan || countMealsInPlan(plan.meal_plan_data) === 0) {
+        const active = withEnd.find((p) => p.is_active && countMealsInPlan(p.meal_plan_data) > 0)
+        const recentWithMeals = withEnd.find((p) => countMealsInPlan(p.meal_plan_data) > 0)
+        plan = active ?? recentWithMeals ?? withEnd.find((p) => p.is_active) ?? withEnd[0] ?? null
+      }
+    }
+
     if (!plan) return NextResponse.json({ error: 'Ingen madplan fundet' }, { status: 404 })
 
     const weekStart = plan.week_start_date as string

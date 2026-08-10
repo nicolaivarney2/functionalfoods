@@ -71,6 +71,23 @@ function weekDaysOf(d: Date): Date[] {
   })
 }
 
+/** Parse YYYY-MM-DD as local calendar date (avoid UTC day-shift). */
+function parseIsoDateLocal(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1)
+}
+
+function formatWeekRange(weekStart: string, weekEnd?: string): string {
+  const start = parseIsoDateLocal(weekStart)
+  const end = parseIsoDateLocal(weekEnd || weekStart)
+  if (!weekEnd) {
+    end.setDate(start.getDate() + 6)
+  }
+  const fmt = (dt: Date) =>
+    `${dt.getDate()}. ${DA_MONTHS_LONG[dt.getMonth()].toLowerCase().slice(0, 3)}`
+  return `${fmt(start)}–${fmt(end)}`
+}
+
 function MacroBox({
   label,
   value,
@@ -84,9 +101,9 @@ function MacroBox({
 }) {
   const pct = goal && goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0
   return (
-    <div className="min-w-0 flex-1 rounded-xl bg-white/80 px-2.5 py-2 ring-1 ring-black/5">
-      <p className="truncate text-[11px] font-medium text-gray-600">{label}</p>
-      <p className="text-sm font-semibold text-gray-900">
+    <div className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2.5 ring-1 ring-black/5">
+      <p className="truncate text-[11px] font-medium text-gray-600 lg:text-xs">{label}</p>
+      <p className="text-sm font-semibold text-gray-900 lg:text-base">
         {Math.round(value)}
         {goal != null ? (
           <span className="font-normal text-gray-400"> / {Math.round(goal)}g</span>
@@ -94,7 +111,7 @@ function MacroBox({
           <span className="font-normal text-gray-400"> g</span>
         )}
       </p>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-gray-100">
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-200/80">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
       </div>
     </div>
@@ -199,13 +216,29 @@ export default function DagbogPage() {
     setSyncMsg(null)
     setError(null)
     try {
-      const res = await syncMealPlanToDiary({ fromDate: dateKey })
+      // Fuld uge-synk (ikke fromDate-filter) — find plan der dækker valgt dag, ellers aktiv/nyeste med mad.
+      const res = await syncMealPlanToDiary({ preferDate: dateKey })
+      if (res.weekStart) {
+        const planMonday = parseIsoDateLocal(res.weekStart)
+        const planEnd = res.weekEnd || isoDate(new Date(planMonday.getFullYear(), planMonday.getMonth(), planMonday.getDate() + 6))
+        // Hop til planens uge, så synkede måltider er synlige.
+        if (dateKey < res.weekStart || dateKey > planEnd) {
+          setDate(planMonday)
+        } else {
+          await load()
+        }
+      } else {
+        await load()
+      }
       setSyncMsg(
         res.inserted > 0
-          ? `${res.inserted} måltid${res.inserted === 1 ? '' : 'er'} synket fra madplanen`
-          : 'Ingen nye måltider at synke (tom plan eller allerede synket)'
+          ? `${res.inserted} måltid${res.inserted === 1 ? '' : 'er'} synket fra madplanen${
+              res.weekStart ? ` (${formatWeekRange(res.weekStart, res.weekEnd)})` : ''
+            }`
+          : res.weekStart
+            ? `Ingen måltider i madplanen for ${formatWeekRange(res.weekStart, res.weekEnd)}`
+            : 'Ingen måltider at synke — generér en madplan først'
       )
-      await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kunne ikke synke madplan')
     } finally {
@@ -234,17 +267,142 @@ export default function DagbogPage() {
     return `${weekday} d. ${dd}. ${mon}`
   })()
 
+  const weekStrip = (
+    <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/15 backdrop-blur-sm lg:bg-slate-50 lg:ring-black/5 lg:backdrop-blur-none">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => shiftWeek(-1)}
+          className="rounded-full p-1.5 text-white hover:bg-white/10 lg:text-gray-700 lg:hover:bg-white"
+          aria-label="Forrige uge"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span className="text-sm font-medium text-emerald-50 lg:text-gray-700">{monthLabel}</span>
+        <button
+          type="button"
+          onClick={() => shiftWeek(1)}
+          className="rounded-full p-1.5 text-white hover:bg-white/10 lg:text-gray-700 lg:hover:bg-white"
+          aria-label="Næste uge"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 lg:gap-1.5">
+        {weekDays.map((d) => {
+          const key = isoDate(d)
+          const active = key === dateKey
+          const isTodayDot = key === today
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setDate(d)}
+              className={`flex flex-col items-center rounded-xl px-1 py-2 text-center transition lg:py-2.5 ${
+                active
+                  ? 'bg-white text-emerald-900 shadow-sm lg:bg-emerald-700 lg:text-white'
+                  : 'text-emerald-50 hover:bg-white/10 lg:text-gray-600 lg:hover:bg-white'
+              }`}
+            >
+              <span className="text-[10px] font-semibold tracking-wide lg:text-[11px]">
+                {DA_WEEKDAYS_SHORT[d.getDay()]}
+              </span>
+              <span className="text-sm font-bold lg:text-base">{d.getDate()}</span>
+              <span
+                className={`mt-1 h-1 w-1 rounded-full ${
+                  isTodayDot
+                    ? active
+                      ? 'bg-emerald-600 lg:bg-amber-300'
+                      : 'bg-amber-300 lg:bg-emerald-500'
+                    : 'bg-transparent'
+                }`}
+              />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  const summaryCard = (
+    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 lg:p-6">
+      <p className="text-sm text-gray-500">{dateText}</p>
+      <div className="mt-3 flex flex-col items-center text-center lg:items-start lg:text-left">
+        <p className="text-4xl font-bold tracking-tight text-gray-900 lg:text-5xl">
+          {(remaining != null ? remaining : totals.calories).toLocaleString('da-DK')}
+        </p>
+        <p className="text-sm text-gray-500 lg:mt-1">
+          {remaining != null ? 'kcal tilbage' : 'kcal indtaget'}
+        </p>
+      </div>
+      <div className="mt-4 flex justify-center gap-6 text-sm text-gray-600 lg:justify-start">
+        <span>
+          <strong className="text-gray-900">{totals.calories.toLocaleString('da-DK')}</strong> indtaget
+        </span>
+        <span>
+          <strong className="text-gray-900">
+            {target ? target.calories.toLocaleString('da-DK') : '–'}
+          </strong>{' '}
+          mål
+        </span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+        <div
+          className="h-full rounded-full bg-emerald-600 transition-all"
+          style={{ width: `${Math.round(progress * 100)}%` }}
+        />
+      </div>
+      <div className="mt-4 flex gap-2">
+        <MacroBox label="Kulhydrater" value={totals.carbs} goal={target?.carbs ?? null} color="#059669" />
+        <MacroBox label="Protein" value={totals.protein} goal={target?.protein ?? null} color="#d98324" />
+        <MacroBox label="Fedt" value={totals.fat} goal={target?.fat ?? null} color="#5b8bd0" />
+      </div>
+      {!target ? (
+        <Link
+          href="/madbudget"
+          className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-100"
+        >
+          <CalendarDays size={16} />
+          Udfyld diæt-profil i Madbudget for at få et dagligt mål
+        </Link>
+      ) : null}
+      <div className="mt-4">
+        <HealthInformationNotice variant="inline" />
+      </div>
+    </div>
+  )
+
+  const quickLinks = (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+      {[
+        { href: '/madbudget', label: 'Madplan' },
+        { href: '/vaegt-tracker', label: 'Vægt tracker' },
+        { href: '/opskriftsoversigt', label: 'Opskrifter' },
+        { href: '/prisalarmer', label: 'Prisalarmer' },
+      ].map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/5 hover:bg-gray-50 lg:py-2.5"
+        >
+          {link.label}
+        </Link>
+      ))}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
-      <div className="bg-gradient-to-b from-emerald-800 to-emerald-700 text-white">
+    <div className="min-h-screen bg-slate-50 pb-16 lg:pb-20">
+      {/* Mobile header */}
+      <div className="bg-gradient-to-b from-emerald-800 to-emerald-700 text-white lg:hidden">
         <div className="container mx-auto max-w-2xl px-4 pb-8 pt-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <Link
-              href="/overblik"
+              href="/madbudget"
               className="inline-flex items-center gap-1 text-sm text-emerald-100 hover:text-white"
             >
               <ChevronLeft size={16} />
-              Overblik
+              Madplan
             </Link>
             <button
               type="button"
@@ -256,234 +414,175 @@ export default function DagbogPage() {
               Synk madplan
             </button>
           </div>
-
           <h1 className="text-2xl font-bold tracking-tight">Maddagbog</h1>
           <p className="mt-1 text-sm text-emerald-100">
-            Log det du spiser — opskrift, link, stemme eller manuelt. Foto er i appen.
+            Log det du spiser — opskrift, link, stemme eller manuelt.
           </p>
+          <div className="mt-6">{weekStrip}</div>
+        </div>
+      </div>
 
-          <div className="mt-6 rounded-2xl bg-white/10 p-3 ring-1 ring-white/15 backdrop-blur-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => shiftWeek(-1)}
-                className="rounded-full p-1.5 hover:bg-white/10"
-                aria-label="Forrige uge"
+      {/* Desktop header */}
+      <div className="hidden border-b border-emerald-900/10 bg-gradient-to-r from-emerald-800 to-teal-700 text-white lg:block">
+        <div className="container mx-auto max-w-6xl px-6 py-8">
+          <div className="flex items-end justify-between gap-6">
+            <div>
+              <Link
+                href="/madbudget"
+                className="mb-3 inline-flex items-center gap-1 text-sm text-emerald-100 hover:text-white"
               >
-                <ChevronLeft size={18} />
-              </button>
-              <span className="text-sm font-medium text-emerald-50">{monthLabel}</span>
-              <button
-                type="button"
-                onClick={() => shiftWeek(1)}
-                className="rounded-full p-1.5 hover:bg-white/10"
-                aria-label="Næste uge"
-              >
-                <ChevronRight size={18} />
-              </button>
+                <ChevronLeft size={16} />
+                Tilbage til madplan
+              </Link>
+              <h1 className="text-3xl font-bold tracking-tight">Maddagbog</h1>
+              <p className="mt-1.5 max-w-xl text-sm text-emerald-100">
+                Log måltider med opskrift, link, stemme eller manuelt — synk madplanen når du vil.
+              </p>
             </div>
-            <div className="grid grid-cols-7 gap-1">
-              {weekDays.map((d) => {
-                const key = isoDate(d)
-                const active = key === dateKey
-                const isTodayDot = key === today
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setDate(d)}
-                    className={`flex flex-col items-center rounded-xl px-1 py-2 text-center transition ${
-                      active ? 'bg-white text-emerald-900 shadow-sm' : 'text-emerald-50 hover:bg-white/10'
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold tracking-wide">
-                      {DA_WEEKDAYS_SHORT[d.getDay()]}
-                    </span>
-                    <span className="text-sm font-bold">{d.getDate()}</span>
-                    <span
-                      className={`mt-1 h-1 w-1 rounded-full ${
-                        isTodayDot ? (active ? 'bg-emerald-600' : 'bg-amber-300') : 'bg-transparent'
-                      }`}
-                    />
-                  </button>
-                )
-              })}
-            </div>
+            <button
+              type="button"
+              onClick={() => void syncPlan()}
+              disabled={syncBusy}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm hover:bg-emerald-50 disabled:opacity-60"
+            >
+              {syncBusy ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Synk madplan
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto max-w-2xl space-y-4 px-4 -mt-4">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <p className="text-sm text-gray-500">{dateText}</p>
-          <div className="mt-2 text-center">
-            <p className="text-4xl font-bold tracking-tight text-gray-900">
-              {(remaining != null ? remaining : totals.calories).toLocaleString('da-DK')}
-            </p>
-            <p className="text-sm text-gray-500">
-              {remaining != null ? 'kcal tilbage' : 'kcal indtaget'}
-            </p>
-          </div>
-          <div className="mt-3 flex justify-center gap-6 text-sm text-gray-600">
-            <span>
-              <strong className="text-gray-900">{totals.calories.toLocaleString('da-DK')}</strong> indtaget
-            </span>
-            <span>
-              <strong className="text-gray-900">
-                {target ? target.calories.toLocaleString('da-DK') : '–'}
-              </strong>{' '}
-              mål
-            </span>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
-            <div
-              className="h-full rounded-full bg-emerald-600 transition-all"
-              style={{ width: `${Math.round(progress * 100)}%` }}
-            />
-          </div>
-          <div className="mt-4 flex gap-2">
-            <MacroBox label="Kulhydrater" value={totals.carbs} goal={target?.carbs ?? null} color="#059669" />
-            <MacroBox label="Protein" value={totals.protein} goal={target?.protein ?? null} color="#d98324" />
-            <MacroBox label="Fedt" value={totals.fat} goal={target?.fat ?? null} color="#5b8bd0" />
-          </div>
-          {!target ? (
-            <Link
-              href="/madbudget"
-              className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800 ring-1 ring-emerald-100"
-            >
-              <CalendarDays size={16} />
-              Udfyld diæt-profil i Madbudget for at få et dagligt mål
-            </Link>
-          ) : null}
-          <div className="mt-4">
-            <HealthInformationNotice variant="inline" />
-          </div>
-        </div>
+      <div className="container mx-auto max-w-2xl space-y-4 px-4 -mt-4 lg:mt-0 lg:max-w-6xl lg:px-6 lg:pt-8">
+        <div className="lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-8 xl:grid-cols-[360px_minmax(0,1fr)]">
+          {/* Sidebar — desktop sticky */}
+          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <div className="hidden lg:block">{weekStrip}</div>
+            {summaryCard}
+            <div className="hidden lg:block">{quickLinks}</div>
+          </aside>
 
-        {syncMsg ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            {syncMsg}
-          </div>
-        ) : null}
+          {/* Meals */}
+          <div className="space-y-4">
+            {syncMsg ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                {syncMsg}
+              </div>
+            ) : null}
 
-        {error ? (
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-left text-sm text-red-700"
-          >
-            <span className="flex-1">{error}</span>
-            <span className="font-medium">Prøv igen</span>
-          </button>
-        ) : null}
-
-        {loading && !day ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500">
-            <Loader2 className="animate-spin" size={18} />
-            Henter dagbog…
-          </div>
-        ) : null}
-
-        {MEAL_KEYS.map((mealKey) => {
-          const Icon = MEAL_ICONS[mealKey]
-          const entries = (day?.entries ?? []).filter((e) => e.mealType === mealKey)
-          const band = target ? MEAL_BANDS[mealKey] : null
-          const rec =
-            band && target
-              ? `${Math.round(band[0] * target.calories)}–${Math.round(band[1] * target.calories)} kcal`
-              : null
-          const mealKcal = entries.reduce((s, e) => s + e.calories, 0)
-          return (
-            <section key={mealKey} className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+            {error ? (
               <button
                 type="button"
-                onClick={() => setSheetMeal(mealKey)}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50"
+                onClick={() => void load()}
+                className="flex w-full items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-left text-sm text-red-700"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                  <Icon size={18} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-900">{MEAL_LABELS[mealKey]}</p>
-                  <p className="text-xs text-gray-500">
-                    {mealKcal > 0
-                      ? `${mealKcal.toLocaleString('da-DK')} kcal`
-                      : rec
-                        ? `Anbefalet ${rec}`
-                        : 'Tom'}
-                  </p>
-                </div>
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-white">
-                  <Plus size={18} />
-                </span>
+                <span className="flex-1">{error}</span>
+                <span className="font-medium">Prøv igen</span>
               </button>
-              {entries.length ? (
-                <ul className="border-t border-gray-100 divide-y divide-gray-50">
-                  {entries.map((entry) => (
-                    <li key={entry.id} className="flex items-center gap-3 px-4 py-3">
-                      <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-gray-100">
-                        {entry.imageUrl ? (
-                          <Image src={entry.imageUrl} alt="" fill className="object-cover" sizes="44px" />
-                        ) : null}
+            ) : null}
+
+            {loading && !day ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
+                <Loader2 className="animate-spin" size={18} />
+                Henter dagbog…
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+              {MEAL_KEYS.map((mealKey) => {
+                const Icon = MEAL_ICONS[mealKey]
+                const entries = (day?.entries ?? []).filter((e) => e.mealType === mealKey)
+                const band = target ? MEAL_BANDS[mealKey] : null
+                const rec =
+                  band && target
+                    ? `${Math.round(band[0] * target.calories)}–${Math.round(band[1] * target.calories)} kcal`
+                    : null
+                const mealKcal = entries.reduce((s, e) => s + e.calories, 0)
+                return (
+                  <section
+                    key={mealKey}
+                    className="flex min-h-[180px] flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSheetMeal(mealKey)}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 lg:px-5 lg:py-4"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 lg:h-11 lg:w-11">
+                        <Icon size={18} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-gray-900">{entry.title}</p>
-                        <p className="text-xs text-gray-500">
-                          {Math.round(entry.calories).toLocaleString('da-DK')} kcal
-                          {entry.source === 'meal-plan' ? ' · madplan' : ''}
-                          {entry.source === 'manual' ? ' · manuel' : ''}
+                        <p className="font-semibold text-gray-900 lg:text-lg">{MEAL_LABELS[mealKey]}</p>
+                        <p className="text-xs text-gray-500 lg:text-sm">
+                          {mealKcal > 0
+                            ? `${mealKcal.toLocaleString('da-DK')} kcal`
+                            : rec
+                              ? `Anbefalet ${rec}`
+                              : 'Tom — klik for at logge'}
                         </p>
                       </div>
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-700 text-white lg:h-10 lg:w-10">
+                        <Plus size={18} />
+                      </span>
+                    </button>
+                    {entries.length ? (
+                      <ul className="flex-1 border-t border-gray-100 divide-y divide-gray-50">
+                        {entries.map((entry) => (
+                          <li key={entry.id} className="flex items-center gap-3 px-4 py-3 lg:px-5">
+                            <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-gray-100 lg:h-12 lg:w-12">
+                              {entry.imageUrl ? (
+                                <Image
+                                  src={entry.imageUrl}
+                                  alt=""
+                                  fill
+                                  className="object-cover"
+                                  sizes="48px"
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-gray-900">{entry.title}</p>
+                              <p className="text-xs text-gray-500">
+                                {Math.round(entry.calories).toLocaleString('da-DK')} kcal
+                                {entry.source === 'meal-plan' ? ' · madplan' : ''}
+                                {entry.source === 'manual' ? ' · manuel' : ''}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setMoveEntry(entry)}
+                              className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
+                              aria-label="Flyt"
+                              title="Flyt til andet måltid"
+                            >
+                              <ArrowLeftRight size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void removeEntry(entry.id)}
+                              className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                              aria-label="Slet"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => setMoveEntry(entry)}
-                        className="rounded-lg p-2 text-gray-400 hover:bg-gray-50 hover:text-gray-700"
-                        aria-label="Flyt"
-                        title="Flyt til andet måltid"
+                        onClick={() => setSheetMeal(mealKey)}
+                        className="hidden flex-1 items-center justify-center border-t border-dashed border-gray-100 px-4 py-8 text-sm text-gray-400 hover:bg-emerald-50/40 hover:text-emerald-700 lg:flex"
                       >
-                        <ArrowLeftRight size={16} />
+                        + Tilføj {MEAL_LABELS[mealKey].toLowerCase()}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void removeEntry(entry.id)}
-                        className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                        aria-label="Slet"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
-          )
-        })}
+                    )}
+                  </section>
+                )
+              })}
+            </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-2">
-          <Link
-            href="/vaegt-tracker"
-            className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/5 hover:bg-gray-50"
-          >
-            Vægt tracker
-          </Link>
-          <Link
-            href="/madbudget"
-            className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/5 hover:bg-gray-50"
-          >
-            Madplan
-          </Link>
-          <Link
-            href="/opskriftsoversigt"
-            className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/5 hover:bg-gray-50"
-          >
-            Opskrifter
-          </Link>
-          <Link
-            href="/prisalarmer"
-            className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-gray-800 shadow-sm ring-1 ring-black/5 hover:bg-gray-50"
-          >
-            Prisalarmer
-          </Link>
+            <div className="lg:hidden">{quickLinks}</div>
+          </div>
         </div>
       </div>
 
@@ -503,7 +602,7 @@ export default function DagbogPage() {
             aria-label="Luk"
             onClick={() => setMoveEntry(null)}
           />
-          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl">
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl lg:max-w-md lg:p-5">
             <h3 className="font-semibold text-gray-900">Flyt «{moveEntry.title}»</h3>
             <p className="mt-1 text-sm text-gray-500">Vælg måltid</p>
             <div className="mt-3 grid grid-cols-2 gap-2">

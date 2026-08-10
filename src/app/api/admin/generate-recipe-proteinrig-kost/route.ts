@@ -9,6 +9,7 @@ import {
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 
 interface ExistingRecipe {
   id: string
@@ -216,6 +217,8 @@ ${kulhydratPrincip}
 - Undgå "tomme" kalorier: begræns sukker og tilsat fedt uden protein.
 
 OPPSKRIFT FORMAT (returner kun JSON):
+
+${PLANOMA_INSTRUCTION_AMOUNT_RULE}
 - "title": sætningscase på dansk — kun stort begyndelsesbogstav i første ord (fx "Grillet kylling med skyr-dip"), aldrig Title Case På Hvert Ord.
 
 {

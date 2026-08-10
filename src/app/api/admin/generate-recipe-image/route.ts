@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-
 interface GenerateImageRequest {
   recipe: {
     title: string
