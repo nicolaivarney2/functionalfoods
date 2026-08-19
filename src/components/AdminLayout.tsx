@@ -90,10 +90,10 @@ const adminNavItems = [
     description: 'Administrer opskriftsbilleder'
   },
   {
-    name: 'Brugere',
+    name: 'Medlemmer',
     href: '/admin/users',
     icon: Users,
-    description: 'Administrer brugerroller'
+    description: 'Brugere, abonnement og opsigelse'
   },
   {
     name: 'Dagligvarer',
@@ -112,6 +112,12 @@ const adminNavItems = [
     href: '/admin/product-ingredient-matching/nye-varer',
     icon: List,
     description: 'Fælles fooddata-kø — nye mad-varer uden ingrediensmatch'
+  },
+  {
+    name: 'Merge ingredienser',
+    href: '/admin/product-ingredient-matching/merge',
+    icon: List,
+    description: 'Saml dubletter som gulerod → gulerødder'
   },
   {
     name: 'Fravalg-tags',

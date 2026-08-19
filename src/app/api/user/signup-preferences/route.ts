@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const productUpdatesConsent = Boolean(body?.productUpdatesConsent)
+  const referralCode = typeof body?.referralCode === 'string' ? body.referralCode : null
 
   const supabase = createClient(supabaseUrl, serviceKey)
   const now = new Date().toISOString()
@@ -64,6 +65,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const stripeCustomerId = await ensureStripeCustomerForUser(supabase, user)
+    if (referralCode) {
+      const { claimReferral } = await import('@/lib/referrals')
+      const claim = await claimReferral(supabase, user.id, referralCode)
+      if (!claim.ok && claim.error !== 'unknown_code' && claim.error !== 'self' && claim.error !== 'too_old') {
+        console.warn('signup-preferences referral claim:', claim.error)
+      }
+    }
     return NextResponse.json({ ok: true, stripeCustomerId })
   } catch (error) {
     console.error('signup-preferences stripe customer', error)

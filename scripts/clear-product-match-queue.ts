@@ -1,86 +1,91 @@
 #!/usr/bin/env tsx
 /**
- * Clear the product_ingredient_match_queue table.
+ * Clear pending rows in product_ingredient_match_queue (FF local + fooddata).
  *
- * By default deletes only pending items (preserving matched/dismissed history).
- * Pass --all to wipe everything.
- *
- *   npx tsx scripts/clear-product-match-queue.ts            # dry-run, show counts
- *   npx tsx scripts/clear-product-match-queue.ts --confirm  # actually delete pending
- *   npx tsx scripts/clear-product-match-queue.ts --confirm --all  # delete all rows
+ *   npx tsx scripts/clear-product-match-queue.ts            # dry-run
+ *   npx tsx scripts/clear-product-match-queue.ts --confirm  # delete pending in both DBs
+ *   npx tsx scripts/clear-product-match-queue.ts --confirm --all  # all statuses
  */
 
 import { resolve } from 'node:path'
 import { config as loadEnv } from 'dotenv'
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const args = new Set(process.argv.slice(2))
 const confirm = args.has('--confirm')
 const wipeAll = args.has('--all')
+const BATCH = 500
+
+function client(urlEnv: string, keyEnv: string, label: string): SupabaseClient {
+  const url = process.env[urlEnv]
+  const key = process.env[keyEnv]
+  if (!url || !key) throw new Error(`Missing ${urlEnv} / ${keyEnv} (${label})`)
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } })
+}
+
+async function countRows(db: SupabaseClient, all: boolean): Promise<number> {
+  let q = db.from('product_ingredient_match_queue').select('id', { count: 'exact', head: true })
+  if (!all) q = q.eq('status', 'pending')
+  const { count, error } = await q
+  if (error) {
+    if (error.code === '42P01') return 0
+    throw error
+  }
+  return count ?? 0
+}
+
+async function deleteBatch(db: SupabaseClient, all: boolean): Promise<number> {
+  let selectQ = db.from('product_ingredient_match_queue').select('id').limit(BATCH)
+  if (!all) selectQ = selectQ.eq('status', 'pending')
+  const { data, error } = await selectQ
+  if (error) throw error
+  if (!data?.length) return 0
+  const ids = data.map((r) => r.id)
+  const { error: delErr } = await db.from('product_ingredient_match_queue').delete().in('id', ids)
+  if (delErr) throw delErr
+  return ids.length
+}
+
+async function clearTable(db: SupabaseClient, label: string, all: boolean): Promise<number> {
+  const before = await countRows(db, all)
+  console.log(`  ${label}: ${before.toLocaleString('da-DK')} rows${all ? ' (all statuses)' : ' (pending)'}`)
+  if (!confirm || before === 0) return before
+
+  let deleted = 0
+  while (true) {
+    const n = await deleteBatch(db, all)
+    if (n === 0) break
+    deleted += n
+    process.stdout.write(`\r  ${label}: deleted ${deleted.toLocaleString('da-DK')}/${before.toLocaleString('da-DK')}...`)
+  }
+  console.log(`\r  ${label}: deleted ${deleted.toLocaleString('da-DK')} rows`)
+  return deleted
+}
 
 async function main(): Promise<void> {
-  const client = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
+  const ff = client('NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'FF')
+  const fooddata = client('GROCERY_SUPABASE_URL', 'GROCERY_SUPABASE_SECRET_KEY', 'fooddata')
 
-  // Counts by status
-  const counts: Record<string, number> = {}
-  const pageSize = 1000
-  let total = 0
-  for (let from = 0; from < 1_000_000; from += pageSize) {
-    const { data, error } = await client
-      .from('product_ingredient_match_queue')
-      .select('status')
-      .range(from, from + pageSize - 1)
-    if (error) throw new Error(error.message)
-    if (!data || data.length === 0) break
-    for (const r of data) counts[r.status] = (counts[r.status] ?? 0) + 1
-    total += data.length
-    if (data.length < pageSize) break
-  }
+  console.log('Clear product_ingredient_match_queue')
+  console.log(`  mode:  ${confirm ? 'EXECUTE' : 'DRY-RUN (add --confirm)'}`)
+  console.log(`  scope: ${wipeAll ? 'all statuses' : 'pending only'}`)
 
-  console.log('────────────────────────────────────────')
-  console.log('▶ product_ingredient_match_queue current state')
-  console.log('────────────────────────────────────────')
-  console.log(`  Total rows: ${total.toLocaleString('da-DK')}`)
-  for (const [status, n] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${status.padEnd(12)} ${n.toLocaleString('da-DK')}`)
-  }
-  console.log()
+  console.log('\n▶ fooddata (fælles sandhed)')
+  await clearTable(fooddata, 'fooddata', wipeAll)
+
+  console.log('\n▶ FF (lokal cache)')
+  await clearTable(ff, 'FF', wipeAll)
 
   if (!confirm) {
-    console.log('DRY-RUN: no rows deleted. Re-run with --confirm to actually delete.')
-    console.log('  --confirm        → delete pending only')
-    console.log('  --confirm --all  → delete every row')
+    console.log('\nDRY-RUN: no rows deleted. Re-run with --confirm to actually delete.')
     return
   }
 
-  const targetStatus = wipeAll ? null : 'pending'
-  const targetCount = wipeAll ? total : (counts.pending ?? 0)
-
-  if (targetCount === 0) {
-    console.log('Nothing to delete.')
-    return
-  }
-
-  console.log(`Deleting ${targetCount.toLocaleString('da-DK')} rows (${wipeAll ? 'ALL' : 'pending only'})…`)
-
-  const t0 = Date.now()
-  let query = client.from('product_ingredient_match_queue').delete()
-  if (targetStatus) {
-    query = query.eq('status', targetStatus)
-  } else {
-    // Need a where clause to delete; use a tautology
-    query = query.gte('queued_at', '1970-01-01')
-  }
-  const { error: delErr } = await query
-
-  if (delErr) throw new Error(delErr.message)
-  const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
-  console.log(`✓ Deleted ${targetCount.toLocaleString('da-DK')} rows in ${elapsed}s`)
+  const fdLeft = await countRows(fooddata, wipeAll)
+  const ffLeft = await countRows(ff, wipeAll)
+  console.log(`\n✓ Remaining — fooddata: ${fdLeft}, FF: ${ffLeft}`)
 }
 
 main().catch((err) => {

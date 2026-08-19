@@ -124,6 +124,8 @@ const STEM_ALIASES: Record<string, string[]> = {
 export const PLANOMA_INSTRUCTION_AMOUNT_RULE = `
 FREMGangsMÅDE OG MÆNGDER (KRITISK):
 - Alle mængder (g, ml, tsk, spsk, stk osv.) må KUN stå i ingredients-listen
+- Salt og peber: ALTID 0,5 tsk salt og 0,25 tsk peber pr. opskrift — aldrig mere.
+  Folk justerer selv. Skriv IKKE 1–2 tsk salt. Brug tsk, aldrig gram/spsk.
 - I instructions: nævn IKKE gram/ml/antal — systemet indsætter skalerede mængder automatisk
 - Når du nævner en ingrediens i et trin, WRAP den i et tag med det PRÆCISE name fra ingredients-listen:
   Korrekt: "Steg [[ing:kyllingebryst]] med [[ing:hvidløgsfed]]."

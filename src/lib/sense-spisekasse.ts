@@ -163,7 +163,8 @@ function foldIngredientName(s: string): string {
 
 function isFedtToken(n: string): boolean {
   // «olie» alene (og sesam-/solsikkeolie …) — ikke kun olivenolie/rapsolie.
-  return /(olivenolie|rapsolie|kokosolie|sesamolie|solsikkeolie|majsolie|\bolie\b|smoer\b|floede|creme fraiche|cremefraiche|mayonnaise|ghee|bearnaise|tahin|tahini|peanutbutter|noeddesmoer|avocado|\bnoedder\b|mandler|valnoed|cashew|pinjekerner|solsikkekerner|graeskarkerner|graeskarfr|chiafr|hoerfroe|hoerfr|sesamfr|kokosmaelk|kokosfloede|\bpesto\b|dressing)/.test(
+  // Kant-saucer: mayo, bearnaise, remoulade, aioli, dressing tæller som fedt i Sense.
+  return /(olivenolie|rapsolie|kokosolie|sesamolie|solsikkeolie|majsolie|\bolie\b|smoer\b|\bmaelk\b|floede|creme fraiche|cremefraiche|mayonnaise|\bmayo\b|ghee|bearnaise|hollandaise|aioli|remoulade|tahin|tahini|peanutbutter|noeddesmoer|avocado|\bnoedder\b|mandler|valnoed|cashew|pinjekerner|solsikkekerner|graeskarkerner|graeskarfr|chiafr|hoerfroe|hoerfr|sesamfr|kokosmaelk|kokosfloede|\bpesto\b|dressing|vinaigrette|guacamole|\branch\b|\bdip\b)/.test(
     n
   )
 }
@@ -171,7 +172,7 @@ function isFedtToken(n: string): boolean {
 function isSmagToken(n: string): boolean {
   // Vigtigt: `\bpeber\b` — ikke bare `peber`, ellers bliver peberfrugt smagsgiver.
   // `soja` kun som sauce (ikke sojabønner). Tomatpuré/passata = smag; hakkede tomater er grønt.
-  return /(\bsalt\b|\bpeber\b|bouillon|bouillontern|eddike|edikk|\bcitron\b|\blime\b|limesaft|citronsaft|hvidloeg|ingefaer|sennep|honning|karry|\bpaprika\b|\bchili\b|chiliflager|dild|persille|timian|oregano|basilikum|koriander|estragon|\bmynte\b|rosmarin|kanel|kommen|spidskommen|gurkemeje|safran|muskat|nellike|sojasauce|soy\s*sauce|mirin|balsam|sirup|\bfond\b|\bstock\b|krydderi|krydderur|fish sauce|fiskesauce|worcestersauce|sriracha|tomatpure|tomatpuree|tomatpasta|passata|passeata|harissa|miso)/.test(
+  return /(\bsalt\b|\bpeber\b|bouillon|bouillontern|eddike|edikk|\bcitron\b|\blime\b|limesaft|citronsaft|hvidloeg|ingefaer|sennep|honning|karry|\bpaprika\b|\bchili\b|chiliflager|dild|persille|timian|oregano|basilikum|koriander|estragon|\bmynte\b|rosmarin|kanel|kommen|spidskommen|gurkemeje|safran|muskat|nellike|sojasauce|soy\s*sauce|mirin|balsam|sirup|\bfond\b|\bstock\b|krydderi|krydderur|fish sauce|fiskesauce|worcestersauce|sriracha|ketchup|chilisauce|barbecuesauce|bbq|chutney|\bsalsa\b|tomatpure|tomatpuree|tomatpasta|passata|passeata|harissa|miso)/.test(
     n
   )
 }
@@ -187,7 +188,7 @@ function isStivelseToken(n: string): boolean {
 }
 
 function isProteinToken(n: string): boolean {
-  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksekoed|oksek|svine|flaesk|bacon|skinke|fars|\bboef\b|hakkeboef|poelse|medister|lamm|tofu|tempeh|edamame|sojabonne|\baeg\b|aeggehvide|skink|tun|boenner|boenne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage|hytteost|hummus|humus)/.test(
+  return /(fisk|laks|torsk|kulmule|sej|makrel|reje|hummer|krabbe|kylling|kalkun|oksekoed|oksek|svine|flaesk|bacon|skinke|fars|\bboef\b|hakkeboef|poelse|medister|lamm|tofu|tempeh|edamame|sojabonne|\baeg\b|aeggehvide|skink|tun|boenner|boenne|linse|kikaert|halloumi|mozzarella|feta|parmesan|skyr|kvark|cottage|hytteost|hummus|humus|yoghurt)/.test(
     n
   )
 }

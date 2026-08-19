@@ -37,6 +37,7 @@ export default function NyeVarerMatchQueuePage() {
   const [page, setPage] = useState(1)
   const [totalPending, setTotalPending] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [hidePlanomoSynced, setHidePlanomoSynced] = useState(true)
 
   const loadIngredients = useCallback(async () => {
     setIngredientsLoading(true)
@@ -73,7 +74,11 @@ export default function NyeVarerMatchQueuePage() {
   const loadMatchQueue = useCallback(async (targetPage = page) => {
     setMatchQueueLoading(true)
     try {
-      const res = await fetch(`/api/admin/product-match-queue?page=${targetPage}&limit=50`)
+      const res = await fetch(
+        `/api/admin/product-match-queue?page=${targetPage}&limit=50${
+          hidePlanomoSynced ? '&excludePlanomo=1' : ''
+        }`
+      )
       const data = await res.json()
       if (data.success && data.data) {
         setMatchQueueItems(data.data.items || [])
@@ -86,7 +91,7 @@ export default function NyeVarerMatchQueuePage() {
     } finally {
       setMatchQueueLoading(false)
     }
-  }, [page])
+  }, [page, hidePlanomoSynced])
 
   useEffect(() => {
     void loadIngredients()
@@ -175,8 +180,9 @@ export default function NyeVarerMatchQueuePage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Nye varer — match-kø</h1>
               <p className="mt-2 text-gray-600 max-w-2xl">
-                Fælles fooddata-kø: nye mad-varer uden ingrediens-match. Match eller afvis — ændringer
-                synkes til fooddata (FF + Planomo).
+                Fælles fooddata-kø: nye mad-varer uden ingrediens-match. Planomo matcher de
+                fælles varer; slå filteret til for at skjule det, Planomo allerede har synket,
+                så du kan matche de få FF-only varer.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
@@ -185,6 +191,12 @@ export default function NyeVarerMatchQueuePage() {
                 className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Ingrediens → produkter
+              </Link>
+              <Link
+                href="/admin/product-ingredient-matching/merge"
+                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Merge ingredienser
               </Link>
               <button
                 type="button"
@@ -205,10 +217,22 @@ export default function NyeVarerMatchQueuePage() {
               <p className="text-sm text-gray-600 mt-1">
                 Vare → ingrediens. Non-food filtreres fra automatisk.
               </p>
+              <label className="mt-3 inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hidePlanomoSynced}
+                  onChange={(e) => {
+                    setHidePlanomoSynced(e.target.checked)
+                    setPage(1)
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Skjul varer Planomo allerede har matchet i fooddata
+              </label>
             </div>
             {totalPending > 0 && (
               <span className="inline-flex items-center rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-800 shrink-0">
-                {totalPending} pending i fooddata
+                {totalPending} pending{hidePlanomoSynced ? ' efter Planomo-filter' : ''}
               </span>
             )}
           </div>
@@ -225,7 +249,11 @@ export default function NyeVarerMatchQueuePage() {
           )}
 
           {!matchQueueTableMissing && !matchQueueLoading && matchQueueItems.length === 0 && (
-            <p className="text-sm text-gray-600">Ingen nye mad-varer i køen lige nu.</p>
+            <p className="text-sm text-gray-600">
+              {hidePlanomoSynced
+                ? 'Ingen FF-only mad-varer i køen lige nu. Slå filteret fra for at se hele den fælles kø.'
+                : 'Ingen nye mad-varer i køen lige nu.'}
+            </p>
           )}
 
           {!matchQueueTableMissing && matchQueueItems.length > 0 && (

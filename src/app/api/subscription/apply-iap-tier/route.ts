@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { normalizeSubscriptionTier, type SubscriptionTier } from '@/lib/subscription-tiers'
+import { profileHasLifetimeAccess } from '@/lib/subscription-entitlements'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,12 +31,15 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseServiceClient()
     const amountOre = tier === 'premium' ? 24900 : 2900
+    const lifetime = await profileHasLifetimeAccess(supabase, user.id)
+    const nextTier = lifetime && tier !== 'premium' ? 'plus' : tier
 
     const { error } = await supabase
       .from('user_profiles')
       .update({
-        subscription_tier: tier,
+        subscription_tier: nextTier,
         last_contribution_amount_ore: amountOre,
+        subscription_source: 'app_store',
         updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)

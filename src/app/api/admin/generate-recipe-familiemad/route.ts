@@ -9,6 +9,7 @@ import {
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
 import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
+import { SAUCE_PACKET_INGREDIENT_RULE, TZATZIKI_INGREDIENT_RULE } from '@/lib/recipe-generation-diversity'
 
 interface ExistingRecipe {
   id: string
@@ -244,6 +245,15 @@ Varier strukturen af opskrifterne for at undgå ensartet format:
 - Nogle opskrifter kan starte med at stege kød, andre med at koge pasta/ris, andre med at forberede grøntsager
 - Varier rækkefølgen af steps - ikke altid samme struktur
 - Summary kan være kort (1-2 sætninger) eller lidt længere (3-4 sætninger) - varier det
+
+KANT-ELEMENT (obligatorisk):
+Tilføj præcis ÉT sidste supplement ved servering, så retten ikke er ren protein + stivelse + grønt. Det skal stå som ingrediens og i sidste trin.
+Typisk dansk hverdag: ketchup, remoulade, sennep, dressing, aioli, yoghurt-dip med salt og peber, eller et brev bearnaise/hollandaise.
+Vælg det der passer (fisk → remoulade; frikadeller/burger → ketchup; kartofler/bøf → bearnaise; salat → dressing). Ikke tre saucer, og ikke i stedet for selve retten.
+
+${SAUCE_PACKET_INGREDIENT_RULE}
+
+${TZATZIKI_INGREDIENT_RULE}
 
 Returnér kun valid JSON i det nøjagtige format. VIKTIGT: amount skal være et positivt tal - IKKE tom eller 0.
 

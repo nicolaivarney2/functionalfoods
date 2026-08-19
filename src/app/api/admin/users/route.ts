@@ -1,68 +1,133 @@
-import { NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-// Force dynamic rendering to prevent build-time execution
+import { requireAdmin } from '@/lib/admin-route-auth'
+import { mapMember, MEMBER_PROFILE_SELECT, MEMBER_PROFILE_SELECT_LEGACY, type MemberProfileRow } from '@/lib/admin-members'
+import type { SubscriptionSource } from '@/lib/subscription-source'
+
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  try {
-    // Create Supabase client with proper cookies context
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required Supabase environment variables')
-    }
-    
-    const cookieStore = await cookies()
-    
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value
-          },
-          set(name: string, value: string, options: any) {
-            cookieStore.set({ name, value, ...options })
-          },
-          remove(name: string, options: any) {
-            cookieStore.set({ name, value: '', ...options })
-          },
-        },
-      }
-    )
+const PAGE_SIZE_MAX = 100
 
-    // Get all users with their profiles
-    const { data: users, error } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
+function serviceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return null
+  return createClient(url, key)
+}
 
-    if (error) {
-      console.error('Error fetching users:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch users' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ users: users || [] })
-  } catch (error) {
-    console.error('Error in users API:', error)
-    
-    // Handle specific environment variable errors
-    if (error instanceof Error && error.message.includes('Missing required Supabase environment variables')) {
-      return NextResponse.json({ 
-        error: 'Server configuration error: Missing Supabase credentials' 
-      }, { status: 500 })
-    }
-    
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+export async function GET(request: NextRequest) {
+  const admin = await requireAdmin(request)
+  if (!admin) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  const supabase = serviceClient()
+  if (!supabase) {
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  }
+
+  const { searchParams } = request.nextUrl
+  const q = (searchParams.get('q') || '').trim()
+  const tierFilter = searchParams.get('tier') || 'all'
+  const sourceFilter = (searchParams.get('source') || 'all') as SubscriptionSource | 'all'
+  const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1)
+  const pageSize = Math.min(
+    PAGE_SIZE_MAX,
+    Math.max(10, Number.parseInt(searchParams.get('pageSize') || '50', 10) || 50)
+  )
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const run = async (select: string) => {
+    let query = supabase
+      .from('user_profiles')
+      .select(select, { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (tierFilter === 'free' || tierFilter === 'plus' || tierFilter === 'premium') {
+      query = query.eq('subscription_tier', tierFilter)
+    } else if (tierFilter === 'paid') {
+      query = query.in('subscription_tier', ['plus', 'premium'])
+    }
+
+    if (sourceFilter === 'stripe') {
+      query = query.not('stripe_subscription_id', 'is', null)
+    } else if (sourceFilter === 'app_store') {
+      query = query.eq('subscription_source', 'app_store')
+    } else if (sourceFilter === 'manual') {
+      query = query.eq('subscription_source', 'manual')
+    } else if (sourceFilter === 'unknown') {
+      query = query.in('subscription_tier', ['plus', 'premium']).is('stripe_subscription_id', null)
+    }
+
+    if (q) {
+      const escaped = q.replace(/[%_,.()]/g, '')
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      query = uuidRe.test(q)
+        ? query.eq('id', q)
+        : query.or(`email.ilike.%${escaped}%,first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%`)
+    }
+
+    return query
+  }
+
+  let { data, error, count } = await run(MEMBER_PROFILE_SELECT)
+  if (
+    error &&
+    (String(error.message || '').includes('subscription_source') ||
+      String(error.message || '').includes('lifetime_access') ||
+      String(error.message || '').includes('referral_code'))
+  ) {
+    const fallback = await run(MEMBER_PROFILE_SELECT_LEGACY)
+    data = fallback.data
+    error = fallback.error
+    count = fallback.count
+  }
+
+  if (error) {
+    console.error('admin users list:', error)
+    return NextResponse.json({ error: 'Kunne ikke hente brugere' }, { status: 500 })
+  }
+
+  const rows = (data || []) as unknown as MemberProfileRow[]
+  const members = rows.map((row) => mapMember(row))
+
+  const [{ count: total }, { count: plus }, { count: premium }, { count: stripeCount }, { count: storeOrUnknown }] =
+    await Promise.all([
+      supabase.from('user_profiles').select('id', { count: 'exact', head: true }),
+      supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'plus'),
+      supabase.from('user_profiles').select('id', { count: 'exact', head: true }).eq('subscription_tier', 'premium'),
+      supabase
+        .from('user_profiles')
+        .select('id', { count: 'exact', head: true })
+        .not('stripe_subscription_id', 'is', null),
+      supabase
+        .from('user_profiles')
+        .select('id', { count: 'exact', head: true })
+        .in('subscription_tier', ['plus', 'premium'])
+        .is('stripe_subscription_id', null),
+    ])
+
+  const sourceCounts = {
+    stripe: stripeCount ?? 0,
+    storeOrUnknown: storeOrUnknown ?? 0,
+  }
+
+  return NextResponse.json({
+    users: members,
+    page,
+    pageSize,
+    total: count ?? members.length,
+    stats: {
+      total: total ?? 0,
+      plus: plus ?? 0,
+      premium: premium ?? 0,
+      free: Math.max(0, (total ?? 0) - (plus ?? 0) - (premium ?? 0)),
+      stripe: sourceCounts.stripe,
+      storeOrUnknown: sourceCounts.storeOrUnknown,
+    },
+    filters: { q, tier: tierFilter, source: sourceFilter },
+  })
 }

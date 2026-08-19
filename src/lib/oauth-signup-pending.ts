@@ -6,6 +6,7 @@ export type OAuthSignupPending = {
   tier: SubscriptionTier
   productUpdatesConsent: boolean
   source: 'onboarding'
+  referralCode?: string | null
 }
 
 export function saveOAuthSignupPending(data: OAuthSignupPending): void {
@@ -29,6 +30,7 @@ export function loadOAuthSignupPending(): OAuthSignupPending | null {
       tier: parsed.tier,
       productUpdatesConsent: Boolean(parsed.productUpdatesConsent),
       source: 'onboarding',
+      referralCode: typeof parsed.referralCode === 'string' ? parsed.referralCode : null,
     }
   } catch {
     return null

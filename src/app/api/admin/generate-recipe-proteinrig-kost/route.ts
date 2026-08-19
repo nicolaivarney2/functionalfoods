@@ -195,6 +195,7 @@ function createProteinrigSystemPrompt(existingTitles: string[], maaltid: string)
 - Undgå standardmønstret kød + peberfrugt + broccoli + olie + salt/peber.
 - Undgå at gentage samme grøntsags-DNA igen og igen (fx fennikel + kikærter + gulerødder som fast trio); søg bredt i køkkener, årstider, rodfrugt, kål, svampe og forskellige kulhydrater.
 - Varier retformat tydeligt mellem fx lasagne, suppe, bowl, gryderet, ovnret, salat, wraps, pastaret, wok, risotto/perlespelt, karry, taco-skål eller sheet-pan.
+- Kant-element: tilføj præcis ét dip/dressing/sauce ved servering (yoghurt-dip, salsa, vinaigrette, remoulade, ketchup når det passer) — egen ingredienslinje og sidste trin.
 - Hvis brugeren angiver ret-type, skal den respekteres tydeligt i både ingredienser og tilberedning.`
     : `VARIATION:
 - Undgå standardmønstret kød + peberfrugt + broccoli + olie + salt/peber.

@@ -29,14 +29,62 @@ import {
 /** PostgREST/Supabase default statement_timeout (~8s) bites on wide product rows. */
 const BATCH_SIZE = 500
 const FETCH_PAGE_SIZE = 1000
+const MIN_FETCH_PAGE_SIZE = 25
 const MIN_UPSERT_BATCH = 25
+/** PostgREST `.in()` stays reliable under this size. */
+const ID_IN_CHUNK = 150
 /** Daily import: ~1 new snapshot/product/store/day. FF already has older rows from prior runs. */
 const PRICE_HISTORY_IMPORT_WINDOW_DAYS = 3
-const PRICE_HISTORY_PRODUCT_CHUNK = 40
+const PRICE_HISTORY_PRODUCT_CHUNK = 80
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 function isStatementTimeout(message: string): boolean {
   const m = message.toLowerCase()
   return m.includes('statement timeout') || m.includes('canceling statement')
+}
+
+function isRetryableFetchError(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    isStatementTimeout(message) ||
+    m.includes('fetch failed') ||
+    m.includes('econnreset') ||
+    m.includes('etimedout') ||
+    m.includes('enotfound') ||
+    m.includes('socket') ||
+    m.includes('network') ||
+    /\b(429|502|503|504)\b/.test(m)
+  )
+}
+
+async function retryingQuery<T>(
+  label: string,
+  log: (msg: string) => void,
+  run: () => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  maxAttempts = 5,
+): Promise<T> {
+  let lastError = 'unknown error'
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { data, error } = await run()
+      if (!error) return (data ?? []) as T
+      lastError = error.message
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'RPC_MISSING') throw err
+      lastError = message
+    }
+    if (!isRetryableFetchError(lastError) || attempt === maxAttempts) {
+      throw new Error(`${label} failed: ${lastError}`)
+    }
+    const delay = Math.min(8000, 400 * 2 ** (attempt - 1))
+    log(`  ⚠ ${label}: ${lastError} — retry ${attempt}/${maxAttempts - 1} in ${delay}ms`)
+    await sleep(delay)
+  }
+  throw new Error(`${label} failed: ${lastError}`)
 }
 
 export interface RunImportOptions {
@@ -182,34 +230,33 @@ async function cleanupTjekOffersForGomaChains(
   return n
 }
 
-/** Pagineret id-hentning med timeout-retry (FF products-tabellen er stor). */
-async function fetchAllFfProductIds(
+/**
+ * PK lookups for the ids we actually care about.
+ * Avoids ORDER BY id / OFFSET over the full FF products table (statement_timeout
+ * even at pageSize=62 once the catalog is ~95k rows).
+ */
+async function fetchExistingFfProductIds(
   ff: SupabaseClient,
+  candidateIds: string[],
   log: (msg: string) => void,
 ): Promise<Set<string>> {
   const ids = new Set<string>()
-  let from = 0
-  let pageSize = FETCH_PAGE_SIZE
+  if (candidateIds.length === 0) return ids
 
-  while (true) {
-    const { data, error } = await ff
-      .from('products')
-      .select('id')
-      .order('id', { ascending: true })
-      .range(from, from + pageSize - 1)
-
-    if (error) {
-      if (isStatementTimeout(error.message) && pageSize > 100) {
-        pageSize = Math.floor(pageSize / 2)
-        log(`  FF product ids: timeout, prøver pageSize=${pageSize}`)
-        continue
-      }
-      throw new Error(`FF products fetch failed: ${error.message}`)
+  for (let i = 0; i < candidateIds.length; i += ID_IN_CHUNK) {
+    const chunk = candidateIds.slice(i, i + ID_IN_CHUNK)
+    const rows = await retryingQuery<{ id: string }[]>(
+      `FF product ids ${i + 1}-${Math.min(i + chunk.length, candidateIds.length)}`,
+      log,
+      () => ff.from('products').select('id').in('id', chunk),
+    )
+    for (const row of rows) {
+      if (row.id) ids.add(String(row.id))
     }
-    if (!data?.length) break
-    for (const r of data as { id: string }[]) ids.add(r.id)
-    if (data.length < pageSize) break
-    from += pageSize
+    const done = Math.min(i + ID_IN_CHUNK, candidateIds.length)
+    if (done % 15000 < ID_IN_CHUNK || done === candidateIds.length) {
+      log(`  FF product ids: ${ids.size} existing (${done}/${candidateIds.length} checked)`)
+    }
   }
   return ids
 }
@@ -227,28 +274,31 @@ async function fetchAll<T = Record<string, unknown>>(
   const log = options.log ?? (() => {})
 
   while (true) {
-    let q = client
-      .from(table)
-      .select(selectCols)
-      .order('id', { ascending: true })
-      .range(from, from + pageSize - 1)
-    if (options.activeOnly) q = q.eq('active', true)
-
-    const { data, error } = await q
-    if (error) {
-      if (isStatementTimeout(error.message) && pageSize > 100) {
-        pageSize = Math.floor(pageSize / 2)
+    try {
+      const rows = await retryingQuery<T[]>(`fetchAll(${table}) ${from}`, log, () => {
+        let q = client
+          .from(table)
+          .select(selectCols)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1)
+        if (options.activeOnly) q = q.eq('active', true)
+        return q
+      })
+      if (!rows.length) break
+      all.push(...rows)
+      if (rows.length < pageSize) break
+      from += pageSize
+      if (limit && all.length >= limit) break
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (isStatementTimeout(message) && pageSize > MIN_FETCH_PAGE_SIZE) {
+        pageSize = Math.max(MIN_FETCH_PAGE_SIZE, Math.floor(pageSize / 2))
         log(`  fetchAll(${table}): timeout, prøver pageSize=${pageSize}`)
+        await sleep(500)
         continue
       }
-      throw new Error(`fetchAll(${table}) failed: ${error.message}`)
+      throw err
     }
-    if (!data || data.length === 0) break
-
-    all.push(...(data as T[]))
-    if (data.length < pageSize) break
-    from += pageSize
-    if (limit && all.length >= limit) break
   }
   return limit ? all.slice(0, limit) : all
 }
@@ -256,20 +306,119 @@ async function fetchAll<T = Record<string, unknown>>(
 const PRICE_HISTORY_COLS =
   'product_id, store_id, price_cents, before_price_cents, is_on_sale, snapshot_date'
 
+type FooddataHistoryRow = Record<string, unknown> & {
+  id?: string
+  product_id?: string
+  snapshot_date?: string
+}
+
+function historyCursor(rows: FooddataHistoryRow[]): { date: string; id: string } | null {
+  const last = rows[rows.length - 1]
+  if (!last?.snapshot_date || !last.id) return null
+  return { date: String(last.snapshot_date), id: String(last.id) }
+}
+
+/** Prefer grocery RPC (60s timeout + snapshot_date index). Returns null if RPC missing. */
+async function fetchPriceHistoryViaRpc(
+  client: SupabaseClient,
+  sinceDate: string,
+  log: (msg: string) => void,
+): Promise<FooddataHistoryRow[] | null> {
+  const all: FooddataHistoryRow[] = []
+  let afterDate: string | null = null
+  let afterId: string | null = null
+
+  while (true) {
+    let rows: FooddataHistoryRow[]
+    try {
+      rows = await retryingQuery<FooddataHistoryRow[]>(
+        'price_history RPC page',
+        log,
+        async () => {
+          const { data, error } = await client.rpc(
+            'price_history_since_page' as never,
+            {
+              p_since: sinceDate,
+              p_after_date: afterDate,
+              p_after_id: afterId,
+              p_limit: FETCH_PAGE_SIZE,
+            } as never,
+          )
+          if (error && /could not find the function|PGRST202/i.test(error.message)) {
+            throw new Error('RPC_MISSING')
+          }
+          return { data: (data ?? []) as FooddataHistoryRow[], error }
+        },
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (message === 'RPC_MISSING' || /RPC_MISSING/.test(message)) return null
+      throw err
+    }
+    if (!rows.length) break
+    all.push(...rows)
+    const cursor = historyCursor(rows)
+    if (!cursor) break
+    afterDate = cursor.date
+    afterId = cursor.id
+    if (rows.length < FETCH_PAGE_SIZE) break
+    if (all.length % 5000 === 0) log(`  price_history RPC: ${all.length} rows`)
+  }
+  return all
+}
+
+async function fetchPriceHistoryByDate(
+  client: SupabaseClient,
+  sinceDate: string,
+  log: (msg: string) => void,
+): Promise<FooddataHistoryRow[]> {
+  const all: FooddataHistoryRow[] = []
+  let afterDate: string | null = null
+  let afterId: string | null = null
+
+  while (true) {
+    const rows = await retryingQuery<FooddataHistoryRow[]>(
+      `price_history since ${sinceDate}`,
+      log,
+      () => {
+        let q = client
+          .from('price_history')
+          .select(`id,${PRICE_HISTORY_COLS}`)
+          .gte('snapshot_date', sinceDate)
+          .order('snapshot_date', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(FETCH_PAGE_SIZE)
+        if (afterDate && afterId) {
+          q = q.or(
+            `and(snapshot_date.eq.${afterDate},id.gt.${afterId}),snapshot_date.gt.${afterDate}`,
+          )
+        }
+        return q
+      },
+    )
+    if (!rows.length) break
+    all.push(...rows)
+    const cursor = historyCursor(rows)
+    if (!cursor) break
+    afterDate = cursor.date
+    afterId = cursor.id
+    if (rows.length < FETCH_PAGE_SIZE) break
+    if (all.length % 5000 === 0) log(`  price_history fetch: ${all.length} rows`)
+  }
+  return all
+}
+
 /**
- * Fetch price_history in bounded chunks instead of a full-table scan.
- * The fooddata table has grown large enough that ordering by id across all rows
- * hits PostgREST's statement timeout even on the first page.
+ * Fallback when date-range queries time out (missing idx_history_snapshot_date_id).
+ * Uses idx_history_product_date — do not ORDER BY id (forces a PK scan).
  */
-async function fetchPriceHistoryForImport(
+async function fetchPriceHistoryByProductChunks(
   client: SupabaseClient,
   fooddataProductIds: string[],
   sinceDate: string,
   log: (msg: string) => void,
-): Promise<Record<string, unknown>[]> {
-  if (fooddataProductIds.length === 0) return []
-
-  const all: Record<string, unknown>[] = []
+): Promise<FooddataHistoryRow[]> {
+  const all: FooddataHistoryRow[] = []
 
   for (let i = 0; i < fooddataProductIds.length; i += PRICE_HISTORY_PRODUCT_CHUNK) {
     const chunk = fooddataProductIds.slice(i, i + PRICE_HISTORY_PRODUCT_CHUNK)
@@ -277,29 +426,37 @@ async function fetchPriceHistoryForImport(
     let pageSize = FETCH_PAGE_SIZE
 
     while (true) {
-      const { data, error } = await client
-        .from('price_history')
-        .select(PRICE_HISTORY_COLS)
-        .in('product_id', chunk)
-        .gte('snapshot_date', sinceDate)
-        .order('id', { ascending: true })
-        .range(from, from + pageSize - 1)
-
-      if (error) {
-        if (isStatementTimeout(error.message) && pageSize > 100) {
-          pageSize = Math.floor(pageSize / 2)
+      try {
+        const rows = await retryingQuery<FooddataHistoryRow[]>(
+          `price_history products ${i + 1}-${i + chunk.length}`,
+          log,
+          () =>
+            client
+              .from('price_history')
+              .select(PRICE_HISTORY_COLS)
+              .in('product_id', chunk)
+              .gte('snapshot_date', sinceDate)
+              .order('product_id', { ascending: true })
+              .order('snapshot_date', { ascending: true })
+              .order('store_id', { ascending: true })
+              .range(from, from + pageSize - 1),
+        )
+        if (!rows.length) break
+        all.push(...rows)
+        if (rows.length < pageSize) break
+        from += pageSize
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (isStatementTimeout(message) && pageSize > MIN_FETCH_PAGE_SIZE) {
+          pageSize = Math.max(MIN_FETCH_PAGE_SIZE, Math.floor(pageSize / 2))
           log(
             `  price_history: timeout på produkt-chunk ${i + 1}-${i + chunk.length}, prøver pageSize=${pageSize}`,
           )
+          await sleep(500)
           continue
         }
-        throw new Error(`fetchPriceHistory failed: ${error.message}`)
+        throw err
       }
-
-      if (!data?.length) break
-      all.push(...(data as Record<string, unknown>[]))
-      if (data.length < pageSize) break
-      from += pageSize
     }
 
     const done = Math.min(i + PRICE_HISTORY_PRODUCT_CHUNK, fooddataProductIds.length)
@@ -309,6 +466,44 @@ async function fetchPriceHistoryForImport(
   }
 
   return all
+}
+
+/**
+ * Fetch recent price_history without scanning 90k+ products one chunk at a time.
+ * RPC (indexed, 60s) → PostgREST date keyset → per-product fallback.
+ */
+async function fetchPriceHistoryForImport(
+  client: SupabaseClient,
+  fooddataProductIds: string[],
+  sinceDate: string,
+  log: (msg: string) => void,
+): Promise<Record<string, unknown>[]> {
+  if (fooddataProductIds.length === 0) return []
+
+  try {
+    const rpcRows = await fetchPriceHistoryViaRpc(client, sinceDate, log)
+    if (rpcRows) {
+      log(`  price_history: ${rpcRows.length} rows via RPC`)
+      return rpcRows
+    }
+    log('  price_history RPC mangler — bruger PostgREST snapshot_date')
+  } catch (err) {
+    log(
+      `  ⚠ price_history RPC: ${err instanceof Error ? err.message : err} — bruger PostgREST`,
+    )
+  }
+
+  try {
+    const byDate = await fetchPriceHistoryByDate(client, sinceDate, log)
+    log(`  price_history: ${byDate.length} rows via snapshot_date`)
+    return byDate
+  } catch (err) {
+    log(
+      `  ⚠ price_history by date failed: ${err instanceof Error ? err.message : err} — fallback til produkt-chunks`,
+    )
+  }
+
+  return fetchPriceHistoryByProductChunks(client, fooddataProductIds, sinceDate, log)
 }
 
 async function fetchAllFfMatchedProductIds(ff: SupabaseClient): Promise<string[]> {
@@ -697,12 +892,6 @@ export async function runFooddataImport(
   // ─── 2. Products ──────────────────────────────────────────────────────
   let productLookup = new Map<string, ProductRef>()
   const newlyImportedProductIds: string[] = []
-  const ffIdsBeforeProducts = new Set<string>()
-
-  if (!skipProducts && !dryRun) {
-    const existing = await fetchAllFfProductIds(ff, log)
-    for (const id of existing) ffIdsBeforeProducts.add(id)
-  }
 
   if (!skipProducts) {
     log('2/4 · PRODUCTS')
@@ -749,9 +938,14 @@ export async function runFooddataImport(
       ]),
     )
     if (!dryRun) {
+      const existingIds = await fetchExistingFfProductIds(
+        ff,
+        mapped.map((p) => String(p.id)),
+        log,
+      )
       result.products.upserted = await upsertBatched(ff, 'products', mapped, 'id', { log })
       for (const ref of productLookup.values()) {
-        if (!ffIdsBeforeProducts.has(ref.id)) newlyImportedProductIds.push(ref.id)
+        if (!existingIds.has(ref.id)) newlyImportedProductIds.push(ref.id)
       }
       result.products.newlyImported = newlyImportedProductIds.length
     }
@@ -792,9 +986,10 @@ export async function runFooddataImport(
   }
 
   // ─── 3. Product offers ──────────────────────────────────────────────────
-  let ffProductIds: Set<string> | null = null
-  if (!skipOffers || !skipHistory) {
-    ffProductIds = await fetchAllFfProductIds(ff, log)
+  const importedFfIds = new Set(Array.from(productLookup.values()).map((r) => r.id))
+  let ffProductIds = importedFfIds
+  if (skipProducts && (!skipOffers || !skipHistory) && importedFfIds.size > 0) {
+    ffProductIds = await fetchExistingFfProductIds(ff, Array.from(importedFfIds), log)
   }
 
   if (!skipOffers) {
@@ -807,7 +1002,7 @@ export async function runFooddataImport(
     )
     const mapped = fooddataOffers
       .map((o) => mapOffer(o, productLookup, gomaImportEnabled))
-      .filter((x): x is NonNullable<typeof x> => x !== null && ffProductIds!.has(x.product_id))
+      .filter((x): x is NonNullable<typeof x> => x !== null && ffProductIds.has(x.product_id))
     result.offers.dropped = fooddataOffers.length - mapped.length
     if (!dryRun) {
       result.offers.upserted = await upsertBatched(
@@ -829,32 +1024,41 @@ export async function runFooddataImport(
   }
 
   // ─── 4. Price history ───────────────────────────────────────────────────
+  // Non-fatal: katalog + offers er allerede skrevet. En history-timeout
+  // må ikke markere hele daily import som failed (GH Action / cron).
   if (!skipHistory) {
     log('4/4 · PRICE_HISTORY')
-    const sinceDate = new Date(Date.now() - historyDays * 86400000).toISOString().slice(0, 10)
-    log(`  importing snapshots since ${sinceDate} (${historyDays} days)`)
-    const fooddataHistory = await fetchPriceHistoryForImport(
-      fooddata,
-      Array.from(productLookup.keys()),
-      sinceDate,
-      log,
-    )
-    const mapped = fooddataHistory
-      .map((h) => mapHistory(h, productLookup))
-      .filter((x): x is NonNullable<typeof x> => x !== null && (!ffProductIds || ffProductIds.has(x.product_id)))
-    result.history.dropped = fooddataHistory.length - mapped.length
-    if (!dryRun) {
-      result.history.upserted = await upsertBatched(
-        ff,
-        'price_history',
-        mapped,
-        'product_id,store_id,snapshot_date',
-        { log },
+    try {
+      const sinceDate = new Date(Date.now() - historyDays * 86400000).toISOString().slice(0, 10)
+      log(`  importing snapshots since ${sinceDate} (${historyDays} days)`)
+      const fooddataHistory = await fetchPriceHistoryForImport(
+        fooddata,
+        Array.from(productLookup.keys()),
+        sinceDate,
+        log,
       )
+      const mapped = fooddataHistory
+        .map((h) => mapHistory(h, productLookup))
+        .filter((x): x is NonNullable<typeof x> => x !== null && ffProductIds.has(x.product_id))
+      result.history.dropped = fooddataHistory.length - mapped.length
+      if (!dryRun) {
+        result.history.upserted = await upsertBatched(
+          ff,
+          'price_history',
+          mapped,
+          'product_id,store_id,snapshot_date',
+          { log },
+        )
+      }
+      log(
+        `  price_history: ${dryRun ? `${mapped.length} (dry-run)` : result.history.upserted}, ${result.history.dropped} dropped`,
+      )
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      result.history.skipped = true
+      log(`  price_history: SKIPPED after error (import otherwise OK): ${msg}`)
+      console.warn('[fooddata-import] price_history failed (non-fatal):', err)
     }
-    log(
-      `  price_history: ${dryRun ? `${mapped.length} (dry-run)` : result.history.upserted}, ${result.history.dropped} dropped`,
-    )
   } else {
     log('  price_history skipped')
   }

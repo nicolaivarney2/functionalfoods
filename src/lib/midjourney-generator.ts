@@ -11,7 +11,7 @@ const MJ_PREFIX = 'Flatlay photograph from directly above of'
 const MJ_STYLE =
   'editorial food photography, slight imperfections, candid shot, authentic homecooked meal look, matte lighting, real life texture'
 const MJ_PARAMS =
-  '--ar 4:3 --style raw --no 3d render, glossy, plastic, tilt, side angle, close-up, depth of field, blur, studio lights, fake look, hyperrealistic, commercial lighting, text, macro, bokeh'
+  '--ar 4:3 --style raw --no 3d render, glossy, plastic, tilt, side angle, close-up, depth of field, blur, studio lights, fake look, hyperrealistic, commercial lighting, text, macro, bokeh, golden hour, sunlight, sunbeams, dramatic lighting'
 
 /** Tallerken + bordflade varierer pr. opskrift, så billederne ikke ser identiske ud. */
 const MJ_TABLE_SETTINGS = [
@@ -27,9 +27,9 @@ const MJ_TABLE_SETTINGS = [
 
 const MJ_LIGHTS = [
   'Soft natural window light',
-  'Soft overcast daylight from the side',
-  'Diffused late afternoon daylight with long soft shadows',
   'Even soft daylight from a north-facing window',
+  'Neutral indoor daylight, even and unobtrusive',
+  'Soft overcast indoor light with no directional sun',
 ]
 
 /** Neutrale ting ved siden af tallerkenen — aldrig krydderi/peberkværn. */

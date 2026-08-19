@@ -10,6 +10,7 @@ export {
 
 export {
   deleteMatchInFooddata,
+  deleteMatchesForIngredientInFooddata,
   upsertMatchInFooddata,
   upsertMatchesBatchInFooddata,
   type ProductIngredientMatchRow,
@@ -23,6 +24,7 @@ export {
 } from './queue'
 
 export {
+  deleteIngredientTagsInFooddata,
   upsertIngredientTagsBatchInFooddata,
   upsertIngredientTagsInFooddata,
 } from './ingredient-tags'

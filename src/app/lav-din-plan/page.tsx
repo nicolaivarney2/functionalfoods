@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import VaegttabsplanOnboardingFlow from '@/components/onboarding/VaegttabsplanOnboardingFlow'
+import ReferralCapture from '@/components/ReferralCapture'
 
 export const metadata: Metadata = {
   title: 'Lav din vægttabsplan | Functional Foods',
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 }
 
 export default function LavDinPlanPage() {
-  return <VaegttabsplanOnboardingFlow />
+  return (
+    <>
+      <ReferralCapture />
+      <VaegttabsplanOnboardingFlow />
+    </>
+  )
 }

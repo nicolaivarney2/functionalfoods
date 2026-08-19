@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
               typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
             monthlyAmountOre:
               tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
+            subscriptionSource: 'stripe',
           })
         }
       } else if (typeof session.amount_total === 'number') {
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       await setUserSubscriptionTier(supabase, userId, tier, {
         stripeSubscriptionId: sub.id,
         monthlyAmountOre: tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
+        subscriptionSource: 'stripe',
       })
     }
   }
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
       await setUserSubscriptionTier(supabase, userId, 'free', {
         stripeSubscriptionId: null,
         monthlyAmountOre: null,
+        subscriptionSource: 'none',
       })
     }
   }

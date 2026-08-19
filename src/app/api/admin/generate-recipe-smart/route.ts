@@ -166,7 +166,8 @@ KATEGORI: FAMILIEMAD
 - Klassiske, næringsrige retter der passer til hele familien
 - Bør være nemme at lave og populære hos børn og voksne
 - Varier gerne smag og køkken globalt, så længe det er børnevenligt og realistisk i hverdagen
-- Brug ingredienser der er realistiske at handle til hjemme`
+- Brug ingredienser der er realistiske at handle til hjemme
+- Tilføj præcis ét kant-element ved servering (ketchup, remoulade, dressing, brev bearnaise, dip). Saucebrev = 1 stk + 30 g smør + 200 ml mælk.`
 
     case 'keto':
       return basePrompt + `
@@ -176,7 +177,8 @@ KATEGORI: KETO
 - Maksimalt 20g netto kulhydrater per portion
 - Fokus på fedtrige ingredienser: avocado, nødder, oliven, fedt kød
 - Undgå: brød, pasta, ris, kartofler, sukker, frugt (undtagen bær)
-- Brug: grøntsager, kød, fisk, æg, nødder, fedt`
+- Brug: grøntsager, kød, fisk, æg, nødder, fedt
+- Kant-element: ét keto-venligt dip/dressing (aioli, bearnaise, mayo) — ikke ketchup. Saucebrev = 1 stk + 30 g smør + 200 ml mælk.`
 
     case 'sense':
       return basePrompt + `
@@ -185,7 +187,8 @@ KATEGORI: SENSE (Suzy Wengel-inspireret portionsforståelse)
 - Spisekasse pr. person (ca.): 1–2 håndfulde ikke-stivelsesholdigt grønt, 1 håndfuld protein, 0–1 håndfuld stivelse eller frugt (afhænger af måltid), 1–3 spsk fedt totalt (olie, smør, dressing, ost …).
 - Ingen kalorietælling i teksten; fokus på mæthed, hverdagsbalance og 2–3 måltider.
 - IKKE keto, IKKE "hjerne-kost" eller kognitiv gimmick-vinkel.
-- Varier protein (kød, fisk, æg, magert mejeri, tofu, bælgfrugt) og stivelse (kartoffel, ris, pasta, fuldkorn, brød) — undgå at hver ret er kylling + broccoli + ris.
+- Varier protein (kylling, svin, okse, fisk, æg — **ikke lam som standard**) og stivelse (kartoffel, ris, pasta, fuldkorn, brød) — undgå at hver ret er kylling + broccoli + ris.
+- Kant-element: præcis ét dip/dressing/sauce ved servering. Saucebrev = 1 stk + 30 g smør + 200 ml mælk. Tzatziki = agurk + græsk yoghurt + hvidløg (aldrig 1 stk tzatziki).
 - Skriv ingrediensmængder i gram; portioner som udgangspunkt 2 personer.`
 
     case 'paleo':
@@ -233,7 +236,8 @@ KATEGORI: PROTEINRIG KOST
 - Proteinrige opskrifter til optimal næring
 - Fokus på: højt proteinindhold, balanceret næring, mæthed
 - Brug: magert kød, fisk, æg, bælgfrugter, nødder
-- Undgå: for meget kulhydrater, for lidt protein`
+- Undgå: for meget kulhydrater, for lidt protein
+- Kant-element: ét dip/dressing/salsa ved servering så retten ikke er ren protein + tilbehør`
 
     default:
       return basePrompt

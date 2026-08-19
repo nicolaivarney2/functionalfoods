@@ -325,6 +325,7 @@ VIGTIGT:
 - Opskriften skal tydeligt afspejle GLP-1 kost som beskrevet ovenfor, ikke paleo, ikke klassisk LCHF og ikke ren keto.
 - Beskrivelsen skal nævne mæthed, protein, fibre eller stabil energi på en naturlig måde.
 - Opskriften skal være hverdagsrealistisk; smag og køkken må gerne være internationale (karry, urter, citrus, miso i små mængder …) så længe GLP-1-principperne overholdes.
+- Kant-element (aftensmad/frokost): tilføj præcis ét let dip/dressing ved servering — yoghurt-dressing, tzatziki, vinaigrette eller salsa i lille portion. Ikke tung flødesauce. Skriv det som ingrediens og i sidste trin.
 - Returner kun gyldig JSON.
 
 ${PLANOMA_INSTRUCTION_AMOUNT_RULE}`

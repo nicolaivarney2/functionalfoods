@@ -70,6 +70,22 @@ export async function deleteMatchInFooddata(
   if (error) throw new Error(`deleteMatchInFooddata: ${error.message}`)
 }
 
+export async function deleteMatchesForIngredientInFooddata(
+  client: SupabaseClient,
+  ingredientId: string,
+  source: FooddataCurationSource = FOODDATA_PUBLISH_SOURCE
+): Promise<void> {
+  if (!isFooddataShareableIngredientId(ingredientId)) return
+
+  const { error } = await client
+    .from('product_ingredient_matches')
+    .delete()
+    .eq('ingredient_id', ingredientId)
+    .eq('source', source)
+
+  if (error) throw new Error(`deleteMatchesForIngredientInFooddata: ${error.message}`)
+}
+
 export async function upsertMatchesBatchInFooddata(
   client: SupabaseClient,
   rows: ProductIngredientMatchRow[],

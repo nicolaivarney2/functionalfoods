@@ -436,6 +436,7 @@ VARIATION:
 - Giv retten en tydelig egen identitet og ikke bare "samme base med nyt krydderi".
 - Du må gerne bryde "samme faste opskriftsskabelon", så længe keto-reglerne holdes.
 - Smag: varier gerne internationalt (karry, harissa, chipotle, miso i små mængder, citrongræs, za'atar …) så længe kulhydratloftet overholdes.
+- Kant-element: tilføj præcis ét keto-venligt dip/dressing/sauce ved servering (aioli, bearnaise, mayo-dip, pesto, citron-olie). Ikke ketchup eller sød chilisauce. Skriv det som ingrediens og i sidste trin. Saucebrev: 1 stk + 30 g smør + 200 ml mælk (eller fløde).
 - Hvis brugeren beder om morgenmad, frokost eller snacks, skal opskriften ligne det måltid tydeligt og ikke bare være en standard aftensmad i mindre format.`
 }
 

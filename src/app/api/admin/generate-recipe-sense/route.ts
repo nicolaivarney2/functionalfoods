@@ -3,7 +3,10 @@ import { getOpenAIConfig } from '@/lib/openai-config'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { generateMidjourneyPromptWithMeta } from '@/lib/midjourney-generator'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-import { buildRecipeVariationPrompt } from '@/lib/recipe-generation-diversity'
+import {
+  buildRecipeVariationPrompt,
+  SENSE_KANT_ELEMENT_SYSTEM_RULE,
+} from '@/lib/recipe-generation-diversity'
 import {
   buildSourceRecipeUserPrompt,
   isSourceRecipe,
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
       ? `${buildSourceRecipeUserPrompt(sourceRecipe, 'Sense')}
 
 ${parameterInstructions}`
-      : `Generer én ny Sense-opskrift til hverdagsbrug. Den skal være unik, realistisk og følge Sense-spisekassen (håndfulde — ikke kalorietælling). Krydderier og køkkenstil må frit hente inspiration fra hele verden, så længe Sense-balancen overholdes.
+      : `Generer én ny Sense-opskrift til hverdagsbrug. Den skal være unik, realistisk og følge Sense-spisekassen (håndfulde — ikke kalorietælling). Protein: dansk hverdag (kylling, svin, okse, fisk, æg) — ikke lam. Krydderier og køkkenstil må frit hente inspiration fra hele verden, så længe Sense-balancen overholdes.
 
 ${senseMealCarbBlock(resolvedMaaltid)}
 
@@ -289,7 +292,7 @@ function classicRetStructureHints(
 
 function senseMealCarbBlock(maaltid: string): string {
   if (maaltid === 'aftensmad') {
-    return `AFTENSMAD (Sense): Måltidet skal kunne bygges som spisekasse — grønt som base, tydelig proteinkilde, én stivelseskilde med passende mængde (kartoffel, ris, pasta, brød …), og fedt fordelt (olie/smør/sovs).`
+    return `AFTENSMAD (Sense): Måltidet skal kunne bygges som spisekasse — grønt som base, tydelig proteinkilde, én stivelseskilde med passende mængde (kartoffel, ris, pasta, brød …), fedt fordelt (olie/smør/sovs), plus ét kant-element ved servering (dressing, dip, ketchup, remoulade eller saucebrev).`
   }
   if (maaltid === 'morgenmad') {
     return `MORGENMAD (Sense): Fx grød, rugbrød, æg, skyr — med frugt/bær eller pålæg i mængder der passer til Sense (ingen kalorietabel i teksten).`
@@ -341,15 +344,17 @@ function createSenseSystemPrompt(existingTitles: string[], maaltid: string): str
 
   const variationBlock = isAftensmad
     ? `VARIATION (Sense — aftensmad):
-- Varier proteinet (kylling, fisk, oksekød, svinekød, fars, æg …). Brug bælgfrugt eller tofu som hovedprotein når det passer til retten — ikke som fast skabelon i hver ret.
+- Varier proteinet: **dansk hverdag** — kylling, hakket oksekød, svinekød, fisk, æg, kalkun, fars, medister. **Ikke lam** som standard (lam kun hvis inspirationen eksplicit siger lam). Brug bælgfrugt eller tofu som hovedprotein når det passer til retten — ikke som fast skabelon i hver ret.
 - Klassiske retnavne (lasagne, pizza, carbonara …): **bevar definerende ingredienser** (lasagneplader, pizzadej, pasta …) i passende Sense-mængder — undgå «kreativ» erstatning uden tydelig titel.
 - Når der hører stivelse til måltidet: kartoffel, ris, pasta, brød, couscous, tortilla osv. i passende mængde; varier mellem ovn, pande, gryde og tallerken.
 - Smag: karry, harissa, soja-ingefær, chipotle, tahin-citrus, thai-basilikum, jerk (mild), gochujang (mild) osv. er velkomment når Sense-balancen stadig er tydelig.
 - **Undgå fast «honning + dijonsennep + citron + pandestegning»** som standardglace i hver ret — brug det kun når retten naturligt er honey-mustard; ellers vælg anden smagsbund (tomat, karry, yoghurt, eddike, kapers, urter …).
-- Skift mellem ovn, pande, gryde og kogt tallerken så retterne ikke ligner hinanden for meget.`
+- Skift mellem ovn, pande, gryde og kogt tallerken så retterne ikke ligner hinanden for meget.
+- Kant: hver aftensmad skal have ét dip/dressing/sauce-element ved servering (se KANT-ELEMENT).`
     : `VARIATION (Sense):
 - Hold måltidet enkelt og passende til tidspunktet (morgen/frokost/snack).
-- Undgå tunge aftensmads-retter som morgenmad.`
+- Undgå tunge aftensmads-retter som morgenmad.
+- Frokost: gerne ét kant-element (dressing, remoulade, sennep). Morgenmad/snack: kun hvis det giver mening.`
 
   return `Du er diætist/kostvejleder og kok med dyb forståelse for **Sense** (Suzy Wengels metode): portionsforståelse med **hænderne**, **mæthed**, **2–3 måltider** om dagen, **ingen kalorietælling** i opskriftsteksten, og **ingen forbudte fødevarer** som gimmick.
 
@@ -358,7 +363,7 @@ ${existingTitles.slice(0, 12).map((title) => `- ${title}`).join('\n')}
 
 SENSE — KERNE (forklar kort i beskrivelsen med enkle ord, ikke som regelsæt):
 1) **Grøntsager (ikke-stivelsesholdige):** ca. 1–2 håndfulde pr. person — fylde, fibre, smag (varier løg, rodfrugt, kål, tomater, salat …).
-2) **Protein (håndfuld 3):** ca. 1 håndfuld pr. person — kød, fisk, æg eller magert mejeri efter hvad der passer til retten; tofu og bælgfrugt når det giver naturlig mening i retten.
+2) **Protein (håndfuld 3):** ca. 1 håndfuld pr. person — **hverdagsprotein**: kylling, svin, okse, fisk, æg, magert mejeri. Lam er niche i Danmark og må **ikke** være go-to (højst undtagelsesvist). Tofu og bælgfrugt kun når det giver naturlig mening i retten.
 3) **Stivelse eller frugt:** ca. 0–1 håndfuld pr. person (juster efter måltid; aftensmad kan have kartoffel/ris/pasta/brød i passende mængde).
 4) **Fedt:** ca. 1–3 spsk pr. person totalt (olie, smør, dressing, ost, nødder … fordelt i retten).
 
@@ -396,10 +401,10 @@ RETNAVNE OG KVALITET (vigtigt):
 INGREDIENSREGLER — SPISEKASSE (obligatorisk):
 - Du SKAL udfylde **ingredientGroups** med præcis disse gruppenavne (stavemåde og rækkefølge): ${SENSE_SPISEKASSE_GROUP_TITLES.map((t) => `"${t}"`).join(', ')}.
 - **Håndfuld 1+2:** ikke-stivelsesholdigt grønt (salat, tomater, broccoli, løg, **peberfrugt**, blomkål, grønne bønner …). Ingen pasta/nudler/kartoffel/ris her. Peberfrugt er GRØNT — aldrig smagsgiver.
-- **Håndfuld 3:** primær protein (kød, fisk, æg eller mejeri efter retten). Undgå at gøre bælgfrugt til eneste hovedprotein medmindre retten naturligt er fx chili, gryderet eller vegetar-aften.
+- **Håndfuld 3:** primær protein — kylling, hakket oksekød, svinekød, fisk, æg eller mejeri. **Ikke lam** medmindre inspirationen beder om det. Undgå at gøre bælgfrugt til eneste hovedprotein medmindre retten naturligt er fx chili, gryderet eller vegetar-aften.
 - **Håndfuld 4:** stivelse eller frugt (kartoffel, ris, **pasta/nudler/lasagneplader**, brød, couscous, bær til måltid …). Ved wok/pastaret: **nudler og pasta ligger HER**, aldrig under grønt.
-- **Fedt:** olie (også bare «olie»), smør, fløde, avocado, nødder, dressing-base — det der tæller på fedt-spsk i Sense. Olie hører IKKE under grønt.
-- **Smagsgivere:** bouillon, hvidløg, krydderier, citron/lime, soyasauce, **sort peber** (krydderi — ikke peberfrugt), chili. Undgå at **hver** ret får samme sur-søde trio (honning + dijonsennep + citron) — varier som i en rigtig køkkenskuffe.
+- **Fedt:** olie (også bare «olie»), smør, fløde, avocado, nødder, dressing, mayonnaise, bearnaise, aioli, remoulade — det der tæller på fedt-spsk i Sense. Olie hører IKKE under grønt. Saucebrev: brevet + 30 g smør + 200 ml mælk ligger her.
+- **Smagsgivere:** bouillon, hvidløg, krydderier, citron/lime, soyasauce, **sort peber** (krydderi — ikke peberfrugt), chili, ketchup, salsa, sennep. Undgå at **hver** ret får samme sur-søde trio (honning + dijonsennep + citron) — varier som i en rigtig køkkenskuffe.
 - Hver ingrediens kun **ét sted** (ét håndfuld-/fedt-/smagsgiver-felt). Tom undergruppe: brug tom array [ ].
 - Alle mængder med tal; primært **g** (undtagen når det giver bedre mening med spsk/ml — men hold det enkelt).
 - Portioner: altid **2** personer som udgangspunkt.
@@ -410,7 +415,9 @@ NÆRING (fornuftigt skøn pr. portion — skal stemme groft med Sense-balancen):
 - Kulhydrat **moderat** (typisk ikke keto-lavt); fiber fra grønt og fuldkorn hvor det giver mening.
 - Fedt i normal hverdagsrange (husk dressing/olie tæller med).
 
-${variationBlock}`
+${variationBlock}
+
+${SENSE_KANT_ELEMENT_SYSTEM_RULE}`
 }
 
 function parseGeneratedRecipe(content: string): any {

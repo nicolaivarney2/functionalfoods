@@ -31,6 +31,22 @@ export async function upsertIngredientTagsInFooddata(
   if (error) throw new Error(`upsertIngredientTagsInFooddata: ${error.message}`)
 }
 
+export async function deleteIngredientTagsInFooddata(
+  client: SupabaseClient,
+  ingredientId: string,
+  source: FooddataCurationSource = FOODDATA_PUBLISH_SOURCE
+): Promise<void> {
+  if (!isFooddataShareableIngredientId(ingredientId)) return
+
+  const { error } = await client
+    .from('ingredient_dietary_tags')
+    .delete()
+    .eq('ingredient_id', ingredientId)
+    .eq('source', source)
+
+  if (error) throw new Error(`deleteIngredientTagsInFooddata: ${error.message}`)
+}
+
 export async function upsertIngredientTagsBatchInFooddata(
   client: SupabaseClient,
   rows: Array<{ ingredient_id: string; exclusions: unknown }>,

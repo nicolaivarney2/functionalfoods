@@ -8,7 +8,8 @@ export type CompleteSignupResult =
 export async function completeSignupAfterAuth(
   accessToken: string,
   tier: SubscriptionTier,
-  productUpdatesConsent: boolean
+  productUpdatesConsent: boolean,
+  referralCode?: string | null
 ): Promise<CompleteSignupResult> {
   const prefRes = await fetch('/api/user/signup-preferences', {
     method: 'POST',
@@ -16,7 +17,7 @@ export async function completeSignupAfterAuth(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ productUpdatesConsent }),
+    body: JSON.stringify({ productUpdatesConsent, referralCode: referralCode || undefined }),
   })
 
   if (!prefRes.ok) {

@@ -10,8 +10,12 @@ export {
 } from './rules'
 
 export {
+  loadFooddataMatchedIngredientIds,
   loadFooddataMatchedProductIds,
   loadFooddataPendingQueueProductIds,
+  loadFooddataPlanomoIngredientIds,
+  loadFooddataSyncedIdsCached,
+  type FooddataSyncedIds,
 } from './fooddata-ids'
 
 export {

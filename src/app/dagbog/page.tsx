@@ -1,9 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -120,7 +120,8 @@ function MacroBox({
 
 export default function DagbogPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const pathname = usePathname()
+  const { user, session, loading: authLoading } = useAuth()
   const [date, setDate] = useState(() => new Date())
   const [day, setDay] = useState<DiaryDay | null>(null)
   const [loading, setLoading] = useState(true)
@@ -130,6 +131,9 @@ export default function DagbogPage() {
   const [moveBusy, setMoveBusy] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  /** Invalidér in-flight loads uden at lade `loading` hænge på true (AbortController-bug). */
+  const loadGenRef = useRef(0)
+  const accessToken = session?.access_token
 
   const today = isoDate(new Date())
   const dateKey = isoDate(date)
@@ -142,33 +146,64 @@ export default function DagbogPage() {
     }
   }, [authLoading, user, router])
 
-  const load = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!user) {
-        setDay(null)
-        setLoading(false)
+  const load = useCallback(async () => {
+    if (!user) {
+      setDay(null)
+      setLoading(false)
+      return
+    }
+    const gen = ++loadGenRef.current
+    setLoading(true)
+    setError(null)
+    let timeoutId: number | undefined
+    try {
+      const data = await Promise.race([
+        loadDiaryDay(dateKey, { accessToken }),
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(() => reject(new Error('Timeout — tryk Prøv igen')), 20_000)
+        }),
+      ])
+      if (gen !== loadGenRef.current) return
+      setDay(data)
+    } catch (e) {
+      if (gen !== loadGenRef.current) return
+      const msg = e instanceof Error ? e.message : 'Kunne ikke hente dagbogen'
+      if (msg === 'The operation was aborted.' || (e instanceof DOMException && e.name === 'AbortError')) {
         return
       }
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await loadDiaryDay(dateKey, signal)
-        setDay(data)
-      } catch (e) {
-        if (signal?.aborted) return
-        setError(e instanceof Error ? e.message : 'Kunne ikke hente dagbogen')
-      } finally {
-        if (!signal?.aborted) setLoading(false)
-      }
-    },
-    [dateKey, user]
-  )
+      setError(msg)
+    } finally {
+      if (timeoutId != null) window.clearTimeout(timeoutId)
+      if (gen === loadGenRef.current) setLoading(false)
+    }
+  }, [accessToken, dateKey, user])
 
+  // Primær load ved dato/auth-skift + når man navigerer tilbage til /dagbog
   useEffect(() => {
-    const ctrl = new AbortController()
-    void load(ctrl.signal)
-    return () => ctrl.abort()
-  }, [load])
+    if (authLoading) return
+    if (pathname !== '/dagbog') return
+    void load()
+    return () => {
+      loadGenRef.current += 1
+    }
+  }, [authLoading, load, pathname])
+
+  // bfcache / app-resume: genindlæs så siden ikke sidder fast i "Henter…"
+  useEffect(() => {
+    if (!user) return
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void load()
+    }
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) void load()
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [load, user])
 
   const shiftWeek = (delta: number) => {
     setDate((prev) => {
@@ -246,10 +281,18 @@ export default function DagbogPage() {
     }
   }
 
-  if (authLoading || !user) {
+  if (authLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
         <p className="text-sm text-slate-600">Indlæser dagbog…</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center bg-slate-50">
+        <p className="text-sm text-slate-600">Sender dig videre til login…</p>
       </div>
     )
   }
@@ -484,6 +527,13 @@ export default function DagbogPage() {
               <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
                 <Loader2 className="animate-spin" size={18} />
                 Henter dagbog…
+              </div>
+            ) : null}
+
+            {loading && day ? (
+              <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs text-gray-500 ring-1 ring-black/5">
+                <Loader2 className="animate-spin" size={14} />
+                Opdaterer…
               </div>
             ) : null}
 

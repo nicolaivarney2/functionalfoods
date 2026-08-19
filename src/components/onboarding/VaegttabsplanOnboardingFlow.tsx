@@ -29,6 +29,8 @@ import { healthMethodologyAnchor } from '@/lib/health-sources'
 import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
 import type { SubscriptionTier } from '@/lib/subscription-tiers'
 import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
+import { readStoredReferralCode } from '@/lib/referral-client'
+import { normalizeReferralCode } from '@/lib/referral-shared'
 import {
   clearOAuthSignupPending,
   hasOAuthSignupPending,
@@ -170,6 +172,7 @@ function VaegttabsplanOnboardingInner() {
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('free')
   const [acceptTerms, setAcceptTerms] = useState(true)
   const [productUpdatesConsent, setProductUpdatesConsent] = useState(true)
+  const [referralCode, setReferralCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -178,6 +181,8 @@ function VaegttabsplanOnboardingInner() {
   useEffect(() => {
     const saved = loadOnboardingData()
     if (saved) setData(saved)
+    const stored = readStoredReferralCode()
+    if (stored) setReferralCode(stored)
     setHydrated(true)
   }, [])
 
@@ -210,7 +215,8 @@ function VaegttabsplanOnboardingInner() {
       const result = await completeSignupAfterAuth(
         session.access_token,
         pending.tier,
-        pending.productUpdatesConsent
+        pending.productUpdatesConsent,
+        pending.referralCode
       )
       if (cancelled) return
 
@@ -435,7 +441,12 @@ function VaegttabsplanOnboardingInner() {
         return
       }
 
-      const result = await completeSignupAfterAuth(accessToken, selectedTier, productUpdatesConsent)
+      const result = await completeSignupAfterAuth(
+        accessToken,
+        selectedTier,
+        productUpdatesConsent,
+        normalizeReferralCode(referralCode)
+      )
 
       if (!result.ok) {
         setError(result.error)
@@ -1055,7 +1066,7 @@ function VaegttabsplanOnboardingInner() {
                   />
                   <span className="text-sm text-emerald-100/85">
                     Jeg accepterer{' '}
-                    <Link href="/indstillinger" className="underline text-amber-200">
+                    <Link href="/betingelser" className="underline text-amber-200" target="_blank">
                       betingelser
                     </Link>
                     .
@@ -1069,6 +1080,19 @@ function VaegttabsplanOnboardingInner() {
                     className="mt-1 rounded border-white/30 bg-white/10 text-amber-400 focus:ring-amber-300"
                   />
                   <span className="text-sm text-emerald-100/85">Ja tak til nyheder om nye funktioner (valgfrit)</span>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-emerald-100/70">
+                    Henvisningskode (valgfrit)
+                  </span>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    className="w-full rounded-xl border-0 bg-white/10 px-3 py-2.5 text-sm text-white ring-1 ring-white/20 focus:ring-2 focus:ring-amber-300"
+                    placeholder="Hvis en ven inviterede dig"
+                  />
                 </label>
 
                 {turnstileSiteKey && <div ref={turnstileElRef} className="min-h-[65px]" />}
@@ -1091,6 +1115,7 @@ function VaegttabsplanOnboardingInner() {
                     tier: selectedTier,
                     productUpdatesConsent,
                     source: 'onboarding',
+                    referralCode: normalizeReferralCode(referralCode),
                   })
                 }}
                 onError={(message) => setError(message)}

@@ -36,6 +36,76 @@ export async function loadFooddataMatchedProductIds(
   return fetchAllColumn(fooddata, 'product_ingredient_matches', 'product_external_id')
 }
 
+export async function loadFooddataMatchedIngredientIds(
+  fooddata: SupabaseClient
+): Promise<Set<string>> {
+  const fromMatches = await fetchAllColumn(
+    fooddata,
+    'product_ingredient_matches',
+    'ingredient_id'
+  )
+  try {
+    const fromTags = await fetchAllColumn(
+      fooddata,
+      'ingredient_dietary_tags',
+      'ingredient_id'
+    )
+    for (const id of fromTags) fromMatches.add(id)
+  } catch (err) {
+    console.warn('[fooddata-ids] ingredient_dietary_tags lookup failed:', err)
+  }
+  return fromMatches
+}
+
+/** Ingredient ids Planomo has published (source=planomo). FF-only matches stay out. */
+export async function loadFooddataPlanomoIngredientIds(
+  fooddata: SupabaseClient
+): Promise<Set<string>> {
+  const fromMatches = await fetchAllColumn(
+    fooddata,
+    'product_ingredient_matches',
+    'ingredient_id',
+    { column: 'source', value: 'planomo' }
+  )
+  try {
+    const fromTags = await fetchAllColumn(
+      fooddata,
+      'ingredient_dietary_tags',
+      'ingredient_id',
+      { column: 'source', value: 'planomo' }
+    )
+    for (const id of fromTags) fromMatches.add(id)
+  } catch (err) {
+    console.warn('[fooddata-ids] planomo ingredient_dietary_tags lookup failed:', err)
+  }
+  return fromMatches
+}
+
+export type FooddataSyncedIds = {
+  /** Only ingredients Planomo has matched/tagged — not FF-only partial matches. */
+  ingredientIds: Set<string>
+  productIds: Set<string>
+}
+
+let syncedIdsCache: { at: number; data: FooddataSyncedIds } | null = null
+const SYNCED_IDS_TTL_MS = 60_000
+
+/** Cached snapshot: Planomo ingredient ids + all matched products (for kø-filter). */
+export async function loadFooddataSyncedIdsCached(
+  fooddata: SupabaseClient
+): Promise<FooddataSyncedIds> {
+  if (syncedIdsCache && Date.now() - syncedIdsCache.at < SYNCED_IDS_TTL_MS) {
+    return syncedIdsCache.data
+  }
+  const [ingredientIds, productIds] = await Promise.all([
+    loadFooddataPlanomoIngredientIds(fooddata),
+    loadFooddataMatchedProductIds(fooddata),
+  ])
+  const data = { ingredientIds, productIds }
+  syncedIdsCache = { at: Date.now(), data }
+  return data
+}
+
 export async function loadFooddataPendingQueueProductIds(
   fooddata: SupabaseClient
 ): Promise<Set<string>> {

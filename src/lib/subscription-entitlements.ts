@@ -11,6 +11,7 @@ import {
   type SubscriptionTier,
   type TierEntitlements,
 } from '@/lib/subscription-tiers'
+import type { SubscriptionSource } from '@/lib/subscription-source'
 
 export type SubscriptionUsage = {
   mealPlansUsedThisWeek: number
@@ -21,26 +22,45 @@ export type SubscriptionStatus = TierEntitlements & {
   usage: SubscriptionUsage
   mealPlansRemainingThisWeek: number | null
   priceAlertsRemaining: number | null
+  lifetimeAccess: boolean
 }
 
 type ProfileRow = {
   subscription_tier?: string | null
   last_contribution_amount_ore?: number | null
+  lifetime_access?: boolean | null
+}
+
+function tierFromProfileRow(row: ProfileRow | null): SubscriptionTier {
+  const stored = row?.subscription_tier ? normalizeSubscriptionTier(row.subscription_tier) : null
+  if (row?.lifetime_access && stored !== 'premium') return 'plus'
+  if (stored) return stored
+  return 'free'
 }
 
 export async function getUserSubscriptionTier(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<SubscriptionTier> {
-  const { data } = await supabase
+  const first = await supabase
     .from('user_profiles')
-    .select('subscription_tier, last_contribution_amount_ore')
+    .select('subscription_tier, last_contribution_amount_ore, lifetime_access')
     .eq('id', userId)
     .maybeSingle()
 
-  const row = data as ProfileRow | null
-  if (row?.subscription_tier) {
-    return normalizeSubscriptionTier(row.subscription_tier)
+  let row = first.data as ProfileRow | null
+  if (first.error && String(first.error.message || '').includes('lifetime_access')) {
+    const fallback = await supabase
+      .from('user_profiles')
+      .select('subscription_tier, last_contribution_amount_ore')
+      .eq('id', userId)
+      .maybeSingle()
+    row = fallback.data as ProfileRow | null
+  }
+
+  const fromRow = tierFromProfileRow(row)
+  if (fromRow !== 'free' || row?.subscription_tier) {
+    return fromRow
   }
 
   // Legacy: pay-what-you-can beløb → tier (indtil alle er migreret).
@@ -81,9 +101,12 @@ export async function getSubscriptionStatus(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<SubscriptionStatus> {
-  const tier = await getUserSubscriptionTier(supabase, userId)
+  const [tier, lifetimeAccess, usage] = await Promise.all([
+    getUserSubscriptionTier(supabase, userId),
+    profileHasLifetimeAccess(supabase, userId),
+    getSubscriptionUsage(supabase, userId),
+  ])
   const ent = entitlementsForTier(tier)
-  const usage = await getSubscriptionUsage(supabase, userId)
 
   const mealPlansRemainingThisWeek =
     ent.mealPlansPerWeek == null
@@ -98,6 +121,7 @@ export async function getSubscriptionStatus(
     usage,
     mealPlansRemainingThisWeek,
     priceAlertsRemaining,
+    lifetimeAccess,
   }
 }
 
@@ -176,14 +200,44 @@ export async function assertMessengerGuidanceAllowed(
   return status
 }
 
+export async function profileHasLifetimeAccess(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('lifetime_access')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error && String(error.message || '').includes('lifetime_access')) return false
+  return Boolean((data as { lifetime_access?: boolean | null } | null)?.lifetime_access)
+}
+
 export async function setUserSubscriptionTier(
   supabase: SupabaseClient,
   userId: string,
   tier: SubscriptionTier,
-  extra?: { stripeSubscriptionId?: string | null; monthlyAmountOre?: number | null },
+  extra?: {
+    stripeSubscriptionId?: string | null
+    monthlyAmountOre?: number | null
+    subscriptionSource?: SubscriptionSource | null
+    ignoreLifetime?: boolean
+  },
 ): Promise<void> {
+  let nextTier = tier
+  if (tier === 'free' && !extra?.ignoreLifetime) {
+    const lifetime = await profileHasLifetimeAccess(supabase, userId)
+    if (lifetime) {
+      nextTier = 'plus'
+      extra = {
+        ...extra,
+        subscriptionSource: extra?.subscriptionSource === 'none' ? 'manual' : extra?.subscriptionSource,
+      }
+    }
+  }
+
   const patch: Record<string, unknown> = {
-    subscription_tier: tier,
+    subscription_tier: nextTier,
     updated_at: new Date().toISOString(),
   }
   if (extra?.stripeSubscriptionId !== undefined) {
@@ -192,6 +246,9 @@ export async function setUserSubscriptionTier(
   if (extra?.monthlyAmountOre !== undefined) {
     patch.last_contribution_amount_ore = extra.monthlyAmountOre
     patch.last_contribution_at = new Date().toISOString()
+  }
+  if (extra?.subscriptionSource !== undefined) {
+    patch.subscription_source = extra.subscriptionSource
   }
 
   const { error } = await supabase.from('user_profiles').update(patch).eq('id', userId)

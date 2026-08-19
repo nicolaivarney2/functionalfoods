@@ -47,6 +47,10 @@ const GRAMS_PER_HERB_BUNDLE = 50
 const GRAMS_PER_TSK_SALT = 5
 /** ~2,5 g pr. tsk peber. */
 const GRAMS_PER_TSK_PEPPER = 2.5
+/** Husets standard — AI skyder typisk 1–2 tsk; folk justerer selv op. */
+const TSK_SALT_MAX = 0.5
+const TSK_PEPPER_MAX = 0.25
+const TSK_SEASONING_MIN = 0.25
 
 const TYPO_FIXES: [RegExp, string][] = [
   [/olivenolei/gi, 'olivenolie'],
@@ -182,7 +186,8 @@ function isSaltName(name: string): boolean {
 }
 
 function isPepperName(name: string): boolean {
-  // Undgå at matche peberfrugt / peberrod (bell pepper / horseradish) via ordgrænse.
+  // Undgå peberfrugt / peberrod / chilipeber — kun krydderiet sort/hvid peber.
+  if (/peberfrugt|peberrod|chilipeber|cayenne/i.test(name)) return false
   return /\b(peber|peberkorn)\b/i.test(name)
 }
 
@@ -208,20 +213,25 @@ function adjustUnitsAndAmounts(name: string, amount: number, unit: string): { na
     return { name: n, amount: pieces, unit: 'stk' }
   }
 
-  // Salt og peber: altid i tsk (aldrig gram/stk)
+  // Salt og peber: altid i tsk. Cap til 0,5 / 0,25 — AI overdriver ellers.
   if (isSaltName(n) || isPepperName(n)) {
-    const gramsPerTsk = isSaltName(n) ? GRAMS_PER_TSK_SALT : GRAMS_PER_TSK_PEPPER
+    const isSalt = isSaltName(n)
+    const gramsPerTsk = isSalt ? GRAMS_PER_TSK_SALT : GRAMS_PER_TSK_PEPPER
+    const maxTsk = isSalt ? TSK_SALT_MAX : TSK_PEPPER_MAX
     let tsk: number
     if (u === 'g' || u === 'gram') {
       tsk = a / gramsPerTsk
     } else if (u === 'spsk') {
       tsk = a * 3
+    } else if (u === 'knsp' || u === 'knivspids' || u === 'nip') {
+      tsk = TSK_SEASONING_MIN
     } else {
-      // allerede tsk eller ukendt enhed (fx stk/knivspids) → behandl tallet som tsk
+      // allerede tsk eller ukendt enhed (fx stk) → behandl tallet som tsk
       tsk = a
     }
-    const rounded = Math.max(0.5, Math.round(tsk * 2) / 2)
-    return { name: n.toLowerCase(), amount: rounded, unit: 'tsk' }
+    const rounded = Math.round(tsk * 4) / 4
+    const clamped = Math.min(maxTsk, Math.max(TSK_SEASONING_MIN, rounded))
+    return { name: n.toLowerCase(), amount: clamped, unit: 'tsk' }
   }
 
   // Olivenolie: gram → spsk (hele tal, fx 1 eller 2 — ikke 1,1/2,2)
@@ -273,13 +283,165 @@ function adjustUnitsAndAmounts(name: string, amount: number, unit: string): { na
   return { name: n.toLowerCase(), amount: a, unit: u || 'stk' }
 }
 
+/** Standard tilberedning af dansk saucebrev (Knorr-type) til 2 personer. */
+const SAUCE_PACKET_BUTTER_G = 30
+const SAUCE_PACKET_MILK_ML = 200
+
+function saucePacketKind(name: string): 'bearnaise' | 'hollandaise' | null {
+  const n = name.toLowerCase()
+  if (/b[ée]arnaise/.test(n)) return 'bearnaise'
+  if (/hollandaise/.test(n)) return 'hollandaise'
+  return null
+}
+
+function isReadyMadeSauceUnit(unit: string): boolean {
+  return /^(spsk|tsk|ml|dl|l)$/i.test(unit)
+}
+
+function notesAreForSauce(notes: string | null): boolean {
+  return /til saucen|saucebrev|\bbrev\b|bearnaise|hollandaise/i.test(notes || '')
+}
+
+function isMilkName(name: string): boolean {
+  const n = name.toLowerCase()
+  if (/kokosmælk|kokosmaelk|havremælk|mandelmælk|sojamælk/i.test(n)) return false
+  return /\b(mælk|minimælk|sødmælk|letmælk|skummetmælk)\b/i.test(n)
+}
+
+function isButterName(name: string): boolean {
+  return /\bsmør\b/i.test(name) && !/peanut|nødde|jordnød|æble/i.test(name)
+}
+
+function isSaucePacketRow(ing: Pick<AiIngredientOutput, 'name' | 'unit' | 'amount' | 'notes'>): boolean {
+  if (saucePacketKind(ing.name) == null) return false
+  if (isReadyMadeSauceUnit(ing.unit)) return false
+  const n = `${ing.name} ${ing.notes || ''}`.toLowerCase()
+  if (/\bbrev\b|pulver|\bpose\b/.test(n)) return true
+  if (ing.unit === 'stk' || ing.unit === 'st' || ing.unit === 'stykke' || ing.unit === 'stykker') return true
+  if ((ing.unit === 'g' || ing.unit === 'gram') && ing.amount <= 40) return true
+  return false
+}
+
+/**
+ * Saucebrev er pulver: tving 1 stk + 30 g smør + 200 ml mælk (egne linjer til saucen).
+ */
+function ensureSaucePacketCompanions(ingredients: AiIngredientOutput[]): AiIngredientOutput[] {
+  const packetIdx = ingredients.findIndex((ing) => isSaucePacketRow(ing))
+  if (packetIdx < 0) return ingredients
+
+  const out = ingredients.map((ing, i) => {
+    if (i !== packetIdx) return ing
+    const kind = saucePacketKind(ing.name) || 'bearnaise'
+    const notes = /\bbrev\b/i.test(ing.notes || '') ? ing.notes : mergeNotes(ing.notes, 'brev')
+    return {
+      name: kind === 'hollandaise' ? 'hollandaisesauce' : 'bearnaisesauce',
+      amount: 1,
+      unit: 'stk',
+      notes,
+    }
+  })
+
+  const hasSauceButter = out.some((ing) => isButterName(ing.name) && notesAreForSauce(ing.notes))
+  const hasSauceMilk = out.some((ing) => isMilkName(ing.name) && notesAreForSauce(ing.notes))
+
+  if (!hasSauceButter) {
+    const dedicatedButter = out.find(
+      (ing) => isButterName(ing.name) && ing.unit === 'g' && ing.amount === SAUCE_PACKET_BUTTER_G
+    )
+    if (dedicatedButter) {
+      dedicatedButter.notes = mergeNotes(dedicatedButter.notes, 'til saucen')
+    } else {
+      out.push({
+        name: 'smør',
+        amount: SAUCE_PACKET_BUTTER_G,
+        unit: 'g',
+        notes: 'til saucen',
+      })
+    }
+  }
+
+  if (!hasSauceMilk) {
+    const existingMilk = out.find((ing) => isMilkName(ing.name))
+    const milkMl =
+      existingMilk == null
+        ? 0
+        : existingMilk.unit === 'ml'
+          ? existingMilk.amount
+          : existingMilk.unit === 'dl'
+            ? existingMilk.amount * 100
+            : existingMilk.unit === 'l'
+              ? existingMilk.amount * 1000
+              : 0
+    if (existingMilk && milkMl >= SAUCE_PACKET_MILK_ML) {
+      existingMilk.notes = mergeNotes(existingMilk.notes, 'til saucen')
+    } else {
+      out.push({
+        name: 'mælk',
+        amount: SAUCE_PACKET_MILK_ML,
+        unit: 'ml',
+        notes: 'til saucen',
+      })
+    }
+  }
+
+  return out.filter((ing, i) => i === packetIdx || !isSaucePacketRow(ing))
+}
+
+function isTzatzikiName(name: string): boolean {
+  return /\btzatziki\b/i.test(name)
+}
+
+function isYogurtName(name: string): boolean {
+  return /\b(græsk\s*yoghurt|graesk\s*yoghurt|yoghurt|yogurt)\b/i.test(name)
+}
+
+function isCucumberName(name: string): boolean {
+  return /\bagurk/i.test(name)
+}
+
+function notesAreForTzatziki(notes: string | null): boolean {
+  return /tzatziki/i.test(notes || '')
+}
+
+/**
+ * Tzatziki købes ikke som én vare — udvid til græsk yoghurt, agurk, hvidløg og citron.
+ */
+function ensureTzatzikiComponents(ingredients: AiIngredientOutput[]): AiIngredientOutput[] {
+  if (!ingredients.some((ing) => isTzatzikiName(ing.name))) return ingredients
+
+  const out = ingredients.filter((ing) => !isTzatzikiName(ing.name))
+
+  if (!out.some((ing) => isYogurtName(ing.name) && notesAreForTzatziki(ing.notes))) {
+    const existing = out.find((ing) => isYogurtName(ing.name) && ing.unit === 'g' && ing.amount >= 200)
+    if (existing) {
+      existing.notes = mergeNotes(existing.notes, 'til tzatziki')
+    } else {
+      out.push({ name: 'græsk yoghurt', amount: 200, unit: 'g', notes: 'til tzatziki' })
+    }
+  }
+
+  if (!out.some((ing) => isCucumberName(ing.name) && notesAreForTzatziki(ing.notes))) {
+    out.push({ name: 'agurk', amount: 150, unit: 'g', notes: 'groftrevet, til tzatziki' })
+  }
+
+  if (!out.some((ing) => isGarlicName(ing.name) && notesAreForTzatziki(ing.notes))) {
+    out.push({ name: 'hvidløgsfed', amount: 1, unit: 'stk', notes: 'til tzatziki' })
+  }
+
+  if (!out.some((ing) => isLemonJuiceName(ing.name) && notesAreForTzatziki(ing.notes))) {
+    out.push({ name: 'citronsaft', amount: 1, unit: 'spsk', notes: 'til tzatziki' })
+  }
+
+  return out
+}
+
 /**
  * Bruges ved gem af AI-opskrifter (save-ai-draft, save-generated-recipe).
  */
 export function normalizeAiRecipeIngredients(ingredients: AiIngredientInput[]): AiIngredientOutput[] {
   if (!Array.isArray(ingredients)) return []
 
-  return ingredients.map((raw) => {
+  const mapped = ingredients.map((raw) => {
     const split = splitNameAndPrep(String(raw.name || ''), raw.notes)
     const adj = adjustUnitsAndAmounts(split.name, Number(raw.amount), String(raw.unit || 'stk'))
     return {
@@ -289,6 +451,8 @@ export function normalizeAiRecipeIngredients(ingredients: AiIngredientInput[]): 
       notes: split.notes,
     }
   })
+
+  return ensureTzatzikiComponents(ensureSaucePacketCompanions(mapped))
 }
 
 function stripCelsiusMentions(text: string): string {

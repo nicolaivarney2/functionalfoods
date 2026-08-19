@@ -47,6 +47,8 @@ const columns = [
     links: [
       { label: 'Om os', href: '/bag-om-ff' },
       { label: 'Privatlivspolitik', href: '/cookies-og-privatliv' },
+      { label: 'Betingelser', href: '/betingelser' },
+      { label: 'Henvis en ven', href: '/henvis' },
       { label: 'Opret dig', href: '/kom-i-gang' },
       { label: 'Opskrifter', href: '/opskriftsoversigt' },
       { label: 'Dagligvarer', href: '/dagligvarer' },
@@ -117,6 +119,12 @@ export default function Footer() {
             </Link>
             <Link href="/cookies-og-privatliv" className="hover:text-white/80 transition-colors">
               Privatlivspolitik
+            </Link>
+            <Link href="/betingelser" className="hover:text-white/80 transition-colors">
+              Betingelser
+            </Link>
+            <Link href="/henvis" className="hover:text-white/80 transition-colors">
+              Henvis en ven
             </Link>
             <CookieSettingsFooterLink />
           </div>

@@ -68,6 +68,12 @@ export default function ProductIngredientMatchingPage() {
   const [hideLowPriorityCategories, setHideLowPriorityCategories] = useState(true)
   /** Skjul ingredienser der allerede har mindst ét produktmatch */
   const [onlyUnmatched, setOnlyUnmatched] = useState(false)
+  /** Skjul ingredienser Planomo allerede har synket til fooddata */
+  const [hidePlanomoSynced, setHidePlanomoSynced] = useState(true)
+  const [planomoSyncedIngredientIds, setPlanomoSyncedIngredientIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const [planomoSyncedAvailable, setPlanomoSyncedAvailable] = useState(false)
   /**
    * `newest` = stabilt overblik (rækken hopper ikke når du tilføjer et match).
    * `fewest_matches` = god til at finde huller, men listen omrokeres ved match.
@@ -88,7 +94,7 @@ export default function ProductIngredientMatchingPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [onlyUnmatched, searchTerm, selectedCategory, hideLowPriorityCategories, listSort])
+  }, [onlyUnmatched, hidePlanomoSynced, searchTerm, selectedCategory, hideLowPriorityCategories, listSort])
 
   const loadData = async () => {
     try {
@@ -107,9 +113,16 @@ export default function ProductIngredientMatchingPage() {
       
       // Load existing matches from database
       console.log('🔗 Loading existing matches...')
-      const existingMatchesData = await loadExistingMatches()
+      const [existingMatchesData, syncedRes] = await Promise.all([
+        loadExistingMatches(),
+        fetch('/api/admin/fooddata-synced-ids').then((r) => r.json()).catch(() => null),
+      ])
       if (existingMatchesData) {
       console.log(`✅ Loaded ${existingMatchesData?.length ?? 0} existing matches`)
+      }
+      if (syncedRes?.success && syncedRes.data) {
+        setPlanomoSyncedAvailable(!!syncedRes.data.available)
+        setPlanomoSyncedIngredientIds(new Set(syncedRes.data.ingredientIds || []))
       }
       
       // Set all data
@@ -466,7 +479,15 @@ export default function ProductIngredientMatchingPage() {
         const matchList = matchesByIngredient.get(idKey) || []
         const hasAnyMatch = matchList.length > 0
         const keepByMatchFilter = !onlyUnmatched || !hasAnyMatch
-        return matchesSearch && matchesCategory && keepByPriority && keepByMatchFilter
+        const keepByPlanomoFilter =
+          !hidePlanomoSynced || !planomoSyncedIngredientIds.has(idKey)
+        return (
+          matchesSearch &&
+          matchesCategory &&
+          keepByPriority &&
+          keepByMatchFilter &&
+          keepByPlanomoFilter
+        )
       })
       .sort((a, b) => {
         const countA = (matchesByIngredient.get(String(a.id).trim()) || []).length
@@ -492,6 +513,8 @@ export default function ProductIngredientMatchingPage() {
     selectedCategory,
     hideLowPriorityCategories,
     onlyUnmatched,
+    hidePlanomoSynced,
+    planomoSyncedIngredientIds,
     matchesByIngredient,
     listSort,
   ])
@@ -528,7 +551,8 @@ export default function ProductIngredientMatchingPage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Product-Ingredient Matching</h1>
               <p className="mt-2 text-gray-600">
-                Match recipe ingredients with grocery products and offers
+                Match FF-ingredienser med dagligvarer. Filteret skjuler kun ingredienser Planomo
+                har matchet — FF-ingredienser vises stadig, også når de kun har nogle af matches.
               </p>
             </div>
             <Link
@@ -593,6 +617,18 @@ export default function ProductIngredientMatchingPage() {
         )}
 
         <div className="flex items-center justify-end gap-2 mb-6 flex-wrap">
+          <Link
+            href="/admin/product-ingredient-matching/nye-varer"
+            className="px-4 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          >
+            Nye varer (kø)
+          </Link>
+          <Link
+            href="/admin/product-ingredient-matching/merge"
+            className="px-4 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
+          >
+            Merge ingredienser
+          </Link>
           <Link
             href="/admin/product-match-queue"
             className="px-4 py-2 text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100"
@@ -703,6 +739,16 @@ export default function ProductIngredientMatchingPage() {
             <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input
                 type="checkbox"
+                checked={hidePlanomoSynced}
+                onChange={(e) => setHidePlanomoSynced(e.target.checked)}
+                disabled={!planomoSyncedAvailable && planomoSyncedIngredientIds.size === 0}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Skjul ingredienser Planomo har matchet (FF-ingredienser vises stadig, også med delvise matches)
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
                 checked={onlyUnmatched}
                 onChange={(e) => setOnlyUnmatched(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -719,6 +765,12 @@ export default function ProductIngredientMatchingPage() {
               Skjul krydderier og urter (viser de mest relevante nye først)
             </label>
           </div>
+          {hidePlanomoSynced && planomoSyncedIngredientIds.size > 0 && (
+            <p className="mt-3 text-xs text-gray-500">
+              Skjuler {planomoSyncedIngredientIds.size} ingredienser som Planomo har matchet.
+              FF-ingredienser med nogle (men ikke alle) produktmatches vises stadig.
+            </p>
+          )}
         </div>
 
         {/* Ingredients List */}
@@ -850,8 +902,16 @@ export default function ProductIngredientMatchingPage() {
                         }}
                       />
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {matchedProducts.length} product{matchedProducts.length !== 1 ? 's' : ''} matched
+                    <div className="text-sm text-gray-500 text-right">
+                      <div>
+                        {matchedProducts.length} product{matchedProducts.length !== 1 ? 's' : ''} matched
+                      </div>
+                      <Link
+                        href={`/admin/product-ingredient-matching/merge?sourceId=${encodeURIComponent(ingredient.id)}`}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        Merge denne
+                      </Link>
                     </div>
                   </div>
 

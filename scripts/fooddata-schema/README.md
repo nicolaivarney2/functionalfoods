@@ -8,6 +8,7 @@ Kør i **grocery Supabase** (`GROCERY_SUPABASE_URL`) i denne rækkefølge:
 4. `004_curation_rls_service_role.sql` — RLS policies så `GROCERY_SUPABASE_SECRET_KEY` kan pushe
 5. `009_rls_grocery_migrations_ledger.sql` — RLS på `_grocery_migrations` (lukker kritisk sikkerhedshul)
 6. `010_security_hardening.sql` — `set_updated_at` search_path + flyt `pg_trgm` til `extensions` schema
+7. `011_price_history_since_page.sql` — index + RPC til daglig price_history-import (undgår statement_timeout)
 
 **FF ansvar:** Kør alle scripts én gang i grocery-projektet (eller `npx tsx scripts/grocery-migrate.ts` for `005_*` i repo). Eksisterende installs: kør mindst `003` efter `001`+`002`, derefter re-merge fra Planomo.
 

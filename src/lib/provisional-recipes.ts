@@ -152,8 +152,8 @@ VIGTIGT:
 - Ingrediensnavne skal være rene basisnavne (fx "kyllingebryst", "broccoli", "olivenolie").
   Læg tilberedning/forklaring i "notes" (fx "i tern", "hakket").
 - Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk.
-- Krydderier skal være nøgterne: brug som udgangspunkt ca. 0,5 tsk salt og 0,25 tsk
-  peber pr. opskrift, medmindre retten tydeligvis kræver mere.
+- Krydderier skal være nøgterne: ALTID 0,5 tsk salt og 0,25 tsk peber pr. opskrift.
+  Aldrig mere (ikke 1–2 tsk). Folk justerer selv.
 - Estimér ernæring PR. PORTION så godt du kan.
 - Stil 2-4 korte opklarende spørgsmål om det du er usikker på (fx portionsstørrelse,
   skjulte ingredienser, tilberedning, olie/smør-mængde).
@@ -182,8 +182,8 @@ VIGTIGT:
 - Ingrediensnavne skal være rene basisnavne (fx "havregryn", "skyr", "banan").
   Læg tilberedning/forklaring i "notes" (fx "ristet", "hakket").
 - Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk.
-- Krydderier skal være nøgterne: brug som udgangspunkt ca. 0,5 tsk salt og 0,25 tsk
-  peber pr. opskrift, medmindre retten tydeligvis kræver mere.
+- Krydderier skal være nøgterne: ALTID 0,5 tsk salt og 0,25 tsk peber pr. opskrift.
+  Aldrig mere (ikke 1–2 tsk). Folk justerer selv.
 - Estimér ernæring PR. PORTION så godt du kan.
 - Stil 2-4 korte opklarende spørgsmål om det du er usikker på (fx portionsstørrelse,
   mængder, skjulte ingredienser, tilberedning).

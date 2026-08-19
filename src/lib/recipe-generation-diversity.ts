@@ -212,6 +212,53 @@ const SENSE_FLAVORS = [
   'balsamico og tomat (lidt sødme fra tomat, ikke honning)',
 ]
 
+/** Ét sidste bord-element så retten ikke er «protein + grønt + stivelse» alene. */
+const SENSE_KANT_POOL = [
+  'brev bearnaise (1 stk + 30 g smør + 200 ml mælk) til kød/kartofler',
+  'remoulade til fisk',
+  'ketchup eller sennep til frikadeller, burger eller pølser',
+  'yoghurt- eller creme fraiche-dip med salt og peber',
+  'vinaigrette eller sennepsdressing til salat/grønt',
+  'aioli eller chili-mayo i lille skål',
+  'tzatziki af agurk, græsk yoghurt og hvidløg til farsret eller ovnbagt',
+  'salsa til mexicansk-inspireret tallerken',
+]
+
+const KETO_KANT_POOL = [
+  'aioli eller hvidløgsmayo',
+  'brev bearnaise (1 stk + 30 g smør + 200 ml fløde eller mælk) eller smeltet smør med urter',
+  'ranch eller creme fraiche-dip med salt og peber',
+  'pesto eller chimichurri i lille skål',
+  'olivenolie-citron-dressing til grønt',
+]
+
+const PROTEINRIG_KANT_POOL = [
+  'yoghurt-dressing eller hjemmelavet tzatziki (agurk + yoghurt + hvidløg)',
+  'sennepsdip eller let aioli',
+  'salsa eller pico de gallo',
+  'vinaigrette til salat/bowl',
+  'ketchup eller remoulade når retten kalder på det',
+]
+
+const GLP1_KANT_POOL = [
+  'yoghurt-dressing eller hjemmelavet tzatziki (lille portion)',
+  'vinaigrette eller sennepsdressing',
+  'salsa eller urtedip',
+  'creme fraiche-dip med salt og peber (1 spsk pr. person)',
+]
+
+/** Dansk hverdagsprotein — lam er niche og må ikke dominere Sense. */
+const SENSE_EVERYDAY_PROTEINS = [
+  'kylling',
+  'hakket oksekød',
+  'svinekød (kotelet, mørbrad eller fars)',
+  'torsk eller anden hvid fisk',
+  'laks',
+  'æg',
+  'kalkun',
+  'hakkebøf eller medister',
+]
+
 const SENSE_PRODUCE_POOL = [
   'blandet salat eller spidskål',
   'tomat og agurk',
@@ -363,6 +410,60 @@ function getProduceRotation(niche: SupportedNiche): string[] {
   return randomItem(GLP1_PRODUCE_ROTATIONS)
 }
 
+function mealWantsKantElement(mealType?: string): boolean {
+  const meal = (mealType || 'aftensmad').toLowerCase()
+  return meal === 'aftensmad' || meal === 'frokost'
+}
+
+function getKantHint(niche: SupportedNiche): string {
+  if (niche === 'keto') return randomItem(KETO_KANT_POOL)
+  if (niche === 'proteinrig') return randomItem(PROTEINRIG_KANT_POOL)
+  if (niche === 'sense') return randomItem(SENSE_KANT_POOL)
+  return randomItem(GLP1_KANT_POOL)
+}
+
+/**
+ * Dansk saucebrev (Knorr-type) er pulver — saucen laves med smør + mælk.
+ * Aldrig kun «1 stk bearnaise» uden tilberedning.
+ */
+export const SAUCE_PACKET_INGREDIENT_RULE = `SAUCEBREV (bearnaise/hollandaise) — KRITISK:
+- Skriv ALDRIG kun «1 stk bearnaise» eller «2 stk bearnaise». Brevet er pulver; saucen SKAL laves.
+- Når kant-elementet er sauce i brev, SKAL ingredients have **tre linjer** (til 2 personer):
+  1) "bearnaisesauce" (eller "hollandaisesauce"), amount 1, unit "stk", notes "brev"
+  2) "smør", amount 30, unit "g", notes "til saucen"
+  3) "mælk", amount 200, unit "ml", notes "til saucen"
+- Sidste trin: pisk brevet op med mælken og smørret efter anvisning på pakken. Tag alle tre: [[ing:bearnaisesauce]], [[ing:mælk]], [[ing:smør]] (brug #n hvis smør også bruges til stegning).
+- Færdig sauce på glas (spsk/ml) skal IKKE have ekstra smør og mælk.`
+
+export const TZATZIKI_INGREDIENT_RULE = `TZATZIKI — KRITISK:
+- Skriv ALDRIG «tzatziki» som én indkøbsvare (ikke 1 stk, ikke 200 g tzatziki). Det laves af råvarer.
+- Når kant-elementet er tzatziki, SKAL ingredients have **egne linjer** (til 2 personer):
+  1) "græsk yoghurt", amount 200, unit "g", notes "til tzatziki"
+  2) "agurk", amount 150, unit "g", notes "groftrevet, til tzatziki"
+  3) "hvidløgsfed", amount 1, unit "stk", notes "til tzatziki"
+  4) "citronsaft", amount 1, unit "spsk", notes "til tzatziki"
+- Sidste trin: rør tzatziki af yoghurt, revet agurk, hvidløg og citron. Tag linjerne — skriv ikke ordet tzatziki som ingrediensnavn.
+- Agurk til salat og agurk til tzatziki er to linjer, hvis begge indgår.`
+
+/**
+ * Sense: ét sidste dip/dressing/sauce-brev så tallerkenen ikke er ren «håndfulde».
+ * Bruges i system-prompten (krav) — variation-prompten peger på et konkret forslag.
+ */
+export const SENSE_KANT_ELEMENT_SYSTEM_RULE = `KANT-ELEMENT (obligatorisk for aftensmad og frokost):
+- Tilføj **præcis ét** sidste supplement der giver retten kant ved servering — ikke tre saucer, ikke en restaurant-reduktion.
+- Tænk dansk køkkenskuffe: dressing, dip med salt og peber, ketchup, remoulade, sennep, aioli, hjemmelavet tzatziki, salsa, eller et **brev bearnaise/hollandaise**.
+- Vælg det der passer naturligt (fisk → remoulade; bøf/kartofler → bearnaise; frikadeller/burger → ketchup eller sennep; salat/bowl → dressing; fars/ovn → tzatziki af yoghurt/agurk/hvidløg).
+- Skriv det som **egen ingredienslinje** (eller råvarer, hvis det laves) og nævn det i sidste trin («serveres med …»).
+- Fedtholdige saucer (mayo, bearnaise, dressing, aioli, remoulade) hører under **Fedt** og tæller med i 1–3 spsk pr. person.
+- Ketchup, sennep, salsa, sriracha hører under **Smagsgivere**.
+- Mængde: 1–2 spsk pr. person for færdig dip/ketchup/dressing. Sauce i brev: se SAUCEBREV-reglen. Tzatziki: se TZATZIKI-reglen (ikke 1 stk).
+- Morgenmad/snack: spring over medmindre det giver mening (fx yoghurt-dip til grøntsnack).
+- Hvis en kilderecept allerede har sauce/dressing, genbrug den — tilføj ikke et ekstra lag.
+
+${SAUCE_PACKET_INGREDIENT_RULE}
+
+${TZATZIKI_INGREDIENT_RULE}`
+
 export function buildRecipeVariationPrompt({
   niche,
   existingRecipes = [],
@@ -387,7 +488,7 @@ export function buildRecipeVariationPrompt({
       : niche === 'proteinrig'
         ? ['broccoli', 'spinat', 'peberfrugt', 'kylling']
         : niche === 'sense'
-          ? ['broccoli', 'spinat', 'peberfrugt']
+          ? ['broccoli', 'spinat', 'peberfrugt', 'lam', 'lammekød']
           : ['broccoli', 'spinat', 'peberfrugt', 'kylling', 'kikærter']
 
   /** Altid læg basis-undgåelser oven i gentagne signaler — ellers forsvinder de og modellen kollapser mod samme grønt-par. */
@@ -403,6 +504,7 @@ export function buildRecipeVariationPrompt({
           : GLP1_FLAVORS
   )
   const produceRotation = getProduceRotation(niche)
+  const kantHint = getKantHint(niche)
 
   const lines = [
     'VARIATIONS-SPOR (brug dette aktivt):',
@@ -413,6 +515,26 @@ export function buildRecipeVariationPrompt({
     `- Grønt- og tilbehørsinspiration (valgfrit, vælg kun hvis det giver mening): ${produceRotation.join(' · ')}.`,
     `- Undgå denne gang, hvis muligt: ${avoidSignals.join(', ')}.`,
   ]
+
+  if (mealWantsKantElement(mealType)) {
+    if (niche === 'sense') {
+      lines.push(
+        `- **Kant-element (obligatorisk, præcis ét):** Et sidste dip/dressing/sauce ved servering så retten ikke er ren spisekasse. Forslag denne gang (byt gerne ud hvis retten kalder på noget andet): ${kantHint}.`
+      )
+    } else if (niche === 'keto') {
+      lines.push(
+        `- **Kant-element (ét, keto-venligt):** Aioli, bearnaise, mayo-dip, pesto eller citron-olie — ikke ketchup eller sød chilisauce. Forslag: ${kantHint}. Saucebrev = 1 stk + 30 g smør + 200 ml mælk (eller fløde).`
+      )
+    } else if (niche === 'proteinrig') {
+      lines.push(
+        `- **Kant-element (ét):** Dressing, dip, salsa, remoulade eller ketchup der passer til retten — egen ingredienslinje og sidste trin. Forslag: ${kantHint}.`
+      )
+    } else {
+      lines.push(
+        `- **Kant-element (ét, let):** Yoghurt-dressing, tzatziki, vinaigrette eller salsa i lille portion — ikke tung flødesauce. Forslag: ${kantHint}.`
+      )
+    }
+  }
 
   if (niche === 'sense') {
     lines.push(
@@ -446,7 +568,13 @@ export function buildRecipeVariationPrompt({
       '- SENSE-SPISEKASSE: Byg retten så den tydeligt kan forklares med håndfulde — masser af ikke-stivelsesholdigt grønt (1–2 håndfulde pr. person), 1 håndfuld protein, 0–1 håndfuld stivelse/frugt efter måltidstype, og fedt som olie/smør/nødder svarende til ca. 1–3 spsk pr. person (fordelt i retten).'
     )
     lines.push(
-      '- PROTEIN: Varier — kød og fisk passer til mange aftener; æg og mejeri også. Undgå at kikærter, linser eller tofu bliver hovedprotein i ret efter ret.'
+      '- PROTEIN (DK hverdag): Varier mellem kylling, hakket oksekød, svinekød, fisk, æg og kalkun. **Lam/lammekød må IKKE være hovedprotein** — det er niche i dansk hverdag og må højst bruges hvis inspirationen eksplicit beder om lam (ca. hver 10. ret eller sjældnere, reelt næsten aldrig).'
+    )
+    lines.push(
+      `- Protein-inspiration denne gang (byt gerne, så længe det ikke er lam): ${randomItem(SENSE_EVERYDAY_PROTEINS)}.`
+    )
+    lines.push(
+      '- Undgå at kikærter, linser eller tofu bliver hovedprotein i ret efter ret.'
     )
     lines.push(
       '- BÆLGFRUGT: Tilladt når retten kalder på det (fx chili, gryderet); brug dem ikke som standard-erstatning for kød/fisk hver gang.'

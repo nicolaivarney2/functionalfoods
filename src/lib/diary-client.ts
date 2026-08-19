@@ -124,8 +124,15 @@ async function readJson<T>(res: Response): Promise<T> {
   return json
 }
 
-export async function loadDiaryDay(date: string, signal?: AbortSignal): Promise<DiaryDay> {
-  const res = await authFetch(`/api/diary/day?date=${encodeURIComponent(date)}`, { signal })
+export async function loadDiaryDay(
+  date: string,
+  opts?: { signal?: AbortSignal; accessToken?: string }
+): Promise<DiaryDay> {
+  const res = await authFetch(
+    `/api/diary/day?date=${encodeURIComponent(date)}`,
+    { signal: opts?.signal },
+    opts?.accessToken
+  )
   const data = await readJson<{
     date: string
     target: DiaryTarget | null

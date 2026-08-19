@@ -114,6 +114,24 @@ export default function FunktionerOversigtPage() {
           })}
         </div>
       </section>
+
+      <section className="border-t border-emerald-100 bg-emerald-50/60">
+        <div className="container mx-auto max-w-3xl px-4 py-12 text-center">
+          <h2 className="text-2xl font-bold text-slate-900">Inviter 10 venner — få Lifetime</h2>
+          <p className="mt-3 text-slate-600 leading-relaxed">
+            Del appen med dit unikke link. Når 10 personer opretter sig — også på gratis plan — kan du få Lifetime:
+            ubegrænset madplaner og prisalarmer. På et tidspunkt forsvinder den nuværende gratis ramme. Med Lifetime
+            har du det gratis for altid.
+          </p>
+          <Link
+            href="/henvis"
+            className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:underline"
+          >
+            Sådan virker henvisning
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
     </div>
   )
 }
