@@ -71,7 +71,7 @@ const CHAINS: ChainSpec[] = [
   { chain: 'meny', label: 'MENY', warnBelow: 20, maxStaleDays: 8 },
   { chain: 'spar', label: 'Spar', warnBelow: 20, maxStaleDays: 8 },
   { chain: 'min-koebmand', label: 'Min Købmand', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'nemlig', label: 'Nemlig', warnBelow: 20, maxStaleDays: 8 },
+  { chain: 'nemlig', label: 'Nemlig', warnBelow: 20, maxStaleDays: 2 },
 ]
 
 const RPC_LIMIT = 51

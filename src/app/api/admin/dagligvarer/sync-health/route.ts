@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 type DanishWeekday = 'Mandag' | 'Tirsdag' | 'Onsdag' | 'Torsdag' | 'Fredag' | 'Lørdag' | 'Søndag'
+type OfferCadence = DanishWeekday | 'Hver dag'
 
 const WEEKDAY_INDEX: Record<DanishWeekday, number> = {
   Søndag: 0,
@@ -20,7 +21,7 @@ type StoreDef = {
   /** store_id slug as it appears in product_offers (matches goma-import.resolveStoreSlug) */
   storeId: string
   label: string
-  offerDay: DanishWeekday
+  offerDay: OfferCadence
 }
 
 /**
@@ -32,7 +33,7 @@ const KNOWN_STORES: StoreDef[] = [
   { storeId: '365discount', label: '365 Discount', offerDay: 'Onsdag' },
   { storeId: 'lidl', label: 'Lidl', offerDay: 'Lørdag' },
   { storeId: 'bilka', label: 'Bilka', offerDay: 'Fredag' },
-  { storeId: 'nemlig', label: 'Nemlig', offerDay: 'Søndag' },
+  { storeId: 'nemlig', label: 'Nemlig', offerDay: 'Hver dag' },
   { storeId: 'meny', label: 'MENY', offerDay: 'Torsdag' },
   { storeId: 'spar', label: 'Spar', offerDay: 'Torsdag' },
   { storeId: 'kvickly', label: 'Kvickly', offerDay: 'Torsdag' },
@@ -114,20 +115,19 @@ function daysSince(iso: string | null): number | null {
  * Returns how many days have passed since this store's last expected offer day,
  * given today's Danish weekday. We are "due for sync" within ~24h of that day.
  */
-function daysSinceLastOfferDay(offerDay: DanishWeekday): number {
+function daysSinceLastOfferDay(offerDay: OfferCadence): number {
+  if (offerDay === 'Hver dag') return 0
   const now = new Date()
   const danish = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }))
   const today = danish.getDay()
   const target = WEEKDAY_INDEX[offerDay]
-  let diff = (today - target + 7) % 7
-  // If today *is* the offer day, treat it as "0 days since" — sync should happen today.
-  return diff
+  return (today - target + 7) % 7
 }
 
 type StoreHealth = {
   storeId: string
   label: string
-  offerDay: DanishWeekday
+  offerDay: OfferCadence
   lastSyncAt: string | null
   daysSinceSync: number | null
   daysSinceLastOfferDay: number
@@ -162,6 +162,12 @@ function classify(input: Omit<StoreHealth, 'status' | 'statusReason'>): {
     return {
       status: 'stale',
       statusReason: `Ikke synket i ${Math.round(input.daysSinceSync)} dage`,
+    }
+  }
+  if (input.offerDay === 'Hver dag' && input.daysSinceSync > 1.5) {
+    return {
+      status: 'late',
+      statusReason: `Forventet daglig Goma-sync – sidst opdateret for ${Math.round(input.daysSinceSync)} dage siden`,
     }
   }
   // If the offer day was 1+ days ago and we still haven't synced since, mark as late

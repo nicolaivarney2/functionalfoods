@@ -104,7 +104,7 @@ const GOMA_STORES: {
   { id: '365discount', label: '365 Discount', offerDay: 'Onsdag', note: 'Goma-id: 365discount' },
   { id: 'Lidl', label: 'Lidl', offerDay: 'Lørdag' },
   { id: 'Bilka', label: 'Bilka', offerDay: 'Fredag' },
-  { id: 'Nemlig', label: 'Nemlig', offerDay: 'Søndag' },
+  { id: 'Nemlig', label: 'Nemlig', offerDay: 'Hver dag' },
   { id: 'MENY', label: 'MENY', offerDay: 'Torsdag' },
   { id: 'Spar', label: 'Spar', offerDay: 'Torsdag' },
   { id: 'Kvickly', label: 'Kvickly', offerDay: 'Torsdag' },

@@ -149,6 +149,8 @@ Per-kæde Goma-strategi:
 - **Ugedagsplan:** første pass på udgivelsesdagen + morning-after dagen efter
   (Goma/Coop opdaterer ofte sent — torsdagens sync ramte ellers sidste uges
   udløbne `sale_valid_to`). Se `getGomaStoresForDanishWeekday()`.
+- **Nemlig hver dag:** ikke papiravis — "God pris" skifter løbende, så den kører
+  i begge Goma-slots (02:00 og 14:00 UTC), også mandag/tirsdag.
 
 Nød-fallback: `GOMA_IMPORT_ENABLED=false` — importerer `tjek:*` igen (ikke anbefalet).
 

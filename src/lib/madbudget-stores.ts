@@ -14,7 +14,7 @@ export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set([
 
 /**
  * Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores).
- * Id 5 (Nemlig.com) er fuldt katalog via Goma/fooddata (synk søndag).
+ * Id 5 (Nemlig.com) er fuldt katalog via Goma/fooddata (synk hver Goma-slot).
  *
  * Id 1–9 er de oprindelige kæder. Id 10–15 tilføjet efter /dagligvarer-udvidelsen
  * (Lidl, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris) — alle tilbuds-only,

@@ -150,26 +150,43 @@ export function defaultGomaImportStoreNames(): GomaStoreName[] {
  * Første pass på kædens typiske udgivelsesdag, plus morning-after dagen efter:
  * Goma/Coop opdaterer ofte sent torsdag, så torsdagens første pass rammer
  * sidste uges udløbne datoer. Fredag fanger den nye avis.
+ *
+ * Nemlig er ikke en ugentlig papiravis — "God pris" / prismatch skifter løbende.
+ * Derfor med i hvert Goma-slot (02:00 og 14:00 UTC), også mandag/tirsdag.
  */
+const GOMA_DAILY_STORES: readonly GomaStoreName[] = ['Nemlig']
+
 export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[] {
+  let stores: GomaStoreName[]
   switch (dayIndex) {
     case 1:
-      return []
+      stores = []
+      break
     case 2:
-      return ['ABC Lavpris']
+      stores = ['ABC Lavpris']
+      break
     case 3:
-      return ['ABC Lavpris', '365discount']
+      stores = ['ABC Lavpris', '365discount']
+      break
     case 4:
-      return ['365discount', 'MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
+      stores = ['365discount', 'MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
+      break
     case 5:
-      return ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg', 'Brugsen']
+      stores = ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg', 'Brugsen']
+      break
     case 6:
-      return ['Lidl']
+      stores = ['Lidl']
+      break
     case 0:
-      return ['Lidl', 'Nemlig']
+      stores = ['Lidl']
+      break
     default:
-      return []
+      stores = []
   }
+  for (const name of GOMA_DAILY_STORES) {
+    if (!stores.includes(name)) stores.push(name)
+  }
+  return stores
 }
 
 /** Skip fooddata→FF copy for chains owned by Goma while import is enabled. */
