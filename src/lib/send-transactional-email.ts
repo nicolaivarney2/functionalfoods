@@ -1,18 +1,26 @@
 /**
- * Server-side transactional email via Loops (loops.so).
+ * Transactional mail via SMTP fra jeres eget domæne.
  *
- * Kræver en publiceret transactional i Loops med data variables:
- *   alertSubject  — emnelinje (sæt også {alertSubject} som Subject i editoren)
- *   alertBody     — brødtekst (plain text)
+ * Vercel kan ikke sende mail selv — men den kan tale SMTP til den postkasse
+ * I allerede har (Google Workspace / Gmail / Microsoft 365). Ingen Loops-skabelon.
  *
- * Env: LOOPS_API_KEY (findes allerede) + LOOPS_TRANSACTIONAL_ID (template-id).
- *
- * @see https://loops.so/docs/api-reference/send-transactional-email
+ * Env (Vercel Production):
+ *   SMTP_HOST   fx smtp.gmail.com
+ *   SMTP_PORT   587 (STARTTLS) — port 25 er blokeret på Vercel
+ *   SMTP_USER   fx nicolai@functionalfoods.dk
+ *   SMTP_PASS   app-adgangskode (ikke almindelig login-kode)
+ *   SMTP_FROM   valgfri, default SMTP_USER
  */
 
-const LOOPS_TRANSACTIONAL_URL = 'https://app.loops.so/api/v1/transactional'
+import nodemailer from 'nodemailer'
 
 export type SendEmailResult = { ok: true; id?: string } | { ok: false; error: string }
+
+function smtpPort(): number {
+  const raw = process.env.SMTP_PORT?.trim()
+  const n = raw ? Number.parseInt(raw, 10) : 587
+  return Number.isFinite(n) && n > 0 ? n : 587
+}
 
 export async function sendTransactionalEmail(input: {
   to: string | string[]
@@ -20,20 +28,17 @@ export async function sendTransactionalEmail(input: {
   text: string
   replyTo?: string
 }): Promise<SendEmailResult> {
-  const apiKey = process.env.LOOPS_API_KEY?.trim()
-  if (!apiKey) {
-    return { ok: false, error: 'LOOPS_API_KEY er ikke sat' }
-  }
-
-  const transactionalId = process.env.LOOPS_TRANSACTIONAL_ID?.trim()
-  if (!transactionalId) {
+  const host = process.env.SMTP_HOST?.trim()
+  const user = process.env.SMTP_USER?.trim()
+  const pass = process.env.SMTP_PASS?.trim()
+  if (!host || !user || !pass) {
     return {
       ok: false,
-      error:
-        'LOOPS_TRANSACTIONAL_ID er ikke sat — opret en transactional i Loops (alertSubject + alertBody) og sæt ID i Vercel',
+      error: 'Mangler SMTP_HOST, SMTP_USER eller SMTP_PASS (send fra jeres egen postkasse)',
     }
   }
 
+  const from = process.env.SMTP_FROM?.trim() || user
   const recipients = (Array.isArray(input.to) ? input.to : [input.to])
     .map((e) => e.trim())
     .filter(Boolean)
@@ -41,44 +46,25 @@ export async function sendTransactionalEmail(input: {
     return { ok: false, error: 'Ingen modtager' }
   }
 
-  let lastId: string | undefined
-  for (const email of recipients) {
-    const res = await fetch(LOOPS_TRANSACTIONAL_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        email,
-        transactionalId,
-        addToAudience: false,
-        dataVariables: {
-          alertSubject: input.subject,
-          alertBody: input.text,
-          ...(input.replyTo ? { replyTo: input.replyTo } : {}),
-        },
-      }),
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: smtpPort(),
+      secure: smtpPort() === 465,
+      auth: { user, pass },
     })
 
-    const data = (await res.json().catch(() => ({}))) as {
-      success?: boolean
-      message?: string
-      id?: string
-    }
+    const info = await transporter.sendMail({
+      from,
+      to: recipients.join(', '),
+      subject: input.subject,
+      text: input.text,
+      ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+    })
 
-    if (res.status === 429) {
-      return { ok: false, error: 'Loops rate limit — prøv igen om lidt' }
-    }
-    if (!res.ok || data.success === false) {
-      return {
-        ok: false,
-        error: data.message || res.statusText || 'Loops kunne ikke sende e-mail',
-      }
-    }
-    lastId = data.id
+    return { ok: true, id: info.messageId }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: message.slice(0, 400) }
   }
-
-  return { ok: true, id: lastId }
 }
