@@ -1,10 +1,13 @@
 /**
  * Salling Group Algolia index types.
  *
- * Shared index `F9VBJLR1BK` indexes:
+ * Grocery app `F9VBJLR1BK` indexes (storeData prices in øre):
  *   - prod_NETTO_PRODUCTS
- *   - prod_BILKA_PRODUCTS
+ *   - prod_BILKATOGO_PRODUCTS
  *   - prod_FOETEX_PRODUCTS
+ *
+ * foetex.dk / bilka.dk `prod_*_PRODUCTS` on app DRP4O45G5T is a different
+ * Hybris schema (no storeData) and is not used here.
  *
  * Prices in storeData are in øre (integer). 250 = 2,50 kr.
  */

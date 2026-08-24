@@ -6,31 +6,43 @@ import {
 } from './types'
 
 /**
- * Salling Group Algolia client.
+ * Salling Group Algolia client — grocery indexes on app F9VBJLR1BK:
+ *   prod_NETTO_PRODUCTS, prod_FOETEX_PRODUCTS, prod_BILKATOGO_PRODUCTS
  *
- * Uses the public search-only API key embedded in the bilkatogo.dk frontend
- * (https://www.bilkatogo.dk/_nuxt/a2c814a.js). This key is intentionally
- * exposed for client-side search and rate-limited to search operations only.
+ * Search-only keys are public (embedded in the chain frontends) and
+ * index-restricted. The bilkatogo.dk key only allows Bilka To Go and
+ * returns 403 for Netto/Føtex. Default is the grocery catalog key that
+ * can query all three indexes.
  *
- * Application ID: F9VBJLR1BK
  * Endpoint: https://f9vbjlr1bk-dsn.algolia.net/1/indexes/{INDEX}/query
+ *
+ * Note: foetex.dk / bilka.dk use a different Algolia app (DRP4O45G5T)
+ * with a Hybris department-store schema — not compatible with this mapper.
  */
 
-const ALGOLIA_APP_ID = 'F9VBJLR1BK'
+export const SALLING_ALGOLIA_APP_ID = 'F9VBJLR1BK'
+
+/** Grocery catalog search key (Netto + Føtex + Bilka To Go). */
+const SALLING_ALGOLIA_GROCERY_SEARCH_KEY = 'd4f161f51f749bdd5baf699175d5f956'
 
 /**
  * Resolves the Algolia search key, preferring an env-var override.
- * Falls back to the publicly-visible frontend key.
+ * Override must be allowed to query Netto/Føtex/Bilka To Go — the
+ * bilkatogo.dk-only key (`1deaf41c…`) 403's on Netto and Føtex.
  */
-function getApiKey(): string {
+export function getSallingAlgoliaSearchKey(): string {
   const override = process.env.SALLING_ALGOLIA_SEARCH_KEY?.trim()
   if (override) return override
-  return '1deaf41c87e729779f7695c00f190cc9'
+  return SALLING_ALGOLIA_GROCERY_SEARCH_KEY
+}
+
+function getApiKey(): string {
+  return getSallingAlgoliaSearchKey()
 }
 
 function endpoint(chain: SallingChain): string {
   const index = SALLING_INDEX_BY_CHAIN[chain]
-  return `https://${ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net/1/indexes/${index}/query`
+  return `https://${SALLING_ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net/1/indexes/${index}/query`
 }
 
 export interface AlgoliaQueryParams {
@@ -74,7 +86,7 @@ export async function querySalling(
   const res = await fetch(endpoint(chain), {
     method: 'POST',
     headers: {
-      'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+      'X-Algolia-Application-Id': SALLING_ALGOLIA_APP_ID,
       'X-Algolia-API-Key': getApiKey(),
       'Content-Type': 'application/json',
     },

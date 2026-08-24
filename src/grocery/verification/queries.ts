@@ -6,6 +6,10 @@
  */
 
 import { getGroceryServiceClient } from '../db/client'
+import {
+  getSallingAlgoliaSearchKey,
+  SALLING_ALGOLIA_APP_ID,
+} from '../adapters/salling-algolia/client'
 
 const TRACKED_CHAINS = ['netto', 'foetex', 'bilka', 'rema-1000'] as const
 export type TrackedChain = (typeof TRACKED_CHAINS)[number]
@@ -312,8 +316,6 @@ export interface SourceCoverage {
   probeError?: string
 }
 
-const ALGOLIA_APP_ID = 'F9VBJLR1BK'
-const ALGOLIA_KEY = '1deaf41c87e729779f7695c00f190cc9'
 const SALLING_INDEX: Record<Exclude<TrackedChain, 'rema-1000'>, string> = {
   netto: 'prod_NETTO_PRODUCTS',
   foetex: 'prod_FOETEX_PRODUCTS',
@@ -322,12 +324,12 @@ const SALLING_INDEX: Record<Exclude<TrackedChain, 'rema-1000'>, string> = {
 
 async function probeSallingNbHits(chain: 'netto' | 'foetex' | 'bilka'): Promise<number> {
   const index = SALLING_INDEX[chain]
-  const url = `https://${ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net/1/indexes/${index}/query`
-  const key = process.env.SALLING_ALGOLIA_SEARCH_KEY?.trim() || ALGOLIA_KEY
+  const url = `https://${SALLING_ALGOLIA_APP_ID.toLowerCase()}-dsn.algolia.net/1/indexes/${index}/query`
+  const key = getSallingAlgoliaSearchKey()
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'X-Algolia-Application-Id': ALGOLIA_APP_ID,
+      'X-Algolia-Application-Id': SALLING_ALGOLIA_APP_ID,
       'X-Algolia-API-Key': key,
       'Content-Type': 'application/json',
     },

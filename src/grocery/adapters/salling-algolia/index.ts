@@ -1,4 +1,9 @@
-export { iterateAllProducts, querySalling } from './client'
+export {
+  iterateAllProducts,
+  querySalling,
+  getSallingAlgoliaSearchKey,
+  SALLING_ALGOLIA_APP_ID,
+} from './client'
 export { mapHitToChainOffer, mapHitToProduct } from './mapper'
 export { pickRepresentativeStore, resolveBeforePriceCents } from './pricing'
 export { syncSallingChain } from './sync'
