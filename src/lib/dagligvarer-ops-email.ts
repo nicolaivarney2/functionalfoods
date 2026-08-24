@@ -1,4 +1,7 @@
-import { sendTransactionalEmail } from '@/lib/send-transactional-email'
+/**
+ * Ops-alerts (grocery-sync fejl + dagligvarer morning report).
+ * Sender via Loops — se send-transactional-email.ts.
+ */
 
 const DEFAULT_TO = 'nicolai@functionalfoods.dk'
 
