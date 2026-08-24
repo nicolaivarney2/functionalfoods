@@ -14,6 +14,7 @@ import { getGroceryServiceClient } from '@/grocery/db/client'
 import type { SourceChain } from '@/grocery/types'
 import {
   NATIVE_CRON_WEEKDAY,
+  NATIVE_SYNC_LOG_SOURCES,
   missedLastScheduledSync,
   type NativeCronChain,
 } from '@/lib/grocery/sync-schedule'
@@ -75,12 +76,6 @@ const CHAINS: ChainSpec[] = [
 
 const RPC_LIMIT = 51
 const ABSURD_UNTIL_MS = 60 * 24 * 60 * 60 * 1000
-const NATIVE_SOURCES: Record<NativeCronChain, string> = {
-  netto: 'salling-algolia:netto',
-  foetex: 'salling-algolia:foetex',
-  bilka: 'salling-algolia:bilka',
-  'rema-1000': 'rema-1000-api',
-}
 
 function ffClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -157,7 +152,7 @@ async function lastSyncLogSuccess(
   const { data } = await grocery
     .from('sync_logs')
     .select('completed_at')
-    .eq('source', NATIVE_SOURCES[chain])
+    .in('source', [...NATIVE_SYNC_LOG_SOURCES[chain]])
     .in('status', ['success', 'partial'])
     .order('completed_at', { ascending: false })
     .limit(1)

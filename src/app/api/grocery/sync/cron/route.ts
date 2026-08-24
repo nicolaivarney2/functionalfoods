@@ -29,6 +29,7 @@ import {
   getScheduledSyncForNow,
   missedLastScheduledSync,
   NATIVE_CRON_WEEKDAY,
+  NATIVE_SYNC_LOG_SOURCES,
   scheduledStepIds,
   type NativeCronChain,
   type ScheduledGrocerySync,
@@ -67,21 +68,14 @@ interface CronSummary {
   catchUp?: NativeCronChain[]
 }
 
-const NATIVE_SYNC_SOURCE: Record<NativeCronChain, string> = {
-  netto: 'salling-algolia:netto',
-  foetex: 'salling-algolia:foetex',
-  bilka: 'salling-algolia:bilka',
-  'rema-1000': 'rema-1000-api',
-}
-
 async function nativeChainsMissingLastSlot(): Promise<NativeCronChain[]> {
   const supabase = getGroceryServiceClient()
   const missed: NativeCronChain[] = []
-  for (const chain of Object.keys(NATIVE_SYNC_SOURCE) as NativeCronChain[]) {
+  for (const chain of Object.keys(NATIVE_SYNC_LOG_SOURCES) as NativeCronChain[]) {
     const { data } = await supabase
       .from('sync_logs')
       .select('completed_at')
-      .eq('source', NATIVE_SYNC_SOURCE[chain])
+      .in('source', [...NATIVE_SYNC_LOG_SOURCES[chain]])
       .in('status', ['success', 'partial'])
       .order('completed_at', { ascending: false })
       .limit(1)

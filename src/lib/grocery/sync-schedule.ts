@@ -24,6 +24,17 @@ export const NATIVE_CRON_WEEKDAY: Record<NativeCronChain, number> = {
   'rema-1000': 0,
 }
 
+/**
+ * `sync_logs.source` values that count as a native scrape.
+ * REMA-adapteren skriver `apify-rema` (ikke `rema-1000-api`).
+ */
+export const NATIVE_SYNC_LOG_SOURCES: Record<NativeCronChain, readonly string[]> = {
+  netto: ['salling-algolia:netto'],
+  foetex: ['salling-algolia:foetex'],
+  bilka: ['salling-algolia:bilka'],
+  'rema-1000': ['apify-rema', 'rema-1000-api'],
+}
+
 export interface ScheduledGrocerySync {
   /** 0 = søndag … 6 = lørdag (Europe/Copenhagen). */
   cronWeekday: number
