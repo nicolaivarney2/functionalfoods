@@ -3,6 +3,8 @@
  * Sender via Loops — se send-transactional-email.ts.
  */
 
+import { sendTransactionalEmail } from '@/lib/send-transactional-email'
+
 const DEFAULT_TO = 'nicolai@functionalfoods.dk'
 
 export function opsAlertEmail(): string {
