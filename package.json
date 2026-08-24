@@ -20,6 +20,7 @@
     "fooddata:sync-publish": "npx tsx scripts/sync-ff-to-fooddata.ts",
     "fooddata:sync-publish:dry-run": "npx tsx scripts/sync-ff-to-fooddata.ts --dry-run",
     "fooddata:import": "npx tsx scripts/import-fooddata-to-ff.ts",
+    "dagligvarer:health": "npx tsx scripts/dagligvarer-launch-health.ts",
     "fooddata:import:curation-only": "npx tsx scripts/import-fooddata-to-ff.ts --curation-only",
     "fooddata:weekly-curation": "npx tsx scripts/fooddata-weekly-curation.ts --app=ff",
     "fooddata:create-api-key": "npx tsx scripts/grocery-create-api-key.ts",

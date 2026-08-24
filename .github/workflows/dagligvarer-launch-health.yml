@@ -1,0 +1,35 @@
+name: Dagligvarer launch health
+
+# Watchdog efter natlig scrape (04:00 UTC) + fooddata-import (05:00 UTC).
+# Kalder production: samme Algolia-nøgle, fooddata og Resend som live-cronen.
+# HTTP 503 = rød Action. ?email=1 sender morgenrapport til nicolai@functionalfoods.dk.
+
+on:
+  schedule:
+    # 06:30 UTC ≈ 08:30 DK — efter scrape + import.
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  launch-health:
+    runs-on: ubuntu-latest
+    environment: FF
+    timeout-minutes: 10
+    steps:
+      - name: Call launch-health on production
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$SITE_URL" ]; then
+            echo "SITE_URL GitHub variable is not set (e.g. https://functionalfoods.dk)."
+            exit 1
+          fi
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET mangler i GitHub Environment FF."
+            exit 1
+          fi
+          echo "GET $SITE_URL/api/admin/dagligvarer/launch-health?email=1"
+          curl --fail-with-body --max-time 120 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/admin/dagligvarer/launch-health?email=1"

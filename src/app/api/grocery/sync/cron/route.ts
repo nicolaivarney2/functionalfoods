@@ -27,11 +27,15 @@ import type { SourceChain } from '@/grocery/types'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   getScheduledSyncForNow,
+  missedLastScheduledSync,
+  NATIVE_CRON_WEEKDAY,
   scheduledStepIds,
+  type NativeCronChain,
   type ScheduledGrocerySync,
 } from '@/lib/grocery/sync-schedule'
 import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
+import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -60,6 +64,32 @@ interface CronSummary {
   }
   skipped?: boolean
   skipReason?: string
+  catchUp?: NativeCronChain[]
+}
+
+const NATIVE_SYNC_SOURCE: Record<NativeCronChain, string> = {
+  netto: 'salling-algolia:netto',
+  foetex: 'salling-algolia:foetex',
+  bilka: 'salling-algolia:bilka',
+  'rema-1000': 'rema-1000-api',
+}
+
+async function nativeChainsMissingLastSlot(): Promise<NativeCronChain[]> {
+  const supabase = getGroceryServiceClient()
+  const missed: NativeCronChain[] = []
+  for (const chain of Object.keys(NATIVE_SYNC_SOURCE) as NativeCronChain[]) {
+    const { data } = await supabase
+      .from('sync_logs')
+      .select('completed_at')
+      .eq('source', NATIVE_SYNC_SOURCE[chain])
+      .in('status', ['success', 'partial'])
+      .order('completed_at', { ascending: false })
+      .limit(1)
+    if (missedLastScheduledSync(data?.[0]?.completed_at, NATIVE_CRON_WEEKDAY[chain])) {
+      missed.push(chain)
+    }
+  }
+  return missed
 }
 
 function isAuthorized(request: Request): boolean {
@@ -122,6 +152,7 @@ async function handle(request: Request) {
 
   let mode: CronSummary['mode'] = 'scheduled'
   let schedule: ScheduledGrocerySync | null = null
+  let catchUp: NativeCronChain[] = []
 
   if (onlyParam) {
     mode = 'manual-only'
@@ -129,7 +160,15 @@ async function handle(request: Request) {
     mode = 'full'
   } else {
     schedule = getScheduledSyncForNow()
-    if (!schedule) {
+    try {
+      catchUp = await nativeChainsMissingLastSlot()
+    } catch (err) {
+      console.warn(
+        '[grocery/cron] catch-up lookup failed:',
+        err instanceof Error ? err.message : err,
+      )
+    }
+    if (!schedule && catchUp.length === 0) {
       const completedAt = new Date()
       const summary: CronSummary = {
         startedAt: startedAt.toISOString(),
@@ -140,7 +179,7 @@ async function handle(request: Request) {
         mode: 'scheduled',
         skipped: true,
         skipReason:
-          'Ingen kæder planlagt i dag (tirsdag er hviledag — sync kører ons–man).',
+          'Ingen kæder planlagt i dag, og ingen native kæder har misset deres ugeslot.',
       }
       return NextResponse.json(summary, { status: 200 })
     }
@@ -150,9 +189,10 @@ async function handle(request: Request) {
     ? new Set(onlyParam.split(',').map((s) => s.trim()))
     : mode === 'full'
       ? null
-      : schedule
-        ? new Set(scheduledStepIds(schedule))
-        : null
+      : new Set([
+          ...(schedule ? scheduledStepIds(schedule) : []),
+          ...catchUp,
+        ])
 
   const shouldRun = (id: string) => !only || only.has(id)
   const tjekChains =
@@ -279,6 +319,7 @@ async function handle(request: Request) {
     totalErrors,
     steps,
     mode,
+    ...(catchUp.length > 0 ? { catchUp } : {}),
     ...(schedule
       ? {
           schedule: {
@@ -291,6 +332,29 @@ async function handle(request: Request) {
           },
         }
       : {}),
+  }
+
+  if (totalErrors > 0) {
+    const failed = steps
+      .filter((s) => s.status === 'failed')
+      .map((s) => `${s.step}: ${'errorMessage' in s ? s.errorMessage : 'failed'}`)
+    const text = [
+      `Grocery sync ${summary.startedAt}`,
+      `mode=${summary.mode} duration=${summary.totalDurationMs}ms errors=${summary.totalErrors}`,
+      catchUp.length ? `catch-up: ${catchUp.join(', ')}` : '',
+      'Fejl:',
+      ...failed.map((f) => `  - ${f}`),
+      'Steps:',
+      ...steps.map((s) => `  ${s.step}: ${s.status}`),
+    ]
+      .filter(Boolean)
+      .join('\n')
+    void sendDagligvarerOpsEmail({
+      subject: `[FF grocery] ${totalErrors} sync-step fejlede`,
+      text,
+    }).then((r) => {
+      if (!r.ok) console.warn('[grocery/cron] ops-mail fejlede:', r.error)
+    })
   }
 
   return NextResponse.json(summary, {

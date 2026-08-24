@@ -14,6 +14,16 @@ import type { SourceChain } from '@/grocery/types'
 /** Steps the cron orchestrator can run (matches `?only=` ids). */
 export type CronSyncStepId = 'netto' | 'foetex' | 'bilka' | 'rema-1000' | 'tjek'
 
+/** Native scrapes that Vercel grocery-cron kører (ikke Goma/Tjek). */
+export type NativeCronChain = 'netto' | 'foetex' | 'bilka' | 'rema-1000'
+
+export const NATIVE_CRON_WEEKDAY: Record<NativeCronChain, number> = {
+  foetex: 5,
+  netto: 6,
+  bilka: 6,
+  'rema-1000': 0,
+}
+
 export interface ScheduledGrocerySync {
   /** 0 = søndag … 6 = lørdag (Europe/Copenhagen). */
   cronWeekday: number
@@ -111,6 +121,35 @@ export function getScheduledSyncForNow(
   date: Date = new Date(),
 ): ScheduledGrocerySync | null {
   return getScheduledSyncForWeekday(getCopenhagenWeekday(date))
+}
+
+/**
+ * Seneste 04:00 UTC-slot hvis Copenhagen-ugedag matcher `cronWeekday`.
+ * Grocery-cron kører `0 4 * * *` — samme tidspunkt som Vercel.
+ */
+export function lastScheduledCronAt(cronWeekday: number, now: Date = new Date()): Date {
+  for (let i = 0; i <= 8; i++) {
+    const candidate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i, 4, 0, 0, 0),
+    )
+    if (candidate.getTime() > now.getTime()) continue
+    if (getCopenhagenWeekday(candidate) === cronWeekday) return candidate
+  }
+  return new Date(0)
+}
+
+/** True hvis sidste succes ligger før kædens seneste planlagte cron-slot. */
+export function missedLastScheduledSync(
+  lastSuccessAt: string | null | undefined,
+  cronWeekday: number,
+  now: Date = new Date(),
+): boolean {
+  const slot = lastScheduledCronAt(cronWeekday, now)
+  if (slot.getTime() === 0) return false
+  if (!lastSuccessAt) return true
+  const t = new Date(lastSuccessAt).getTime()
+  if (!Number.isFinite(t)) return true
+  return t < slot.getTime() - 5 * 60 * 1000
 }
 
 /** Flat list of cron `only` step ids for a scheduled day. */
