@@ -1,18 +1,52 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
 import type { GomaProduct } from './types'
 import { extractEanFromSourceId } from '@/lib/product-ean'
+import { isGomaFullCatalogChain } from '@/lib/goma-import-stores'
 
 const SYNC_SOURCE = 'goma' as const
+
+/** Goma sender jævnligt 2037 / jul 2026 som sale_valid_to. Clamp til ~3 uger. */
+export const GOMA_OFFER_MAX_HORIZON_DAYS = 21
 
 function toCents(kr: number | null | undefined): number | null {
   if (kr == null || !Number.isFinite(kr)) return null
   return Math.round(kr * 100)
 }
 
-function resolveSaleState(p: GomaProduct): {
+/**
+ * Gomas sale_valid_to er upålidelig:
+ *   - offers-only: ofte sidste uges udløbsdato mens p_on_sale_only stadig returnerer varen
+ *   - Løvbjerg m.fl.: datoer i 2030–2037
+ *
+ * keepLiveSale: drop forældet udløb (null) i stedet for at slå tilbuddet fra.
+ * Absurde fremtidige datoer clamps altid.
+ */
+export function sanitizeGomaOfferUntil(
+  until: string | null | undefined,
+  options: { keepLiveSale: boolean; now?: Date },
+): string | null {
+  if (!until) return null
+  const now = options.now ?? new Date()
+  const end = new Date(until)
+  if (Number.isNaN(end.getTime())) return null
+  if (end.getTime() < now.getTime()) {
+    return options.keepLiveSale ? null : until
+  }
+  const maxMs = GOMA_OFFER_MAX_HORIZON_DAYS * 24 * 60 * 60 * 1000
+  if (end.getTime() > now.getTime() + maxMs) {
+    return new Date(now.getTime() + maxMs).toISOString()
+  }
+  return until
+}
+
+function resolveSaleState(
+  p: GomaProduct,
+  chain: SourceChain,
+): {
   isOnSale: boolean
   isOfferActive: boolean
   discountPct: number | null
+  offerUntil: string | null
 } {
   // Stol på Gomas eget is_on_sale-flag: for offers-only kæder (Lidl, 365discount,
   // SuperBrugsen, ABC Lavpris, Løvbjerg, …) leverer Goma sjældent en førpris, men
@@ -24,15 +58,21 @@ function resolveSaleState(p: GomaProduct): {
     isOnSale = true
   }
 
-  if (isOnSale && p.sale_valid_to) {
+  const offersOnly = !isGomaFullCatalogChain(chain)
+  const nowDate = new Date()
+
+  if (!offersOnly && isOnSale && p.sale_valid_to) {
     const saleEndDate = new Date(p.sale_valid_to)
-    if (saleEndDate < new Date()) {
+    if (!Number.isNaN(saleEndDate.getTime()) && saleEndDate < nowDate) {
       isOnSale = false
     }
   }
 
-  const nowDate = new Date()
-  const isOfferDateValid = !p.sale_valid_to || new Date(p.sale_valid_to) >= nowDate
+  const offerUntil = sanitizeGomaOfferUntil(p.sale_valid_to, {
+    keepLiveSale: offersOnly && isOnSale,
+    now: nowDate,
+  })
+  const isOfferDateValid = !offerUntil || new Date(offerUntil) >= nowDate
   const isOfferActive = isOnSale && isOfferDateValid
 
   let discountPct: number | null = null
@@ -42,7 +82,7 @@ function resolveSaleState(p: GomaProduct): {
     discountPct = Math.round(p.discount_percentage)
   }
 
-  return { isOnSale, isOfferActive, discountPct }
+  return { isOnSale, isOfferActive, discountPct, offerUntil }
 }
 
 export function mapGomaToProduct(
@@ -87,7 +127,7 @@ export function mapGomaToOffer(
   if (priceCents == null || priceCents <= 0) return null
 
   const beforeCents = toCents(p.normal_price)
-  const { isOnSale, isOfferActive, discountPct } = resolveSaleState(p)
+  const { isOnSale, isOfferActive, discountPct, offerUntil } = resolveSaleState(p, storeId)
   // Shelf availability from Goma — NOT tied to sale state. Full-catalog chains
   // (Nemlig, MENY, …) must stay visible even when not on sale.
   const inStock = p.is_available !== false
@@ -101,7 +141,7 @@ export function mapGomaToOffer(
     unit_price_unit: p.unit,
     is_on_sale: isOfferActive,
     offer_from: p.sale_valid_from,
-    offer_until: p.sale_valid_to,
+    offer_until: offerUntil,
     offer_description: null,
     multibuy: null,
     discount_percentage: isOfferActive ? discountPct : null,

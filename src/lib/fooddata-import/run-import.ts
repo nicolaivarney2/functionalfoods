@@ -25,6 +25,7 @@ import {
   shouldImportFooddataOfferSource,
   shouldImportFooddataProduct,
 } from '@/lib/goma-import-stores'
+import { sanitizeGomaOfferUntil } from '@/grocery/adapters/goma/mapper'
 
 /** PostgREST/Supabase default statement_timeout (~8s) bites on wide product rows. */
 const BATCH_SIZE = 500
@@ -748,23 +749,30 @@ function mapOffer(
   }
   const now = new Date()
   const fromOk = !o.offer_from || new Date(o.offer_from) <= now
-  const untilOk = !o.offer_until || new Date(o.offer_until) > now
   const currentKr = o.price_cents != null ? Number(o.price_cents) / 100 : 0
   const beforeKr = resolveBeforePriceKr(o as Parameters<typeof resolveBeforePriceKr>[0])
   const hasProvenDiscount = beforeKr != null
-  // Tilbudsavis (Tjek) og Goma offers-only: hele rækken er et tilbud uden bevist førpris.
-  // Goma fuldt katalog (MENY, Spar, …): kun reelle tilbud via førpris eller is_on_sale fra sync.
+  // Tilbudsavis (Tjek): hele rækken er et tilbud uden bevist førpris.
+  // Goma offers-only: stol på fooddata is_on_sale (mapper + Goma verify) — ellers
+  // ville stale rækker med forældet sale_valid_to blive genoplivet som aktuelle.
   const isTjekSource =
     typeof o.source === 'string' && o.source.toLowerCase().startsWith('tjek')
   const isGomaOffersOnlySource =
     o.source === 'goma' &&
     isGomaImportChain(ref.source_chain) &&
     !isGomaFullCatalogChain(ref.source_chain)
-  const isSaleOnlySource = isTjekSource || isGomaOffersOnlySource
+  const saleValidTo =
+    o.source === 'goma'
+      ? sanitizeGomaOfferUntil(o.offer_until ?? null, {
+          keepLiveSale: isGomaOffersOnlySource && o.is_on_sale === true,
+          now,
+        })
+      : (o.offer_until ?? null)
+  const untilOk = !saleValidTo || new Date(saleValidTo) > now
   const isOfferActive = !!(
     fromOk &&
     untilOk &&
-    (hasProvenDiscount || isSaleOnlySource || o.is_on_sale)
+    (hasProvenDiscount || isTjekSource || o.is_on_sale)
   )
   return {
     product_id: ref.id,
@@ -782,7 +790,7 @@ function mapOffer(
     price_per_unit: o.unit_price_cents != null ? Number(o.unit_price_cents) / 100 : null,
     is_available: o.in_stock ?? true,
     sale_valid_from: o.offer_from ?? null,
-    sale_valid_to: o.offer_until ?? null,
+    sale_valid_to: saleValidTo,
     source: o.source,
     last_seen_at: o.source_synced_at ?? null,
     amount: ref.amount,

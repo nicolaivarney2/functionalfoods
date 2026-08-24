@@ -731,7 +731,7 @@ export class DatabaseService {
   /** Synonymer pr. kanonisk kategori — matcher fx REMA "Kød & fisk" mod UI "Kød og fisk". */
   private getDepartmentAliasesForCanonicalCategory(canonical: string): string[] {
     const map: Record<string, string[]> = {
-      'Kød og fisk': ['Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød fisk'],
+      'Kød og fisk': ['Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød fisk', 'Kød'],
       'Mejeri og køl': ['Køl', 'Mejeri', 'Ost m.v.'],
       'Brød og kager': ['Brød', 'Kager', 'Brød & Bavinchi'],
       'Frugt og grønt': ['Frugt & grønt'],

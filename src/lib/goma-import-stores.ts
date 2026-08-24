@@ -144,6 +144,34 @@ export function defaultGomaImportStoreNames(): GomaStoreName[] {
   return ALL_GOMA_STORE_NAMES.filter(isGomaImportStoreName) as GomaStoreName[]
 }
 
+/**
+ * Goma cron-butikker for en given ugedag (0 = søndag … 6 = lørdag, Europe/Copenhagen).
+ *
+ * Første pass på kædens typiske udgivelsesdag, plus morning-after dagen efter:
+ * Goma/Coop opdaterer ofte sent torsdag, så torsdagens første pass rammer
+ * sidste uges udløbne datoer. Fredag fanger den nye avis.
+ */
+export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[] {
+  switch (dayIndex) {
+    case 1:
+      return []
+    case 2:
+      return ['ABC Lavpris']
+    case 3:
+      return ['ABC Lavpris', '365discount']
+    case 4:
+      return ['365discount', 'MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
+    case 5:
+      return ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg', 'Brugsen']
+    case 6:
+      return ['Lidl']
+    case 0:
+      return ['Lidl', 'Nemlig']
+    default:
+      return []
+  }
+}
+
 /** Skip fooddata→FF copy for chains owned by Goma while import is enabled. */
 export function shouldSkipFooddataChainForGoma(chain: SourceChain): boolean {
   return isGomaImportChain(chain)

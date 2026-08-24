@@ -38,9 +38,10 @@ const KNOWN_STORES: StoreDef[] = [
   { storeId: 'kvickly', label: 'Kvickly', offerDay: 'Torsdag' },
   { storeId: 'superbrugsen', label: 'SuperBrugsen', offerDay: 'Torsdag' },
   { storeId: 'brugsen', label: 'Brugsen', offerDay: 'Fredag' },
-  { storeId: 'lovbjerg', label: 'Løvbjerg', offerDay: 'Torsdag' },
+  { storeId: 'loevbjerg', label: 'Løvbjerg', offerDay: 'Torsdag' },
   { storeId: 'abc-lavpris', label: 'ABC Lavpris', offerDay: 'Tirsdag' },
-  { storeId: 'fotex', label: 'Føtex', offerDay: 'Torsdag' },
+  { storeId: 'foetex', label: 'Føtex', offerDay: 'Fredag' },
+  { storeId: 'min-koebmand', label: 'Min Købmand', offerDay: 'Torsdag' },
 ]
 
 function getAdminClient(): SupabaseClient {

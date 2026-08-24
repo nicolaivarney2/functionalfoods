@@ -1,4 +1,5 @@
 export { syncGoma, GOMA_SYNC_DEFAULTS, GOMA_CATALOG_SYNC_DEFAULTS } from './sync'
+export { GOMA_OFFER_MAX_HORIZON_DAYS, sanitizeGomaOfferUntil } from './mapper'
 export {
   GOMA_CATALOG_MAX_PAGES,
   GOMA_CATALOG_PAGE_SIZE,

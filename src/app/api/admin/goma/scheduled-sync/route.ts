@@ -2,49 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { importGomaProducts } from '@/lib/goma-import'
 import { cleanupExpiredOffers } from '@/lib/dagligvarer-offer-cleanup'
 import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
-import { filterGomaStoresForImport, type GomaStoreName } from '@/lib/goma-import-stores'
+import { filterGomaStoresForImport, getGomaStoresForDanishWeekday } from '@/lib/goma-import-stores'
 import { GOMA_SYNC_DEFAULTS } from '@/grocery/adapters/goma/sync'
+import { getCopenhagenWeekday } from '@/lib/grocery/sync-schedule'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 300
 
-type GomaStoreId = GomaStoreName
-
-function getStoresForToday(): { dayIndex: number; stores: GomaStoreId[] } {
-  const now = new Date()
-  const danishTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Copenhagen' }))
-  const dayIndex = danishTime.getDay()
-
-  let stores: GomaStoreId[] = []
-
-  switch (dayIndex) {
-    case 1:
-      stores = []
-      break
-    case 2:
-      stores = ['ABC Lavpris']
-      break
-    case 3:
-      stores = ['365discount']
-      break
-    case 4:
-      stores = ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
-      break
-    case 5:
-      stores = ['Brugsen']
-      break
-    case 6:
-      stores = ['Lidl']
-      break
-    case 0:
-      stores = ['Nemlig']
-      break
-    default:
-      stores = []
-  }
-
-  return { dayIndex, stores }
+function getStoresForToday(): { dayIndex: number; stores: ReturnType<typeof getGomaStoresForDanishWeekday> } {
+  const dayIndex = getCopenhagenWeekday()
+  return { dayIndex, stores: getGomaStoresForDanishWeekday(dayIndex) }
 }
 
 export async function POST(req: NextRequest) {

@@ -98,7 +98,9 @@ GROCERY_SUPABASE_DB_PASSWORD=...                   # used to build pooler conn s
 # Optional region override (default: eu-central-1):
 # GROCERY_SUPABASE_REGION=eu-central-1
 
-# Optional override (defaults to public frontend key)
+# Optional override of the grocery Algolia search key (must be allowed to
+# query Netto + Føtex + Bilka To Go). Do NOT set this to the bilkatogo.dk-only
+# key — that 403's on Netto/Føtex.
 # SALLING_ALGOLIA_SEARCH_KEY=...
 ```
 
@@ -144,6 +146,9 @@ When `GOMA_IMPORT_ENABLED=true` (påkrævet på Vercel + GitHub Actions):
 Per-kæde Goma-strategi:
 - **Kun tilbud:** Lidl, Coop-kæder, Løvbjerg, ABC Lavpris, … (`p_on_sale_only=true`)
 - **Fuldt katalog:** MENY, Spar, Nemlig, Min Købmand (`p_on_sale_only=false`)
+- **Ugedagsplan:** første pass på udgivelsesdagen + morning-after dagen efter
+  (Goma/Coop opdaterer ofte sent — torsdagens sync ramte ellers sidste uges
+  udløbne `sale_valid_to`). Se `getGomaStoresForDanishWeekday()`.
 
 Nød-fallback: `GOMA_IMPORT_ENABLED=false` — importerer `tjek:*` igen (ikke anbefalet).
 
