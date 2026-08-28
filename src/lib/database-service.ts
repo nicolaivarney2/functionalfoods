@@ -3,6 +3,7 @@ import { Recipe } from '@/types/recipe'
 import { IngredientTag } from '@/lib/ingredient-system/types'
 import { SupermarketProduct } from '@/lib/supermarket-scraper/types'
 import { getFoodCatalogLabelsForFilter, isFoodCatalogProduct } from '@/lib/product-food-classification'
+import { dagligvarerSearchMatches } from '@/lib/dagligvarer-search'
 import {
   applyDagligvarerSourceFilter,
   applyDagligvarerTjekStoreFilter,
@@ -110,6 +111,13 @@ export class DatabaseService {
     'kød, fisk & fjerkræ': 'Kød og fisk',
     'kød & fisk': 'Kød og fisk',
     'kød og fisk': 'Kød og fisk',
+    'kød & fjerkræ': 'Kød og fisk',
+    'oksekød': 'Kød og fisk',
+    'hakket oksekød': 'Kød og fisk',
+    'svinekød': 'Kød og fisk',
+    'fjerkræ': 'Kød og fisk',
+    'fisk': 'Kød og fisk',
+    'kød': 'Kød og fisk',
     'kolonial': 'Kolonial',
     'mejeri': 'Mejeri og køl',
     'køl': 'Mejeri og køl',
@@ -619,9 +627,7 @@ export class DatabaseService {
       p.category,
       p.subcategory,
     ]
-      .map((v) => String(v ?? '').toLowerCase())
-    const needle = term.toLowerCase()
-    return haystack.some((h) => h.includes(needle))
+    return haystack.some((h) => dagligvarerSearchMatches(String(h ?? ''), term))
   }
 
   private async fetchFoodOffersViaDirectQuery(
@@ -634,14 +640,14 @@ export class DatabaseService {
       ? new Set(opts.productIds.map((id) => String(id)))
       : null
 
-    const foodDeptSet = new Set(
-      this.getFoodOnlyDepartmentAllowList().map((d) => d.toLowerCase().trim()),
-    )
-
     const isFoodRow = (row: Record<string, any>) => {
       if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
-      const dept = String(row.products?.department ?? '').trim().toLowerCase()
-      return dept.length > 0 && foodDeptSet.has(dept)
+      return isFoodCatalogProduct({
+        department: row.products?.department,
+        category: row.products?.category,
+        subcategory: row.products?.subcategory,
+        name: row.products?.name_generic ?? row.name_store,
+      })
     }
 
     let organicIdSet: Set<string> | null = null
@@ -731,7 +737,18 @@ export class DatabaseService {
   /** Synonymer pr. kanonisk kategori — matcher fx REMA "Kød & fisk" mod UI "Kød og fisk". */
   private getDepartmentAliasesForCanonicalCategory(canonical: string): string[] {
     const map: Record<string, string[]> = {
-      'Kød og fisk': ['Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød fisk', 'Kød'],
+      'Kød og fisk': [
+        'Kød & fisk',
+        'Kød, fisk & fjerkræ',
+        'Kød & fjerkræ',
+        'Kød fisk',
+        'Kød',
+        'Oksekød',
+        'Hakket oksekød',
+        'Svinekød',
+        'Fjerkræ',
+        'Fisk',
+      ],
       'Mejeri og køl': ['Køl', 'Mejeri', 'Ost m.v.'],
       'Brød og kager': ['Brød', 'Kager', 'Brød & Bavinchi'],
       'Frugt og grønt': ['Frugt & grønt'],
@@ -899,6 +916,7 @@ export class DatabaseService {
       case 'brugsen':
         return 'Brugsen'
       case 'loevbjerg':
+      case 'lovbjerg':
       case 'løvbjerg':
         return 'Løvbjerg'
       case 'abc-lavpris':
@@ -934,6 +952,8 @@ export class DatabaseService {
       'Super Brugsen': 'superbrugsen',
       'Brugsen': 'brugsen',
       'Løvbjerg': 'loevbjerg',
+      loevbjerg: 'loevbjerg',
+      lovbjerg: 'loevbjerg',
       'ABC Lavpris': 'abc-lavpris',
       'min-koebmand': 'min-koebmand',
       'Min Købmand': 'min-koebmand',

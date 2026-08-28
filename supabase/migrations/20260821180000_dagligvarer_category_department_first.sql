@@ -1,15 +1,119 @@
--- /dagligvarer kategori-filter: match department først.
+-- /dagligvarer: department-first kategorier, Goma butiksnavn-afdeling, folded search.
 --
--- Tidligere matchedes p_department_patterns mod BÅDE department OG category.
--- Bilka To Go lægger fersk kød i department='Kød & fisk' og frostvarer i
--- department='Frost' med category='Kød & fisk'. Filteret "Kød og fisk" ramte
--- derfor frost-nuggets/rejer (billige, høj rabat) og skubbede kyllingeinderfilet
--- ud — eller viste en liste der ikke lignede kød-kategorien.
---
--- Category/subcategory bruges kun når department IKKE er en kendt fødevare-
--- afdeling (Goma/Tjek hvor department kan være butiksnavn).
+-- 1) Kategori-filter matcher department først (Bilka frost må ikke lande i kød).
+--    Category/subcategory kun når department IKKE er en kendt fødevare-afdeling.
+-- 2) Goma sætter ofte department = butiksnavn ('Lidl', '365discount', 'Diverse').
+--    De tæller med hvis category/subcategory er mad, ELLER department er store-navn
+--    (tilbudsavisen er allerede mad-tung; non-food filtreres i appen).
+-- 3) Søgning: 'xray' matcher 'X-Ray' (separatorer strippes).
+-- 4) Counts bruger samme food-filter og bucket'er store-navn via category/subcategory.
 
 DROP FUNCTION IF EXISTS public.get_food_offers_v2(boolean, integer, integer, text[], boolean, boolean, text[], text, text[]);
+DROP FUNCTION IF EXISTS public.get_product_counts_v2();
+DROP FUNCTION IF EXISTS public.get_product_counts_v2(boolean);
+DROP FUNCTION IF EXISTS public.get_product_counts_v2(boolean, boolean);
+
+CREATE OR REPLACE FUNCTION public.get_product_counts_v2(
+  filter_food_only boolean DEFAULT true,
+  p_goma_primary boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+SET statement_timeout = '25s'
+AS $$
+  WITH food_departments AS (
+    SELECT unnest(ARRAY[
+      'Frugt og grønt', 'Frugt & grønt',
+      'Brød og kager', 'Brød', 'Kager', 'Brød & Bavinchi',
+      'Kød og fisk', 'Kød & fisk', 'Kød, fisk & fjerkræ', 'Kød',
+      'Kolonial',
+      'Mejeri og køl', 'Mejeri & køl', 'Mejeri', 'Køl', 'Ost m.v.',
+      'Nemt og hurtigt', 'Nemt & hurtigt',
+      'Slik og snacks', 'Slik & snacks', 'Slik',
+      'Frost', 'Kiosk',
+      'Mad fra hele verden'
+    ]::text[]) AS dept
+  ),
+  store_named_departments AS (
+    SELECT unnest(ARRAY[
+      'Lidl', 'SPAR', 'Spar', 'SuperBrugsen', '365discount', 'Løvbjerg',
+      'Kvickly', 'Brugsen', 'ABC Lavpris', 'MENY', 'Nemlig', 'Min Købmand',
+      'Diverse', 'Not Categorized'
+    ]::text[]) AS dept
+  ),
+  goma_offers_only_stores AS (
+    SELECT unnest(ARRAY[
+      'lidl', '365discount', 'kvickly', 'superbrugsen', 'brugsen',
+      'loevbjerg', 'abc-lavpris'
+    ]::text[]) AS store_id
+  ),
+  goma_full_catalog_stores AS (
+    SELECT unnest(ARRAY[
+      'meny', 'spar', 'min-koebmand', 'nemlig'
+    ]::text[]) AS store_id
+  ),
+  per_bucket AS (
+    SELECT
+      CASE
+        WHEN prod.department IN (SELECT dept FROM food_departments) THEN prod.department
+        WHEN prod.category IN (SELECT dept FROM food_departments) THEN prod.category
+        ELSE COALESCE(
+          NULLIF(TRIM(prod.category), ''),
+          NULLIF(TRIM(prod.subcategory), ''),
+          NULLIF(TRIM(prod.department), ''),
+          'Ukategoriseret'
+        )
+      END AS bucket,
+      COUNT(*)::bigint AS cnt,
+      COUNT(*) FILTER (
+        WHERE po.current_price > 0
+          AND (po.sale_valid_to IS NULL OR po.sale_valid_to >= now())
+          AND (
+            (po.normal_price IS NOT NULL AND po.normal_price > po.current_price + 0.01)
+            OR (NOT p_goma_primary AND po.source LIKE 'tjek%')
+            OR (
+              p_goma_primary
+              AND po.source = 'goma'
+              AND po.store_id IN (SELECT store_id FROM goma_offers_only_stores)
+            )
+            OR (
+              p_goma_primary
+              AND po.source = 'goma'
+              AND po.store_id IN (SELECT store_id FROM goma_full_catalog_stores)
+              AND po.is_on_sale = true
+            )
+          )
+      )::bigint AS offer_cnt
+    FROM public.product_offers po
+    INNER JOIN public.products prod ON prod.id = po.product_id
+    WHERE po.is_available = true
+      AND (
+        (NOT p_goma_primary AND po.source IS DISTINCT FROM 'goma')
+        OR (p_goma_primary AND po.source NOT LIKE 'tjek%')
+      )
+      AND (
+        NOT filter_food_only
+        OR prod.department IN (SELECT dept FROM food_departments)
+        OR prod.category IN (SELECT dept FROM food_departments)
+        OR prod.department IN (SELECT dept FROM store_named_departments)
+        OR (NOT p_goma_primary AND po.source LIKE 'tjek%')
+      )
+    GROUP BY 1
+  )
+  SELECT jsonb_build_object(
+    'total', COALESCE((SELECT SUM(cnt) FROM per_bucket), 0),
+    'offers', COALESCE((SELECT SUM(offer_cnt) FROM per_bucket), 0),
+    'categories', COALESCE(
+      (SELECT jsonb_object_agg(bucket, cnt) FROM per_bucket),
+      '{}'::jsonb
+    )
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_product_counts_v2(boolean, boolean) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.get_food_offers_v2(
   p_offers_only boolean DEFAULT true,
@@ -42,6 +146,13 @@ AS $$
       'Mad fra hele verden'
     ]::text[]) AS dept
   ),
+  store_named_departments AS (
+    SELECT unnest(ARRAY[
+      'Lidl', 'SPAR', 'Spar', 'SuperBrugsen', '365discount', 'Løvbjerg',
+      'Kvickly', 'Brugsen', 'ABC Lavpris', 'MENY', 'Nemlig', 'Min Købmand',
+      'Diverse', 'Not Categorized'
+    ]::text[]) AS dept
+  ),
   goma_offers_only_stores AS (
     SELECT unnest(ARRAY[
       'lidl', '365discount', 'kvickly', 'superbrugsen', 'brugsen',
@@ -54,7 +165,12 @@ AS $$
     ]::text[]) AS store_id
   ),
   search_term AS (
-    SELECT NULLIF(trim(p_search), '') AS term
+    SELECT
+      NULLIF(trim(p_search), '') AS term,
+      NULLIF(
+        regexp_replace(lower(trim(coalesce(p_search, ''))), '[^a-z0-9æøåäöü]+', '', 'g'),
+        ''
+      ) AS term_folded
   ),
   filtered AS (
     SELECT
@@ -90,6 +206,8 @@ AS $$
       )
       AND (
         prod.department IN (SELECT dept FROM food_departments)
+        OR prod.category IN (SELECT dept FROM food_departments)
+        OR prod.department IN (SELECT dept FROM store_named_departments)
         OR (NOT p_goma_primary AND po.source LIKE 'tjek%')
       )
       AND (
@@ -114,6 +232,8 @@ AS $$
                AND (
                  prod.category ILIKE pat.pattern
                  OR prod.subcategory ILIKE pat.pattern
+                 OR prod.category ILIKE '%' || pat.pattern || '%'
+                 OR prod.subcategory ILIKE '%' || pat.pattern || '%'
                )
              )
         )
@@ -130,6 +250,17 @@ AS $$
         OR prod.department ILIKE '%' || st.term || '%'
         OR prod.category ILIKE '%' || st.term || '%'
         OR prod.subcategory ILIKE '%' || st.term || '%'
+        OR (
+          st.term_folded IS NOT NULL
+          AND (
+            regexp_replace(lower(coalesce(po.name_store, '')), '[^a-z0-9æøåäöü]+', '', 'g')
+              LIKE '%' || st.term_folded || '%'
+            OR regexp_replace(lower(coalesce(prod.name_generic, '')), '[^a-z0-9æøåäöü]+', '', 'g')
+              LIKE '%' || st.term_folded || '%'
+            OR regexp_replace(lower(coalesce(prod.brand, '')), '[^a-z0-9æøåäöü]+', '', 'g')
+              LIKE '%' || st.term_folded || '%'
+          )
+        )
       )
       AND (
         NOT p_offers_only
@@ -164,4 +295,4 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_food_offers_v2(boolean, integer, integer, text[], boolean, boolean, text[], text, text[]) TO anon, authenticated, service_role;
 
 COMMENT ON FUNCTION public.get_food_offers_v2(boolean, integer, integer, text[], boolean, boolean, text[], text, text[]) IS
-  'Dagligvarer offers. Category filter matches products.department first; category/subcategory only when department is not a known food department.';
+  'Dagligvarer offers. Department-first category filter; store-named Goma departments fall back to category/subcategory; search folds hyphens.';
