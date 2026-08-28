@@ -72,14 +72,27 @@ async function nativeChainsMissingLastSlot(): Promise<NativeCronChain[]> {
   const supabase = getGroceryServiceClient()
   const missed: NativeCronChain[] = []
   for (const chain of Object.keys(NATIVE_SYNC_LOG_SOURCES) as NativeCronChain[]) {
-    const { data } = await supabase
-      .from('sync_logs')
-      .select('completed_at')
-      .in('source', [...NATIVE_SYNC_LOG_SOURCES[chain]])
-      .in('status', ['success', 'partial'])
-      .order('completed_at', { ascending: false })
-      .limit(1)
-    if (missedLastScheduledSync(data?.[0]?.completed_at, NATIVE_CRON_WEEKDAY[chain])) {
+    const [{ data: log }, { data: seen }] = await Promise.all([
+      supabase
+        .from('sync_logs')
+        .select('completed_at')
+        .in('source', [...NATIVE_SYNC_LOG_SOURCES[chain]])
+        .in('status', ['success', 'partial'])
+        .order('completed_at', { ascending: false })
+        .limit(1),
+      supabase
+        .from('products')
+        .select('last_seen_at')
+        .eq('source_chain', chain)
+        .not('last_seen_at', 'is', null)
+        .order('last_seen_at', { ascending: false })
+        .limit(1),
+    ])
+    const lastOk = [log?.[0]?.completed_at, seen?.[0]?.last_seen_at]
+      .filter((v): v is string => typeof v === 'string')
+      .sort()
+      .at(-1)
+    if (missedLastScheduledSync(lastOk, NATIVE_CRON_WEEKDAY[chain])) {
       missed.push(chain)
     }
   }

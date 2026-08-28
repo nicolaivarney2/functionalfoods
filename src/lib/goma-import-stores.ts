@@ -183,8 +183,10 @@ export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[]
     default:
       stores = []
   }
+  // Nemlig først: fuld-katalog + daglig. Sidst i listen blev den oftest
+  // spist af Vercel 300s-timeout efter MENY/Spar/Min Købmand.
   for (const name of GOMA_DAILY_STORES) {
-    if (!stores.includes(name)) stores.push(name)
+    if (!stores.includes(name)) stores.unshift(name)
   }
   return stores
 }

@@ -82,6 +82,7 @@ export type SyncSource =
   | `tjek-offers`
   | `tjek:offers`
   | `goma`
+  | `goma:${string}`
 
 export interface StoreRow {
   id: string

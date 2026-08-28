@@ -6,7 +6,13 @@
  */
 
 import { getGroceryServiceClient } from '../../db/client'
-import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
+import type {
+  ProductInsert,
+  ProductOfferInsert,
+  SourceChain,
+  SyncLogInsert,
+} from '../../types'
+import { gomaSyncLogSource } from '@/lib/goma-catch-up'
 import {
   filterGomaStoresForImport,
   getGomaSyncMode,
@@ -24,8 +30,8 @@ import {
 import { mapGomaToOffer, mapGomaToProduct } from './mapper'
 import type { GomaProduct } from './types'
 
-const PRODUCT_BATCH_SIZE = 200
-const OFFER_BATCH_SIZE = 200
+const PRODUCT_BATCH_SIZE = 50
+const OFFER_BATCH_SIZE = 50
 const OFFERS_PAGE_CONCURRENCY = 4
 const CATALOG_PAGE_CONCURRENCY = 6
 
@@ -93,6 +99,11 @@ function resolveStoreSyncParams(
   }
 }
 
+function isStatementTimeout(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes('statement timeout') || m.includes('canceling statement')
+}
+
 function dedupeBySourceId(products: GomaProduct[]): GomaProduct[] {
   const byId = new Map<string, GomaProduct>()
   for (const p of products) {
@@ -127,6 +138,13 @@ async function upsertProductsAndOffers(
       .from('products')
       .upsert(productInserts, { onConflict: 'source_chain,source_id', ignoreDuplicates: false })
     if (productErr) {
+      if (slice.length > 10 && isStatementTimeout(productErr.message)) {
+        const mid = Math.ceil(slice.length / 2)
+        await upsertProductsAndOffers(chain, storeName, slice.slice(0, mid), syncedAt)
+        await upsertProductsAndOffers(chain, storeName, slice.slice(mid), syncedAt)
+        processed += slice.length
+        continue
+      }
       throw new Error(`Goma product upsert failed (${storeName}): ${productErr.message}`)
     }
 
@@ -137,6 +155,13 @@ async function upsertProductsAndOffers(
       .eq('source_chain', chain)
       .in('source_id', sourceIds)
     if (selectErr) {
+      if (slice.length > 10 && isStatementTimeout(selectErr.message)) {
+        const mid = Math.ceil(slice.length / 2)
+        await upsertProductsAndOffers(chain, storeName, slice.slice(0, mid), syncedAt)
+        await upsertProductsAndOffers(chain, storeName, slice.slice(mid), syncedAt)
+        processed += slice.length
+        continue
+      }
       throw new Error(`Goma post-upsert select failed (${storeName}): ${selectErr.message}`)
     }
 
@@ -296,6 +321,31 @@ async function verifyAndDeactivateStaleOffers(
   }
 }
 
+async function finishGomaSyncLog(
+  logId: string | undefined,
+  payload: {
+    status: 'success' | 'partial' | 'failed'
+    durationMs: number
+    productsProcessed: number
+    errorMessage?: string
+  },
+): Promise<void> {
+  if (!logId) return
+  const supabase = getGroceryServiceClient()
+  await supabase
+    .from('sync_logs')
+    .update({
+      status: payload.status,
+      completed_at: new Date().toISOString(),
+      duration_ms: payload.durationMs,
+      products_processed: payload.productsProcessed,
+      offers_processed: payload.productsProcessed,
+      errors_count: payload.status === 'failed' ? 1 : 0,
+      error_message: payload.errorMessage?.slice(0, 1000) ?? null,
+    })
+    .eq('id', logId)
+}
+
 async function syncGomaStore(
   storeName: string,
   params: StoreSyncParams,
@@ -306,6 +356,52 @@ async function syncGomaStore(
     throw new Error(`Ukendt Goma-butik: ${storeName}`)
   }
 
+  const supabase = getGroceryServiceClient()
+  const startedAt = Date.now()
+  let syncLogId: string | undefined
+  const initial: SyncLogInsert = {
+    source: gomaSyncLogSource(chain),
+    status: 'running',
+    started_at: new Date(startedAt).toISOString(),
+    metadata: { storeName, mode: getGomaSyncMode(chain) },
+  }
+  const { data: logRow, error: logErr } = await supabase
+    .from('sync_logs')
+    .insert(initial)
+    .select('id')
+    .single()
+  if (logErr) {
+    console.warn(`⚠️ Goma sync_logs insert fejlede (${storeName}):`, logErr.message)
+  } else {
+    syncLogId = logRow.id as string
+  }
+
+  try {
+    const imported = await syncGomaStoreBody(chain, storeName, params, onProgress)
+    await finishGomaSyncLog(syncLogId, {
+      status: 'success',
+      durationMs: Date.now() - startedAt,
+      productsProcessed: imported,
+    })
+    return imported
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await finishGomaSyncLog(syncLogId, {
+      status: 'failed',
+      durationMs: Date.now() - startedAt,
+      productsProcessed: 0,
+      errorMessage: message,
+    })
+    throw err
+  }
+}
+
+async function syncGomaStoreBody(
+  chain: SourceChain,
+  storeName: string,
+  params: StoreSyncParams,
+  onProgress?: GomaSyncOptions['onProgress'],
+): Promise<number> {
   const mode = getGomaSyncMode(chain)
   const pageConcurrency =
     mode === 'full-catalog' ? CATALOG_PAGE_CONCURRENCY : OFFERS_PAGE_CONCURRENCY

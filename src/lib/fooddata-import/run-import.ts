@@ -105,6 +105,11 @@ export interface RunImportOptions {
   historyDays?: number
   /** Logger — defaults to console.log. Pass a no-op or accumulator for serverless. */
   log?: (msg: string) => void
+  /**
+   * Spring over hvis FF allerede er nyere eller lig fooddata (inden for 2 min)
+   * og sidste FF-offer er under 14 timer gammel. Bruges af backup-cron 07:00/16:00.
+   */
+  skipIfFresh?: boolean
 }
 
 export interface RunImportResult {
@@ -122,6 +127,7 @@ export interface RunImportResult {
     queueUpserted: number
   } | null
   durationMs: number
+  skippedFresh?: boolean
 }
 
 type ProductRef = {
@@ -841,9 +847,59 @@ export async function runFooddataImport(
     pullQueue = false,
     historyDays = PRICE_HISTORY_IMPORT_WINDOW_DAYS,
     log = console.log,
+    skipIfFresh = false,
   } = options
 
   const t0 = Date.now()
+
+  if (skipIfFresh && !dryRun && !curationOnly) {
+    try {
+    const [{ data: ffOffer }, { data: fdProduct }] = await Promise.all([
+      ff
+        .from('product_offers')
+        .select('last_seen_at')
+        .not('last_seen_at', 'is', null)
+        .order('last_seen_at', { ascending: false })
+        .limit(1),
+      fooddata
+        .from('products')
+        .select('last_seen_at')
+        .not('last_seen_at', 'is', null)
+        .order('last_seen_at', { ascending: false })
+        .limit(1),
+    ])
+    const ffAt = ffOffer?.[0]?.last_seen_at
+      ? new Date(ffOffer[0].last_seen_at as string).getTime()
+      : 0
+    const fdAt = fdProduct?.[0]?.last_seen_at
+      ? new Date(fdProduct[0].last_seen_at as string).getTime()
+      : 0
+    const ageMs = ffAt > 0 ? Date.now() - ffAt : Number.POSITIVE_INFINITY
+    const fooddataIsNewer = fdAt > ffAt + 2 * 60 * 1000
+    if (ffAt > 0 && !fooddataIsNewer && ageMs < 14 * 60 * 60 * 1000) {
+      log(
+        `skip-if-fresh: FF last_seen ${new Date(ffAt).toISOString()} er ≤ fooddata og < 14t gammel — hopper over`,
+      )
+      return {
+        dryRun,
+        curationOnly,
+        stores: 0,
+        products: { upserted: 0, newlyImported: 0 },
+        offers: { upserted: 0, dropped: 0, cleaned: 0 },
+        history: { upserted: 0, dropped: 0, skipped: true },
+        queue: null,
+        curation: null,
+        durationMs: Date.now() - t0,
+        skippedFresh: true,
+      }
+    }
+    } catch (err) {
+      log(
+        `skip-if-fresh lookup fejlede — kører import (${err instanceof Error ? err.message : err})`,
+      )
+    }
+  }
+
   const gomaImportEnabled = isGomaImportEnabled()
   if (gomaImportEnabled) {
     log('Goma aktiv — fooddata→FF bruger source=goma for offers-only kæder (Tjek cold backup i grocery-DB)')

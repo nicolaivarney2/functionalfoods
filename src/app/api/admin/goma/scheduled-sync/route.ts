@@ -5,14 +5,43 @@ import { GOMA_SUNSET_MESSAGE, isGomaImportEnabled } from '@/lib/goma-sunset'
 import { filterGomaStoresForImport, getGomaStoresForDanishWeekday } from '@/lib/goma-import-stores'
 import { GOMA_SYNC_DEFAULTS } from '@/grocery/adapters/goma/sync'
 import { getCopenhagenWeekday } from '@/lib/grocery/sync-schedule'
+import {
+  mergeGomaStoreLists,
+  parseGomaStoreQuery,
+  resolveGomaCatchUpStores,
+} from '@/lib/goma-catch-up'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const maxDuration = 300
 
-function getStoresForToday(): { dayIndex: number; stores: ReturnType<typeof getGomaStoresForDanishWeekday> } {
-  const dayIndex = getCopenhagenWeekday()
-  return { dayIndex, stores: getGomaStoresForDanishWeekday(dayIndex) }
+function formatImportError(err: unknown): string {
+  const anyErr = err as {
+    name?: string
+    message?: string
+    cause?: { message?: string }
+    errors?: unknown[]
+  }
+  const parts: string[] = []
+  if (anyErr?.name) parts.push(anyErr.name)
+  if (anyErr?.message) parts.push(anyErr.message)
+  if (typeof err === 'string') parts.push(err)
+  if (anyErr?.cause?.message) parts.push(`cause: ${anyErr.cause.message}`)
+  if (Array.isArray(anyErr?.errors)) {
+    parts.push(
+      'errors: ' +
+        anyErr.errors
+          .map((e) => (e as { message?: string })?.message || String(e))
+          .filter(Boolean)
+          .join(' | '),
+    )
+  }
+  if (parts.length > 0) return parts.join(' — ')
+  try {
+    return JSON.stringify(err)
+  } catch {
+    return String(err)
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -37,11 +66,37 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    const { dayIndex, stores: scheduledStores } = getStoresForToday()
-    const { allowed: stores, skipped: skippedStores } = filterGomaStoresForImport(scheduledStores)
+    const url = new URL(req.url)
+    const skipCleanup = url.searchParams.get('skipCleanup') === '1'
+    const explicitStores = parseGomaStoreQuery(url.searchParams.get('stores'))
+    const dayIndex = getCopenhagenWeekday()
+    const scheduledStores = getGomaStoresForDanishWeekday(dayIndex)
+
+    let catchUpStores: typeof scheduledStores = []
+    const wantCatchUp =
+      url.searchParams.get('catchUp') === '1' ||
+      (explicitStores.length === 0 && url.searchParams.get('catchUp') !== '0')
+    if (wantCatchUp) {
+      try {
+        catchUpStores = await resolveGomaCatchUpStores()
+      } catch (err) {
+        console.warn(
+          'Goma catch-up lookup fejlede:',
+          err instanceof Error ? err.message : err,
+        )
+      }
+    }
+
+    const requested =
+      explicitStores.length > 0
+        ? mergeGomaStoreLists(explicitStores, wantCatchUp ? catchUpStores : [])
+        : mergeGomaStoreLists(scheduledStores, catchUpStores)
+
+    const { allowed: stores, skipped: skippedStores } = filterGomaStoresForImport(requested)
 
     let imported: number | null = null
     let importError: string | null = null
+    let storeErrors: string[] = []
 
     if (stores.length > 0) {
       try {
@@ -51,43 +106,25 @@ export async function POST(req: NextRequest) {
           pages: GOMA_SYNC_DEFAULTS.pages,
         })
         imported = result?.totalImported ?? 0
-      } catch (err) {
-        const anyErr = err as { name?: string; message?: string; cause?: { message?: string }; errors?: unknown[] }
-        const parts: string[] = []
-        if (anyErr?.name) parts.push(anyErr.name)
-        if (anyErr?.message) parts.push(anyErr.message)
-        if (typeof err === 'string') parts.push(err)
-        if (anyErr?.cause?.message) parts.push(`cause: ${anyErr.cause.message}`)
-        if (Array.isArray(anyErr?.errors)) {
-          parts.push(
-            'errors: ' +
-              anyErr.errors
-                .map((e) => (e as { message?: string })?.message || String(e))
-                .filter(Boolean)
-                .join(' | '),
-          )
+        storeErrors = result?.errors ?? []
+        if (storeErrors.length > 0) {
+          importError = storeErrors.join(' | ')
         }
-        importError =
-          parts.length > 0
-            ? parts.join(' — ')
-            : (() => {
-                try {
-                  return JSON.stringify(err)
-                } catch {
-                  return String(err)
-                }
-              })() || 'Ukendt importfejl'
+      } catch (err) {
+        importError = formatImportError(err) || 'Ukendt importfejl'
         console.error('❌ Goma import fejlede i scheduled-sync:', err)
       }
     }
 
     let cleanupResult: Awaited<ReturnType<typeof cleanupExpiredOffers>> | null = null
     let cleanupError: string | null = null
-    try {
-      cleanupResult = await cleanupExpiredOffers()
-    } catch (err) {
-      cleanupError = err instanceof Error ? err.message : 'Ukendt cleanup-fejl'
-      console.error('❌ Expired-offer cleanup fejlede:', err)
+    if (!skipCleanup) {
+      try {
+        cleanupResult = await cleanupExpiredOffers()
+      } catch (err) {
+        cleanupError = err instanceof Error ? err.message : 'Ukendt cleanup-fejl'
+        console.error('❌ Expired-offer cleanup fejlede:', err)
+      }
     }
 
     const overallSuccess = !importError && !cleanupError
@@ -102,10 +139,12 @@ export async function POST(req: NextRequest) {
           : 'Scheduled Goma sync kørt med fejl (se importError / cleanupError)',
         dayIndex,
         scheduledStores,
+        catchUpStores,
         stores,
         skippedStores,
         imported,
         importError,
+        storeErrors,
         cleanup: cleanupResult
           ? {
               cleaned: cleanupResult.cleaned,
@@ -115,7 +154,7 @@ export async function POST(req: NextRequest) {
           : null,
         cleanupError,
       },
-      { status: 200 },
+      { status: overallSuccess ? 200 : 500 },
     )
   } catch (error) {
     console.error('❌ Error in scheduled Goma sync:', error)

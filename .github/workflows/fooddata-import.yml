@@ -10,10 +10,17 @@ name: Fooddata Daily Import (incl. price history)
 
 on:
   schedule:
-    # Dagligt 05:00 UTC — efter den natlige scrape (04:00 UTC).
-    # NB: GitHubs scheduler kan være et par minutter forsinket; det er fint her.
+    # Primær: efter native scrape 04:00 + Goma 02:00.
     - cron: '0 5 * * *'
+    # Backup hvis 05:00 blev sprunget over (GitHub cron er ikke garanteret).
+    - cron: '0 7 * * *'
+    # Efter eftermiddagens Goma-slot (14:00 UTC).
+    - cron: '0 16 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: fooddata-import
+  cancel-in-progress: false
 
 jobs:
   fooddata-import:
@@ -60,4 +67,10 @@ jobs:
       # Match-queue og price_history er non-fatal: katalog + offers tæller som success
       # selv hvis history/enqueue timeout'er. Scope: kun nye product ids (ikke fuld offers-scan).
       - name: Run full fooddata import (incl. price history)
-        run: npx tsx scripts/import-fooddata-to-ff.ts
+        run: |
+          # 05:00 og manuel dispatch kører altid. Backup-slots hopper over hvis FF allerede er frisk.
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "${{ github.event.schedule }}" != "0 5 * * *" ]; then
+            npx tsx scripts/import-fooddata-to-ff.ts --skip-if-fresh
+          else
+            npx tsx scripts/import-fooddata-to-ff.ts
+          fi

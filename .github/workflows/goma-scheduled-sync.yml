@@ -1,42 +1,64 @@
 name: Goma Scheduled Sync
 
-# Goma sync for offers-only kæder (Lidl, Coop, MENY, …). Salling/REMA kommer fra fooddata.
-# Kræver GOMA_IMPORT_ENABLED=true + GOMA_API_KEY i Vercel. Slå import fra for at falde tilbage til Tjek via fooddata-import.
+# Goma → fooddata for offers-only kæder (Lidl, Coop, MENY, Nemlig, …).
+# Kører på GitHub-runner (ikke ét Vercel-request) så fuldt katalog ikke rammer 300s.
+# Catch-up henter kæder der er blevet sprunget over (fx Nemlig sidst i listen).
 on:
   schedule:
-    # Two runs per day in UTC:
-    #   02:00 UTC ≈ 04:00 dansk (sommer) / 03:00 (vinter)
-    #   14:00 UTC ≈ 16:00 dansk (sommer) / 15:00 (vinter)
     - cron: '0 2 * * *'
     - cron: '0 14 * * *'
   workflow_dispatch:
 
+concurrency:
+  group: goma-scheduled-sync
+  cancel-in-progress: false
+
 jobs:
   goma-scheduled-sync:
     runs-on: ubuntu-latest
-    # CRON_SECRET ligger på GitHub Environment "FF" (samme som fooddata-import).
     environment: FF
+    timeout-minutes: 40
+    env:
+      GOMA_IMPORT_ENABLED: 'true'
+      GOMA_API_KEY: ${{ secrets.GOMA_API_KEY }}
+      GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
+      GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      SITE_URL: ${{ vars.SITE_URL }}
     steps:
-      - name: Call scheduled Goma sync endpoint
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify grocery + Goma or Vercel fallback
         run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "SITE_URL GitHub variable is not set. Please set it to your production URL (e.g. https://functionalfoods.dk)."
+          missing=0
+          for v in GROCERY_SUPABASE_URL GROCERY_SUPABASE_SECRET_KEY NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required secret: $v"
+              missing=1
+            fi
+          done
+          if [ -z "$GOMA_API_KEY" ]; then
+            echo "GOMA_API_KEY mangler — scriptet falder tilbage til per-kæde Vercel-kald."
+            if [ -z "$SITE_URL" ] || [ -z "$CRON_SECRET" ]; then
+              echo "Fallback kræver SITE_URL + CRON_SECRET."
+              missing=1
+            fi
+          fi
+          if [ "$missing" = "1" ]; then
             exit 1
           fi
 
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET GitHub secret is not set. Please add it and keep it in sync with the Vercel env CRON_SECRET."
-            exit 1
-          fi
-
-          echo "Calling scheduled Goma sync on $SITE_URL ..."
-          curl --fail --max-time 300 --retry 3 --retry-delay 5 -X POST \
-            -H "Content-Type: application/json" \
-            -H "x-cron-secret: $CRON_SECRET" \
-            "$SITE_URL/api/admin/goma/scheduled-sync" || {
-            echo "Failed to call scheduled sync endpoint"
-            exit 1
-          }
+      - name: Run scheduled Goma sync (incl. catch-up)
+        run: npx tsx scripts/grocery-sync-goma-scheduled.ts

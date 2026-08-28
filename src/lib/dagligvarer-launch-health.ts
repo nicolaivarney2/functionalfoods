@@ -124,15 +124,20 @@ async function rpcOffers(
   return { count: rows.length, sample, absurdUntilCount }
 }
 
-async function lastSeen(client: SupabaseClient, chain: SourceChain): Promise<string | null> {
+async function lastSeen(
+  client: SupabaseClient,
+  chain: SourceChain,
+  column: 'last_seen_at' | 'source_synced_at' = 'last_seen_at',
+): Promise<string | null> {
   const { data } = await client
     .from('product_offers')
-    .select('last_seen_at')
+    .select(column)
     .eq('store_id', chain)
-    .not('last_seen_at', 'is', null)
-    .order('last_seen_at', { ascending: false })
+    .not(column, 'is', null)
+    .order(column, { ascending: false })
     .limit(1)
-  return data?.[0]?.last_seen_at ?? null
+  const value = data?.[0]?.[column]
+  return typeof value === 'string' ? value : null
 }
 
 async function countOnSale(client: SupabaseClient, chain: SourceChain): Promise<number | null> {
@@ -252,7 +257,20 @@ function classify(
     }
   }
   if (input.rpcCount === 0) {
-    return { level: 'fail', reason: 'Ingen madtilbud på /dagligvarer' }
+    const isNative = Boolean(spec.native || spec.algolia)
+    // Goma-kæder (fx ABC): tom kilde ≠ nede site. Kun rød hvis fooddata HAR tilbud, FF ikke.
+    if (!isNative && (input.fooddataOnSale == null || input.fooddataOnSale === 0)) {
+      return {
+        level: 'warn',
+        reason:
+          input.fooddataOnSale === 0
+            ? 'Ingen madtilbud — Goma/fooddata er også tom'
+            : 'Ingen madtilbud (fooddata ikke tjekket)',
+      }
+    }
+    const fd =
+      input.fooddataOnSale != null ? ` (fooddata har ${input.fooddataOnSale})` : ''
+    return { level: 'fail', reason: `Ingen madtilbud på /dagligvarer${fd}` }
   }
   if (input.absurdUntilCount > 0) {
     return {
@@ -272,9 +290,17 @@ function classify(
     }
   }
   if (input.samplePriceMismatches != null && input.samplePriceMismatches >= 3) {
+    // Samme-dags scrape kan stadig afvige pr. fysisk butik i Algolia.
+    // Rødt kun når vi også missede cron-slottet (så er fooddata reelt bagud).
+    if (input.missedScheduledSlot) {
+      return {
+        level: 'fail',
+        reason: `${input.samplePriceMismatches}/8 stikprøver matcher ikke Algolia-prisen`,
+      }
+    }
     return {
-      level: 'fail',
-      reason: `${input.samplePriceMismatches}/8 stikprøver matcher ikke Algolia-prisen`,
+      level: 'warn',
+      reason: `${input.samplePriceMismatches}/8 stikprøver afviger fra Algolia (butiksvariance)`,
     }
   }
   if (input.daysSinceSeen != null && input.daysSinceSeen > spec.maxStaleDays) {
@@ -333,7 +359,8 @@ export async function runDagligvarerLaunchHealth(
     }
 
     if (grocery) {
-      fooddataLastSeenAt = await lastSeen(grocery, spec.chain)
+      // fooddata.product_offers bruger source_synced_at (ikke last_seen_at).
+      fooddataLastSeenAt = await lastSeen(grocery, spec.chain, 'source_synced_at')
       fooddataOnSale = await countOnSale(grocery, spec.chain)
       if (spec.native) {
         const logAt = await lastSyncLogSuccess(grocery, spec.native)

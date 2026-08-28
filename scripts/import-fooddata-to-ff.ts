@@ -92,6 +92,7 @@ async function main() {
     pullCuration: args.has('--pull-curation'),
     curationOnly: args.has('--curation-only'),
     pullQueue: args.has('--pull-queue'),
+    skipIfFresh: args.has('--skip-if-fresh'),
     log: (msg) => console.log(msg),
   })
 
