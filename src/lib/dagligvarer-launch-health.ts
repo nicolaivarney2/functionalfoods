@@ -9,7 +9,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { querySalling } from '@/grocery/adapters/salling-algolia/client'
-import { pickRepresentativeStore } from '@/grocery/adapters/salling-algolia/pricing'
+import { storedPriceMatchesAlgolia } from '@/grocery/adapters/salling-algolia/pricing'
 import { getGroceryServiceClient } from '@/grocery/db/client'
 import type { SourceChain } from '@/grocery/types'
 import {
@@ -222,9 +222,9 @@ async function sampleAlgoliaPriceMismatches(
     for (const hit of hits) {
       const productId = idBySource.get(hit.objectID)
       const ours = productId ? priceByProduct.get(productId) : null
-      const rep = pickRepresentativeStore(hit.storeData, hit)
-      const sourcePrice = rep?.data.price ? Math.round(rep.data.price) : null
-      if (ours == null || sourcePrice == null || Math.abs(ours - sourcePrice) > 1) {
+      // Ét repræsentativt storeId skifter mellem scrape og health-check.
+      // Match hvis fooddata-prisen stadig findes på en Algolia-butik.
+      if (!storedPriceMatchesAlgolia(hit.storeData, hit, ours)) {
         mismatches++
       }
     }
@@ -282,7 +282,8 @@ function classify(
     input.sourceLeafletCount != null &&
     input.sourceLeafletCount >= 50 &&
     input.fooddataOnSale != null &&
-    input.fooddataOnSale < input.sourceLeafletCount * 0.5
+    (input.fooddataOnSale < input.sourceLeafletCount * 0.5 ||
+      input.fooddataOnSale > input.sourceLeafletCount * 1.35)
   ) {
     return {
       level: 'fail',
@@ -290,14 +291,7 @@ function classify(
     }
   }
   if (input.samplePriceMismatches != null && input.samplePriceMismatches >= 3) {
-    // Samme-dags scrape kan stadig afvige pr. fysisk butik i Algolia.
-    // Rødt kun når vi også missede cron-slottet (så er fooddata reelt bagud).
-    if (input.missedScheduledSlot) {
-      return {
-        level: 'fail',
-        reason: `${input.samplePriceMismatches}/8 stikprøver matcher ikke Algolia-prisen`,
-      }
-    }
+    // Butikspriser i Algolia varierer; missed cron er allerede rød ovenfor.
     return {
       level: 'warn',
       reason: `${input.samplePriceMismatches}/8 stikprøver afviger fra Algolia (butiksvariance)`,

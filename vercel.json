@@ -2,19 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": false
-  },
-  "crons": [
-    {
-      "path": "/api/grocery/sync/cron",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/grocery/sync/cleanup-expired",
-      "schedule": "30 4 * * *"
-    },
-    {
-      "path": "/api/cron/price-alert-notify",
-      "schedule": "0 8 * * *"
-    }
-  ]
+  }
 }

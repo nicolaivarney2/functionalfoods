@@ -1,0 +1,30 @@
+name: Price alert notify
+
+# Expo-push for udløste prisalarmer. GitHub-runner — ikke Vercel cron.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: price-alert-notify
+  cancel-in-progress: false
+
+jobs:
+  price-alert-notify:
+    runs-on: ubuntu-latest
+    environment: FF
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Send price-alert pushes
+        run: npx tsx scripts/price-alert-notify.ts

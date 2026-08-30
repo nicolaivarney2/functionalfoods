@@ -5,7 +5,9 @@ name: Fooddata Daily Import (incl. price history)
 # Why GitHub Actions and not a Vercel cron: the full import takes ~12 min
 # (price_history alone ~11 min), which blows past Vercel's 300s function limit.
 #
-# Schedule: 05:00 UTC daily — after native scrape (04:00) + Goma sync (02:00/14:00).
+# Schedule: 05:00 UTC daily — after Goma (02:00) + Vercel native scrape (04:00).
+# Salling-avis refresh kører HER (GitHub), så udgåede Netto/Føtex/Bilka-tilbud
+# aldrig afhænger af at Vercel-cron nåede i mål.
 # Requires GOMA_IMPORT_ENABLED=true so import copies source=goma (not legacy tjek:*).
 
 on:
@@ -63,6 +65,11 @@ jobs:
             echo "Set the missing secrets under Settings → Environments → FF (or check the environment name matches 'environment: FF' in this workflow)."
             exit 1
           fi
+
+      # Salling-avis på runneren (ikke Vercel). Udgåede tilbud ryddes før import,
+      # også hvis Vercel-cron blev sprunget over eller timed out.
+      - name: Refresh Salling leaflets (Netto / Føtex / Bilka)
+        run: npx tsx scripts/grocery-sync-salling-leaflets.ts
 
       # Match-queue og price_history er non-fatal: katalog + offers tæller som success
       # selv hvis history/enqueue timeout'er. Scope: kun nye product ids (ikke fuld offers-scan).

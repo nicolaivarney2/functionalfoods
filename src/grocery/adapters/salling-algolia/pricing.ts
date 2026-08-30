@@ -2,8 +2,15 @@ import type { AlgoliaStoreData, SallingAlgoliaHit } from './types'
 
 type BeforePriceHitContext = Pick<
   SallingAlgoliaHit,
-  'cpOriginalPrice' | 'isInCurrentLeaflet'
+  'cpOriginalPrice' | 'isInCurrentLeaflet' | 'cpOffer'
 >
+
+/** Live ugeavis / CP-kampagne — ikke en efterladt førpris fra sidste uge. */
+export function isLiveSallingOfferSignal(
+  hit: Pick<SallingAlgoliaHit, 'isInCurrentLeaflet' | 'cpOffer'>,
+): boolean {
+  return Boolean(hit.isInCurrentLeaflet || hit.cpOffer)
+}
 
 export interface RepresentativeStore {
   storeId: string
@@ -37,8 +44,8 @@ export function resolveBeforePriceCents(
   const uomPrice = storeData.unitsOfMeasurePrice ?? 0
   const uomOfferPrice = storeData.unitsOfMeasureOfferPrice ?? 0
   const hasOfferSignal =
+    isLiveSallingOfferSignal(hit) ||
     Boolean(storeData.offerDescription?.trim()) ||
-    hit.isInCurrentLeaflet ||
     (storeData.unitsOfMeasureShowPrice > 0 &&
       uomOfferPrice > 0 &&
       storeData.unitsOfMeasureShowPrice === uomOfferPrice)
@@ -82,7 +89,10 @@ export function pickRepresentativeStore(
     if (
       !best ||
       discount > best.discount ||
-      (discount === best.discount && data.inStock && !best.data.inStock)
+      (discount === best.discount && data.inStock && !best.data.inStock) ||
+      (discount === best.discount &&
+        Boolean(data.inStock) === Boolean(best.data.inStock) &&
+        storeId < best.storeId)
     ) {
       best = {
         storeId,
@@ -134,4 +144,22 @@ export function pickRepresentativeStore(
 
   const [storeId, data] = entries[0]
   return { storeId, data, beforePriceCents: null }
+}
+
+/** True if `storedCents` is still a live Algolia store price (øre, ±1). */
+export function storedPriceMatchesAlgolia(
+  storeData: Record<string, AlgoliaStoreData> | null,
+  hit: BeforePriceHitContext,
+  storedCents: number | null | undefined,
+): boolean {
+  if (storedCents == null) return false
+  const prices: number[] = []
+  const rep = pickRepresentativeStore(storeData, hit)
+  if (rep && rep.data.price > 0) prices.push(Math.round(rep.data.price))
+  if (storeData) {
+    for (const data of Object.values(storeData)) {
+      if (data && data.price > 0) prices.push(Math.round(data.price))
+    }
+  }
+  return prices.some((p) => Math.abs(p - storedCents) <= 1)
 }

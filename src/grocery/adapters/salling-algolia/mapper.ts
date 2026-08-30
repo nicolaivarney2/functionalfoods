@@ -1,6 +1,6 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
 import { isPromoOfferExpired } from '../../sync/catalog-retention'
-import { pickRepresentativeStore } from './pricing'
+import { isLiveSallingOfferSignal, pickRepresentativeStore } from './pricing'
 import type { SallingAlgoliaHit, SallingChain } from './types'
 
 /**
@@ -147,16 +147,17 @@ export function mapHitToChainOffer(
   const rep = pickRepresentativeStore(hit.storeData, hit)
   const price = rep?.data.price ?? 0
   const beforePriceCents = rep?.beforePriceCents ?? null
-  const isOnSale = beforePriceCents !== null
+  const liveOffer = isLiveSallingOfferSignal(hit)
+  const isOnSale = liveOffer && beforePriceCents !== null
 
   let discountPct: number | null = null
-  if (beforePriceCents && price > 0 && beforePriceCents > price) {
+  if (isOnSale && beforePriceCents && price > 0 && beforePriceCents > price) {
     discountPct = Number(
       (((beforePriceCents - price) / beforePriceCents) * 100).toFixed(2),
     )
   }
 
-  const offerUntil = hit.cpOfferToDate ? toIsoOrNull(hit.cpOfferToDate) : null
+  const offerUntil = isOnSale && hit.cpOfferToDate ? toIsoOrNull(hit.cpOfferToDate) : null
   const promoExpired = isOnSale && isPromoOfferExpired(offerUntil)
   const catalogAvailable =
     price > 0 && (rep?.data.inStock ?? true) !== false
@@ -165,7 +166,7 @@ export function mapHitToChainOffer(
     product_id: productId,
     store_id: CHAIN_TO_SOURCE[chain],
     price_cents: price > 0 ? Math.round(price) : null,
-    before_price_cents: beforePriceCents,
+    before_price_cents: isOnSale && !promoExpired ? beforePriceCents : null,
     unit_price_cents:
       rep?.data.unitsOfMeasurePrice && rep.data.unitsOfMeasurePrice > 0
         ? Math.round(rep.data.unitsOfMeasurePrice)
@@ -173,9 +174,15 @@ export function mapHitToChainOffer(
     unit_price_unit:
       rep?.data.unitsOfMeasurePriceUnit || hit.unitOfMeasurePriceUnits || null,
     is_on_sale: isOnSale && !promoExpired,
-    offer_from: hit.cpOfferFromDate ? toIsoOrNull(hit.cpOfferFromDate) : null,
-    offer_until: offerUntil,
-    offer_description: hit.cpOfferTitle || rep?.data.offerDescription || null,
+    offer_from:
+      isOnSale && !promoExpired && hit.cpOfferFromDate
+        ? toIsoOrNull(hit.cpOfferFromDate)
+        : null,
+    offer_until: isOnSale && !promoExpired ? offerUntil : null,
+    offer_description:
+      isOnSale && !promoExpired
+        ? hit.cpOfferTitle || rep?.data.offerDescription || null
+        : null,
     multibuy:
       rep?.data.multipromo && rep.data.multipromo > 0
         ? `${rep.data.multipromo} for ${(Math.round(rep.data.multiPromoPrice) / 100).toFixed(2)} kr`

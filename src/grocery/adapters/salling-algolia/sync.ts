@@ -1,7 +1,7 @@
 import { getGroceryServiceClient } from '../../db/client'
 import { applyCatalogRetentionAfterFullSync } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert, SourceChain } from '../../types'
-import { iterateAllProducts } from './client'
+import { iterateAllProducts, querySalling } from './client'
 import { mapHitToChainOffer, mapHitToProduct } from './mapper'
 import type { SallingAlgoliaHit, SallingChain } from './types'
 
@@ -23,6 +23,11 @@ export interface SyncOptions {
   hitsPerPage?: number
   /** Optional filter (e.g. only on-sale items). */
   filters?: string
+  /**
+   * Only current leaflet + drop is_on_sale on SKUs that left the avis.
+   * Does not deactivate the rest of the catalog.
+   */
+  leafletRefresh?: boolean
 }
 
 export interface SyncResult {
@@ -43,11 +48,19 @@ export async function syncSallingChain(
   chain: SallingChain,
   options: SyncOptions = {},
 ): Promise<SyncResult> {
-  const source = `salling-algolia:${chain}` as const
+  const leafletRefresh = Boolean(options.leafletRefresh)
+  const offerSource = `salling-algolia:${chain}` as const
+  const source = leafletRefresh
+    ? (`salling-algolia:${chain}:leaflet` as const)
+    : offerSource
   const startedAt = Date.now()
   const syncStartedAt = new Date(startedAt).toISOString()
   const supabase = options.dryRun ? null : getGroceryServiceClient()
-  const runRetention = !options.dryRun && !options.maxProducts
+  const filters = leafletRefresh
+    ? [options.filters, 'isInCurrentLeaflet:true'].filter(Boolean).join(' AND ')
+    : options.filters
+  const runRetention = !options.dryRun && !options.maxProducts && !leafletRefresh
+  const liveSourceIds = leafletRefresh ? new Set<string>() : null
 
   let syncLogId: string | undefined
   if (supabase) {
@@ -149,13 +162,14 @@ export async function syncSallingChain(
   try {
     for await (const hit of iterateAllProducts(chain, {
       hitsPerPage: options.hitsPerPage,
-      filters: options.filters,
+      filters,
     })) {
       if (options.maxProducts && productsProcessed >= options.maxProducts) break
 
       const product = mapHitToProduct(chain, hit)
       productBuffer.push(product)
       hitBuffer.push(hit)
+      liveSourceIds?.add(hit.objectID)
       productsProcessed++
 
       if (productBuffer.length >= PRODUCT_BATCH_SIZE) {
@@ -196,7 +210,26 @@ export async function syncSallingChain(
     }
   }
 
-  const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
+  if (leafletRefresh && supabase && liveSourceIds) {
+    try {
+      const ended = await clearEndedSallingLeafletOffers(
+        CHAIN_TO_SOURCE[chain],
+        offerSource,
+        liveSourceIds,
+      )
+      offersProcessed += ended
+    } catch (clearErr) {
+      errorsCount++
+      const msg = clearErr instanceof Error ? clearErr.message : String(clearErr)
+      console.error(`Leaflet clear ${chain}:`, msg)
+      if (syncLogId) {
+        await supabase
+          .from('sync_logs')
+          .update({ error_message: `Leaflet clear: ${msg}`.slice(0, 1000) })
+          .eq('id', syncLogId)
+      }
+    }
+  }
 
   if (runRetention) {
     try {
@@ -217,6 +250,8 @@ export async function syncSallingChain(
       }
     }
   }
+
+  const status: 'success' | 'partial' = errorsCount === 0 ? 'success' : 'partial'
 
   if (supabase && syncLogId) {
     await supabase
@@ -246,6 +281,116 @@ export async function syncSallingChain(
     syncLogId,
     sampleProductIds,
   }
+}
+
+async function clearEndedSallingLeafletOffers(
+  chain: SourceChain,
+  offerSource: string,
+  liveSourceIds: Set<string>,
+): Promise<number> {
+  const supabase = getGroceryServiceClient()
+  const PAGE = 1000
+  const IN_BATCH = 80
+  const liveProductIds = new Set<string>()
+  const sourceIds = [...liveSourceIds]
+  for (let i = 0; i < sourceIds.length; i += IN_BATCH) {
+    const slice = sourceIds.slice(i, i + IN_BATCH)
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, source_id')
+      .eq('source_chain', chain)
+      .in('source_id', slice)
+    if (error) throw new Error(`leaflet product lookup: ${error.message}`)
+    for (const row of data ?? []) {
+      if (row.id) liveProductIds.add(String(row.id))
+    }
+  }
+
+  const stale: Array<{ id: string; productId: string }> = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('product_offers')
+      .select('id, product_id')
+      .eq('store_id', chain)
+      .eq('source', offerSource)
+      .eq('is_on_sale', true)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) throw new Error(`leaflet on-sale scan: ${error.message}`)
+    if (!data?.length) break
+    for (const row of data) {
+      const productId = String(row.product_id)
+      if (!liveProductIds.has(productId)) stale.push({ id: String(row.id), productId })
+    }
+    if (data.length < PAGE) break
+    from += PAGE
+  }
+
+  const sourceIdByProduct = new Map<string, string>()
+  const staleProductIds = [...new Set(stale.map((s) => s.productId))]
+  for (let i = 0; i < staleProductIds.length; i += IN_BATCH) {
+    const slice = staleProductIds.slice(i, i + IN_BATCH)
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, source_id')
+      .eq('source_chain', chain)
+      .in('id', slice)
+    if (error) throw new Error(`leaflet stale product lookup: ${error.message}`)
+    for (const row of data ?? []) {
+      if (row.id && row.source_id) sourceIdByProduct.set(String(row.id), String(row.source_id))
+    }
+  }
+
+  const chainKey = chain as SallingChain
+  const refreshed = new Set<string>()
+  const staleSourceIds = [...new Set(sourceIdByProduct.values())]
+  for (let i = 0; i < staleSourceIds.length; i += 15) {
+    const slice = staleSourceIds.slice(i, i + 15)
+    const filters = slice.map((id) => `objectID:${id}`).join(' OR ')
+    const res = await querySalling(chainKey, { hitsPerPage: 20, filters })
+    const offerBuffer: ProductOfferInsert[] = []
+    const productBySource = new Map(
+      [...sourceIdByProduct.entries()].map(([pid, sid]) => [sid, pid]),
+    )
+    for (const hit of res.hits ?? []) {
+      const pid = productBySource.get(hit.objectID)
+      if (!pid) continue
+      const offer = mapHitToChainOffer(chainKey, hit, pid)
+      if (offer) {
+        offerBuffer.push(offer)
+        refreshed.add(pid)
+      }
+    }
+    if (offerBuffer.length) {
+      const { error: offerError } = await supabase
+        .from('product_offers')
+        .upsert(offerBuffer, { onConflict: 'product_id,store_id', ignoreDuplicates: false })
+      if (offerError) throw new Error(`leaflet stale upsert: ${offerError.message}`)
+    }
+  }
+
+  const leftoverIds = stale.filter((s) => !refreshed.has(s.productId)).map((s) => s.id)
+  let ended = refreshed.size
+  for (let i = 0; i < leftoverIds.length; i += IN_BATCH) {
+    const slice = leftoverIds.slice(i, i + IN_BATCH)
+    const { error: updErr } = await supabase
+      .from('product_offers')
+      .update({
+        is_on_sale: false,
+        before_price_cents: null,
+        offer_from: null,
+        offer_until: null,
+        offer_description: null,
+        discount_percentage: null,
+        source_synced_at: new Date().toISOString(),
+      })
+      .in('id', slice)
+    if (updErr) throw new Error(`leaflet clear: ${updErr.message}`)
+    ended += slice.length
+  }
+
+  return ended
 }
 
 function failureResult(source: string, startedAt: number, message: string): SyncResult {

@@ -1,9 +1,8 @@
 /**
  * Daily cleanup of expired offers across BOTH Supabase projects.
  *
- * Run by Vercel Cron (see vercel.json) at 04:30 UTC — between the nightly
- * grocery scrape (04:00 UTC) and the GitHub Actions fooddata→FF import
- * (05:00 UTC). This ordering matters:
+ * Planlagt på GitHub (grocery-native-sync.yml) efter native scrape.
+ * Manuel HTTP: Bearer $CRON_SECRET. This ordering matters:
  *
  *   1. 04:00 — grocery sync pulls fresh offers + sleeps stale ones per chain
  *   2. 04:30 — THIS job sweeps anything still flagged active but past

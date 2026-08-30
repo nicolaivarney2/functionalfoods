@@ -32,6 +32,8 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
+      - name: Refresh Salling leaflets if 05:00-import missede dem
+        run: npx tsx scripts/grocery-sync-salling-leaflets.ts
       - name: Import fooddata → FF if stale
         run: npx tsx scripts/import-fooddata-to-ff.ts --skip-if-fresh
 
@@ -94,6 +96,8 @@ jobs:
       - run: npm ci
       - name: Goma catch-up for stale / empty chains
         run: npx tsx scripts/grocery-sync-goma-scheduled.ts --catch-up-only
+      - name: Refresh Salling leaflets (Netto/Føtex/Bilka)
+        run: npx tsx scripts/grocery-sync-salling-leaflets.ts
       - name: Re-import fooddata → FF
         run: npx tsx scripts/import-fooddata-to-ff.ts
       - name: Re-check health

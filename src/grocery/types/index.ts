@@ -75,6 +75,7 @@ export const COVERAGE_LABEL: Record<CatalogCoverage, string> = {
 
 export type SyncSource =
   | `salling-algolia:${'netto' | 'foetex' | 'bilka'}`
+  | `salling-algolia:${'netto' | 'foetex' | 'bilka'}:leaflet`
   | `apify-rema`
   | `apify-nemlig`
   | `rema-1000-api`

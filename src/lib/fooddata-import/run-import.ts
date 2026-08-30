@@ -775,10 +775,14 @@ function mapOffer(
         })
       : (o.offer_until ?? null)
   const untilOk = !saleValidTo || new Date(saleValidTo) > now
+  const isSallingSource =
+    typeof o.source === 'string' && o.source.toLowerCase().startsWith('salling-algolia')
   const isOfferActive = !!(
     fromOk &&
     untilOk &&
-    (hasProvenDiscount || isTjekSource || o.is_on_sale)
+    (isSallingSource
+      ? o.is_on_sale === true && hasProvenDiscount
+      : hasProvenDiscount || isTjekSource || o.is_on_sale)
   )
   return {
     product_id: ref.id,
@@ -786,7 +790,7 @@ function mapOffer(
     store_id: o.store_id,
     name_store: ref.name,
     current_price: currentKr,
-    normal_price: beforeKr,
+    normal_price: isOfferActive ? beforeKr : null,
     currency: 'DKK',
     is_on_sale: isOfferActive,
     discount_percentage:

@@ -1,0 +1,48 @@
+name: Grocery native sync (Salling + REMA)
+
+# Fuldt katalog + catch-up på GitHub-runner. Ikke Vercel (300s loft).
+# 04:00 UTC — før fooddata-import 05:00.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: grocery-native-sync
+  cancel-in-progress: false
+
+jobs:
+  grocery-native-sync:
+    runs-on: ubuntu-latest
+    environment: FF
+    timeout-minutes: 45
+    env:
+      GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
+      GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GOMA_IMPORT_ENABLED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Verify secrets
+        run: |
+          missing=0
+          for v in GROCERY_SUPABASE_URL GROCERY_SUPABASE_SECRET_KEY NEXT_PUBLIC_SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v}" ]; then
+              echo "Missing required secret: $v"
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            exit 1
+          fi
+      - name: Scheduled native scrape
+        run: npx tsx scripts/grocery-sync-scheduled.ts
+      - name: Cleanup expired offers (fooddata + FF)
+        run: npx tsx scripts/cleanup-expired-offers.ts

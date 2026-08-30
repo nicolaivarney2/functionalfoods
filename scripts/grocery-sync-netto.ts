@@ -24,6 +24,7 @@ for (const arg of process.argv.slice(2)) {
 }
 
 const dryRun = Boolean(args.get('dry-run'))
+const leafletRefresh = Boolean(args.get('leaflet-refresh'))
 const maxRaw = args.get('max')
 const maxProducts = typeof maxRaw === 'string' ? Number.parseInt(maxRaw, 10) : undefined
 const chain = (args.get('chain') as 'netto' | 'bilka' | 'foetex' | undefined) ?? 'netto'
@@ -34,11 +35,12 @@ async function main() {
   console.log(`  chain      : ${chain}`)
   console.log(`  dryRun     : ${dryRun}`)
   console.log(`  maxProducts: ${maxProducts ?? 'unlimited'}`)
+  console.log(`  leafletRefresh: ${leafletRefresh}`)
   console.log(`  target DB  : ${process.env.GROCERY_SUPABASE_URL}`)
   console.log('────────────────────────────────────────')
 
   const t0 = Date.now()
-  const result = await syncSallingChain(chain, { dryRun, maxProducts })
+  const result = await syncSallingChain(chain, { dryRun, maxProducts, leafletRefresh })
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1)
 
   console.log('')

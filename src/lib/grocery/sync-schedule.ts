@@ -6,13 +6,20 @@
  * Eksempel: Netto/Bilka opdaterer typisk fredag → cron lørdag ~05:00 DK
  * (04:00 UTC vinter). En fredag-nat sync kl. 04:00 ville misse fredag-aften.
  *
- * Vercel cron: `0 4 * * *` — route vælger dagens kæder via getScheduledSyncForNow().
+ * GitHub Actions `grocery-native-sync.yml` kl. 04:00 UTC — fuldt katalog
+ * efter kædens avisdag, plus daglig Salling-avis-refresh.
  */
 
 import type { SourceChain } from '@/grocery/types'
 
 /** Steps the cron orchestrator can run (matches `?only=` ids). */
-export type CronSyncStepId = 'netto' | 'foetex' | 'bilka' | 'rema-1000' | 'tjek'
+export type CronSyncStepId =
+  | 'netto'
+  | 'foetex'
+  | 'bilka'
+  | 'rema-1000'
+  | 'tjek'
+  | 'salling-offers'
 
 /** Native scrapes that Vercel grocery-cron kører (ikke Goma/Tjek). */
 export type NativeCronChain = 'netto' | 'foetex' | 'bilka' | 'rema-1000'
@@ -114,14 +121,10 @@ export function getScheduledSyncForWeekday(
   const tjekChains = TJEK_ONLY_BY_CRON_WEEKDAY[cronWeekday] ?? []
   const rema1000 = REMA_BY_CRON_WEEKDAY.has(cronWeekday)
 
-  if (sallingChains.length === 0 && tjekChains.length === 0 && !rema1000) {
-    return null
-  }
-
   return {
     cronWeekday,
     labelDa: LABEL_BY_WEEKDAY[cronWeekday] ?? `dag ${cronWeekday}`,
-    releaseNoteDa: RELEASE_NOTE_BY_WEEKDAY[cronWeekday] ?? '',
+    releaseNoteDa: RELEASE_NOTE_BY_WEEKDAY[cronWeekday] || 'Salling-avis refresh',
     sallingChains,
     rema1000,
     tjekChains,
@@ -173,5 +176,6 @@ export function scheduledStepIds(
   }
   if (schedule.rema1000) steps.push('rema-1000')
   if (schedule.tjekChains.length > 0) steps.push('tjek')
+  steps.push('salling-offers')
   return steps
 }
