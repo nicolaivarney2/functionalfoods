@@ -37,7 +37,7 @@ export async function runPriceAlertNotify(): Promise<PriceAlertNotifyResult> {
   const triggeredAlerts: { alert: (typeof alertList)[number]; cents: number }[] = []
   for (const alert of alertList) {
     const offer = offersByKey.get(`${alert.product_id}:${alert.store_id}`)
-    if (!isPriceAlertTriggered(alert, offer)) continue
+    if (!offer || !isPriceAlertTriggered(alert, offer)) continue
     const cents = Math.round(Number(offer.current_price) * 100)
     if (alert.last_notified_price_cents === cents) continue
     triggeredAlerts.push({ alert, cents })
