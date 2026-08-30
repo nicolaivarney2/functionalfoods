@@ -136,7 +136,8 @@ async function lastSeen(
     .not(column, 'is', null)
     .order(column, { ascending: false })
     .limit(1)
-  const value = data?.[0]?.[column]
+  const row = data?.[0] as Record<string, unknown> | undefined
+  const value = row?.[column]
   return typeof value === 'string' ? value : null
 }
 
