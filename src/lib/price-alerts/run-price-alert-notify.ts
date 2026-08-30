@@ -30,8 +30,9 @@ export async function runPriceAlertNotify(): Promise<PriceAlertNotifyResult> {
     .select('product_id, store_id, current_price, normal_price, is_on_sale, discount_percentage')
     .in('product_id', productIds)
 
-  const offersByKey = new Map<string, (typeof offers)[number]>()
-  for (const o of offers || []) offersByKey.set(`${o.product_id}:${o.store_id}`, o)
+  const offerRows = offers ?? []
+  const offersByKey = new Map<string, (typeof offerRows)[number]>()
+  for (const o of offerRows) offersByKey.set(`${o.product_id}:${o.store_id}`, o)
 
   const triggeredAlerts: { alert: (typeof alertList)[number]; cents: number }[] = []
   for (const alert of alertList) {
