@@ -12,14 +12,25 @@ import { resolve } from 'node:path'
 
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
 
+import { sendDagligvarerOpsEmail } from '../src/lib/dagligvarer-ops-email'
 import {
   formatLaunchHealthReport,
   runDagligvarerLaunchHealth,
 } from '../src/lib/dagligvarer-launch-health'
 
+const sendEmail = process.argv.includes('--email')
+
 async function main() {
   const report = await runDagligvarerLaunchHealth()
-  console.log(formatLaunchHealthReport(report))
+  const text = formatLaunchHealthReport(report)
+  console.log(text)
+  if (sendEmail) {
+    const subject = report.ok
+      ? `[FF dagligvarer] Rapport OK (${report.warnCount} advarsler)`
+      : `[FF dagligvarer] ${report.failCount} kæder røde`
+    const sent = await sendDagligvarerOpsEmail({ subject, text })
+    if (!sent.ok) console.warn('ops-mail fejlede:', sent.error)
+  }
   if (!report.ok) process.exit(1)
 }
 

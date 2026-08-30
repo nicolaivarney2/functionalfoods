@@ -41,29 +41,26 @@ jobs:
     needs: ensure-import
     runs-on: ubuntu-latest
     environment: FF
-    timeout-minutes: 10
+    timeout-minutes: 15
     outputs:
       unhealthy: ${{ steps.health.outputs.unhealthy }}
+    env:
+      GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
+      GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
-      - name: Call launch-health on production
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Launch health on runner
         id: health
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL }}
         run: |
-          if [ -z "$SITE_URL" ]; then
-            echo "SITE_URL GitHub variable is not set (e.g. https://functionalfoods.dk)."
-            exit 1
-          fi
-          if [ -z "$CRON_SECRET" ]; then
-            echo "CRON_SECRET mangler i GitHub Environment FF."
-            exit 1
-          fi
-          echo "GET $SITE_URL/api/admin/dagligvarer/launch-health?email=1"
           set +e
-          curl --fail-with-body --max-time 120 \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$SITE_URL/api/admin/dagligvarer/launch-health?email=1"
+          npx tsx scripts/dagligvarer-launch-health.ts --email
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
@@ -85,8 +82,6 @@ jobs:
       GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      CRON_SECRET: ${{ secrets.CRON_SECRET }}
-      SITE_URL: ${{ vars.SITE_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -94,17 +89,13 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
+      - name: Native catch-up (REMA / Salling hvis slottet blev missset)
+        run: npx tsx scripts/grocery-sync-scheduled.ts
       - name: Goma catch-up for stale / empty chains
         run: npx tsx scripts/grocery-sync-goma-scheduled.ts --catch-up-only
       - name: Refresh Salling leaflets (Netto/Føtex/Bilka)
         run: npx tsx scripts/grocery-sync-salling-leaflets.ts
       - name: Re-import fooddata → FF
         run: npx tsx scripts/import-fooddata-to-ff.ts
-      - name: Re-check health
-        env:
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          SITE_URL: ${{ vars.SITE_URL }}
-        run: |
-          curl --fail-with-body --max-time 120 \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$SITE_URL/api/admin/dagligvarer/launch-health?email=1"
+      - name: Re-check health on runner
+        run: npx tsx scripts/dagligvarer-launch-health.ts --email

@@ -358,7 +358,15 @@ export async function runDagligvarerLaunchHealth(
       fooddataOnSale = await countOnSale(grocery, spec.chain)
       if (spec.native) {
         const logAt = await lastSyncLogSuccess(grocery, spec.native)
-        missedScheduledSlot = missedLastScheduledSync(logAt, NATIVE_CRON_WEEKDAY[spec.native])
+        // Samme evidens som grocery-cron catch-up: log ELLER sidst sete række.
+        const lastOk = [logAt, fooddataLastSeenAt, lastSeenAt]
+          .filter((v): v is string => typeof v === 'string')
+          .sort()
+          .at(-1)
+        missedScheduledSlot = missedLastScheduledSync(
+          lastOk,
+          NATIVE_CRON_WEEKDAY[spec.native],
+        )
       }
       if (spec.algolia && !algoliaError) {
         samplePriceMismatches = await sampleAlgoliaPriceMismatches(grocery, spec.algolia)
