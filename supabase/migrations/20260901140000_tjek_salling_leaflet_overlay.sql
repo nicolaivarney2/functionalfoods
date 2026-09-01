@@ -211,6 +211,11 @@ AS $$
       po.price_per_kilogram,
       po.sale_valid_to,
       po.source,
+      -- Uden disse to falder isRealOfferFields() i database-service tilbage til
+      -- false for native katalogkæder, og /dagligvarer?offers=true bliver tom
+      -- for Netto/Føtex/Bilka/REMA/MENY selvom rækkerne er på tilbud.
+      po.is_on_sale,
+      po.is_offer_active,
       prod.ean,
       prod.name_generic,
       prod.brand,

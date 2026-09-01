@@ -570,6 +570,24 @@ export class DatabaseService {
     return Array.from(patterns)
   }
 
+  /**
+   * Ældre udgaver af get_food_offers_v2 returnerer ikke is_on_sale. Uden feltet
+   * ender isRealOfferFields() på false for native katalogkæder, og
+   * tilbudsvisningen bliver helt tom for Netto/Føtex/Bilka/REMA/MENY — kun
+   * Goma offers-only kæder slipper igennem på deres egen gren. Kaldet er
+   * allerede sket med p_offers_only, så SQL har afgjort tilbudsstatus; mangler
+   * feltet, stoler vi på det. Migrationen tilføjer kolonnen, hvorefter denne
+   * fallback ikke længere rammer.
+   */
+  private applyRpcOfferFlagFallback(
+    row: Record<string, any>,
+    offersOnly: boolean,
+  ): Record<string, any> {
+    if (!offersOnly) return row
+    if (row.is_on_sale != null) return row
+    return { ...row, is_on_sale: true, is_offer_active: true }
+  }
+
   private async fetchFoodOffersViaRpc(
     opts: FoodOffersFetchOptions,
   ): Promise<{ products: any[]; total: number; hasMore: boolean } | null> {
@@ -597,6 +615,7 @@ export class DatabaseService {
       }
 
       const rows = this.parseFoodOffersRpcRows(data)
+        .map((row) => this.applyRpcOfferFlagFallback(row, !!opts.offersOnly))
         .filter((row) => !opts.offersOnly || isRealOfferFields(row))
       if (rows.length === 0 && data != null && !Array.isArray(data)) {
         console.warn('get_food_offers_v2 RPC returned unexpected shape, using direct query fallback')
