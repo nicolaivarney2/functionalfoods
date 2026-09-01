@@ -75,7 +75,7 @@ async function withRetries<T>(label: string, fn: () => Promise<T>): Promise<T> {
 }
 
 async function listStoreIds(supabase: SupabaseClient): Promise<string[]> {
-  const { data, error } = await withRetries('list chain stores', async () => {
+  const { data } = await withRetries('list chain stores', async () => {
     const res = await supabase.from('stores').select('id').eq('type', 'chain')
     if (res.error) throw new Error(res.error.message)
     return res
