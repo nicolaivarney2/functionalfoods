@@ -21,6 +21,7 @@ import {
   type ScheduledGrocerySync,
 } from '@/lib/grocery/sync-schedule'
 import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
+import { snapshotPriceHistory } from '@/lib/grocery/snapshot-price-history'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
 import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 
@@ -265,12 +266,11 @@ export async function runScheduledGrocerySync(
       await runStep('snapshot', async () => {
         const t0 = Date.now()
         const supabase = getGroceryServiceClient()
-        const { data, error } = await supabase.rpc('snapshot_price_history')
-        if (error) throw new Error(error.message)
+        const rowsAffected = await snapshotPriceHistory(supabase)
         return {
           step: 'snapshot',
           status: 'success' as const,
-          rowsAffected: typeof data === 'number' ? data : 0,
+          rowsAffected,
           durationMs: Date.now() - t0,
         }
       }),
