@@ -62,7 +62,11 @@ function isRetryableFetchError(message: string): boolean {
     m.includes('enotfound') ||
     m.includes('socket') ||
     m.includes('network') ||
-    /\b(429|502|503|504)\b/.test(m)
+    m.includes('connection timed out') ||
+    m.includes('error code 522') ||
+    (m.includes('cloudflare') && m.includes('522')) ||
+    m.includes('<!doctype html>') ||
+    /\b(429|502|503|504|522|524)\b/.test(m)
   )
 }
 
@@ -522,26 +526,39 @@ async function upsertBatchWithRetry<T extends Record<string, unknown>>(
   batch: T[],
   onConflict: string,
   offset: number,
+  log: (msg: string) => void = () => {},
 ): Promise<void> {
-  const { error } = await client.from(table).upsert(batch, { onConflict })
-  if (!error) return
+  const label = `upsert ${table} ${offset}-${offset + batch.length}`
+  let lastError = 'unknown error'
 
-  if (isStatementTimeout(error.message) && batch.length > MIN_UPSERT_BATCH) {
-    const mid = Math.ceil(batch.length / 2)
-    await upsertBatchWithRetry(client, table, batch.slice(0, mid), onConflict, offset)
-    await upsertBatchWithRetry(
-      client,
-      table,
-      batch.slice(mid),
-      onConflict,
-      offset + mid,
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const { error } = await client.from(table).upsert(batch, { onConflict })
+    if (!error) return
+    lastError = error.message
+
+    if (isStatementTimeout(lastError) && batch.length > MIN_UPSERT_BATCH) {
+      const mid = Math.ceil(batch.length / 2)
+      await upsertBatchWithRetry(client, table, batch.slice(0, mid), onConflict, offset, log)
+      await upsertBatchWithRetry(
+        client,
+        table,
+        batch.slice(mid),
+        onConflict,
+        offset + mid,
+        log,
+      )
+      return
+    }
+
+    if (!isRetryableFetchError(lastError) || attempt === 5) break
+    const delay = Math.min(20_000, 1000 * 2 ** (attempt - 1))
+    log(
+      `  ⚠ ${label}: ${lastError.slice(0, 80).replace(/\s+/g, ' ')} — retry ${attempt}/4 om ${delay}ms`,
     )
-    return
+    await sleep(delay)
   }
 
-  throw new Error(
-    `upsert ${table} batch ${offset}-${offset + batch.length} failed: ${error.message}`,
-  )
+  throw new Error(`${label} failed: ${lastError}`)
 }
 
 async function upsertBatched<T extends Record<string, unknown>>(
@@ -554,7 +571,7 @@ async function upsertBatched<T extends Record<string, unknown>>(
   const uniqueRows = dedupeByConflictKey(rows, onConflict)
   for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
     const batch = uniqueRows.slice(i, i + BATCH_SIZE)
-    await upsertBatchWithRetry(client, table, batch, onConflict, i)
+    await upsertBatchWithRetry(client, table, batch, onConflict, i, options.log)
     if (options.log && (i + BATCH_SIZE) % 5000 === 0) {
       options.log(`  ${table}: ${Math.min(i + BATCH_SIZE, uniqueRows.length)}/${uniqueRows.length}`)
     }
