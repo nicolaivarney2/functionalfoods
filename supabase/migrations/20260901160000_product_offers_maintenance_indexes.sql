@@ -26,3 +26,13 @@ CREATE INDEX IF NOT EXISTS idx_product_offers_source_store
 CREATE INDEX IF NOT EXISTS idx_product_offers_expiring_sales
   ON public.product_offers (sale_valid_to)
   WHERE is_on_sale = true;
+
+-- EAN-baseret billed-fallback. idx_products_ean_with_image (juni) kan ikke
+-- bruges: dens WHERE indeholder btrim(image_url) <> '', som PostgREST-queryen
+-- (.in('ean', …).not('image_url','is',null)) ikke kan udtrykke, så planneren
+-- kan ikke bevise at det partielle index dækker. Resultatet er et seq scan
+-- over ~103k rækker og statement_timeout selv for ét enkelt EAN. Predikatet
+-- her er implicit opfyldt af .in('ean', …).
+CREATE INDEX IF NOT EXISTS idx_products_ean_lookup
+  ON public.products (ean)
+  WHERE ean IS NOT NULL;

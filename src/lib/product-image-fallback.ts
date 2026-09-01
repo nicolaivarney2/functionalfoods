@@ -12,6 +12,16 @@ const PLACEHOLDER_MARKERS = ['recipe-placeholder.jpg', 'recipe-placeholder']
 const eanImageCache = new Map<string, { url: string; expiresAt: number }>()
 const EAN_IMAGE_CACHE_TTL_MS = 60 * 60 * 1000
 
+/**
+ * Opslaget kræver et index på products.ean. Findes det ikke, bliver hver
+ * forespørgsel et fuldt tabelscan der rammer statement_timeout — også for et
+ * enkelt EAN. Uden pause betaler hver sidevisning 2–8 sekunder for et kald der
+ * alligevel fejler, så vi holder igen et stykke tid efter en fejl. Billederne
+ * falder tilbage til kædens eget billede i mellemtiden.
+ */
+const EAN_LOOKUP_COOLDOWN_MS = 5 * 60 * 1000
+let eanLookupCooldownUntil = 0
+
 export function isUsableProductImage(url: string | null | undefined): boolean {
   if (!url || !String(url).trim()) return false
   const normalized = String(url).trim().toLowerCase()
@@ -74,6 +84,7 @@ export async function buildEanImageLookup(
     }
   }
   if (toFetch.length === 0) return result
+  if (now < eanLookupCooldownUntil) return result
 
   const candidates = new Map<string, ImageCandidate>()
   const CHUNK = 150
@@ -88,7 +99,8 @@ export async function buildEanImageLookup(
 
     if (error) {
       console.warn('buildEanImageLookup (ean column) failed:', error.message)
-      continue
+      eanLookupCooldownUntil = Date.now() + EAN_LOOKUP_COOLDOWN_MS
+      break
     }
 
     for (const row of data ?? []) {
@@ -111,7 +123,8 @@ export async function buildEanImageLookup(
 
       if (error) {
         console.warn('buildEanImageLookup (sibling ids) failed:', error.message)
-        continue
+        eanLookupCooldownUntil = Date.now() + EAN_LOOKUP_COOLDOWN_MS
+        break
       }
 
       for (const row of data ?? []) {

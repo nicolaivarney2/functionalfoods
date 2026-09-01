@@ -85,18 +85,36 @@ function sourceFamily(source: string | null | undefined): 'tjek' | 'native' {
 }
 
 /**
- * Ældste last_seen_at blandt de tilbud importen lige skrev, pr. butik og
- * kildefamilie. Salling-kæderne har to kilder (Algolia + Tjek-avisoverlay) med
- * hver sit synk-tidspunkt, så én cutoff pr. butik ville slukke den ene kildes
- * friske tilbud hver gang den anden kørte.
+ * En synk omskriver alle sine rækker, så nyeste last_seen_at pr. butik og
+ * kildefamilie er tidspunktet kilden sidst leverede data. Alt der ikke er rørt
+ * inden for nådevinduet derfra findes ikke længere hos kilden.
+ *
+ * Bevidst nyeste og ikke ældste: fooddata har selv efterladte on-sale rækker
+ * (Nemlig havde nogle fra juni), og med ældste-som-cutoff trak de grænsen to
+ * måneder tilbage, så zombierne i FF aldrig blev fanget.
+ *
+ * Nådevinduet dækker synk der spænder over tid eller kun lykkes halvt — en kæde
+ * der synkes ugentligt har alle rækker på samme tidspunkt og rammes ikke.
+ * Salling-kæderne har to kilder (Algolia + Tjek-avisoverlay) med hvert sit
+ * tidspunkt, så nøglen skal indeholde kildefamilien; ellers slukker den ene
+ * kildes synk den andens friske tilbud.
  */
+const SLEEP_CUTOFF_GRACE_MS = 36 * 60 * 60 * 1000
+
 export function buildSleepCutoffs(fresh: FreshOfferRef[]): Map<string, string> {
-  const cutoffs = new Map<string, string>()
+  const newest = new Map<string, string>()
   for (const row of fresh) {
     if (!row.store_id || !row.is_on_sale || !row.last_seen_at) continue
     const key = `${row.store_id}|${sourceFamily(row.source)}`
-    const current = cutoffs.get(key)
-    if (!current || row.last_seen_at < current) cutoffs.set(key, row.last_seen_at)
+    const current = newest.get(key)
+    if (!current || row.last_seen_at > current) newest.set(key, row.last_seen_at)
+  }
+
+  const cutoffs = new Map<string, string>()
+  for (const [key, seenAt] of newest) {
+    const ms = new Date(seenAt).getTime()
+    if (!Number.isFinite(ms)) continue
+    cutoffs.set(key, new Date(ms - SLEEP_CUTOFF_GRACE_MS).toISOString())
   }
   return cutoffs
 }

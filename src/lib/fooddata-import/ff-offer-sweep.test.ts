@@ -89,14 +89,27 @@ function fakeFf(rows: Row[], pageLimit = 1000): { ff: SupabaseClient; writes: Wr
 
 const NOISE = () => {}
 
+/** Datoer relativt til nu — «udløbet» og «forsvundet» afhænger af rigtig tid. */
+const HOUR = 60 * 60 * 1000
+const iso = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString()
+
 describe('buildSleepCutoffs', () => {
   it('holder Tjek-overlay og primærkilde adskilt pr. butik', () => {
     const cutoffs = buildSleepCutoffs([
       { store_id: 'foetex', source: 'salling-algolia:foetex', is_on_sale: true, last_seen_at: '2026-09-01T12:00:00Z' },
-      { store_id: 'foetex', source: 'tjek:offers', is_on_sale: true, last_seen_at: '2026-08-30T09:00:00Z' },
+      { store_id: 'foetex', source: 'tjek:offers', is_on_sale: true, last_seen_at: '2026-08-25T09:00:00Z' },
     ])
-    assert.equal(cutoffs.get('foetex|native'), '2026-09-01T12:00:00Z')
-    assert.equal(cutoffs.get('foetex|tjek'), '2026-08-30T09:00:00Z')
+    // Nyeste minus 36 timers nådevindue.
+    assert.equal(cutoffs.get('foetex|native'), '2026-08-31T00:00:00.000Z')
+    assert.equal(cutoffs.get('foetex|tjek'), '2026-08-23T21:00:00.000Z')
+  })
+
+  it('bruger nyeste skrivning, så kildens egne gamle rækker ikke trækker grænsen tilbage', () => {
+    const cutoffs = buildSleepCutoffs([
+      { store_id: 'nemlig', source: 'goma', is_on_sale: true, last_seen_at: '2026-06-29T04:39:00Z' },
+      { store_id: 'nemlig', source: 'goma', is_on_sale: true, last_seen_at: '2026-09-01T07:09:00Z' },
+    ])
+    assert.equal(cutoffs.get('nemlig|native'), '2026-08-30T19:09:00.000Z')
   })
 
   it('ignorerer rækker uden tilbud eller uden last_seen', () => {
@@ -111,21 +124,21 @@ describe('buildSleepCutoffs', () => {
 describe('sweepFfProductOffers', () => {
   it('slukker forsvundne tilbud men lader friske og Tjek-overlay stå', async () => {
     const { ff, writes } = fakeFf([
-      row({ id: 'a', is_on_sale: true, last_seen_at: '2026-09-01T12:00:00Z' }),
-      row({ id: 'b', is_on_sale: true, last_seen_at: '2026-08-25T12:00:00Z' }),
+      row({ id: 'a', is_on_sale: true, last_seen_at: iso(-2 * HOUR) }),
+      row({ id: 'b', is_on_sale: true, last_seen_at: iso(-14 * 24 * HOUR) }),
       row({
         id: 'c',
         source: 'tjek:offers',
         is_on_sale: true,
-        last_seen_at: '2026-08-30T09:00:00Z',
-        sale_valid_to: '2026-09-10T00:00:00Z',
+        last_seen_at: iso(-10 * HOUR),
+        sale_valid_to: iso(9 * 24 * HOUR),
       }),
     ])
     const result = await sweepFfProductOffers({
       ff,
       cutoffs: buildSleepCutoffs([
-        { store_id: 'foetex', source: 'salling-algolia:foetex', is_on_sale: true, last_seen_at: '2026-09-01T12:00:00Z' },
-        { store_id: 'foetex', source: 'tjek:offers', is_on_sale: true, last_seen_at: '2026-08-30T09:00:00Z' },
+        { store_id: 'foetex', source: 'salling-algolia:foetex', is_on_sale: true, last_seen_at: iso(-2 * HOUR) },
+        { store_id: 'foetex', source: 'tjek:offers', is_on_sale: true, last_seen_at: iso(-10 * HOUR) },
       ]),
       gomaImportEnabled: true,
       log: NOISE,
@@ -141,8 +154,8 @@ describe('sweepFfProductOffers', () => {
       row({
         id: 'a',
         is_on_sale: true,
-        last_seen_at: '2026-09-01T12:00:00Z',
-        sale_valid_to: '2026-08-20T00:00:00Z',
+        last_seen_at: iso(-1 * HOUR),
+        sale_valid_to: iso(-12 * 24 * HOUR),
       }),
     ])
     const result = await sweepFfProductOffers({ ff, gomaImportEnabled: true, log: NOISE })
@@ -153,9 +166,9 @@ describe('sweepFfProductOffers', () => {
   it('sletter goma på Salling, udløbet goma og Tjek på Goma-kæder', async () => {
     const { ff, writes } = fakeFf([
       row({ id: 'a', store_id: 'bilka', source: 'goma', is_on_sale: true }),
-      row({ id: 'b', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: '2026-08-01T00:00:00Z' }),
+      row({ id: 'b', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: iso(-30 * 24 * HOUR) }),
       row({ id: 'c', store_id: 'lidl', source: 'tjek:offers', is_on_sale: true }),
-      row({ id: 'd', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: '2099-01-01T00:00:00Z' }),
+      row({ id: 'd', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: iso(365 * 24 * HOUR) }),
     ])
     const result = await sweepFfProductOffers({ ff, gomaImportEnabled: true, log: NOISE })
     assert.deepEqual(writes.deleted.sort(), ['a', 'b', 'c'])

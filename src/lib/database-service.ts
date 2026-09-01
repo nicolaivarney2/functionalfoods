@@ -9,6 +9,7 @@ import {
   applyDagligvarerTjekStoreFilter,
   dagligvarerOfferScanOrFilter,
   isGomaOffersOnlyStoreId,
+  TJEK_OVERLAY_STORE_IDS,
 } from '@/lib/dagligvarer-source-filter'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
@@ -94,6 +95,9 @@ export class DatabaseService {
   private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
   private allRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
 
+  private readonly TJEK_OVERLAY_CACHE_TTL_MS = 120_000
+  private tjekOverlayCache: { expiresAt: number; byStore: Map<string, Record<string, any>[]> } | null =
+    null
   private readonly PRODUCT_COUNTS_CACHE_TTL_MS = 600_000
   private productCountsCache: {
     slot: 'food' | 'all'
@@ -172,6 +176,9 @@ export class DatabaseService {
     'Slik',
     'Nemt & hurtigt',
   ] as const
+
+  /** Loft på RPC-vinduet. 1500 rækker ligger på ~2,7s mod alle kæder. */
+  private readonly RPC_MAX_FETCH = 1500
 
   private readonly OFFER_SELECT_WITH_PRODUCT = `
     id,
@@ -588,6 +595,85 @@ export class DatabaseService {
     return { ...row, is_on_sale: true, is_offer_active: true }
   }
 
+  /**
+   * Papiravis-overlay (Tjek) på Salling-kæder. Prod-RPC filtrerer tjek% væk
+   * når p_goma_primary=true, indtil 20260901140000 er kørt. Direkte query
+   * bruger dagligvarer-source-filteret, som allerede tillader overlayet.
+   * Efter migrationen er det et no-op (id-dedupe).
+   */
+  private async fetchTjekOverlayOfferRows(
+    opts: FoodOffersFetchOptions,
+    storeIds: string[] | undefined,
+  ): Promise<Record<string, any>[]> {
+    if (!isGomaImportEnabled()) return []
+    // Kategorifilter: Tjek-rækker har ofte department = kædenavn, så de matcher
+    // ikke "Kød og fisk". Søgeruten dækker dem. Browse uden kategori gør.
+    if (opts.departmentPatterns?.length) return []
+
+    const overlayStores = storeIds?.length
+      ? storeIds.filter((id) => (TJEK_OVERLAY_STORE_IDS as readonly string[]).includes(id))
+      : [...TJEK_OVERLAY_STORE_IDS]
+    if (overlayStores.length === 0) return []
+
+    const now = Date.now()
+    if (!this.tjekOverlayCache || this.tjekOverlayCache.expiresAt <= now) {
+      this.tjekOverlayCache = { expiresAt: now + this.TJEK_OVERLAY_CACHE_TTL_MS, byStore: new Map() }
+    }
+
+    try {
+      const supabase = createSupabaseServiceClient()
+      const merged: Record<string, any>[] = []
+      for (const storeId of overlayStores) {
+        let cached = this.tjekOverlayCache.byStore.get(storeId)
+        if (!cached) {
+          const { data, error } = await supabase
+            .from('product_offers')
+            .select(this.OFFER_SELECT_WITH_PRODUCT)
+            .eq('is_available', true)
+            .eq('store_id', storeId)
+            .like('source', 'tjek%')
+            .eq('is_on_sale', true)
+            .limit(1000)
+          if (error) {
+            console.warn(`Tjek overlay ${storeId}:`, error.message)
+            continue
+          }
+          cached = (data ?? []).map((row) => this.normalizeRpcOfferRow(row as Record<string, any>))
+          this.tjekOverlayCache.byStore.set(storeId, cached)
+        }
+        for (const normalized of cached) {
+          if (opts.offersOnly && !isRealOfferFields(normalized)) continue
+          merged.push(normalized)
+        }
+      }
+      return merged
+    } catch (err) {
+      console.warn('Tjek overlay fetch failed:', err)
+      return []
+    }
+  }
+
+  private isFoodOfferRow(row: Record<string, any>): boolean {
+    if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
+    return isFoodCatalogProduct({
+      department: row.products?.department,
+      category: row.products?.category,
+      subcategory: row.products?.subcategory,
+      name: row.products?.name_generic ?? row.name_store,
+    })
+  }
+
+  /** Samme rækkefølge som get_food_offers_v2: rabat DESC NULLS LAST, pris ASC. */
+  private compareOfferRows = (a: Record<string, any>, b: Record<string, any>): number => {
+    const da = a.discount_percentage
+    const db = b.discount_percentage
+    const aNull = da == null
+    const bNull = db == null
+    if (aNull !== bNull) return aNull ? 1 : -1
+    if (!aNull && !bNull && db !== da) return Number(db) - Number(da)
+    return Number(a.current_price || 0) - Number(b.current_price || 0)
+  }
+
   private async fetchFoodOffersViaRpc(
     opts: FoodOffersFetchOptions,
   ): Promise<{ products: any[]; total: number; hasMore: boolean } | null> {
@@ -596,10 +682,16 @@ export class DatabaseService {
       const offset = (opts.page - 1) * opts.limit
       const storeIds = opts.stores?.length ? this.mapStoreFilterToIds(opts.stores) : undefined
 
+      // SQL'ens afdelingsfilter er grovere end isFoodCatalogProduct() — slik og
+      // chokolade slipper igennem i basen og frasorteres først her. En side på
+      // limit+1 rækker blev derfor kun delvist fyldt (Føtex: 14 af 24), og
+      // SQL-offset peger i en anden række end den filtrerede liste. Hent et
+      // vindue fra 0 og skær siden ud bagefter, som direkte-queryen gør.
+      const fetchSize = Math.min((offset + opts.limit) * 2 + 50, this.RPC_MAX_FETCH)
       const params: Record<string, unknown> = {
         p_offers_only: !!opts.offersOnly,
-        p_limit: opts.limit + 1,
-        p_offset: offset,
+        p_limit: fetchSize,
+        p_offset: 0,
         p_organic_only: !!opts.organicOnly,
         p_goma_primary: isGomaImportEnabled(),
       }
@@ -621,25 +713,32 @@ export class DatabaseService {
         console.warn('get_food_offers_v2 RPC returned unexpected shape, using direct query fallback')
         return null
       }
-      const hasMore = rows.length > opts.limit
-      const pageRows = hasMore ? rows.slice(0, opts.limit) : rows
-      const normalizedRows = pageRows
+      const normalizedRows = rows
         .map((row) => this.normalizeRpcOfferRow(row))
-        .filter((row) =>
-          String(row.source ?? '').toLowerCase().startsWith('tjek')
-            ? true
-            : isFoodCatalogProduct({
-                department: row.products?.department,
-                category: row.products?.category,
-                subcategory: row.products?.subcategory,
-                name: row.products?.name_generic ?? row.name_store,
-              }),
-        )
-      const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
+        .filter((row) => this.isFoodOfferRow(row))
+
+      const rpcAlreadyHasOverlay = normalizedRows.some((row) =>
+        String(row.source ?? '').toLowerCase().startsWith('tjek'),
+      )
+      if (!rpcAlreadyHasOverlay) {
+        const overlay = await this.fetchTjekOverlayOfferRows(opts, storeIds)
+        if (overlay.length > 0) {
+          const seen = new Set(normalizedRows.map((row) => String(row.id)))
+          for (const extra of overlay) {
+            if (seen.has(String(extra.id))) continue
+            seen.add(String(extra.id))
+            normalizedRows.push(extra)
+          }
+          normalizedRows.sort(this.compareOfferRows)
+        }
+      }
+
+      const pageRows = normalizedRows.slice(offset, offset + opts.limit)
+      const imageLookup = await this.buildEanImageLookupForOfferRows(pageRows)
       return {
-        products: normalizedRows.map((row) => this.mapOfferRowToProduct(row, imageLookup)),
-        total: offset + pageRows.length + (hasMore ? 1 : 0),
-        hasMore,
+        products: pageRows.map((row) => this.mapOfferRowToProduct(row, imageLookup)),
+        total: normalizedRows.length,
+        hasMore: normalizedRows.length > offset + opts.limit,
       }
     } catch (e) {
       console.warn('get_food_offers_v2 RPC exception, using direct query fallback:', e)
@@ -725,17 +824,15 @@ export class DatabaseService {
       return true
     }
 
-    const sortProducts = (products: any[]) => {
-      products.sort((a, b) => {
-        if (a.is_on_sale && !b.is_on_sale) return -1
-        if (!a.is_on_sale && b.is_on_sale) return 1
-        if (a.is_on_sale && b.is_on_sale) {
-          const aDiscount = a.discount_percentage || 0
-          const bDiscount = b.discount_percentage || 0
-          if (bDiscount !== aDiscount) return bDiscount - aDiscount
-        }
-        return (a.price || 0) - (b.price || 0)
-      })
+    const compareProducts = (a: any, b: any) => {
+      if (a.is_on_sale && !b.is_on_sale) return -1
+      if (!a.is_on_sale && b.is_on_sale) return 1
+      if (a.is_on_sale && b.is_on_sale) {
+        const aDiscount = a.discount_percentage || 0
+        const bDiscount = b.discount_percentage || 0
+        if (bDiscount !== aDiscount) return bDiscount - aDiscount
+      }
+      return (a.price || 0) - (b.price || 0)
     }
 
     const fetchSize = Math.min((offset + opts.limit) * 3 + 100, 1500)
@@ -788,14 +885,26 @@ export class DatabaseService {
     }
 
     const filteredRows = (data || []).filter(passesFilters)
-    const imageLookup = await this.buildEanImageLookupForOfferRows(filteredRows)
-    const products = filteredRows.map((row) => this.mapOfferRowToProduct(row, imageLookup))
-    sortProducts(products)
+    // Sortér på et billedfrit map, så rækkefølgen er uændret, og slå først
+    // EAN-billeder op for den side vi faktisk returnerer. Opslag på hele
+    // vinduet (op til 1500 rækker) ramte statement_timeout, så varerne mistede
+    // deres billede-fallback.
+    const noImages = new Map<string, string>()
+    const ranked = filteredRows.map((row) => ({
+      row,
+      product: this.mapOfferRowToProduct(row, noImages),
+    }))
+    ranked.sort((a, b) => compareProducts(a.product, b.product))
+
+    const pageEntries = ranked.slice(offset, offset + opts.limit)
+    const imageLookup = await this.buildEanImageLookupForOfferRows(
+      pageEntries.map((entry) => entry.row),
+    )
 
     return {
-      products: products.slice(offset, offset + opts.limit),
-      total: products.length,
-      hasMore: products.length > offset + opts.limit,
+      products: pageEntries.map((entry) => this.mapOfferRowToProduct(entry.row, imageLookup)),
+      total: ranked.length,
+      hasMore: ranked.length > offset + opts.limit,
     }
   }
 
