@@ -12,6 +12,13 @@ export interface CatalogRetentionResult {
   productsDeactivated: number
 }
 
+export interface SleepStaleOffersOptions {
+  /** Only sleep rows whose `source` matches, e.g. `tjek%`. */
+  sourceLike?: string
+  /** Never sleep rows whose `source` matches, e.g. `tjek%` (Salling/REMA overlay). */
+  sourceNotLike?: string
+}
+
 /** Promo tilbud past offer_until (offer row stays with last price). */
 export function isPromoOfferExpired(offerUntil: string | null | undefined): boolean {
   if (!offerUntil) return false
@@ -26,9 +33,10 @@ export function isPromoOfferExpired(offerUntil: string | null | undefined): bool
 export async function sleepStaleOffersForChain(
   chain: SourceChain,
   syncStartedAt: string,
+  options: SleepStaleOffersOptions = {},
 ): Promise<number> {
   const supabase = getGroceryServiceClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('product_offers')
     .update({
       in_stock: false,
@@ -38,7 +46,15 @@ export async function sleepStaleOffersForChain(
     .eq('store_id', chain)
     .eq('in_stock', true)
     .lt('source_synced_at', syncStartedAt)
-    .select('id')
+
+  if (options.sourceLike) {
+    query = query.like('source', options.sourceLike)
+  }
+  if (options.sourceNotLike) {
+    query = query.not('source', 'like', options.sourceNotLike)
+  }
+
+  const { data, error } = await query.select('id')
 
   if (error) {
     throw new Error(`sleepStaleOffers(${chain}): ${error.message}`)
@@ -49,6 +65,9 @@ export async function sleepStaleOffersForChain(
 /**
  * Full-catalog sync only: products not seen this run (last_seen_at unchanged)
  * are treated as genuinely gone from the source API.
+ *
+ * Tjek overlay products share `source_chain` with Salling/REMA but are keyed
+ * by leaflet offer id (`raw_data.tjek_offer_id`). Never deactivate those here.
  */
 export async function deactivateProductsMissingFromCatalogSync(
   chain: SourceChain,
@@ -61,6 +80,7 @@ export async function deactivateProductsMissingFromCatalogSync(
     .eq('source_chain', chain)
     .eq('active', true)
     .lt('last_seen_at', syncStartedAt)
+    .is('raw_data->>tjek_offer_id', null)
     .select('id')
 
   if (error) {
@@ -74,7 +94,9 @@ export async function applyCatalogRetentionAfterFullSync(
   syncStartedAt: string,
   options: { deactivateMissingProducts?: boolean } = {},
 ): Promise<CatalogRetentionResult> {
-  const offersSlept = await sleepStaleOffersForChain(chain, syncStartedAt)
+  const offersSlept = await sleepStaleOffersForChain(chain, syncStartedAt, {
+    sourceNotLike: 'tjek%',
+  })
   const productsDeactivated = options.deactivateMissingProducts
     ? await deactivateProductsMissingFromCatalogSync(chain, syncStartedAt)
     : 0

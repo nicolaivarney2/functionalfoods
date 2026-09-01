@@ -17,13 +17,14 @@ import {
   resolveProductImageUrl,
 } from '@/lib/product-image-fallback'
 
-/** Proven discount — stol ikke på is_on_sale / is_offer_active alene (Planomo jun 2026). */
+/** Proven discount — stol ikke på leftover `normal_price` alene. */
 export type OfferPricingFields = {
   current_price?: number | null
   normal_price?: number | null
   sale_valid_to?: string | null
   source?: string | null
   store_id?: string | null
+  is_on_sale?: boolean
 }
 
 /**
@@ -40,13 +41,13 @@ export function isRealOfferFields(offer: OfferPricingFields): boolean {
   const price = Number(offer.current_price || 0)
   if (price <= 0) return false
   if (offer.sale_valid_to && new Date(offer.sale_valid_to) < new Date()) return false
-  const normal = offer.normal_price != null ? Number(offer.normal_price) : null
-  // Bevist rabat: en rigtig førpris over tilbudsprisen.
-  if (normal != null && normal > price + 0.01) return true
   // Tilbudsavis-kilder uden førpris: stadig et reelt tilbud i gyldighedsvinduet.
   if (isSaleOnlySource(offer.source)) return true
   // Goma offers-only sync (p_on_sale_only): hele rækken er ugens tilbud.
   if (offer.source === 'goma' && isGomaOffersOnlyStoreId(offer.store_id)) return true
+  // Native katalog (Salling/REMA): kun mapperens is_on_sale. En efterladt
+  // normal_price fra maj/juni må ikke genoplive sidste uges avis.
+  if (offer.is_on_sale === true) return true
   return false
 }
 
@@ -389,8 +390,7 @@ export class DatabaseService {
         .from('product_offers')
         .select('id, products!inner(department)', { count: 'exact', head: true })
         .eq('is_available', true)
-        .not('normal_price', 'is', null)
-        .gt('normal_price', 0),
+        .eq('is_on_sale', true),
     )
 
     if (foodDepts) {
@@ -536,6 +536,14 @@ export class DatabaseService {
         search: search?.trim() || undefined,
       }
 
+      // Søgning skal ramme Tjek-overlay (Føtex-slagter i papiravisen). Prod-RPC
+      // skjulte tjek% indtil overlay-migrationen er ude.
+      if (fetchOpts.search) {
+        const direct = await this.fetchFoodOffersViaDirectQuery(fetchOpts)
+        console.log('[OFFERS DIRECT search] ok')
+        return direct
+      }
+
       const rpc = await this.fetchFoodOffersViaRpc(fetchOpts)
       if (rpc) {
         console.log('[OFFERS RPC] ok')
@@ -589,6 +597,7 @@ export class DatabaseService {
       }
 
       const rows = this.parseFoodOffersRpcRows(data)
+        .filter((row) => !opts.offersOnly || isRealOfferFields(row))
       if (rows.length === 0 && data != null && !Array.isArray(data)) {
         console.warn('get_food_offers_v2 RPC returned unexpected shape, using direct query fallback')
         return null
@@ -598,12 +607,14 @@ export class DatabaseService {
       const normalizedRows = pageRows
         .map((row) => this.normalizeRpcOfferRow(row))
         .filter((row) =>
-          isFoodCatalogProduct({
-            department: row.products?.department,
-            category: row.products?.category,
-            subcategory: row.products?.subcategory,
-            name: row.products?.name_generic ?? row.name_store,
-          }),
+          String(row.source ?? '').toLowerCase().startsWith('tjek')
+            ? true
+            : isFoodCatalogProduct({
+                department: row.products?.department,
+                category: row.products?.category,
+                subcategory: row.products?.subcategory,
+                name: row.products?.name_generic ?? row.name_store,
+              }),
         )
       const imageLookup = await this.buildEanImageLookupForOfferRows(normalizedRows)
       return {
@@ -692,6 +703,15 @@ export class DatabaseService {
     )
 
     if (storeIds) q = q.in('store_id', storeIds)
+
+    if (opts.search) {
+      const term = opts.search.replace(/[%*,()]/g, ' ').trim()
+      if (term) {
+        q = q.or(
+          `name_store.ilike.%${term}%,products.name_generic.ilike.%${term}%,products.brand.ilike.%${term}%`,
+        )
+      }
+    }
 
     if (opts.productIds?.length && opts.productIds.length <= 100) {
       q = q.in('product_id', opts.productIds)

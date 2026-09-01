@@ -7,10 +7,11 @@
  * (04:00 UTC vinter). En fredag-nat sync kl. 04:00 ville misse fredag-aften.
  *
  * GitHub Actions `grocery-native-sync.yml` kl. 04:00 UTC — fuldt katalog
- * efter kædens avisdag, plus daglig Salling-avis-refresh.
+ * efter kædens avisdag, plus daglig Salling-avis-refresh og daglig REMA
+ * (kataloget er ~1 min; en misset søndag må ikke efterlade ugens avis).
  */
 
-import type { SourceChain } from '@/grocery/types'
+import { TJEK_LEAFLET_OVERLAY_CHAINS, type SourceChain } from '@/grocery/types'
 
 /** Steps the cron orchestrator can run (matches `?only=` ids). */
 export type CronSyncStepId =
@@ -118,7 +119,13 @@ export function getScheduledSyncForWeekday(
   cronWeekday: number,
 ): ScheduledGrocerySync | null {
   const sallingChains = SALLING_BY_CRON_WEEKDAY[cronWeekday] ?? []
-  const tjekChains = TJEK_ONLY_BY_CRON_WEEKDAY[cronWeekday] ?? []
+  // Salling paper-avis overlay every day (Algolia misses slagtervarer).
+  const tjekChains = [
+    ...new Set<SourceChain>([
+      ...(TJEK_ONLY_BY_CRON_WEEKDAY[cronWeekday] ?? []),
+      ...TJEK_LEAFLET_OVERLAY_CHAINS,
+    ]),
+  ]
   const rema1000 = REMA_BY_CRON_WEEKDAY.has(cronWeekday)
 
   return {
@@ -174,7 +181,9 @@ export function scheduledStepIds(
   for (const c of schedule.sallingChains) {
     steps.push(c)
   }
-  if (schedule.rema1000) steps.push('rema-1000')
+  // REMA public API er hele kataloget på ~1 min. Kør hver dag — ikke kun
+  // søndag — så en hung/failed cron ikke efterlader sidste uges priser.
+  steps.push('rema-1000')
   if (schedule.tjekChains.length > 0) steps.push('tjek')
   steps.push('salling-offers')
   return steps

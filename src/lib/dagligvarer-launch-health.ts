@@ -30,6 +30,8 @@ export type LaunchHealthChain = {
   daysSinceSeen: number | null
   fooddataLastSeenAt: string | null
   fooddataOnSale: number | null
+  /** Aktive tilbud fra Tjek-avisoverlayet (Salling-kæder). */
+  fooddataTjekOnSale: number | null
   sourceLeafletCount: number | null
   samplePriceMismatches: number | null
   missedScheduledSlot: boolean
@@ -141,12 +143,19 @@ async function lastSeen(
   return typeof value === 'string' ? value : null
 }
 
-async function countOnSale(client: SupabaseClient, chain: SourceChain): Promise<number | null> {
-  const { count, error } = await client
+async function countOnSale(
+  client: SupabaseClient,
+  chain: SourceChain,
+  source?: { like?: string; notLike?: string },
+): Promise<number | null> {
+  let query = client
     .from('product_offers')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', chain)
     .eq('is_on_sale', true)
+  if (source?.like) query = query.like('source', source.like)
+  if (source?.notLike) query = query.not('source', 'like', source.notLike)
+  const { count, error } = await query
   if (error) return null
   return count ?? 0
 }
@@ -245,6 +254,8 @@ function classify(
     missedScheduledSlot: boolean
     sourceLeafletCount: number | null
     fooddataOnSale: number | null
+    /** Kun primærkilden (Algolia) — uden Tjek-avisoverlay. */
+    fooddataNativeOnSale: number | null
     samplePriceMismatches: number | null
   },
 ): { level: LaunchHealthLevel; reason: string } {
@@ -279,16 +290,20 @@ function classify(
       reason: `${input.absurdUntilCount} tilbud med slutdato > 60 dage (fx 2037/jul)`,
     }
   }
+  // Sammenlign kun Algolia-avisen med Algolia-kilden. Tjek-overlayet (papiravisens
+  // slagtervarer) ligger på samme butik, men findes ikke i Algolia — regnes det med,
+  // sprænger loftet og kæden bliver rød selvom begge kilder er sunde.
+  const algoliaOnSale = input.fooddataNativeOnSale ?? input.fooddataOnSale
   if (
     input.sourceLeafletCount != null &&
     input.sourceLeafletCount >= 50 &&
-    input.fooddataOnSale != null &&
-    (input.fooddataOnSale < input.sourceLeafletCount * 0.5 ||
-      input.fooddataOnSale > input.sourceLeafletCount * 1.35)
+    algoliaOnSale != null &&
+    (algoliaOnSale < input.sourceLeafletCount * 0.5 ||
+      algoliaOnSale > input.sourceLeafletCount * 1.35)
   ) {
     return {
       level: 'fail',
-      reason: `Algolia avis ${input.sourceLeafletCount} vs fooddata on_sale ${input.fooddataOnSale}`,
+      reason: `Algolia avis ${input.sourceLeafletCount} vs fooddata on_sale ${algoliaOnSale}`,
     }
   }
   if (input.samplePriceMismatches != null && input.samplePriceMismatches >= 3) {
@@ -345,6 +360,7 @@ export async function runDagligvarerLaunchHealth(
     let samplePriceMismatches: number | null = null
     let fooddataLastSeenAt: string | null = null
     let fooddataOnSale: number | null = null
+    let fooddataTjekOnSale: number | null = null
     let missedScheduledSlot = false
 
     if (spec.algolia) {
@@ -357,6 +373,9 @@ export async function runDagligvarerLaunchHealth(
       // fooddata.product_offers bruger source_synced_at (ikke last_seen_at).
       fooddataLastSeenAt = await lastSeen(grocery, spec.chain, 'source_synced_at')
       fooddataOnSale = await countOnSale(grocery, spec.chain)
+      if (spec.algolia) {
+        fooddataTjekOnSale = await countOnSale(grocery, spec.chain, { like: 'tjek%' })
+      }
       if (spec.native) {
         const logAt = await lastSyncLogSuccess(grocery, spec.native)
         // Samme evidens som grocery-cron catch-up: log ELLER sidst sete række.
@@ -383,6 +402,10 @@ export async function runDagligvarerLaunchHealth(
       missedScheduledSlot,
       sourceLeafletCount,
       fooddataOnSale,
+      fooddataNativeOnSale:
+        fooddataOnSale != null && fooddataTjekOnSale != null
+          ? fooddataOnSale - fooddataTjekOnSale
+          : fooddataOnSale,
       samplePriceMismatches,
     })
     chains.push({
@@ -394,6 +417,7 @@ export async function runDagligvarerLaunchHealth(
       daysSinceSeen: daysSinceSeen != null ? Math.round(daysSinceSeen * 10) / 10 : null,
       fooddataLastSeenAt,
       fooddataOnSale,
+      fooddataTjekOnSale,
       sourceLeafletCount,
       samplePriceMismatches,
       missedScheduledSlot,
@@ -423,6 +447,7 @@ export function formatLaunchHealthReport(report: LaunchHealthReport): string {
       pad('rpc', 5) +
       pad('avis', 6) +
       pad('fd', 6) +
+      pad('tjek', 6) +
       pad('alder', 8) +
       pad('status', 6) +
       'årsag',
@@ -431,11 +456,13 @@ export function formatLaunchHealthReport(report: LaunchHealthReport): string {
     const age = c.daysSinceSeen == null ? '-' : `${c.daysSinceSeen}d`
     const avis = c.sourceLeafletCount == null ? '-' : String(c.sourceLeafletCount)
     const fd = c.fooddataOnSale == null ? '-' : String(c.fooddataOnSale)
+    const tjek = c.fooddataTjekOnSale == null ? '-' : String(c.fooddataTjekOnSale)
     lines.push(
       pad(c.label, 16) +
         pad(c.rpcCount, 5) +
         pad(avis, 6) +
         pad(fd, 6) +
+        pad(tjek, 6) +
         pad(age, 8) +
         pad(c.level, 6) +
         c.reason,

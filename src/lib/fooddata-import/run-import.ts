@@ -26,6 +26,11 @@ import {
   shouldImportFooddataProduct,
 } from '@/lib/goma-import-stores'
 import { sanitizeGomaOfferUntil } from '@/grocery/adapters/goma/mapper'
+import {
+  buildSleepCutoffs,
+  formatSweepSummary,
+  sweepFfProductOffers,
+} from './ff-offer-sweep'
 
 /** PostgREST/Supabase default statement_timeout (~8s) bites on wide product rows. */
 const BATCH_SIZE = 500
@@ -162,80 +167,6 @@ async function fetchGomaOfferProductUuids(fooddata: SupabaseClient): Promise<Set
 
 const PRODUCT_SELECT_COLS =
   'id, source_chain, source_id, gtin, name, brand, manufacturer, description, amount, unit, image_url, category_path, category_lvl0, category_lvl1, category_lvl2, last_seen_at, active'
-
-/** Salling/REMA-kæder må aldrig have source=goma offers i FF (kommer fra fooddata-native). */
-const SALLING_REMA_STORE_IDS = ['netto', 'bilka', 'foetex', 'rema-1000'] as const
-
-/**
- * Ryd ophobede stale Goma-offers i FF. UPSERT-importen sletter aldrig rækker der
- * forsvinder fra fooddata, så udløbne/forkerte Goma-offers hober sig op:
- *   1. Goma-offers på Salling/REMA-kæder (gammelt eksperiment — skal aldrig være goma)
- *   2. Udløbne Goma-offers (sale_valid_to i fortiden) — tilbudsavisen er slut
- */
-async function cleanupStaleGomaOffers(
-  ff: SupabaseClient,
-  log: (msg: string) => void,
-): Promise<number> {
-  let cleaned = 0
-
-  const { count: sallingCount, error: sallingErr } = await ff
-    .from('product_offers')
-    .delete({ count: 'exact' })
-    .eq('source', 'goma')
-    .in('store_id', SALLING_REMA_STORE_IDS as unknown as string[])
-  if (sallingErr) {
-    log(`  ! cleanup (Salling goma) fejlede: ${sallingErr.message}`)
-  } else {
-    cleaned += sallingCount ?? 0
-  }
-
-  const { count: expiredCount, error: expiredErr } = await ff
-    .from('product_offers')
-    .delete({ count: 'exact' })
-    .eq('source', 'goma')
-    .not('sale_valid_to', 'is', null)
-    .lt('sale_valid_to', new Date().toISOString())
-  if (expiredErr) {
-    log(`  ! cleanup (udløbne goma) fejlede: ${expiredErr.message}`)
-  } else {
-    cleaned += expiredCount ?? 0
-  }
-
-  return cleaned
-}
-
-/** Goma-kæder — Tjek skal ikke længere vises i FF når Goma er primær. */
-const GOMA_CHAIN_STORE_IDS = [
-  'lidl',
-  '365discount',
-  'kvickly',
-  'superbrugsen',
-  'brugsen',
-  'meny',
-  'spar',
-  'loevbjerg',
-  'abc-lavpris',
-  'min-koebmand',
-  'nemlig',
-] as const
-
-async function cleanupTjekOffersForGomaChains(
-  ff: SupabaseClient,
-  log: (msg: string) => void,
-): Promise<number> {
-  const { count, error } = await ff
-    .from('product_offers')
-    .delete({ count: 'exact' })
-    .like('source', 'tjek%')
-    .in('store_id', [...GOMA_CHAIN_STORE_IDS])
-  if (error) {
-    log(`  ! cleanup (Tjek på Goma-kæder) fejlede: ${error.message}`)
-    return 0
-  }
-  const n = count ?? 0
-  if (n > 0) log(`  cleaned ${n} legacy Tjek-offers på Goma-kæder`)
-  return n
-}
 
 /**
  * PK lookups for the ids we actually care about.
@@ -781,7 +712,7 @@ function mapOffer(
     fromOk &&
     untilOk &&
     (isSallingSource
-      ? o.is_on_sale === true && hasProvenDiscount
+      ? o.is_on_sale === true
       : hasProvenDiscount || isTjekSource || o.is_on_sale)
   )
   return {
@@ -1081,9 +1012,21 @@ export async function runFooddataImport(
         { log },
       )
     }
-    if (!dryRun && gomaImportEnabled) {
-      result.offers.cleaned += await cleanupStaleGomaOffers(ff, log)
-      result.offers.cleaned += await cleanupTjekOffersForGomaChains(ff, log)
+    if (!dryRun) {
+      try {
+        const sweep = await sweepFfProductOffers({
+          ff,
+          cutoffs: buildSleepCutoffs(mapped),
+          gomaImportEnabled,
+          log,
+        })
+        result.offers.cleaned += sweep.slept + sweep.deleted + sweep.normalPriceCleared
+        log(`  sweep: ${formatSweepSummary(sweep)}`)
+      } catch (err) {
+        // Katalog + offers er skrevet — en sweep-fejl må ikke fejle hele importen.
+        const msg = err instanceof Error ? err.message : String(err)
+        log(`  ! sweep fejlede (import ellers OK): ${msg}`)
+      }
     }
     log(
       `  offers: ${dryRun ? `${mapped.length} (dry-run)` : result.offers.upserted}, ${result.offers.dropped} dropped` +

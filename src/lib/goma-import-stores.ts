@@ -4,7 +4,8 @@
  * Strategi (jul 2026):
  *   Native scrape → fooddata: Netto, Bilka, Føtex, REMA 1000
  *   Goma → fooddata: alle øvrige kæder (source=goma)
- *   Tjek: udfaset — importeres ikke til FF når GOMA_IMPORT_ENABLED=true
+ *   Tjek overlay: Salling papiravis (Føtex/Netto/Bilka slagtervarer)
+ *   Tjek øvrigt: importeres ikke til FF når GOMA_IMPORT_ENABLED=true
  */
 
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'

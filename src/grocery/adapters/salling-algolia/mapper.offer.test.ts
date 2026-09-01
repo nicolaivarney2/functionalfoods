@@ -73,4 +73,40 @@ describe('mapHitToChainOffer Salling tilbud', () => {
     assert.equal(offer?.before_price_cents, 795)
     assert.equal(offer?.price_cents, 300)
   })
+
+  it('tæller avisvare som tilbud også uden strikethrough-førpris', () => {
+    const offer = mapHitToChainOffer(
+      'netto',
+      hit({
+        isInCurrentLeaflet: true,
+        cpOriginalPrice: 0,
+        storeData: {
+          '7701': {
+            inStock: true,
+            multipromo: 0,
+            offerDescription: 'Avisvare',
+            price: 2500,
+            multiPromoPrice: 0,
+            unitsOfMeasurePrice: 412,
+            unitsOfMeasurePriceUnit: 'kg',
+            unitsOfMeasureOfferPrice: 313,
+            unitsOfMeasureShowPrice: 313,
+          },
+        },
+      }),
+      'prod-2',
+    )
+    assert.equal(offer?.is_on_sale, true)
+    assert.equal(offer?.price_cents, 2500)
+  })
+
+  it('slår CP-kampagne fra når varen ikke er i ugens avis', () => {
+    const offer = mapHitToChainOffer(
+      'netto',
+      hit({ isInCurrentLeaflet: false, cpOffer: true }),
+      'prod-3',
+    )
+    assert.equal(offer?.is_on_sale, false)
+    assert.equal(offer?.before_price_cents, null)
+  })
 })

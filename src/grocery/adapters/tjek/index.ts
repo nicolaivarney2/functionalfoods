@@ -16,5 +16,6 @@ export {
   CHAIN_TO_TJEK_DEALER,
   CHAINS_WITH_PRIMARY_CATALOG,
   TJEK_DEALER_TO_CHAIN,
+  TJEK_LEAFLET_OVERLAY_CHAINS,
 } from './types'
 export type { TjekCatalog, TjekDealer, TjekOffer } from './types'

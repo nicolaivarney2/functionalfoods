@@ -17,6 +17,8 @@
 
 import type { SourceChain } from '../../types'
 
+export { TJEK_LEAFLET_OVERLAY_CHAINS } from '../../types'
+
 export interface TjekDealer {
   id: string
   ern: string
@@ -119,11 +121,10 @@ export const CHAIN_TO_TJEK_DEALER: Partial<Record<SourceChain, string>> =
   ) as Partial<Record<SourceChain, string>>
 
 /**
- * Chains where we already have a full primary-source catalog. By default the
- * Tjek sync skips these so we don't pollute their canonical products table
- * with leaflet-only entries — Tjek offers for these chains can still be useful
- * for *enriching* offer prices, which is handled by a separate enrichment
- * pass (not yet implemented; flagged in TODO).
+ * Chains where we already have a full primary-source catalog. Default Tjek
+ * sync still pulls a *leaflet overlay* for Salling (`TJEK_LEAFLET_OVERLAY_CHAINS`)
+ * because Algolia misses paper-avis slagtervarer. REMA stays skipped unless
+ * `includePrimary` — their public API already has avis-SKU'er.
  */
 export const CHAINS_WITH_PRIMARY_CATALOG: ReadonlySet<SourceChain> = new Set([
   'netto',

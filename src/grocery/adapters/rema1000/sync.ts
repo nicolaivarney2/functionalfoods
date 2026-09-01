@@ -8,6 +8,7 @@ import type { RemaDepartment, RemaProduct } from './types'
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
+const STALE_RUNNING_MS = 30 * 60 * 1000
 
 export interface RemaSyncOptions {
   dryRun?: boolean
@@ -38,6 +39,23 @@ export async function syncRema1000(
 
   let syncLogId: string | undefined
   if (supabase) {
+    const staleBefore = new Date(startedAt - STALE_RUNNING_MS).toISOString()
+    await retryGroceryDb('abandon stale running REMA logs', async () => {
+      const res = await supabase
+        .from('sync_logs')
+        .update({
+          status: 'failed',
+          completed_at: new Date(startedAt).toISOString(),
+          error_message: 'Stale running — abandoned before new REMA sync',
+          duration_ms: STALE_RUNNING_MS,
+        })
+        .eq('source', 'apify-rema')
+        .eq('status', 'running')
+        .lt('started_at', staleBefore)
+      if (res.error) throw new Error(res.error.message)
+      return res
+    })
+
     const initial: SyncLogInsert = {
       source: 'apify-rema', // we reuse the existing enum value; semantically "rema-1000-api"
       status: 'running',
@@ -49,7 +67,6 @@ export async function syncRema1000(
       if (res.error) throw new Error(res.error.message)
       return res
     })
-    syncLogId = data.id
     syncLogId = data.id
   }
 
@@ -215,20 +232,5 @@ export async function syncRema1000(
     durationMs: Date.now() - startedAt,
     syncLogId,
     sampleProductIds,
-  }
-}
-
-function failureResult(startedAt: number, message: string): RemaSyncResult {
-  return {
-    source: 'rema1000',
-    status: 'failed',
-    productsProcessed: 0,
-    productsCreated: 0,
-    productsUpdated: 0,
-    offersProcessed: 0,
-    errorsCount: 1,
-    errorMessage: message,
-    durationMs: Date.now() - startedAt,
-    sampleProductIds: [],
   }
 }

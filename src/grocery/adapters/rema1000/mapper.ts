@@ -3,6 +3,8 @@ import { isPromoOfferExpired } from '../../sync/catalog-retention'
 import type { RemaDepartment, RemaPrice, RemaProduct } from './types'
 
 const SOURCE = 'rema-1000' as const
+/** REMA uses 2099-12-31 as "no end" — don't treat that as a real offer window. */
+const SENTINEL_END_MS = 365 * 24 * 60 * 60 * 1000
 
 /**
  * Parses underline-fields like "285 GR. / EASIS" or "500 ML. / JACOBS"
@@ -50,19 +52,66 @@ function toCents(decimal: number | null | undefined): number | null {
   return Math.round(decimal * 100)
 }
 
+function parseTs(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  const t = Date.parse(iso)
+  return Number.isFinite(t) ? t : null
+}
+
+export function isPriceWindowActive(price: RemaPrice, nowMs: number): boolean {
+  const start = parseTs(price.starting_at)
+  const end = parseTs(price.ending_at)
+  const startOk = start == null || start <= nowMs
+  const endOk = end == null || end > nowMs
+  return startOk && endOk
+}
+
+export function isSentinelOfferEnd(iso: string | null | undefined, nowMs: number): boolean {
+  const t = parseTs(iso)
+  return t == null || t > nowMs + SENTINEL_END_MS
+}
+
+function lowestPrice(prices: RemaPrice[]): RemaPrice {
+  return prices.reduce((lowest, p) => (p.price < lowest.price ? p : lowest))
+}
+
+/**
+ * Prefer an in-window campaign, then advertised leaflet price, then any
+ * in-window price. If REMA leaves a 1-day gap between campaign end and the
+ * next regular start, take the earliest upcoming price rather than the
+ * expired campaign.
+ */
 export function pickCurrentPrice(
   prices: RemaPrice[] | undefined,
+  nowMs: number = Date.now(),
 ): RemaPrice | null {
   if (!prices || prices.length === 0) return null
 
-  const campaigns = prices.filter((p) => p.is_campaign)
-  if (campaigns.length > 0) {
-    return campaigns.reduce((lowest, p) =>
-      p.price < lowest.price ? p : lowest,
-    )
-  }
+  const active = prices.filter((p) => isPriceWindowActive(p, nowMs))
+  const pool = active.length > 0 ? active : upcomingOrAll(prices, nowMs)
+  return pickPreferred(pool)
+}
 
-  return prices[0]
+function upcomingOrAll(prices: RemaPrice[], nowMs: number): RemaPrice[] {
+  const future = prices.filter((p) => {
+    const start = parseTs(p.starting_at)
+    return start != null && start > nowMs
+  })
+  if (future.length === 0) return prices
+  const earliest = future.reduce((a, b) => {
+    const as = parseTs(a.starting_at) ?? 0
+    const bs = parseTs(b.starting_at) ?? 0
+    return bs < as ? b : a
+  })
+  return [earliest]
+}
+
+function pickPreferred(pool: RemaPrice[]): RemaPrice {
+  const campaigns = pool.filter((p) => p.is_campaign)
+  if (campaigns.length > 0) return lowestPrice(campaigns)
+  const advertised = pool.filter((p) => p.is_advertised)
+  if (advertised.length > 0) return lowestPrice(advertised)
+  return pool[0]
 }
 
 export function pickRegularPrice(
@@ -118,8 +167,9 @@ export function isRemaProductInStock(product: RemaProduct): boolean {
 
 export function resolveRemaOfferPricing(
   prices: RemaPrice[] | undefined,
+  nowMs: number = Date.now(),
 ): RemaOfferPricing | null {
-  const current = pickCurrentPrice(prices)
+  const current = pickCurrentPrice(prices, nowMs)
   if (!current) return null
 
   const priceCents = toCents(current.price)
@@ -128,7 +178,10 @@ export function resolveRemaOfferPricing(
     regular && regular.price > current.price + 0.01
       ? toCents(regular.price)
       : null
-  const isOnSale = beforePriceCents !== null
+  // Leaflet "partivarer" often have is_advertised without is_campaign or a
+  // strikethrough. They still belong in ugens tilbud.
+  const isOnSale =
+    beforePriceCents !== null || current.is_campaign || current.is_advertised
 
   let discountPct: number | null = null
   if (beforePriceCents && priceCents && beforePriceCents > priceCents) {
@@ -183,14 +236,18 @@ export function mapRemaProduct(
 export function mapRemaOffer(
   product: RemaProduct,
   productId: string,
+  nowMs: number = Date.now(),
 ): ProductOfferInsert | null {
-  const pricing = resolveRemaOfferPricing(product.prices)
+  const pricing = resolveRemaOfferPricing(product.prices, nowMs)
   if (!pricing) return null
 
   const { current, priceCents, beforePriceCents, isOnSale, discountPct } =
     pricing
 
-  const offerUntil = isOnSale ? current.ending_at : null
+  const offerUntil =
+    isOnSale && !isSentinelOfferEnd(current.ending_at, nowMs)
+      ? current.ending_at
+      : null
   const promoExpired = isOnSale && isPromoOfferExpired(offerUntil)
 
   return {

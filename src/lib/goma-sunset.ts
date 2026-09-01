@@ -3,13 +3,8 @@
  *
  * Native (fooddata direkte): Netto, Bilka, Føtex, REMA 1000.
  * Goma (via fooddata): Lidl, Coop-kæder, MENY, Spar, Nemlig, Min Købmand, …
- * Tjek: udfaset — kun nød-fallback når GOMA_IMPORT_ENABLED=false.
- *
- * Env:
- * - GOMA_IMPORT_ENABLED=true      — påkrævet på Vercel + GitHub Actions import
- * - GOMA_SIMULATE_GONE=true       — dev: simuler manglende Goma (som gammel prod)
- * - GOMA_LEGACY_DATA_ENABLED=true — nød: genaktiver legacy Goma product IDs i prissøgning
- * - GROCERY_TJEK_DISABLED=true    — stop Tjek-scrape i fooddata (anbefalet med Goma)
+ * Tjek: Salling papiravis-overlay (Algolia mangler slagtervarer). Øvrige kæder
+ * via Goma. GROCERY_TJEK_DISABLED=true stopper al Tjek-trafik.
  */
 
 export const GOMA_SUNSET_MESSAGE =

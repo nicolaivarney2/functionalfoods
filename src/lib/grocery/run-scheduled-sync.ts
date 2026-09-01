@@ -9,7 +9,11 @@ import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 import { syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
-import type { SourceChain } from '@/grocery/types'
+import {
+  isTjekLeafletOverlayChain,
+  TJEK_LEAFLET_OVERLAY_CHAINS,
+  type SourceChain,
+} from '@/grocery/types'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   getScheduledSyncForNow,
@@ -219,16 +223,27 @@ export async function runScheduledGrocerySync(
     )
   }
 
-  const tjekDisabled =
-    isGomaImportEnabled() || process.env.GROCERY_TJEK_DISABLED === 'true'
+  const tjekKillSwitch = process.env.GROCERY_TJEK_DISABLED === 'true'
+  const tjekOverlayChains: SourceChain[] = tjekChains
+    ? tjekChains.filter(isTjekLeafletOverlayChain)
+    : [...TJEK_LEAFLET_OVERLAY_CHAINS]
 
-  if (shouldRun('tjek') && !tjekDisabled) {
-    steps.push(
-      await runStep('tjek', async () => ({
-        ...(await syncTjek(tjekChains ? { chains: tjekChains } : undefined)),
-        step: 'tjek',
-      })),
-    )
+  if (shouldRun('tjek') && !tjekKillSwitch) {
+    const tjekOpts = isGomaImportEnabled()
+      ? tjekOverlayChains.length > 0
+        ? { chains: tjekOverlayChains, includePrimary: true }
+        : null
+      : tjekChains
+        ? { chains: tjekChains, includePrimary: tjekChains.some(isTjekLeafletOverlayChain) }
+        : undefined
+    if (tjekOpts !== null) {
+      steps.push(
+        await runStep('tjek', async () => ({
+          ...(await syncTjek(tjekOpts)),
+          step: 'tjek',
+        })),
+      )
+    }
   }
 
   const ranProductSync = steps.some(

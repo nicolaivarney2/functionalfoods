@@ -15,7 +15,7 @@
  *   # Sync all non-primary chains (default)
  *   npx tsx scripts/grocery-sync-tjek.ts
  *
- *   # Include the primary-source chains too (overwrites canonical products!)
+ *   # Also overlay REMA (Salling Føtex/Netto/Bilka already overlay by default)
  *   npx tsx scripts/grocery-sync-tjek.ts --include-primary
  *
  * Kill-switch:

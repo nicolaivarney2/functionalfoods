@@ -5,9 +5,9 @@
  * offers, and upserts them into `products` + `product_offers` in batches.
  * Writes a sync_logs row tracking the run.
  *
- * Default behavior excludes chains that have a primary-source catalog
- * adapter (Salling Algolia, REMA API). Override with `includePrimary: true`
- * if you want to use Tjek as a secondary signal for those chains too.
+ * Default behavior skips REMA (primary catalog is enough) but still syncs a
+ * Tjek *leaflet overlay* for Salling chains — Algolia misses paper-avis
+ * slagtervarer. Pass `includePrimary: true` to also overlay REMA.
  *
  * Dry-run mode bypasses ALL DB writes — useful for the explorer view to
  * preview what would happen without committing anything.
@@ -29,7 +29,7 @@ import {
   TJEK_DEALER_TO_CHAIN,
   type TjekOffer,
 } from './types'
-import type { SourceChain } from '../../types'
+import { isTjekLeafletOverlayChain, type SourceChain } from '../../types'
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
@@ -101,7 +101,10 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
     options.chains ?? (Object.values(TJEK_DEALER_TO_CHAIN) as SourceChain[])
   const targetDealers: Array<{ chain: SourceChain; dealerId: string }> = []
   for (const chain of requestedChains) {
-    if (!includePrimary && CHAINS_WITH_PRIMARY_CATALOG.has(chain)) continue
+    const overlay = isTjekLeafletOverlayChain(chain)
+    if (!includePrimary && CHAINS_WITH_PRIMARY_CATALOG.has(chain) && !overlay) {
+      continue
+    }
     const dealerId = CHAIN_TO_TJEK_DEALER[chain]
     if (!dealerId) continue
     targetDealers.push({ chain, dealerId })
@@ -278,7 +281,11 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
       await flush(chain)
       if (runRetention) {
         try {
-          await sleepStaleOffersForChain(chain, syncStartedAt)
+          await sleepStaleOffersForChain(
+            chain,
+            syncStartedAt,
+            isTjekLeafletOverlayChain(chain) ? { sourceLike: 'tjek%' } : undefined,
+          )
         } catch (retentionErr) {
           errorsCount++
           const msg =

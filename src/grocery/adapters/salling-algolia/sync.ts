@@ -391,18 +391,3 @@ async function clearEndedSallingLeafletOffers(
 
   return ended
 }
-
-function failureResult(source: string, startedAt: number, message: string): SyncResult {
-  return {
-    source,
-    status: 'failed',
-    productsProcessed: 0,
-    productsCreated: 0,
-    productsUpdated: 0,
-    offersProcessed: 0,
-    errorsCount: 1,
-    errorMessage: message,
-    durationMs: Date.now() - startedAt,
-    sampleProductIds: [],
-  }
-}

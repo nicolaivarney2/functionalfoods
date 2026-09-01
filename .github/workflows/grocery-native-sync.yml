@@ -1,7 +1,8 @@
 name: Grocery native sync (Salling + REMA)
 
 # Fuldt katalog + catch-up på GitHub-runner. Ikke Vercel (300s loft).
-# 04:00 UTC — før fooddata-import 05:00.
+# 04:00 UTC — før fooddata-import 05:00. REMA kører hver dag (billigt).
+# Tjek kører som Salling papiravis-overlay (slagtervarer som Algolia mangler).
 
 on:
   schedule:

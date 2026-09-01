@@ -43,14 +43,15 @@ export type SourceChain =
 export type CatalogCoverage = 'full' | 'offers-only' | 'none'
 
 export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
-  // Direct primary-source adapters
+  // Direct primary-source adapters (Salling grocery Algolia misses paper-avis
+  // slagtervarer — Tjek overlay fills that; see TJEK_LEAFLET_OVERLAY_CHAINS)
   netto: 'full',
   foetex: 'full',
   bilka: 'full',
   'rema-1000': 'full',
 
-  // Tjek/Squid API — udfaset jul 2026. Goma dækker alle ikke-native kæder.
-  // Behold adapter til manuel nød-kørsel; cron springes over når Goma er aktiv.
+  // Øvrige kæder: Tjek udfaset — Goma er primær. Salling papiravis kører
+  // stadig som Tjek-overlay (se TJEK_LEAFLET_OVERLAY_CHAINS).
   lidl: 'offers-only',
   meny: 'offers-only',
   spar: 'offers-only',
@@ -64,6 +65,20 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
 
   // Fuldt katalog via Goma (ikke Tjek)
   nemlig: 'offers-only',
+}
+
+/**
+ * Salling app-katalog (Algolia) dækker pakkede dagligvarer, ikke slagterens
+ * vejevarer i papiravisen. Tjek OCR'er den avis — overlay, ikke erstatning.
+ */
+export const TJEK_LEAFLET_OVERLAY_CHAINS = ['netto', 'foetex', 'bilka'] as const
+
+export type TjekLeafletOverlayChain = (typeof TJEK_LEAFLET_OVERLAY_CHAINS)[number]
+
+export function isTjekLeafletOverlayChain(
+  chain: string | null | undefined,
+): chain is TjekLeafletOverlayChain {
+  return (TJEK_LEAFLET_OVERLAY_CHAINS as readonly string[]).includes(chain ?? '')
 }
 
 /** Human-readable Danish label for the coverage status. */

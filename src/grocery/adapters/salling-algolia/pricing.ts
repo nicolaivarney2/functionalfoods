@@ -5,11 +5,11 @@ type BeforePriceHitContext = Pick<
   'cpOriginalPrice' | 'isInCurrentLeaflet' | 'cpOffer'
 >
 
-/** Live ugeavis / CP-kampagne — ikke en efterladt førpris fra sidste uge. */
+/** Live ugeavis — ikke CP-kampagne eller en efterladt førpris fra sidste uge. */
 export function isLiveSallingOfferSignal(
   hit: Pick<SallingAlgoliaHit, 'isInCurrentLeaflet' | 'cpOffer'>,
 ): boolean {
-  return Boolean(hit.isInCurrentLeaflet || hit.cpOffer)
+  return Boolean(hit.isInCurrentLeaflet)
 }
 
 export interface RepresentativeStore {

@@ -148,7 +148,8 @@ export function mapHitToChainOffer(
   const price = rep?.data.price ?? 0
   const beforePriceCents = rep?.beforePriceCents ?? null
   const liveOffer = isLiveSallingOfferSignal(hit)
-  const isOnSale = liveOffer && beforePriceCents !== null
+  // Avisvare tæller som tilbud også uden strikethrough (Netto har ofte kun UOM-rabat).
+  const isOnSale = liveOffer
 
   let discountPct: number | null = null
   if (isOnSale && beforePriceCents && price > 0 && beforePriceCents > price) {
