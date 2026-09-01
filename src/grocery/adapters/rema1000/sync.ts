@@ -1,4 +1,5 @@
 import { getGroceryServiceClient } from '../../db/client'
+import { retryGroceryDb } from '../../db/retry'
 import { applyCatalogRetentionAfterFullSync } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
 import { iterateAllRemaProducts } from './client'
@@ -43,14 +44,12 @@ export async function syncRema1000(
       started_at: new Date(startedAt).toISOString(),
       metadata: { adapter: 'rema-1000-api' },
     }
-    const { data, error } = await supabase
-      .from('sync_logs')
-      .insert(initial)
-      .select('id')
-      .single()
-    if (error) {
-      return failureResult(startedAt, `Failed to create sync_log: ${error.message}`)
-    }
+    const { data } = await retryGroceryDb('create sync_log', async () => {
+      const res = await supabase.from('sync_logs').insert(initial).select('id').single()
+      if (res.error) throw new Error(res.error.message)
+      return res
+    })
+    syncLogId = data.id
     syncLogId = data.id
   }
 

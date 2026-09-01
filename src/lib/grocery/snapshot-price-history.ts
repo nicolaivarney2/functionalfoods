@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
 
 const RPC_BATCH = 1500
 const REST_PAGE = 400
-const MAX_ATTEMPTS = 8
 
 type BatchResult = {
   rows_affected: number
@@ -14,32 +14,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message)
-  }
-  return String(err)
-}
-
 function isTimeout(err: unknown): boolean {
-  return /timeout|57014|canceling statement|upstream request/i.test(errorMessage(err))
-}
-
-/** PostgREST could not load schema (DB busy) — retry, do not treat as missing RPC. */
-function isSchemaCacheBusy(err: unknown): boolean {
-  return /could not query the database for the schema cache/i.test(errorMessage(err))
+  return /timeout|57014|canceling statement|upstream request/i.test(groceryDbErrorMessage(err))
 }
 
 /** Function truly absent from PostgREST schema cache (PGRST202). */
 function isMissingRpc(err: unknown): boolean {
-  const msg = errorMessage(err)
-  if (isSchemaCacheBusy(err)) return false
+  const msg = groceryDbErrorMessage(err)
+  if (/could not query the database for the schema cache/i.test(msg)) return false
   return /could not find the function|pgrst202/i.test(msg)
-}
-
-function isRetryable(err: unknown): boolean {
-  return isTimeout(err) || isSchemaCacheBusy(err) || /fetch failed|econnreset|503|502/i.test(errorMessage(err))
 }
 
 function parseBatchResult(data: unknown): BatchResult {
@@ -56,26 +39,8 @@ function parseBatchResult(data: unknown): BatchResult {
   }
 }
 
-async function withRetries<T>(label: string, fn: () => Promise<T>): Promise<T> {
-  let lastError: unknown
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      lastError = err
-      if (!isRetryable(err) || attempt === MAX_ATTEMPTS - 1) throw err
-      const wait = Math.min(30_000, 1000 * 2 ** attempt)
-      console.warn(
-        `[grocery/cron] ${label} retry ${attempt + 1}/${MAX_ATTEMPTS} in ${wait}ms: ${errorMessage(err)}`,
-      )
-      await sleep(wait)
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error(errorMessage(lastError))
-}
-
 async function listStoreIds(supabase: SupabaseClient): Promise<string[]> {
-  const { data } = await withRetries('list chain stores', async () => {
+  const { data } = await retryGroceryDb('list chain stores', async () => {
     const res = await supabase.from('stores').select('id').eq('type', 'chain')
     if (res.error) throw new Error(res.error.message)
     return res
@@ -102,7 +67,7 @@ async function snapshotStoreViaRpc(
   let total = 0
 
   for (;;) {
-    const page = await withRetries(`snapshot rpc ${storeId}`, async () => {
+    const page = await retryGroceryDb(`snapshot rpc ${storeId}`, async () => {
       const { data, error } = await supabase.rpc('snapshot_price_history_batch', {
         p_store_id: storeId,
         p_after_product_id: after,
@@ -138,7 +103,7 @@ async function snapshotStoreViaRest(
   let total = 0
 
   for (;;) {
-    const rows = await withRetries(`snapshot rest read ${storeId}`, async () => {
+    const rows = await retryGroceryDb(`snapshot rest read ${storeId}`, async () => {
       let query = supabase
         .from('product_offers')
         .select('product_id, store_id, price_cents, before_price_cents, is_on_sale')
@@ -162,7 +127,7 @@ async function snapshotStoreViaRest(
       snapshot_date: snapshotDate,
     }))
 
-    await withRetries(`snapshot rest upsert ${storeId}`, async () => {
+    await retryGroceryDb(`snapshot rest upsert ${storeId}`, async () => {
       const { error } = await supabase.from('price_history').upsert(payload, {
         onConflict: 'product_id,store_id,snapshot_date',
       })
@@ -184,7 +149,6 @@ async function snapshotStoreViaRest(
  * only if the RPC is actually missing from PostgREST.
  */
 export async function snapshotPriceHistory(supabase: SupabaseClient): Promise<number> {
-  // Heavy offer upserts just ran — give PostgREST a moment to reload schema.
   await sleep(5000)
 
   const storeIds = await listStoreIds(supabase)

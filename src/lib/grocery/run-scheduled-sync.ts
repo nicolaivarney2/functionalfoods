@@ -22,6 +22,7 @@ import {
 } from '@/lib/grocery/sync-schedule'
 import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
 import { snapshotPriceHistory } from '@/lib/grocery/snapshot-price-history'
+import { retryGroceryDb } from '@/grocery/db/retry'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
 import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 
@@ -62,7 +63,7 @@ async function nativeChainsMissingLastSlot(): Promise<NativeCronChain[]> {
   const supabase = getGroceryServiceClient()
   const missed: NativeCronChain[] = []
   for (const chain of Object.keys(NATIVE_SYNC_LOG_SOURCES) as NativeCronChain[]) {
-    const [{ data: log }, { data: seen }] = await Promise.all([
+    const [{ data: log, error: logErr }, { data: seen, error: seenErr }] = await Promise.all([
       supabase
         .from('sync_logs')
         .select('completed_at')
@@ -78,6 +79,8 @@ async function nativeChainsMissingLastSlot(): Promise<NativeCronChain[]> {
         .order('last_seen_at', { ascending: false })
         .limit(1),
     ])
+    if (logErr) throw new Error(logErr.message)
+    if (seenErr) throw new Error(seenErr.message)
     const lastOk = [log?.[0]?.completed_at, seen?.[0]?.last_seen_at]
       .filter((v): v is string => typeof v === 'string')
       .sort()
@@ -116,6 +119,16 @@ export async function runScheduledGrocerySync(
   const skipSnapshot = Boolean(options.skipSnapshot)
   const onlyParam = options.only?.trim() || null
   const fullSync = Boolean(options.fullSync)
+
+  await retryGroceryDb(
+    'wait for PostgREST schema cache',
+    async () => {
+      const supabase = getGroceryServiceClient()
+      const { error } = await supabase.from('stores').select('id').limit(1)
+      if (error) throw new Error(error.message)
+    },
+    { attempts: 10, maxWaitMs: 20_000 },
+  )
 
   let mode: GroceryCronSummary['mode'] = 'scheduled'
   let schedule: ScheduledGrocerySync | null = null
