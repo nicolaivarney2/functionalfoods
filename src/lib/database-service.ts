@@ -641,6 +641,31 @@ export class DatabaseService {
     return haystack.some((h) => dagligvarerSearchMatches(String(h ?? ''), term))
   }
 
+  /**
+   * product_id'er hvor produktnavn eller brand matcher søgningen. Bro til
+   * tilbuds-queryen, som kun må filtrere på egne kolonner. Loftet holder
+   * `product_id.in.(…)` inden for URL-grænsen; navnet på tilbudsrækken
+   * (name_store) fanger resten.
+   */
+  private async findProductIdsMatchingSearch(term: string, limit = 200): Promise<string[]> {
+    try {
+      const supabase = createSupabaseServiceClient()
+      const { data, error } = await supabase
+        .from('products')
+        .select('id')
+        .or(`name_generic.ilike.*${term}*,brand.ilike.*${term}*`)
+        .limit(limit)
+      if (error) {
+        console.warn('findProductIdsMatchingSearch failed:', error.message)
+        return []
+      }
+      return (data || []).map((row: any) => String(row.id))
+    } catch (err) {
+      console.warn('findProductIdsMatchingSearch threw:', err)
+      return []
+    }
+  }
+
   private async fetchFoodOffersViaDirectQuery(
     opts: FoodOffersFetchOptions,
   ): Promise<{ products: any[]; total: number; hasMore: boolean }> {
@@ -707,9 +732,15 @@ export class DatabaseService {
     if (opts.search) {
       const term = opts.search.replace(/[%*,()]/g, ' ').trim()
       if (term) {
-        q = q.or(
-          `name_store.ilike.%${term}%,products.name_generic.ilike.%${term}%,products.brand.ilike.%${term}%`,
-        )
+        // PostgREST kan ikke have join-kolonner (products.*) i et .or() på
+        // product_offers — hele logiktræet fejler at parse, og søgningen giver
+        // nul træf. Slå produktnavn/brand op først og søg videre på product_id.
+        const productIds = await this.findProductIdsMatchingSearch(term)
+        const clauses = [`name_store.ilike.*${term}*`]
+        if (productIds.length > 0) {
+          clauses.push(`product_id.in.(${productIds.join(',')})`)
+        }
+        q = q.or(clauses.join(','))
       }
     }
 
