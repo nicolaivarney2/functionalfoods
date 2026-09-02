@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import AppStoreBadges from '@/components/AppStoreBadges'
 import ReferralCapture from '@/components/ReferralCapture'
-import { APP_STORE_URL, PLAY_STORE_URL, normalizeReferralCode } from '@/lib/referral-shared'
+import { normalizeReferralCode } from '@/lib/referral-shared'
 
 type Props = { params: Promise<{ code: string }> }
 
@@ -49,19 +50,8 @@ export default async function ReferralLandingPage({ params }: Props) {
             <p className="mt-6 text-sm text-slate-500">Linket ser ugyldigt ud. Bed venner om et nyt.</p>
           )}
 
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <a
-              href={APP_STORE_URL}
-              className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white sm:w-auto"
-            >
-              Download i App Store
-            </a>
-            <a
-              href={PLAY_STORE_URL}
-              className="inline-flex w-full items-center justify-center rounded-xl border border-emerald-800 px-5 py-3 text-sm font-semibold text-emerald-900 sm:w-auto"
-            >
-              Download i Google Play
-            </a>
+          <div className="mt-8 flex justify-center">
+            <AppStoreBadges showCaption align="center" />
           </div>
           <p className="mt-4">
             <Link

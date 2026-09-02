@@ -17,6 +17,37 @@ function effectiveChildrenAges(children: number, raw: unknown): string[] {
   return [...arr, ...Array.from({ length: children - arr.length }, () => '4-9')]
 }
 
+/** Rester gemt som `isLeftover` på den aktive indkøbsliste — genbruges ved genberegning. */
+export function extractLeftoversFromShoppingList(
+  list: unknown
+): Array<{ ingredientId?: string; name: string; amount: number; unit: string }> {
+  if (!list || typeof list !== 'object') return []
+  const categories = (list as { categories?: unknown }).categories
+  if (!Array.isArray(categories)) return []
+
+  const out: Array<{ ingredientId?: string; name: string; amount: number; unit: string }> = []
+  for (const cat of categories) {
+    if (!cat || typeof cat !== 'object') continue
+    const items = (cat as { items?: unknown }).items
+    if (!Array.isArray(items)) continue
+    for (const it of items) {
+      if (!it || typeof it !== 'object') continue
+      const row = it as Record<string, unknown>
+      if (!row.isLeftover) continue
+      const name = String(row.name || '').trim()
+      const amount = Number(row.amount)
+      if (!name || !Number.isFinite(amount) || amount <= 0) continue
+      out.push({
+        ingredientId: typeof row.ingredientId === 'string' ? row.ingredientId : undefined,
+        name,
+        amount,
+        unit: String(row.unit || 'g'),
+      })
+    }
+  }
+  return out
+}
+
 /**
  * Genopbygger indkøbslisten ud fra en madplan-grid + brugerens gemte familieprofil.
  *
@@ -69,10 +100,20 @@ export async function rebuildShoppingListForUser(
     const planDietaryApproach =
       adultsProfiles.find((p: { dietaryApproach?: string }) => p.dietaryApproach)?.dietaryApproach
 
+    const { data: activePlan } = await supabase
+      .from('user_meal_plans')
+      .select('shopping_list')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const availableIngredients = extractLeftoversFromShoppingList(activePlan?.shopping_list)
+
     const shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
       syncedGrid,
       1,
-      { ...family, planDietaryApproach }
+      { ...family, planDietaryApproach },
+      availableIngredients.length ? availableIngredients : undefined
     )
 
     return shoppingList ?? null

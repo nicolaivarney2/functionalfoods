@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import CookieSettingsFooterLink from '@/components/CookieSettingsFooterLink'
+import AppStoreBadges from '@/components/AppStoreBadges'
 
 const columns = [
   {
@@ -100,6 +101,10 @@ export default function Footer() {
         <div className="mt-10 border border-white/10 rounded-lg p-4 text-xs text-white/60 leading-relaxed">
           FunctionalFoods er til information og inspiration. Siden erstatter ikke professionel medicinsk
           rådgivning.
+        </div>
+
+        <div className="mt-8">
+          <AppStoreBadges showCaption tone="dark" />
         </div>
 
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-white/50">

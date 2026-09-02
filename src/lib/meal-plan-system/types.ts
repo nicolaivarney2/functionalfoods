@@ -95,6 +95,13 @@ export interface ShoppingItem {
   isSupplement?: boolean; // Marker supplements fra kombi-opskrifter
   supplementReason?: string; // Forklaring til hvorfor supplementet er tilføjet
   isBasis?: boolean; // Marker basisvarer som "Varer du måske allerede har"
+  /** Varen kommer fra brugerens køleskab/rester — tæller ikke med i indkøb. */
+  isLeftover?: boolean;
+  /** Hele behovet er dækket af rester. */
+  isCoveredByLeftovers?: boolean;
+  leftoverCoveredAmount?: number;
+  leftoverUsedFor?: string[];
+  amountBeforeLeftovers?: number;
 }
 
 export interface WeeklyNutrition {
@@ -175,6 +182,13 @@ export interface MealPlanConfig {
   peoplePerMeal?: Record<string, number>;
   /** Samlet PE for børn (aldersbånd) – lægges oven i voksne pr. måltid ved portionsberegning. */
   childPersonEquivalent?: number;
+  /** Rester / køleskab — trækkes fra indkøbslisten med enhedskonvertering. */
+  availableIngredients?: Array<{
+    ingredientId?: string
+    name: string
+    amount: number
+    unit: string
+  }>
 }
 
 export interface MealStructureConfig {

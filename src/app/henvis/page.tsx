@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import AppStoreBadges from '@/components/AppStoreBadges'
+
 export const metadata: Metadata = {
   title: 'Henvis en ven | Functional Foods',
   description:
@@ -33,7 +35,10 @@ export default function HenvisMarketingPage() {
             </Link>
             .
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8">
+            <AppStoreBadges showCaption />
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/kom-i-gang"
               className="inline-flex rounded-xl bg-emerald-800 px-5 py-3 text-sm font-semibold text-white"

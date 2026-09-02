@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { hydrateGridIngredientsFromRecipes, type MealPlanGrid } from '@/lib/madbudget/meal-plan-ingredients'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { extractLeftoversFromShoppingList } from '@/lib/meal-plan-system/rebuild-shopping-list'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -88,6 +89,20 @@ export async function POST(request: NextRequest) {
       family.adultsProfiles?.find((p: { dietaryApproach?: string }) => p.dietaryApproach)
         ?.dietaryApproach
 
+    let availableIngredients = Array.isArray(body?.availableIngredients)
+      ? body.availableIngredients
+      : undefined
+    if (!availableIngredients?.length && service) {
+      const { data: plan } = await service
+        .from('user_meal_plans')
+        .select('shopping_list')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle()
+      const fromList = extractLeftoversFromShoppingList(plan?.shopping_list)
+      availableIngredients = fromList.length ? fromList : undefined
+    }
+
     const shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
       syncedGrid,
       1,
@@ -96,7 +111,8 @@ export async function POST(request: NextRequest) {
         childrenAges: family.childrenAges || [],
         adultsProfiles: family.adultsProfiles,
         planDietaryApproach: dietaryApproachId,
-      }
+      },
+      availableIngredients
     )
 
     return NextResponse.json({

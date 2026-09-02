@@ -26,6 +26,7 @@ import {
 import { Recipe } from '@/types/recipe'
 import HeroVideo from '@/components/home/HeroVideo'
 import HeroPlanCard from '@/components/home/HeroPlanCard'
+import AppStoreBadges from '@/components/AppStoreBadges'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 
 const PILLARS = [
@@ -337,6 +338,7 @@ export default function Home() {
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               </div>
+              <AppStoreBadges showCaption tone="dark" className="mt-5" />
             </div>
             <div className="order-2 min-w-0">
               <HeroPlanCard />
@@ -855,6 +857,7 @@ export default function Home() {
                 Se opskrifter først
               </Link>
             </div>
+            <AppStoreBadges showCaption tone="dark" align="center" className="mt-8" />
           </div>
         </div>
       </section>

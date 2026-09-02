@@ -52,6 +52,128 @@ import { applyKetoShoppingListRules, isKetoDietaryApproach } from './keto-shoppi
 
 import { buildAcceptableDietKeys, recipeDietTagMatches, resolveFactoryDietId } from '../diet-tag-matching';
 import { madbudgetStoreIdsToSlugs } from '../madbudget-stores';
+import {
+  formatAmount as formatLeftoverAmount,
+  fromBaseAmount,
+  normalizeUnit as leftoverNormalizeUnit,
+  roundAmount,
+  toBaseAmount,
+} from '../madbudget/unit-conversion';
+
+type AvailableIngredient = {
+  ingredientId?: string
+  name: string
+  amount: number
+  unit: string
+}
+
+function leftoverNameKey(name?: string | null): string {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+/** Nøglesæt (ids + navne) for de rester brugeren vil bruge i den nye plan. */
+function buildLeftoverKeys(available: AvailableIngredient[]): Set<string> {
+  const keys = new Set<string>()
+  for (const item of available || []) {
+    if (!item) continue
+    if (item.ingredientId) keys.add(`id:${item.ingredientId}`)
+    const name = leftoverNameKey(item.name)
+    if (name) keys.add(`name:${name}`)
+  }
+  return keys
+}
+
+function buildLeftoverNote(covered: number, remaining: number, unit: string): string {
+  if (remaining <= 0) {
+    return `Dækket af dine rester (${formatLeftoverAmount(covered)} ${unit}) — du skal ikke købe det`
+  }
+  return `Du har ${formatLeftoverAmount(covered)} ${unit} hjemme — køb ${formatLeftoverAmount(remaining)} ${unit} mere`
+}
+
+/** Træk rester fra indkøbslisten med enhedskonvertering (gram ↔ kg, ml ↔ liter). */
+function applyLeftoversToCategories(
+  categories: ShoppingCategory[],
+  availableIngredients: AvailableIngredient[]
+): void {
+  if (!availableIngredients.length) return
+
+  const fridgeItems: ShoppingItem[] = []
+  const seenFridge = new Set<string>()
+
+  for (const available of availableIngredients) {
+    const wantedUnit = leftoverNormalizeUnit(available.unit)
+    const wantedId = available.ingredientId || null
+    const wantedName = leftoverNameKey(available.name)
+    const availableBase = toBaseAmount(Number(available.amount) || 0, wantedUnit)
+    if (!availableBase || availableBase.amount <= 0) continue
+
+    let remainingBase = availableBase.amount
+    const usedFor: string[] = []
+
+    for (const cat of categories) {
+      if (remainingBase <= 0) break
+      for (const item of cat.items) {
+        if (remainingBase <= 0) break
+        if (item.isBasis || item.isSupplement || item.isLeftover) continue
+        if (item.isCoveredByLeftovers) continue
+
+        const idMatch = wantedId != null && item.ingredientId === wantedId
+        const nameMatch = !idMatch && !!wantedName && leftoverNameKey(item.name) === wantedName
+        if (!idMatch && !nameMatch) continue
+
+        const itemBase = toBaseAmount(item.amount, item.unit)
+        if (!itemBase || itemBase.family !== availableBase.family || itemBase.amount <= 0) continue
+
+        const coveredBase = Math.min(itemBase.amount, remainingBase)
+        remainingBase -= coveredBase
+
+        const coveredInItemUnit = roundAmount(fromBaseAmount(coveredBase, item.unit))
+        const before = item.amount
+        const after = Math.max(0, roundAmount(before - coveredInItemUnit))
+
+        item.amountBeforeLeftovers = item.amountBeforeLeftovers ?? before
+        item.leftoverCoveredAmount = roundAmount((item.leftoverCoveredAmount || 0) + coveredInItemUnit)
+        item.amount = after
+        item.isCoveredByLeftovers = after <= 0
+        item.notes = buildLeftoverNote(item.leftoverCoveredAmount, after, leftoverNormalizeUnit(item.unit))
+        usedFor.push(item.name)
+      }
+    }
+
+    const unusedInPlan = roundAmount(fromBaseAmount(remainingBase, wantedUnit))
+    const fridgeKey = `${wantedId || wantedName}:${availableBase.family}`
+    if (!seenFridge.has(fridgeKey)) {
+      seenFridge.add(fridgeKey)
+      fridgeItems.push({
+        name: available.name,
+        amount: roundAmount(Number(available.amount) || 0),
+        unit: wantedUnit,
+        ingredientId: wantedId || undefined,
+        isLeftover: true,
+        isBasis: true,
+        leftoverUsedFor: usedFor,
+        notes:
+          usedFor.length > 0
+            ? unusedInPlan > 0
+              ? `Bruges i madplanen — ${formatLeftoverAmount(unusedInPlan)} ${wantedUnit} bliver til rest`
+              : 'Bruges helt op i madplanen'
+            : 'Ligger i køleskabet — ikke brugt i denne uges retter',
+      })
+    }
+  }
+
+  if (fridgeItems.length > 0) {
+    const existingFridge = categories.find((c) => c.name === 'Fra køleskabet')
+    if (existingFridge) {
+      existingFridge.items.push(...fridgeItems)
+    } else {
+      categories.push({ name: 'Fra køleskabet', items: fridgeItems })
+    }
+  }
+}
 
 export class MealPlanGenerator {
   private recipes: Recipe[] = [];
@@ -60,6 +182,7 @@ export class MealPlanGenerator {
   private recipeLastUsed: Map<string, Date> = new Map(); // Track last used date per recipe
   private currentOffers: Map<string, any[]> = new Map(); // Cache for current offers by ingredient
   private selectedIngredientIds: Set<string> = new Set(); // Track selected ingredients for overlap scoring
+  private leftoverIngredientKeys: Set<string> = new Set();
   /** Afvent altid denne før generering — ellers er `this.recipes` tom ved første klik (race). */
   private readonly recipesLoadPromise: Promise<void>
 
@@ -73,6 +196,7 @@ export class MealPlanGenerator {
     this.dailyUsedRecipes.clear()
     this.recipeLastUsed.clear()
     this.selectedIngredientIds.clear()
+    this.leftoverIngredientKeys.clear()
     this.currentOffers.clear()
   }
 
@@ -509,6 +633,13 @@ export class MealPlanGenerator {
       includedRecipeCategories?: string[]
       /** Recipe IDs fra seneste madplaner — undgås ved ny generering. */
       recentlyUsedRecipeIds?: string[]
+      /** Rester / køleskab — scores + trækkes fra indkøbslisten. */
+      availableIngredients?: Array<{
+        ingredientId?: string
+        name: string
+        amount: number
+        unit: string
+      }>
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
@@ -602,6 +733,15 @@ export class MealPlanGenerator {
       },
       peoplePerMeal,
       childPersonEquivalent,
+      availableIngredients: Array.isArray(familyProfile.availableIngredients)
+        ? familyProfile.availableIngredients.filter(
+            (it) =>
+              it &&
+              Number(it.amount) > 0 &&
+              typeof it.name === 'string' &&
+              it.name.trim().length > 0
+          )
+        : undefined,
       varietyPreferences: {
         maxRepeatDays: Math.max(1, 3 - variationLevel), // Higher variation = fewer repeat days
         preferredCuisines: [],
@@ -719,6 +859,10 @@ export class MealPlanGenerator {
   /**
    * Byg indkøbsliste ud fra den nuværende madplans-grid (fx efter manuelle ændringer).
    * Bruger samme logik som ugen-generering.
+   *
+   * `availableIngredients` SKAL sendes med, når brugeren har rester i køleskabet.
+   * Ellers mister en genberegning (skift/fjern ret) fratrækket, og varerne
+   * dukker op igen i fuld mængde som om resterne ikke fandtes.
    */
   public async buildShoppingListFromMadbudgetGrid(
     grid: Record<string, { breakfast?: unknown; lunch?: unknown; dinner?: unknown } | undefined>,
@@ -735,7 +879,8 @@ export class MealPlanGenerator {
         adultsProfiles: { mealsPerDay?: string[]; dietaryApproach?: string }[]
       planDietaryApproach?: string
       }
-    }
+    },
+    availableIngredients?: AvailableIngredient[]
   ): Promise<ShoppingList> {
     const dayKeys = [
       'monday',
@@ -801,6 +946,7 @@ export class MealPlanGenerator {
     return this.generateShoppingList(weekNumber, days, {
       light: true,
       dietaryApproachId,
+      availableIngredients,
     });
   }
 
@@ -868,7 +1014,20 @@ export class MealPlanGenerator {
   ): Promise<WeekPlan> {
     // Per-uge overlap mellem måltider — ikke kryds-generering.
     this.selectedIngredientIds.clear();
-    
+    const availableIngredients = Array.isArray(config.availableIngredients)
+      ? config.availableIngredients
+      : []
+    this.leftoverIngredientKeys = buildLeftoverKeys(availableIngredients)
+    if (availableIngredients.length > 0) {
+      for (const item of availableIngredients) {
+        if (item.ingredientId) this.selectedIngredientIds.add(item.ingredientId)
+      }
+      const seeded = availableIngredients
+        .map((item) => `${item.name} (${item.amount} ${item.unit})`)
+        .join(', ')
+      console.log(`🥒 Rester pre-seedet til generator (boost): ${seeded}`)
+    }
+
     const days: DayPlan[] = [];
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + (weekNumber - 1) * 7);
@@ -884,6 +1043,7 @@ export class MealPlanGenerator {
     // Generate shopping list for the week
     const shoppingList = await this.generateShoppingList(weekNumber, days, {
       dietaryApproachId: config.dietaryApproach.id,
+      availableIngredients,
     });
 
     // Calculate weekly nutrition
@@ -1096,16 +1256,21 @@ export class MealPlanGenerator {
   ): Promise<RecipeScore[]> {
     // Cap async work: score top candidates by compatibility first, then apply offer bonus.
     const preRanked = recipes
-      .map((recipe) => ({
-        recipe,
-        baseScore: this.calculateOverallScore(
-          this.calculateRecipeCompatibility(recipe, mealDistribution, config),
-        ),
-      }))
+      .map((recipe) => {
+        const leftoverScore = this.calculateLeftoverScore(recipe)
+        return {
+          recipe,
+          leftoverScore,
+          baseScore:
+            this.calculateOverallScore(
+              this.calculateRecipeCompatibility(recipe, mealDistribution, config),
+            ) + leftoverScore,
+        }
+      })
       .sort((a, b) => b.baseScore - a.baseScore)
       .slice(0, 50)
 
-    const scoredRecipes = preRanked.map(({ recipe, baseScore }) => {
+    const scoredRecipes = preRanked.map(({ recipe, baseScore, leftoverScore }) => {
       const compatibility = this.calculateRecipeCompatibility(recipe, mealDistribution, config);
       const offerScore = this.calculateOfferScoreFromCache(recipe);
       const overlapScore = this.calculateIngredientOverlapScore(recipe);
@@ -1117,6 +1282,9 @@ export class MealPlanGenerator {
       }
       if (overlapScore > 0) {
         reasons.push(`Deler ingredienser med andre opskrifter (+${Math.round(overlapScore)} point)`);
+      }
+      if (leftoverScore > 0) {
+        reasons.push(`Bruger rester fra køleskabet (+${Math.round(leftoverScore)} point)`);
       }
 
       return {
@@ -1484,7 +1652,7 @@ export class MealPlanGenerator {
   private async generateShoppingList(
     weekNumber: number,
     days: DayPlan[],
-    options?: { light?: boolean; dietaryApproachId?: string }
+    options?: { light?: boolean; dietaryApproachId?: string; availableIngredients?: AvailableIngredient[] }
   ): Promise<ShoppingList> {
     const ingredientMap = new Map<string, { amount: number; unit: string; name: string; ingredientId?: string }>();
     const supplementMap = new Map<string, { amount: number; unit: string; reason: string }>();
@@ -1955,6 +2123,10 @@ export class MealPlanGenerator {
       weekNumber,
       categories,
     };
+
+    if (Array.isArray(options?.availableIngredients) && options.availableIngredients.length > 0) {
+      applyLeftoversToCategories(list.categories, options.availableIngredients)
+    }
 
     if (isKetoDietaryApproach(options?.dietaryApproachId)) {
       return applyKetoShoppingListRules(list);
@@ -2480,6 +2652,33 @@ export class MealPlanGenerator {
     // Score: 5 points per overlapping ingredient, up to 50 points max
     // This encourages reusing ingredients
     return Math.min(50, overlapCount * 5);
+  }
+
+  /**
+   * Boost opskrifter der bruger brugerens bekræftede rester.
+   *
+   * Adskilt fra overlap-score, fordi det boost udvandes efterhånden som ugen
+   * fyldes op — og fordi overlap kun matcher på ingredient_id. Manuelle rester
+   * har ofte intet id, så vi matcher også på navn.
+   */
+  private calculateLeftoverScore(recipe: Recipe): number {
+    if (this.leftoverIngredientKeys.size === 0) return 0;
+
+    const matched = new Set<string>();
+    for (const ing of recipe.ingredients ?? []) {
+      const idKey = ing.ingredientId ? `id:${ing.ingredientId}` : null;
+      if (idKey && this.leftoverIngredientKeys.has(idKey)) {
+        matched.add(idKey);
+        continue;
+      }
+      const rawName = (ing as { name?: string }).name || '';
+      const nameKey = `name:${leftoverNameKey(rawName)}`;
+      if (rawName && this.leftoverIngredientKeys.has(nameKey)) matched.add(nameKey);
+    }
+
+    // 25 point pr. rest der bruges, op til 75 — nok til at slå et middelstort
+    // tilbuds-boost, men ikke nok til at overtrumfe familiens diæt-filtre.
+    return Math.min(75, matched.size * 25);
   }
   
   /**

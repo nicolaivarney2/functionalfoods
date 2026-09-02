@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import AppStoreBadges from '@/components/AppStoreBadges'
 import {
   ArrowRight,
   BookOpen,
@@ -78,6 +79,9 @@ export default function FunktionerOversigtPage() {
             >
               Find opskrifter
             </Link>
+          </div>
+          <div className="mt-8 flex justify-center">
+            <AppStoreBadges showCaption tone="dark" align="center" />
           </div>
         </div>
       </section>

@@ -89,7 +89,7 @@ function appendKidCarbToDinners(
  * vi genbruger samme generator (mealPlanGenerator) her med samme input-form, så
  * app og web deler præcis samme logik og output-format.
  *
- * Body (valgfrit): { variationLevel?: number; targetWeek?: 'current' | 'next'; weekOffset?: number }
+ * Body (valgfrit): { variationLevel?: number; targetWeek?: 'current' | 'next'; weekOffset?: number; availableIngredients?: [...] }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -181,6 +181,32 @@ export async function POST(request: NextRequest) {
 
     const variationLevel =
       typeof body?.variationLevel === 'number' ? body.variationLevel : profile.variation_level ?? 2
+    const availableIngredients = Array.isArray(body?.availableIngredients)
+      ? body.availableIngredients
+          .map((it: unknown) => {
+            if (!it || typeof it !== 'object') return null
+            const row = it as { ingredientId?: unknown; name?: unknown; amount?: unknown; unit?: unknown }
+            const name = typeof row.name === 'string' ? row.name.trim() : ''
+            const amount = Number(row.amount)
+            if (!name || !Number.isFinite(amount) || amount <= 0) return null
+            const ingredientId =
+              typeof row.ingredientId === 'string' && row.ingredientId.trim()
+                ? row.ingredientId.trim()
+                : undefined
+            return {
+              ingredientId,
+              name,
+              amount,
+              unit: typeof row.unit === 'string' && row.unit.trim() ? row.unit.trim() : 'g',
+            }
+          })
+          .filter(
+            (
+              it
+            ): it is { ingredientId?: string; name: string; amount: number; unit: string } =>
+              it != null
+          )
+      : undefined
     const targetWeek = parseWeekTarget(body?.targetWeek)
     const weekInfo =
       typeof body?.weekOffset === 'number' && Number.isFinite(body.weekOffset)
@@ -208,6 +234,7 @@ export async function POST(request: NextRequest) {
           ? profile.included_recipe_categories
           : [],
         recentlyUsedRecipeIds,
+        availableIngredients,
       },
       variationLevel
     )
