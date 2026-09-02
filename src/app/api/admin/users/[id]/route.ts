@@ -10,6 +10,11 @@ import {
   type MemberProfileRow,
 } from '@/lib/admin-members'
 import { listReferralsForAdmin } from '@/lib/referrals'
+import {
+  countCellsMissingIngredients,
+  countMealsInGrid,
+} from '@/lib/madbudget/meal-plan-ingredients'
+import { shoppingListItemCount } from '@/lib/madbudget/shopping-list-presence'
 import { getStripe } from '@/lib/stripe-server'
 import { setUserSubscriptionTier } from '@/lib/subscription-entitlements'
 import { normalizeSubscriptionTier, type SubscriptionTier } from '@/lib/subscription-tiers'
@@ -64,7 +69,27 @@ export async function GET(
 
   const referrals = await listReferralsForAdmin(supabase, id)
 
-  return NextResponse.json({ user: mapMember(row, stripeLive), referrals })
+  const { data: plan } = await supabase
+    .from('user_meal_plans')
+    .select('id, week_number, week_start_date, meal_plan_data, shopping_list')
+    .eq('user_id', id)
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const mealPlan = plan
+    ? {
+        id: plan.id,
+        weekNumber: plan.week_number,
+        weekStartDate: plan.week_start_date,
+        mealCount: countMealsInGrid(plan.meal_plan_data),
+        shoppingItemCount: shoppingListItemCount(plan.shopping_list),
+        missingIngredients: countCellsMissingIngredients(plan.meal_plan_data),
+      }
+    : null
+
+  return NextResponse.json({ user: mapMember(row, stripeLive), referrals, mealPlan })
 }
 
 /**

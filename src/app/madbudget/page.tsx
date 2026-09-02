@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
 import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
+import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
@@ -1028,7 +1029,7 @@ export default function MadbudgetPage() {
     if (!displayShoppingList) return
     setSmartShareError('')
     if (selectedStoreTab === 'all') {
-      setSmartShareError('Vælg en butik-fane (fx Netto eller REMA) først – så ved vi hvilken butik du handler i.')
+      setSmartShareError('Vælg en butik først — REMA, Netto eller Løvbjerg — så listen matcher den butik, du handler i.')
       return
     }
     const sid = storeIdFromTabKey(selectedStoreTab)
@@ -1623,8 +1624,9 @@ export default function MadbudgetPage() {
               const parsed = parseMealPlanData(activePlan.meal_plan_data)
               setMealPlan(parsed.grid)
               setSlotLocks(parsed.slotLocks)
-              setShoppingList(activePlan.shopping_list || [])
-              setShoppingListStale(false)
+              const list = shoppingListHasItems(activePlan.shopping_list) ? activePlan.shopping_list : null
+              setShoppingList(list)
+              setShoppingListStale(!list)
               setSelectedWeekNumber(activePlan.week_number || null)
               setActivePlanRef(activePlan)
             } else {
@@ -1687,8 +1689,9 @@ export default function MadbudgetPage() {
       const parsed = parseMealPlanData(plan.meal_plan_data)
       setMealPlan(parsed.grid)
       setSlotLocks(parsed.slotLocks)
-      setShoppingList(plan.shopping_list || [])
-      setShoppingListStale(false)
+      const list = shoppingListHasItems(plan.shopping_list) ? plan.shopping_list : null
+      setShoppingList(list)
+      setShoppingListStale(!list)
       setSelectedWeekNumber(weekNumber)
       setActivePlanRef(plan)
     } else if (isGuest) {
@@ -1744,7 +1747,13 @@ export default function MadbudgetPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      const shoppingListToPersist = options?.shoppingList ?? activePlanRef?.shopping_list ?? shoppingList
+      const shoppingListToPersist = shoppingListHasItems(options?.shoppingList)
+        ? options?.shoppingList
+        : shoppingListHasItems(activePlanRef?.shopping_list)
+          ? activePlanRef?.shopping_list
+          : shoppingListHasItems(shoppingList)
+            ? shoppingList
+            : null
 
       const weekInfo = activePlanRef
         ? {
@@ -1846,10 +1855,9 @@ export default function MadbudgetPage() {
         Record<MealType, any | null>
       >
       const list = result.data.shoppingList
-
       setMealPlan(syncedMealPlan)
-      setShoppingList(list)
-      setShoppingListStale(false)
+      setShoppingList(shoppingListHasItems(list) ? list : null)
+      setShoppingListStale(!shoppingListHasItems(list))
 
       void saveMealPlanToDb(syncedMealPlan, {
         shoppingList: list,
@@ -4426,6 +4434,11 @@ export default function MadbudgetPage() {
                         {creatingSmartLink ? 'Opretter link…' : 'Send til mobil (SMS)'}
                       </button>
                     </div>
+                    {selectedStoreTab === 'all' && shoppingList && (
+                      <p className="text-sm text-gray-600 max-w-md">
+                        Vælg en butik-fane (REMA, Netto eller Løvbjerg) før du sender listen til mobilen.
+                      </p>
+                    )}
                     {smartShareError && (
                       <p className="text-sm text-red-600 max-w-md">{smartShareError}</p>
                     )}

@@ -1,3 +1,4 @@
+import { hydrateGridIngredientsFromRecipes } from '@/lib/madbudget/meal-plan-ingredients'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
@@ -62,7 +63,8 @@ export async function rebuildShoppingListForUser(
       adultsProfiles,
     }
 
-    const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(grid as any, family)
+    const hydratedGrid = await hydrateGridIngredientsFromRecipes(supabase, grid)
+    const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(hydratedGrid as any, family)
 
     const planDietaryApproach =
       adultsProfiles.find((p: { dietaryApproach?: string }) => p.dietaryApproach)?.dietaryApproach

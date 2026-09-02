@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-payload'
+import { mergeMealPlanDataPreservingIngredients, countMealsInGrid } from '@/lib/madbudget/meal-plan-ingredients'
+import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
 
 export const dynamic = 'force-dynamic'
 
@@ -214,10 +216,21 @@ export async function POST(request: NextRequest) {
     // Check if meal plan for this week already exists
     const { data: existingPlan } = await supabase
       .from('user_meal_plans')
-      .select('id')
+      .select('id, meal_plan_data, shopping_list')
       .eq('user_id', user.id)
       .eq('week_start_date', weekStartDate)
       .single()
+
+    const mealPlanDataToSave = existingPlan
+      ? mergeMealPlanDataPreservingIngredients(mealPlanData, existingPlan.meal_plan_data)
+      : mealPlanData
+    const incomingListEmpty = !shoppingListHasItems(shoppingList)
+    const existingListOk = shoppingListHasItems(existingPlan?.shopping_list)
+    const gridHasMeals = countMealsInGrid(mealPlanDataToSave) > 0
+    const shoppingListToSave =
+      incomingListEmpty && existingListOk && gridHasMeals
+        ? existingPlan?.shopping_list
+        : shoppingList
     
     let data, error
     if (existingPlan) {
@@ -230,8 +243,8 @@ export async function POST(request: NextRequest) {
           week_number: weekNumber || null,
           variation_level: variationLevel || 2,
           family_profile_snapshot: familyProfileSnapshot,
-          meal_plan_data: mealPlanData,
-          shopping_list: shoppingList,
+          meal_plan_data: mealPlanDataToSave,
+          shopping_list: shoppingListToSave,
           total_cost: totalCost,
           total_savings: totalSavings,
           estimated_calories_per_day: estimatedCaloriesPerDay,
@@ -255,8 +268,8 @@ export async function POST(request: NextRequest) {
           week_number: weekNumber || null,
           variation_level: variationLevel || 2,
           family_profile_snapshot: familyProfileSnapshot,
-          meal_plan_data: mealPlanData,
-          shopping_list: shoppingList,
+          meal_plan_data: mealPlanDataToSave,
+          shopping_list: shoppingListToSave,
           total_cost: totalCost,
           total_savings: totalSavings,
           estimated_calories_per_day: estimatedCaloriesPerDay,

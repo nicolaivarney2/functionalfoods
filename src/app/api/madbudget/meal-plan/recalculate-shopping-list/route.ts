@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { hydrateGridIngredientsFromRecipes } from '@/lib/madbudget/meal-plan-ingredients'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 
 export const dynamic = 'force-dynamic'
@@ -70,15 +71,21 @@ export async function POST(request: NextRequest) {
     }
 
     const grid = parseGrid(plan.meal_plan_data)
-    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, grid as any)
+    const hydratedGrid = await hydrateGridIngredientsFromRecipes(supabase, grid as any)
+    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, hydratedGrid as any)
 
     if (shoppingList == null) {
       return NextResponse.json({ error: 'Failed to rebuild shopping list' }, { status: 500 })
     }
 
+    const mealPlanData =
+      plan.meal_plan_data && typeof plan.meal_plan_data === 'object' && 'grid' in (plan.meal_plan_data as object)
+        ? { ...(plan.meal_plan_data as Record<string, unknown>), grid: hydratedGrid }
+        : hydratedGrid
+
     const { error: updateError } = await supabase
       .from('user_meal_plans')
-      .update({ shopping_list: shoppingList, updated_at: new Date().toISOString() })
+      .update({ shopping_list: shoppingList, meal_plan_data: mealPlanData, updated_at: new Date().toISOString() })
       .eq('id', plan.id)
 
     if (updateError) {

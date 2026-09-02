@@ -57,6 +57,7 @@ type QueueItem = {
   current_price: number | null
   normal_price: number | null
   name_store: string | null
+  existing_matches: Array<{ id: string; ingredient_id: string; name: string }>
 }
 
 function missingTableResponse(limit: number) {
@@ -131,6 +132,7 @@ function mapAndFilterRows(
         current_price: offer?.current_price ?? null,
         normal_price: offer?.normal_price ?? null,
         name_store: offer?.name_store ?? null,
+        existing_matches: [],
       }
     })
     .filter((item) => !excludeProductIds.has(item.product_id))
@@ -310,6 +312,30 @@ export async function GET(request: NextRequest) {
 
     const totalPages = Math.ceil(visibleTotal / limit) || 0
     const hasMore = !scannedAll ? kept.length >= limit : page * limit < visibleTotal
+
+    const productIds = [...new Set(kept.map((k) => k.product_id).filter(Boolean))]
+    if (productIds.length > 0) {
+      const { data: matchRows } = await supabase
+        .from('product_ingredient_matches')
+        .select('id, ingredient_id, product_external_id, ingredients(name)')
+        .in('product_external_id', productIds)
+      const byProduct = new Map<string, QueueItem['existing_matches']>()
+      for (const row of matchRows ?? []) {
+        const pid = String(row.product_external_id ?? '')
+        const ing = row.ingredients as { name?: string } | { name?: string }[] | null
+        const name = Array.isArray(ing) ? ing[0]?.name : ing?.name
+        const list = byProduct.get(pid) ?? []
+        list.push({
+          id: String(row.id),
+          ingredient_id: String(row.ingredient_id),
+          name: name || 'ingrediens',
+        })
+        byProduct.set(pid, list)
+      }
+      for (const item of kept) {
+        item.existing_matches = byProduct.get(item.product_id) ?? []
+      }
+    }
 
     return NextResponse.json({
       success: true,

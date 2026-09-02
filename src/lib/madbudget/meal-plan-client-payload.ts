@@ -29,12 +29,9 @@ export function stripMealPlanDataForClient(raw: unknown): unknown {
         continue
       }
       const c = cell as Record<string, unknown>
-      const {
-        ingredients: _ing,
-        vitamins: _vit,
-        minerals: _min,
-        ...rest
-      } = c
+      const { vitamins: _vit, minerals: _min, ...rest } = c
+      // Behold ingredients — uden dem kan klienten ikke genberegne indkøbslisten,
+      // og et senere save overskriver DB med tomme retter.
       outDay[meal] = rest
     }
     strippedGrid[day] = outDay

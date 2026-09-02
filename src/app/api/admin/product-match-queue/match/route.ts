@@ -15,11 +15,27 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
     const queueId = body?.queue_id as string | undefined
-    const ingredientId = body?.ingredient_id as string | undefined
+    const complete = body?.complete !== false
+    const ingredientIds = [
+      ...new Set(
+        [
+          body?.ingredient_id as string | undefined,
+          ...((Array.isArray(body?.ingredient_ids) ? body.ingredient_ids : []) as unknown[]),
+        ]
+          .map((id) => String(id ?? '').trim())
+          .filter(Boolean),
+      ),
+    ]
 
-    if (!queueId || !ingredientId) {
+    if (!queueId) {
       return NextResponse.json(
-        { success: false, message: 'queue_id og ingredient_id kræves' },
+        { success: false, message: 'queue_id kræves' },
+        { status: 400 },
+      )
+    }
+    if (ingredientIds.length === 0 && !complete) {
+      return NextResponse.json(
+        { success: false, message: 'ingredient_id eller ingredient_ids kræves' },
         { status: 400 },
       )
     }
@@ -47,33 +63,15 @@ export async function POST(request: NextRequest) {
       .select('id, ingredient_id')
       .eq('product_external_id', product_external_id)
 
-    if (existingForProduct && existingForProduct.length > 0) {
-      const sameIngredient = existingForProduct.some((m) => m.ingredient_id === ingredientId)
-      if (sameIngredient) {
-        await supabase
-          .from('product_ingredient_match_queue')
-          .update({ status: 'matched', resolved_at: new Date().toISOString() })
-          .eq('id', queueId)
-          .eq('status', 'pending')
-        return NextResponse.json({
-          success: true,
-          message: 'Match fandtes allerede — kø ryddet',
-          data: { alreadyHadMatch: true },
-        })
-      }
-      return NextResponse.json(
-        { success: false, message: 'Dette produkt er allerede matchet til en anden ingrediens' },
-        { status: 409 },
-      )
-    }
+    const already = new Set((existingForProduct ?? []).map((m) => String(m.ingredient_id)))
+    const toInsert = ingredientIds.filter((id) => !already.has(id))
 
-    const { data: ingredient, error: ingErr } = await supabase
-      .from('ingredients')
-      .select('id, name')
-      .eq('id', ingredientId)
-      .maybeSingle()
+    const { data: ingredients, error: ingErr } = toInsert.length
+      ? await supabase.from('ingredients').select('id, name').in('id', toInsert)
+      : { data: [] as Array<{ id: string; name: string }>, error: null }
 
-    if (ingErr || !ingredient) {
+    if (ingErr) throw ingErr
+    if (toInsert.length > 0 && (ingredients ?? []).length !== toInsert.length) {
       return NextResponse.json({ success: false, message: 'Ingrediens ikke fundet' }, { status: 404 })
     }
 
@@ -82,61 +80,71 @@ export async function POST(request: NextRequest) {
       store: mapStoreIdToDisplayName(row.store_id),
     })
 
-    const { data: matchRow, error: insErr } = await supabase
-      .from('product_ingredient_matches')
-      .insert({
-        ingredient_id: ingredientId,
-        product_external_id,
-        confidence: 100,
-        match_type: 'manual',
-        is_manual: true,
-        ...snapshot,
-      })
-      .select()
-      .single()
+    const inserted: Array<Record<string, unknown>> = []
+    for (const ingredientId of toInsert) {
+      const { data: matchRow, error: insErr } = await supabase
+        .from('product_ingredient_matches')
+        .insert({
+          ingredient_id: ingredientId,
+          product_external_id,
+          confidence: 100,
+          match_type: 'manual',
+          is_manual: true,
+          ...snapshot,
+        })
+        .select()
+        .single()
 
-    if (insErr) {
-      console.error('❌ match queue insert match:', insErr)
-      return NextResponse.json(
-        { success: false, message: insErr.message || 'Kunne ikke oprette match' },
-        { status: 400 },
-      )
+      if (insErr) {
+        console.error('❌ match queue insert match:', insErr)
+        return NextResponse.json(
+          { success: false, message: insErr.message || 'Kunne ikke oprette match' },
+          { status: 400 },
+        )
+      }
+      inserted.push(matchRow)
     }
 
     const now = new Date().toISOString()
-    await supabase
-      .from('product_ingredient_match_queue')
-      .update({ status: 'matched', resolved_at: now })
-      .eq('id', queueId)
-      .eq('status', 'pending')
+    if (complete) {
+      await supabase
+        .from('product_ingredient_match_queue')
+        .update({ status: 'matched', resolved_at: now })
+        .eq('id', queueId)
+        .eq('status', 'pending')
+    }
 
     const fooddataSync = await runFooddataPublish('queue-match', async (client) => {
-      await upsertMatchInFooddata(client, {
-        ingredient_id: ingredientId,
-        product_external_id,
-        confidence: matchRow.confidence,
-        match_type: matchRow.match_type,
-        is_manual: matchRow.is_manual,
-        product_name_snapshot: matchRow.product_name_snapshot,
-        product_store_snapshot: matchRow.product_store_snapshot,
-        last_known_price: matchRow.last_known_price,
-        created_at: matchRow.created_at,
-        updated_at: matchRow.updated_at,
-      })
-      await upsertQueueRowInFooddata(client, {
-        product_id: row.product_id,
-        store_product_id: row.store_product_id,
-        store_id: row.store_id,
-        product_name_snapshot: row.product_name_snapshot,
-        status: 'matched',
-        resolved_at: now,
-      })
+      for (const matchRow of inserted) {
+        await upsertMatchInFooddata(client, {
+          ingredient_id: String(matchRow.ingredient_id),
+          product_external_id,
+          confidence: matchRow.confidence as number,
+          match_type: String(matchRow.match_type),
+          is_manual: Boolean(matchRow.is_manual),
+          product_name_snapshot: matchRow.product_name_snapshot as string | null,
+          product_store_snapshot: matchRow.product_store_snapshot as string | null,
+          last_known_price: matchRow.last_known_price as number | null,
+          created_at: matchRow.created_at as string,
+          updated_at: matchRow.updated_at as string,
+        })
+      }
+      if (complete) {
+        await upsertQueueRowInFooddata(client, {
+          product_id: row.product_id,
+          store_product_id: row.store_product_id,
+          store_id: row.store_id,
+          product_name_snapshot: row.product_name_snapshot,
+          status: 'matched',
+          resolved_at: now,
+        })
+      }
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Match oprettet',
-      data: { match: matchRow },
+      message: complete ? 'Match oprettet' : 'Ingrediens tilføjet',
+      data: { matches: inserted, alreadyHadMatch: toInsert.length === 0 },
       fooddataSync,
     })
   } catch (error) {

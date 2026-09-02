@@ -10,6 +10,12 @@ interface Ingredient {
   exclusions?: unknown
 }
 
+interface ExistingMatch {
+  id: string
+  ingredient_id: string
+  name: string
+}
+
 interface MatchQueueItem {
   id: string
   product_id: string
@@ -24,6 +30,7 @@ interface MatchQueueItem {
   current_price: number | null
   normal_price: number | null
   name_store: string | null
+  existing_matches?: ExistingMatch[]
 }
 
 export default function NyeVarerMatchQueuePage() {
@@ -33,6 +40,7 @@ export default function NyeVarerMatchQueuePage() {
   const [matchQueueLoading, setMatchQueueLoading] = useState(true)
   const [matchQueueTableMissing, setMatchQueueTableMissing] = useState(false)
   const [queueIngredientChoice, setQueueIngredientChoice] = useState<Record<string, string>>({})
+  const [pendingByQueue, setPendingByQueue] = useState<Record<string, ExistingMatch[]>>({})
   const [queueActionId, setQueueActionId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [totalPending, setTotalPending] = useState(0)
@@ -106,18 +114,77 @@ export default function NyeVarerMatchQueuePage() {
     [ingredients],
   )
 
-  const handleQueueMatch = async (queueId: string) => {
+  const addPendingIngredient = (queueId: string) => {
     const ingredientId = queueIngredientChoice[queueId]?.trim()
     if (!ingredientId) {
       alert('Vælg en ingrediens først')
       return
     }
+    const opt = ingredientOptions.find((o) => o.id === ingredientId)
+    if (!opt) return
+    const item = matchQueueItems.find((q) => q.id === queueId)
+    const alreadySaved = (item?.existing_matches ?? []).some((m) => m.ingredient_id === ingredientId)
+    const alreadyPending = (pendingByQueue[queueId] ?? []).some((m) => m.ingredient_id === ingredientId)
+    if (alreadySaved || alreadyPending) {
+      setQueueIngredientChoice((prev) => ({ ...prev, [queueId]: '' }))
+      return
+    }
+    setPendingByQueue((prev) => ({
+      ...prev,
+      [queueId]: [...(prev[queueId] ?? []), { id: `pending:${ingredientId}`, ingredient_id: ingredientId, name: opt.name }],
+    }))
+    setQueueIngredientChoice((prev) => ({ ...prev, [queueId]: '' }))
+  }
+
+  const removePendingIngredient = (queueId: string, ingredientId: string) => {
+    setPendingByQueue((prev) => ({
+      ...prev,
+      [queueId]: (prev[queueId] ?? []).filter((m) => m.ingredient_id !== ingredientId),
+    }))
+  }
+
+  const removeSavedMatch = async (queueId: string, matchId: string) => {
+    setQueueActionId(queueId)
+    try {
+      const res = await fetch('/api/admin/remove-product-match', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match_id: matchId }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        alert(data.message || 'Kunne ikke fjerne match')
+        return
+      }
+      setMatchQueueItems((prev) =>
+        prev.map((q) =>
+          q.id === queueId
+            ? { ...q, existing_matches: (q.existing_matches ?? []).filter((m) => m.id !== matchId) }
+            : q,
+        ),
+      )
+    } finally {
+      setQueueActionId(null)
+    }
+  }
+
+  const handleQueueMatch = async (queueId: string) => {
+    const pending = pendingByQueue[queueId] ?? []
+    const selected = queueIngredientChoice[queueId]?.trim()
+    const ingredientIds = [
+      ...pending.map((m) => m.ingredient_id),
+      ...(selected ? [selected] : []),
+    ]
     setQueueActionId(queueId)
     try {
       const res = await fetch('/api/admin/product-match-queue/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queue_id: queueId, ingredient_id: ingredientId }),
+        body: JSON.stringify({
+          queue_id: queueId,
+          ingredient_ids: ingredientIds,
+          complete: true,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -126,6 +193,11 @@ export default function NyeVarerMatchQueuePage() {
       }
       await loadMatchQueue(page)
       setQueueIngredientChoice((prev) => {
+        const next = { ...prev }
+        delete next[queueId]
+        return next
+      })
+      setPendingByQueue((prev) => {
         const next = { ...prev }
         delete next[queueId]
         return next
@@ -150,6 +222,11 @@ export default function NyeVarerMatchQueuePage() {
       }
       await loadMatchQueue(page)
       setQueueIngredientChoice((prev) => {
+        const next = { ...prev }
+        delete next[queueId]
+        return next
+      })
+      setPendingByQueue((prev) => {
         const next = { ...prev }
         delete next[queueId]
         return next
@@ -282,6 +359,28 @@ export default function NyeVarerMatchQueuePage() {
                         <tr key={q.id}>
                           <td className="px-3 py-2 align-top">
                             <div className="font-medium text-gray-900">{label}</div>
+                            {(q.existing_matches ?? []).length > 0 && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <span className="text-xs text-emerald-700">Allerede:</span>
+                                {(q.existing_matches ?? []).map((m) => (
+                                  <span
+                                    key={m.id}
+                                    className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                                  >
+                                    {m.name}
+                                    <button
+                                      type="button"
+                                      disabled={busy}
+                                      title={`Fjern ${m.name}`}
+                                      onClick={() => void removeSavedMatch(q.id, m.id)}
+                                      className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-emerald-700 hover:bg-emerald-200 hover:text-emerald-950"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                             {q.brand && <div className="text-xs text-gray-500">{q.brand}</div>}
                             {q.category && <div className="text-xs text-gray-500">{q.category}</div>}
                             <div className="text-xs text-gray-400 font-mono">{q.product_id}</div>
@@ -297,7 +396,8 @@ export default function NyeVarerMatchQueuePage() {
                             })}
                           </td>
                           <td className="px-3 py-2 align-top">
-                            <select
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <select
                               value={selectedIngredientId}
                               onChange={(e) =>
                                 setQueueIngredientChoice((prev) => ({
@@ -305,7 +405,7 @@ export default function NyeVarerMatchQueuePage() {
                                   [q.id]: e.target.value,
                                 }))
                               }
-                              disabled={ingredientsLoading}
+                              disabled={ingredientsLoading || busy}
                               className="w-full max-w-xs px-2 py-1.5 border border-gray-300 rounded-md text-sm"
                             >
                               <option value="">Vælg ingrediens…</option>
@@ -315,6 +415,34 @@ export default function NyeVarerMatchQueuePage() {
                                 </option>
                               ))}
                             </select>
+                              <button
+                                type="button"
+                                disabled={busy || !selectedIngredientId}
+                                onClick={() => addPendingIngredient(q.id)}
+                                className="px-2.5 py-1.5 text-sm font-medium text-sky-800 bg-sky-100 rounded-md hover:bg-sky-200 disabled:opacity-50"
+                              >
+                                Tilføj
+                              </button>
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {(pendingByQueue[q.id] ?? []).map((m) => (
+                                <span
+                                  key={m.id}
+                                  className="inline-flex items-center gap-0.5 rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-900"
+                                >
+                                  {m.name}
+                                  <button
+                                    type="button"
+                                    disabled={busy}
+                                    title="Fjern"
+                                    onClick={() => removePendingIngredient(q.id, m.ingredient_id)}
+                                    className="ml-0.5 rounded-full px-1 text-indigo-700 hover:bg-indigo-200"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
                             {selectedIngredient && (
                               <IngredientTagEditor
                                 compact
@@ -340,7 +468,7 @@ export default function NyeVarerMatchQueuePage() {
                               onClick={() => void handleQueueMatch(q.id)}
                               className="mr-2 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
                             >
-                              {busy ? '…' : 'Match'}
+                              {busy ? '…' : 'Match og færdig'}
                             </button>
                             <button
                               type="button"

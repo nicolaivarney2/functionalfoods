@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+import { hydrateGridIngredientsFromRecipes, type MealPlanGrid } from '@/lib/madbudget/meal-plan-ingredients'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 
 export const dynamic = 'force-dynamic'
@@ -66,7 +68,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'mealPlanGrid og family er påkrævet' }, { status: 400 })
     }
 
-    const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(grid, {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const service =
+      supabaseUrl && serviceKey ? createClient(supabaseUrl, serviceKey) : null
+    const hydratedGrid = service
+      ? await hydrateGridIngredientsFromRecipes(service, grid as MealPlanGrid)
+      : grid
+
+    const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(hydratedGrid, {
       adults: Number(family.adults) || 1,
       childrenAges: family.childrenAges || [],
       adultsProfiles: family.adultsProfiles,

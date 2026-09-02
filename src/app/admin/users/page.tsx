@@ -50,6 +50,15 @@ type ReferralRow = {
   refereeCreatedAt: string | null
 }
 
+type MealPlanSummary = {
+  id: string
+  weekNumber: number | null
+  weekStartDate: string | null
+  mealCount: number
+  shoppingItemCount: number
+  missingIngredients: number
+}
+
 type Stats = {
   total: number
   plus: number
@@ -96,6 +105,7 @@ export default function AdminUsersPage() {
   const [openId, setOpenId] = useState<string | null>(null)
   const [detail, setDetail] = useState<Member | null>(null)
   const [referrals, setReferrals] = useState<ReferralRow[]>([])
+  const [mealPlan, setMealPlan] = useState<MealPlanSummary | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -159,6 +169,7 @@ export default function AdminUsersPage() {
     setOpenId(id)
     setDetail(null)
     setReferrals([])
+    setMealPlan(null)
     setActionError(null)
     setDetailLoading(true)
     try {
@@ -170,6 +181,7 @@ export default function AdminUsersPage() {
       if (!res.ok) throw new Error(data.error || 'Kunne ikke hente detaljer')
       setDetail(data.user)
       setReferrals(data.referrals || [])
+      setMealPlan(data.mealPlan || null)
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Ukendt fejl')
     } finally {
@@ -265,6 +277,30 @@ export default function AdminUsersPage() {
         setDetail(data.user)
       }
       await loadUsers()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Ukendt fejl')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const rebuildShoppingList = async (id: string) => {
+    const ok = window.confirm(
+      'Genopbyg indkøbslisten fra madplanen? Retterne beholdes. Du logger ikke ind som brugeren.'
+    )
+    if (!ok) return
+
+    setBusyId(id)
+    setActionError(null)
+    try {
+      const res = await fetch(`/api/admin/users/${id}/rebuild-shopping-list`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await authHeaders(),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Kunne ikke genopbygge indkøbslisten')
+      if (data.mealPlan) setMealPlan(data.mealPlan)
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Ukendt fejl')
     } finally {
@@ -431,11 +467,13 @@ export default function AdminUsersPage() {
                         <MemberDetail
                           user={shown}
                           referrals={open && detail?.id === shown.id ? referrals : []}
+                          mealPlan={open && detail?.id === shown.id ? mealPlan : null}
                           busy={busyId === shown.id}
                           error={actionError}
                           onCancel={cancelStripe}
                           onSetTier={patchTier}
                           onSetLifetime={patchLifetime}
+                          onRebuildShoppingList={rebuildShoppingList}
                         />
                       )}
                     </div>
@@ -499,19 +537,23 @@ function StatCard({
 function MemberDetail({
   user,
   referrals,
+  mealPlan,
   busy,
   error,
   onCancel,
   onSetTier,
   onSetLifetime,
+  onRebuildShoppingList,
 }: {
   user: Member
   referrals: ReferralRow[]
+  mealPlan: MealPlanSummary | null
   busy: boolean
   error: string | null
   onCancel: (id: string, mode: 'period_end' | 'immediate') => void
   onSetTier: (id: string, tier: SubscriptionTier) => void
   onSetLifetime: (id: string, lifetime: boolean) => void
+  onRebuildShoppingList: (id: string) => void
 }) {
   const storeBlock = cannotCancelReason(user.source)
   const live = user.stripeLive
@@ -552,6 +594,36 @@ function MemberDetail({
           </>
         )}
       </dl>
+
+      {mealPlan ? (
+        <div className="rounded-md border border-gray-200 bg-white px-3 py-3">
+          <p className="text-xs font-medium text-gray-500">Aktiv madplan</p>
+          <p className="mt-1 text-sm text-gray-900">
+            Uge {mealPlan.weekNumber ?? '—'}
+            {mealPlan.weekStartDate ? ` · fra ${formatDate(mealPlan.weekStartDate)}` : ''}
+            {' · '}
+            {mealPlan.mealCount} retter · {mealPlan.shoppingItemCount} varer på indkøbslisten
+          </p>
+          {mealPlan.missingIngredients > 0 && (
+            <p className="mt-1 text-sm text-amber-800">
+              {mealPlan.missingIngredients} retter mangler ingredienser — det er derfor listen kan være tom.
+            </p>
+          )}
+          {mealPlan.mealCount > 0 && mealPlan.shoppingItemCount === 0 && (
+            <p className="mt-1 text-sm text-red-800">Indkøbslisten er tom, selv om der er retter.</p>
+          )}
+          <button
+            type="button"
+            disabled={busy || mealPlan.mealCount === 0}
+            onClick={() => onRebuildShoppingList(user.id)}
+            className="mt-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 disabled:opacity-50"
+          >
+            {busy ? 'Genopbygger…' : 'Genopbyg indkøbsliste'}
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">Ingen aktiv madplan.</p>
+      )}
 
       {referrals.length > 0 && (
         <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
