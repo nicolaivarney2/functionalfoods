@@ -29,6 +29,36 @@ function parseWeekTarget(raw: unknown): MealPlanWeekTarget {
   return raw === 'next' ? 'next' : 'current'
 }
 
+type LeftoverIngredient = {
+  ingredientId?: string
+  name: string
+  amount: number
+  unit: string
+}
+
+/** Parse rester fra request-body. `body` er `any` fra `request.json()`, så kæden skal ikke køre på `any`. */
+function parseAvailableIngredients(raw: unknown): LeftoverIngredient[] | undefined {
+  if (!Array.isArray(raw)) return undefined
+  const parsed: LeftoverIngredient[] = []
+  for (const it of raw) {
+    if (!it || typeof it !== 'object') continue
+    const row = it as { ingredientId?: unknown; name?: unknown; amount?: unknown; unit?: unknown }
+    const name = typeof row.name === 'string' ? row.name.trim() : ''
+    const amount = Number(row.amount)
+    if (!name || !Number.isFinite(amount) || amount <= 0) continue
+    parsed.push({
+      ingredientId:
+        typeof row.ingredientId === 'string' && row.ingredientId.trim()
+          ? row.ingredientId.trim()
+          : undefined,
+      name,
+      amount,
+      unit: typeof row.unit === 'string' && row.unit.trim() ? row.unit.trim() : 'g',
+    })
+  }
+  return parsed
+}
+
 /** Udled børnenes aldersbånd (fallback til '4-9' hvis ikke sat), så generatoren altid får et array. */
 function effectiveChildrenAges(children: number, raw: unknown): string[] {
   const arr = Array.isArray(raw) ? (raw as string[]) : []
@@ -181,32 +211,7 @@ export async function POST(request: NextRequest) {
 
     const variationLevel =
       typeof body?.variationLevel === 'number' ? body.variationLevel : profile.variation_level ?? 2
-    const availableIngredients = Array.isArray(body?.availableIngredients)
-      ? body.availableIngredients
-          .map((it: unknown) => {
-            if (!it || typeof it !== 'object') return null
-            const row = it as { ingredientId?: unknown; name?: unknown; amount?: unknown; unit?: unknown }
-            const name = typeof row.name === 'string' ? row.name.trim() : ''
-            const amount = Number(row.amount)
-            if (!name || !Number.isFinite(amount) || amount <= 0) return null
-            const ingredientId =
-              typeof row.ingredientId === 'string' && row.ingredientId.trim()
-                ? row.ingredientId.trim()
-                : undefined
-            return {
-              ingredientId,
-              name,
-              amount,
-              unit: typeof row.unit === 'string' && row.unit.trim() ? row.unit.trim() : 'g',
-            }
-          })
-          .filter(
-            (
-              it
-            ): it is { ingredientId?: string; name: string; amount: number; unit: string } =>
-              it != null
-          )
-      : undefined
+    const availableIngredients = parseAvailableIngredients(body?.availableIngredients)
     const targetWeek = parseWeekTarget(body?.targetWeek)
     const weekInfo =
       typeof body?.weekOffset === 'number' && Number.isFinite(body.weekOffset)
