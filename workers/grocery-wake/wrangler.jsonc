@@ -1,0 +1,13 @@
+{
+  "name": "grocery-wake",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-07",
+  "workers_dev": true,
+  "vars": {
+    "GITHUB_REPO": "nicolaivarney2/functionalfoods",
+    "GITHUB_REF": "main",
+  },
+  "triggers": {
+    "crons": ["0 1 * * *", "0 2 * * *", "0 14 * * *"],
+  },
+}

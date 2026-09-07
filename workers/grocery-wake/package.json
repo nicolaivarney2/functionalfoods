@@ -1,0 +1,13 @@
+{
+  "name": "grocery-wake",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "secret:github": "wrangler secret put GITHUB_TOKEN",
+    "secret:wake": "wrangler secret put WAKE_SECRET"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.0"
+  }
+}

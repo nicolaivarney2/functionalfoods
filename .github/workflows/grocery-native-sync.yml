@@ -1,13 +1,15 @@
 name: Grocery native sync (Salling + REMA)
 
 # Fuldt katalog + catch-up på GitHub-runner. Ikke Vercel (300s loft).
-# 04:00 UTC — før fooddata-import 05:00. REMA kører hver dag (billigt).
-# Tjek kører som Salling papiravis-overlay (slagtervarer som Algolia mangler).
+# Vækkes af Cloudflare Worker `grocery-wake` kl. 02:00 UTC (ikke GitHub schedule —
+# den er ofte 4+ timer sen). Efter success: fooddata-import.
 
 on:
-  schedule:
-    - cron: '0 4 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
 
 concurrency:
   group: grocery-native-sync
@@ -47,3 +49,7 @@ jobs:
         run: npx tsx scripts/grocery-sync-scheduled.ts
       - name: Cleanup expired offers (fooddata + FF)
         run: npx tsx scripts/cleanup-expired-offers.ts
+      - name: Kick fooddata import
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run fooddata-import.yml --ref main

@@ -3,11 +3,18 @@ name: Goma Scheduled Sync
 # Goma → fooddata for offers-only kæder (Lidl, Coop, MENY, Nemlig, …).
 # Kører på GitHub-runner (ikke ét Vercel-request) så fuldt katalog ikke rammer 300s.
 # Catch-up henter kæder der er blevet sprunget over (fx Nemlig sidst i listen).
+# Vækkes af Cloudflare Worker `grocery-wake` (01:00 og 14:00 UTC) — ikke GitHub schedule.
 on:
-  schedule:
-    - cron: '0 2 * * *'
-    - cron: '0 14 * * *'
   workflow_dispatch:
+    inputs:
+      followup_import:
+        description: Kick fooddata-import when this job succeeds
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
 
 concurrency:
   group: goma-scheduled-sync
@@ -62,3 +69,9 @@ jobs:
 
       - name: Run scheduled Goma sync (incl. catch-up)
         run: npx tsx scripts/grocery-sync-goma-scheduled.ts
+
+      - name: Kick fooddata import
+        if: ${{ inputs.followup_import == true || inputs.followup_import == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run fooddata-import.yml --ref main

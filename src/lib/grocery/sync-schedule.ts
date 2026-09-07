@@ -3,10 +3,10 @@
  * publicerer nye tilbud (samme kalender som Goma i scheduled-sync), men vi
  * henter først **morgenen efter** så kataloget er på plads.
  *
- * Eksempel: Netto/Bilka opdaterer typisk fredag → cron lørdag ~05:00 DK
- * (04:00 UTC vinter). En fredag-nat sync kl. 04:00 ville misse fredag-aften.
+ * Eksempel: Netto/Bilka opdaterer typisk fredag → cron lørdag ~03–04 DK
+ * (02:00 UTC). En fredag-nat sync ville misse fredag-aften.
  *
- * GitHub Actions `grocery-native-sync.yml` kl. 04:00 UTC — fuldt katalog
+ * GitHub Actions `grocery-native-sync.yml` kl. 02:00 UTC — fuldt katalog
  * efter kædens avisdag, plus daglig Salling-avis-refresh og daglig REMA
  * (kataloget er ~1 min; en misset søndag må ikke efterlade ugens avis).
  */
@@ -144,14 +144,25 @@ export function getScheduledSyncForNow(
   return getScheduledSyncForWeekday(getCopenhagenWeekday(date))
 }
 
+/** UTC-time for `grocery-native-sync.yml` (`0 2 * * *`). */
+export const NATIVE_CRON_UTC_HOUR = 2
+
 /**
- * Seneste 04:00 UTC-slot hvis Copenhagen-ugedag matcher `cronWeekday`.
- * Grocery-cron kører `0 4 * * *` — samme tidspunkt som Vercel.
+ * Seneste native-scrape-slot hvis Copenhagen-ugedag matcher `cronWeekday`.
+ * Grocery-cron kører `0 2 * * *`.
  */
 export function lastScheduledCronAt(cronWeekday: number, now: Date = new Date()): Date {
   for (let i = 0; i <= 8; i++) {
     const candidate = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i, 4, 0, 0, 0),
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() - i,
+        NATIVE_CRON_UTC_HOUR,
+        0,
+        0,
+        0,
+      ),
     )
     if (candidate.getTime() > now.getTime()) continue
     if (getCopenhagenWeekday(candidate) === cronWeekday) return candidate

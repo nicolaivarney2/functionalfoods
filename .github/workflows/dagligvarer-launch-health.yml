@@ -1,7 +1,7 @@
 name: Dagligvarer launch health
 
 # Watchdog efter natlig scrape + fooddata-import.
-# 1) Sikrer FF-import (skip hvis allerede frisk) — fanger GitHubs skippede 05:00-cron.
+# 1) Sikrer FF-import (skip hvis allerede frisk) — fanger GitHubs skippede 03:00-cron.
 # 2) Health-check + mail.
 # 3) Ved røde kæder: Goma catch-up + import igen.
 
