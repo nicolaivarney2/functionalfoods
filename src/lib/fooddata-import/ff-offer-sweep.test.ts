@@ -6,6 +6,7 @@ import { buildSleepCutoffs, sweepFfProductOffers } from './ff-offer-sweep'
 type Row = {
   id: string
   store_id: string | null
+  store_product_id: string | null
   source: string | null
   is_on_sale: boolean | null
   normal_price: number | null
@@ -23,6 +24,7 @@ type Writes = {
 function row(partial: Partial<Row> & { id: string }): Row {
   return {
     store_id: 'foetex',
+    store_product_id: '72675001-EA',
     source: 'salling-algolia:foetex',
     is_on_sale: false,
     normal_price: null,
@@ -205,6 +207,38 @@ describe('sweepFfProductOffers', () => {
     assert.equal(result.normalPriceCleared, 2500)
     // 3 fulde/delvise sider + én tom side der afslutter løkken.
     assert.equal(writes.pageRequests, 4)
+  })
+
+  it('slukker tilbud med forkert kæde-prefix selv når last_seen er frisk', async () => {
+    const { ff, writes } = fakeFf([
+      row({
+        id: 'rema-bad',
+        store_id: 'rema-1000',
+        store_product_id: '1000-60009',
+        source: 'rema-native',
+        is_on_sale: true,
+        last_seen_at: iso(-1 * HOUR),
+      }),
+      row({
+        id: 'rema-good',
+        store_id: 'rema-1000',
+        store_product_id: '60009',
+        source: 'rema-native',
+        is_on_sale: true,
+        last_seen_at: iso(-1 * HOUR),
+      }),
+      row({
+        id: 'abc-bad',
+        store_id: 'abc-lavpris',
+        store_product_id: 'lavpris-abclavpris-2026w36',
+        source: 'goma',
+        is_on_sale: true,
+        last_seen_at: iso(-1 * HOUR),
+      }),
+    ])
+    const result = await sweepFfProductOffers({ ff, gomaImportEnabled: true, log: NOISE })
+    assert.deepEqual(writes.slept.sort(), ['abc-bad', 'rema-bad'])
+    assert.equal(result.sleptByReason['forkert kæde-prefix'], 2)
   })
 
   it('skriver intet i dry-run', async () => {

@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isMangledHyphenChainStoreProductId } from '@/lib/product-match-snapshots'
 
 /** Salling/REMA har fuldt katalog fra fooddata-native — aldrig source=goma. */
 export const SALLING_REMA_STORE_IDS = ['netto', 'bilka', 'foetex', 'rema-1000'] as const
@@ -36,7 +37,7 @@ export const GOMA_CHAIN_STORE_IDS = [
 ] as const
 
 const SWEEP_COLS =
-  'id, store_id, source, is_on_sale, normal_price, sale_valid_to, last_seen_at'
+  'id, store_id, store_product_id, source, is_on_sale, normal_price, sale_valid_to, last_seen_at'
 
 /**
  * Sider på PK: stor nok til få requests, lille nok til at ligge under timeout.
@@ -51,6 +52,7 @@ const ID_CHUNK = 150
 type SweepRow = {
   id: string
   store_id: string | null
+  store_product_id: string | null
   source: string | null
   is_on_sale: boolean | null
   normal_price: number | null
@@ -152,6 +154,9 @@ function decide(
   }
 
   if (row.is_on_sale) {
+    if (isMangledHyphenChainStoreProductId(storeId, row.store_product_id)) {
+      return { action: 'sleep', reason: 'forkert kæde-prefix' }
+    }
     if (expired) return { action: 'sleep', reason: 'udløbet tilbud' }
     const cutoff = ctx.cutoffs.get(`${storeId}|${sourceFamily(row.source)}`)
     if (cutoff && row.last_seen_at && row.last_seen_at < cutoff) {
