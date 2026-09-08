@@ -30,6 +30,33 @@ export function isFooddataProductExternalId(productId: string | null | undefined
   return parseFooddataProductId(productId) !== null
 }
 
+/**
+ * FF `product_offers.store_product_id` = kædens source_id.
+ * Må ikke klippe på første bindestreg: `rema-1000-60009` er 60009, ikke `1000-60009`.
+ */
+export function storeProductIdFromFooddataProductId(productId: string): string {
+  const parsed = parseFooddataProductId(productId)
+  if (parsed?.source_id) return parsed.source_id
+  const trimmed = productId.trim()
+  return trimmed.includes('-') ? trimmed.split('-').slice(1).join('-') : trimmed
+}
+
+/**
+ * True when `store_product_id` looks like the old first-hyphen split of a
+ * hyphenated chain (`rema-1000` → `1000-60009`, `abc-lavpris` → `lavpris-…`).
+ */
+export function isMangledHyphenChainStoreProductId(
+  storeId: string | null | undefined,
+  storeProductId: string | null | undefined,
+): boolean {
+  const store = (storeId ?? '').trim()
+  const spid = (storeProductId ?? '').trim()
+  if (!store.includes('-') || !spid) return false
+  const remainder = store.split('-').slice(1).join('-')
+  if (!remainder) return false
+  return spid === remainder || spid.startsWith(`${remainder}-`)
+}
+
 export async function resolveProductMatchSnapshot(
   supabase: SupabaseClient,
   productExternalId: string,

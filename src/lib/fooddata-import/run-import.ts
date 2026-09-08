@@ -11,7 +11,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SourceChain } from '@/grocery/types'
 import { pullCurationFromFooddata } from './curation-pull'
-import { parseFooddataProductId } from '@/lib/product-match-snapshots'
+import {
+  parseFooddataProductId,
+  storeProductIdFromFooddataProductId,
+} from '@/lib/product-match-snapshots'
 import {
   enqueueUnmatchedFooddataProducts,
   type EnqueueFooddataQueueResult,
@@ -734,7 +737,7 @@ function mapOffer(
   )
   return {
     product_id: ref.id,
-    store_product_id: ref.id.includes('-') ? ref.id.split('-').slice(1).join('-') : ref.id,
+    store_product_id: storeProductIdFromFooddataProductId(ref.id),
     store_id: o.store_id,
     name_store: ref.name,
     current_price: currentKr,
