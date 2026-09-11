@@ -240,6 +240,7 @@ export default function AddMealSheet({ open, meal, date, onClose, onLogged }: Pr
         ingredients: row.ingredients ?? [],
         provisionalId: row.id,
         aiFallback: row.nutrition ?? undefined,
+        preferManualNutrition: Number(row.nutrition?.calories) > 0,
       })
       onLogged()
       onClose()

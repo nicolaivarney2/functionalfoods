@@ -169,6 +169,7 @@ function VaegttabsplanOnboardingInner() {
   const [hydrated, setHydrated] = useState(false)
 
   const [password, setPassword] = useState('')
+  const [emailConfirm, setEmailConfirm] = useState('')
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('free')
   const [acceptTerms, setAcceptTerms] = useState(true)
   const [productUpdatesConsent, setProductUpdatesConsent] = useState(true)
@@ -399,6 +400,10 @@ function VaegttabsplanOnboardingInner() {
 
     if (!data.email?.trim()) {
       setError('Angiv din e-mail.')
+      return
+    }
+    if (data.email.trim().toLowerCase() !== emailConfirm.trim().toLowerCase()) {
+      setError('E-mail og bekræftelse er ikke ens. Tjek for tastefejl.')
       return
     }
     if (!acceptTerms) {
@@ -1042,6 +1047,18 @@ function VaegttabsplanOnboardingInner() {
                     onChange={(e) => patch({ email: e.target.value })}
                     className="w-full rounded-xl border-0 bg-white/10 px-3 py-3 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-amber-300"
                     placeholder="dig@email.dk"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-emerald-100/80">Bekræft e-mail</span>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="off"
+                    value={emailConfirm}
+                    onChange={(e) => setEmailConfirm(e.target.value)}
+                    className="w-full rounded-xl border-0 bg-white/10 px-3 py-3 text-white ring-1 ring-white/20 focus:ring-2 focus:ring-amber-300"
+                    placeholder="Skriv e-mailen igen"
                   />
                 </label>
                 <label className="block">

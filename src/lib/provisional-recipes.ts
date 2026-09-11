@@ -174,19 +174,22 @@ Returnér KUN gyldig JSON i præcis dette format:
 }`
 
 export const VOICE_SYSTEM_PROMPT = `Du er en dansk ernærings- og madekspert. Du får en transskription af, hvad en bruger fortæller, de har spist (talesprog — kan være rodet, ufuldstændigt eller indeholde fyldord).
-Tolk det og lav et kvalificeret bud på en opskrift/et måltid på dansk.
+Tolk det og lav et kvalificeret bud på ET måltid, som brugeren har spist — ikke en opskrift til mange.
 
 VIGTIGT:
+- servings er NÆSTEN ALTID 1 (det brugeren spiste). Kun højere hvis de eksplicit siger de lavede til flere og spiste flere portioner.
 - Udled måltidet ud fra det brugeren siger. Ignorér fyldord ("øh", "altså", "tror jeg").
-- Hvis mængder ikke nævnes, estimér realistiske portioner (fx "en håndfuld mandler" ≈ 30 g).
-- Ingrediensnavne skal være rene basisnavne (fx "havregryn", "skyr", "banan").
-  Læg tilberedning/forklaring i "notes" (fx "ristet", "hakket").
-- Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk.
-- Krydderier skal være nøgterne: ALTID 0,5 tsk salt og 0,25 tsk peber pr. opskrift.
-  Aldrig mere (ikke 1–2 tsk). Folk justerer selv.
-- Estimér ernæring PR. PORTION så godt du kan.
-- Stil 2-4 korte opklarende spørgsmål om det du er usikker på (fx portionsstørrelse,
-  mængder, skjulte ingredienser, tilberedning).
+- Sammensatte retter (burger, pizza, shawarma, "burger med pomfritter") SKAL splittes til råvarer med realistiske VÆGTE i gram — aldrig "1 stk burger" eller "burger" uden vægt.
+  Typiske voksenportioner hvis intet andet siges:
+  - Burger: burgerbolle 70 g, hakket oksekød 120–150 g, ost 20 g, ketchup 15 g, salat 20 g
+  - Pomfritter/pommes: 120–150 g
+  - Pizza (1 person): 300–350 g
+- Ingrediensnavne skal være rene basisnavne som findes i danske næringsdatabaser (fx "hakket oksekød", "burgerbolle", "pommes frites", "havregryn", "skyr").
+  Læg tilberedning i "notes".
+- Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk. Undgå 1 stk uden gram for kalorietunge varer.
+- Krydderier: 0,5 tsk salt og 0,25 tsk peber. Ikke mere.
+- nutritionalInfo er PR. PORTION (typisk hele måltidet når servings=1). En voksen burger med pomfritter er typisk 700–1100 kcal — ALDRIG under 200 kcal for et hovedmåltid.
+- Stil 2-4 korte opklarende spørgsmål (størrelse, ost, sauce, drikkevarer).
 
 Returnér KUN gyldig JSON i præcis dette format:
 {
@@ -197,10 +200,10 @@ Returnér KUN gyldig JSON i præcis dette format:
   "cookTime": 0,
   "difficulty": "Easy|Medium|Hard",
   "dietaryCategories": ["fx proteinrig"],
-  "ingredients": [{ "name": "skyr", "amount": 150, "unit": "g", "notes": null }],
+  "ingredients": [{ "name": "hakket oksekød", "amount": 140, "unit": "g", "notes": "bøf" }],
   "instructions": [{ "stepNumber": 1, "instruction": "..." }],
-  "nutritionalInfo": { "calories": 220, "protein": 20, "carbs": 18, "fat": 5, "fiber": 2 },
-  "clarifyingQuestions": ["Hvor stor en portion var det?", "Var der sukker eller honning i?"]
+  "nutritionalInfo": { "calories": 850, "protein": 35, "carbs": 70, "fat": 42, "fiber": 5 },
+  "clarifyingQuestions": ["Var det en stor eller lille burger?", "Var der ost og sauce?"]
 }`
 
 /** Trækker JSON-objekt ud af et LLM-svar (tåler markdown-fences og indlejret tekst). */
@@ -243,7 +246,7 @@ export function parseVisionRecipe(content: string): {
   return {
     title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim().slice(0, 150) : 'Foreløbig opskrift',
     description: typeof raw.description === 'string' ? raw.description.trim().slice(0, 600) : '',
-    servings: Math.max(1, Math.round(num(raw.servings, 2))),
+    servings: Math.max(1, Math.round(num(raw.servings, 1))),
     prepTime: Math.max(0, Math.round(num(raw.prepTime, 10))),
     cookTime: Math.max(0, Math.round(num(raw.cookTime, 15))),
     difficulty: typeof raw.difficulty === 'string' ? raw.difficulty : 'Medium',

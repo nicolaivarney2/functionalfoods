@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
       typeof body.preferDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.preferDate)
         ? body.preferDate
         : null
+    /** true = ny genereret plan (slet og skriv forfra). false = åbning/fill: kun manglende slots. */
+    const replaceAll = body.replaceAll === true || body.mode === 'replace'
+    /** Opdatér eksisterende madplan-slots (fx efter skift af ret), men rør ikke manuelt fjernede. */
+    const updateExisting = body.mode === 'update' || body.updateExisting === true
 
     type PlanRow = {
       id: string
@@ -184,46 +188,89 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Erstat tidligere madplan-entries (bevarer manuelle logninger).
-    const deleteFrom = fromDate && fromDate > weekStart ? fromDate : weekStart;
-    let delErr;
-    if (fromDate) {
-      ({ error: delErr } = await supabase
-        .from('food_log_entries')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('source', 'meal-plan')
-        .eq('meal_plan_id', plan.id)
-        .gte('logged_date', deleteFrom)
-        .lte('logged_date', weekEnd));
-    } else {
-      await supabase
-        .from('food_log_entries')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('source', 'meal-plan')
-        .eq('meal_plan_id', plan.id);
+    const rangeStart = fromDate && fromDate > weekStart ? fromDate : weekStart
 
-      ({ error: delErr } = await supabase
-        .from('food_log_entries')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('source', 'meal-plan')
-        .gte('logged_date', weekStart)
-        .lte('logged_date', weekEnd));
+    const { data: existingSlots, error: existErr } = await supabase
+      .from('food_log_entries')
+      .select('logged_date, meal_type, source')
+      .eq('user_id', user.id)
+      .in('source', ['meal-plan', 'meal-plan-dismissed'])
+      .gte('logged_date', rangeStart)
+      .lte('logged_date', weekEnd)
+    if (existErr) {
+      console.error('sync-meal-plan existing', existErr)
+      return NextResponse.json({ error: 'Kunne ikke læse dagbogen', details: existErr.message }, { status: 500 })
     }
-    if (delErr) {
-      console.error('sync-meal-plan delete', delErr)
-      return NextResponse.json({ error: 'Kunne ikke rydde gamle madplan-entries', details: delErr.message }, { status: 500 })
+
+    const occupied = new Set<string>()
+    const dismissed = new Set<string>()
+    for (const row of existingSlots ?? []) {
+      const key = `${row.logged_date}:${row.meal_type}`
+      if (row.source === 'meal-plan-dismissed') dismissed.add(key)
+      else occupied.add(key)
+    }
+
+    let delErr
+    if (replaceAll) {
+      const sources = ['meal-plan', 'meal-plan-dismissed']
+      if (fromDate) {
+        ({ error: delErr } = await supabase
+          .from('food_log_entries')
+          .delete()
+          .eq('user_id', user.id)
+          .in('source', sources)
+          .eq('meal_plan_id', plan.id)
+          .gte('logged_date', rangeStart)
+          .lte('logged_date', weekEnd))
+      } else {
+        await supabase
+          .from('food_log_entries')
+          .delete()
+          .eq('user_id', user.id)
+          .in('source', sources)
+          .eq('meal_plan_id', plan.id)
+        ;({ error: delErr } = await supabase
+          .from('food_log_entries')
+          .delete()
+          .eq('user_id', user.id)
+          .in('source', sources)
+          .gte('logged_date', weekStart)
+          .lte('logged_date', weekEnd))
+      }
+      if (delErr) {
+        console.error('sync-meal-plan delete', delErr)
+        return NextResponse.json({ error: 'Kunne ikke rydde gamle madplan-entries', details: delErr.message }, { status: 500 })
+      }
     }
 
     const dedupedRows: Record<string, unknown>[] = []
     const seen = new Set<string>()
     for (const row of rows) {
-      const key = `${row.logged_date}:${row.meal_type}:${row.recipe_id ?? row.title}`
+      const slotKey = `${row.logged_date}:${row.meal_type}`
+      const key = `${slotKey}:${row.recipe_id ?? row.title}`
       if (seen.has(key)) continue
       seen.add(key)
+      if (!replaceAll) {
+        if (dismissed.has(slotKey)) continue
+        if (occupied.has(slotKey) && !updateExisting) continue
+      }
       dedupedRows.push(row)
+    }
+
+    if (updateExisting && !replaceAll && dedupedRows.length) {
+      const dates = [...new Set(dedupedRows.map((r) => String(r.logged_date)))]
+      const meals = [...new Set(dedupedRows.map((r) => String(r.meal_type)))]
+      const { error: updDelErr } = await supabase
+        .from('food_log_entries')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('source', 'meal-plan')
+        .in('logged_date', dates)
+        .in('meal_type', meals)
+      if (updDelErr) {
+        console.error('sync-meal-plan update-delete', updDelErr)
+        return NextResponse.json({ error: 'Kunne ikke opdatere dagbogen', details: updDelErr.message }, { status: 500 })
+      }
     }
 
     if (!dedupedRows.length) {

@@ -247,6 +247,42 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
     if (!id) return NextResponse.json({ error: 'Mangler id' }, { status: 400 })
 
+    const { data: existing, error: loadErr } = await supabase
+      .from('food_log_entries')
+      .select('id, source')
+      .eq('user_id', user.id)
+      .eq('id', id)
+      .maybeSingle()
+
+    if (loadErr) {
+      console.error('food_log_entries DELETE load', loadErr)
+      return NextResponse.json({ error: 'Kunne ikke slette', details: loadErr.message }, { status: 500 })
+    }
+    if (!existing) return NextResponse.json({ success: true })
+
+    // Madplan-retter: markér som afvist, så åbning af madplanen ikke lægger dem ind igen.
+    if (existing.source === 'meal-plan') {
+      const { error } = await supabase
+        .from('food_log_entries')
+        .update({
+          source: 'meal-plan-dismissed',
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          vitamins: {},
+          minerals: {},
+        })
+        .eq('user_id', user.id)
+        .eq('id', id)
+      if (error) {
+        console.error('food_log_entries DISMISS', error)
+        return NextResponse.json({ error: 'Kunne ikke slette', details: error.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, dismissed: true })
+    }
+
     const { error } = await supabase
       .from('food_log_entries')
       .delete()

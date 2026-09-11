@@ -62,11 +62,29 @@ export async function POST(request: NextRequest) {
     const servings = Math.max(0.1, num(body.servings, 1))
     const portionsLogged = Math.max(0.1, num(body.portionsLogged ?? body.servings, 1))
 
-    const { nutrition, matchedIngredients, totalIngredients, source } = await nutritionForProvisionalMeal(
-      ingredients,
-      servings,
-      body.aiFallback ?? null
-    )
+    const preferManual =
+      body.preferManualNutrition === true &&
+      body.aiFallback &&
+      typeof body.aiFallback === 'object' &&
+      Number((body.aiFallback as { calories?: unknown }).calories) > 0
+
+    const computed = preferManual
+      ? {
+          nutrition: body.aiFallback as {
+            calories?: number
+            protein?: number
+            carbs?: number
+            fat?: number
+            fiber?: number
+            vitamins?: Record<string, number>
+            minerals?: Record<string, number>
+          },
+          matchedIngredients: 0,
+          totalIngredients: ingredients.length,
+          source: 'manual' as const,
+        }
+      : await nutritionForProvisionalMeal(ingredients, servings, body.aiFallback ?? null)
+    const { nutrition, matchedIngredients, totalIngredients, source } = computed
 
     const perPortion = {
       calories: num(nutrition.calories),

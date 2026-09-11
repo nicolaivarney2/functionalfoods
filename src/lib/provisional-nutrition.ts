@@ -35,7 +35,18 @@ export async function nutritionForProvisionalMeal(
   }
 
   const calc = await calculateNutritionFromIngredientLines(lines, servings)
-  if (calc.matchedIngredients > 0) {
+  const aiCal = aiFallback?.calories != null ? Number(aiFallback.calories) : null
+  const fridaCal = Number(calc.perPortion.calories) || 0
+  const fridaLooksWrong =
+    calc.matchedIngredients > 0 &&
+    aiCal != null &&
+    Number.isFinite(aiCal) &&
+    aiCal >= 80 &&
+    (fridaCal < 80 && aiCal >= 200 ||
+      fridaCal < aiCal * 0.35 ||
+      (calc.totalIngredients >= 3 && calc.matchedIngredients <= 1 && fridaCal < aiCal * 0.6))
+
+  if (calc.matchedIngredients > 0 && !fridaLooksWrong) {
     return {
       nutrition: {
         ...calc.perPortion,

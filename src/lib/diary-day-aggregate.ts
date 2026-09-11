@@ -46,17 +46,24 @@ export function sumMacroTotals(entries: Array<Record<string, unknown>>): MacroTo
   }
 }
 
+export const DISMISSED_MEAL_PLAN_SOURCE = 'meal-plan-dismissed'
+
+export function isVisibleFoodLogEntry(entry: Record<string, unknown>): boolean {
+  return entry.source !== DISMISSED_MEAL_PLAN_SOURCE
+}
+
 export function buildDiaryDayPayload(
   date: string,
   entries: Array<Record<string, unknown>>,
   target: unknown
 ) {
-  const totals = sumMacroTotals(entries)
-  const microTotals = aggregateEntryMicros(entries)
+  const visible = entries.filter(isVisibleFoodLogEntry)
+  const totals = sumMacroTotals(visible)
+  const microTotals = aggregateEntryMicros(visible)
   return {
     date,
     target,
     totals: { ...totals, vitamins: microTotals.vitamins, minerals: microTotals.minerals },
-    entries,
+    entries: visible,
   }
 }

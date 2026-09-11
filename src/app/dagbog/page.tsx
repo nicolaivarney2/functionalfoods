@@ -21,6 +21,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
 import AddMealSheet from '@/components/diary/AddMealSheet'
+import FeedbackCta from '@/components/FeedbackCta'
 import {
   deleteDiaryEntry,
   isoDate,
@@ -299,8 +300,8 @@ export default function DagbogPage() {
 
   const target = day?.target ?? null
   const totals = day?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
-  const remaining = target ? Math.max(0, target.calories - totals.calories) : null
-  const progress = target && target.calories > 0 ? Math.min(1, totals.calories / target.calories) : 0
+  const remaining = target ? Math.round(target.calories - totals.calories) : null
+  const progress = target && target.calories > 0 ? Math.min(1, Math.max(0, totals.calories / target.calories)) : 0
   const monthLabel = `${DA_MONTHS_LONG[date.getMonth()]} ${date.getFullYear()}`
   const dateText = (() => {
     const dd = date.getDate()
@@ -371,11 +372,11 @@ export default function DagbogPage() {
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 lg:p-6">
       <p className="text-sm text-gray-500">{dateText}</p>
       <div className="mt-3 flex flex-col items-center text-center lg:items-start lg:text-left">
-        <p className="text-4xl font-bold tracking-tight text-gray-900 lg:text-5xl">
+        <p className={`text-4xl font-bold tracking-tight lg:text-5xl ${remaining != null && remaining < 0 ? 'text-red-600' : 'text-gray-900'}`}>
           {(remaining != null ? remaining : totals.calories).toLocaleString('da-DK')}
         </p>
         <p className="text-sm text-gray-500 lg:mt-1">
-          {remaining != null ? 'kcal tilbage' : 'kcal indtaget'}
+          {remaining == null ? 'kcal indtaget' : remaining >= 0 ? 'kcal tilbage' : 'kcal over mål'}
         </p>
       </div>
       <div className="mt-4 flex justify-center gap-6 text-sm text-gray-600 lg:justify-start">
@@ -632,6 +633,7 @@ export default function DagbogPage() {
             </div>
 
             <div className="lg:hidden">{quickLinks}</div>
+            <FeedbackCta screen="dagbog" />
           </div>
         </div>
       </div>

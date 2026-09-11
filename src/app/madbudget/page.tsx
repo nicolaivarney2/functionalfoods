@@ -53,6 +53,7 @@ import { hasPendingOnboardingData, consumeAutoFirstPlanPending, FF_AUTO_FIRST_PL
 import { syncMealPlanToDiary } from '@/lib/diary-client'
 import { Cite } from '@/components/Cite'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
+import FeedbackCta from '@/components/FeedbackCta'
 import { healthMethodologyAnchor } from '@/lib/health-sources'
 import {
   getPlanOwnerSettings,
@@ -2811,6 +2812,7 @@ export default function MadbudgetPage() {
                 await syncMealPlanToDiary({
                   mealPlanId: result.data.id,
                   preferDate: weekInfo.weekStartDate,
+                  mode: 'replace',
                 })
               } catch (syncErr) {
                 console.error('Auto-sync madplan → dagbog fejlede:', syncErr)
@@ -4456,6 +4458,8 @@ export default function MadbudgetPage() {
                 </div>
               )}
               
+              <FeedbackCta screen="madbudget" />
+
               {!shoppingList ? (
                 <div className="text-center py-8 text-gray-500">
                   {shoppingListStale ? (

@@ -202,6 +202,7 @@ export type LogMealInput = {
   ingredients: { name: string; amount: number; unit: string; notes?: string | null }[]
   provisionalId?: string
   aiFallback?: { calories?: number; protein?: number; carbs?: number; fat?: number; fiber?: number }
+  preferManualNutrition?: boolean
 }
 
 export async function logMealToDiary(input: LogMealInput): Promise<DiaryEntry> {
@@ -218,6 +219,7 @@ export async function syncMealPlanToDiary(opts?: {
   fromDate?: string
   /** Find plan der dækker denne dato (eller falder tilbage til aktiv/nyeste med mad). */
   preferDate?: string
+  mode?: 'fill' | 'replace' | 'update'
 }): Promise<{ inserted: number; weekStart?: string; weekEnd?: string }> {
   const res = await authFetch('/api/diary/sync-meal-plan', {
     method: 'POST',
