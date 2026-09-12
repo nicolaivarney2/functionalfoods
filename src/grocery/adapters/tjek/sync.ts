@@ -30,9 +30,42 @@ import {
   type TjekOffer,
 } from './types'
 import { isTjekLeafletOverlayChain, type SourceChain } from '../../types'
+import { tjekOverlayDuplicatesCatalog } from './overlay-dedupe'
 
 const PRODUCT_BATCH_SIZE = 200
 const OFFER_BATCH_SIZE = 200
+
+async function loadPrimaryCatalogSaleNames(chain: SourceChain): Promise<string[]> {
+  const supabase = getGroceryServiceClient()
+  const productIds: string[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('product_offers')
+      .select('product_id')
+      .eq('store_id', chain)
+      .eq('is_on_sale', true)
+      .not('source', 'like', 'tjek%')
+      .range(from, from + 999)
+    if (error) throw new Error(`overlay catalog lookup: ${error.message}`)
+    if (!data?.length) break
+    for (const row of data) productIds.push(String(row.product_id))
+    if (data.length < 1000) break
+    from += 1000
+  }
+  const names: string[] = []
+  for (let i = 0; i < productIds.length; i += 80) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('name')
+      .in('id', productIds.slice(i, i + 80))
+    if (error) throw new Error(`overlay catalog names: ${error.message}`)
+    for (const row of data ?? []) {
+      if (row.name) names.push(String(row.name))
+    }
+  }
+  return names
+}
 
 export interface TjekSyncOptions {
   /** Don't write to DB; just count + return preview. */
@@ -249,6 +282,14 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
     for (const { chain, dealerId } of targetDealers) {
       dealersProcessed++
       let perDealerCount = 0
+      const overlayCatalogNames = isTjekLeafletOverlayChain(chain)
+        ? await loadPrimaryCatalogSaleNames(chain)
+        : null
+      if (overlayCatalogNames) {
+        console.log(
+          `Tjek overlay ${chain}: skipper dubletter mod ${overlayCatalogNames.length} Algolia-tilbud`,
+        )
+      }
 
       for await (const offer of client.iterateDealerOffers(dealerId)) {
         if (options.maxOffers && offersProcessed >= options.maxOffers) break
@@ -260,6 +301,12 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
 
         // Defensive: should never happen since we resolved earlier.
         if (resolveChain(offer.dealer_id) !== chain) continue
+        if (
+          overlayCatalogNames &&
+          tjekOverlayDuplicatesCatalog(offer.heading, overlayCatalogNames)
+        ) {
+          continue
+        }
 
         const product = mapTjekOfferToProduct(offer)
         if (!product) continue

@@ -136,12 +136,12 @@ export async function GET(
     const fridaNameByRef = new Map<string, string>()
     const fridaMacrosPer100ByRef = new Map<
       string,
-      { calories: number; protein: number; carbs: number; fat: number }
+      { calories: number; protein: number; carbs: number; fat: number; householdUnits?: Record<string, number> }
     >()
     if (fridaRefs.length > 0) {
       const { data: fiRows, error: fiErr } = await supabase
         .from('frida_ingredients')
-        .select('id, name, calories, protein, carbs, fat')
+        .select('id, name, calories, protein, carbs, fat, household_units')
         .in('id', fridaRefs)
 
       if (fiErr) {
@@ -156,6 +156,7 @@ export async function GET(
               protein: Number((row as { protein?: number }).protein) || 0,
               carbs: Number((row as { carbs?: number }).carbs) || 0,
               fat: Number((row as { fat?: number }).fat) || 0,
+              householdUnits: ((row as { household_units?: Record<string, number> }).household_units) || {},
             })
           }
         }
@@ -185,6 +186,8 @@ export async function GET(
         const gramsPerPiece = catalogForGrams ? gramsPerUnitByCatalogId.get(catalogForGrams) : undefined
         const grams = convertToGrams(Number(ing.amount) || 0, String(ing.unit || ''), {
           gramsPerPiece,
+          householdUnits: per100.householdUnits,
+          foodName: fridaName || String(ing.name || ''),
         })
         const sf = grams / 100
         contribution = {

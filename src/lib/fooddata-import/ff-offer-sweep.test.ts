@@ -101,9 +101,9 @@ describe('buildSleepCutoffs', () => {
       { store_id: 'foetex', source: 'salling-algolia:foetex', is_on_sale: true, last_seen_at: '2026-09-01T12:00:00Z' },
       { store_id: 'foetex', source: 'tjek:offers', is_on_sale: true, last_seen_at: '2026-08-25T09:00:00Z' },
     ])
-    // Nyeste minus 36 timers nådevindue.
+    // Native: 36t. Tjek-overlay: 2t (kan skrumpe samme dag).
     assert.equal(cutoffs.get('foetex|native'), '2026-08-31T00:00:00.000Z')
-    assert.equal(cutoffs.get('foetex|tjek'), '2026-08-23T21:00:00.000Z')
+    assert.equal(cutoffs.get('foetex|tjek'), '2026-08-25T07:00:00.000Z')
   })
 
   it('bruger nyeste skrivning, så kildens egne gamle rækker ikke trækker grænsen tilbage', () => {

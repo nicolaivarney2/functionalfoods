@@ -102,6 +102,8 @@ function sourceFamily(source: string | null | undefined): 'tjek' | 'native' {
  * kildes synk den andens friske tilbud.
  */
 const SLEEP_CUTOFF_GRACE_MS = 36 * 60 * 60 * 1000
+/** Tjek-overlay kan skrumpe samme dag — 36t ville lade dubletter stå. */
+const TJEK_SLEEP_CUTOFF_GRACE_MS = 2 * 60 * 60 * 1000
 
 export function buildSleepCutoffs(fresh: FreshOfferRef[]): Map<string, string> {
   const newest = new Map<string, string>()
@@ -116,7 +118,8 @@ export function buildSleepCutoffs(fresh: FreshOfferRef[]): Map<string, string> {
   for (const [key, seenAt] of newest) {
     const ms = new Date(seenAt).getTime()
     if (!Number.isFinite(ms)) continue
-    cutoffs.set(key, new Date(ms - SLEEP_CUTOFF_GRACE_MS).toISOString())
+    const grace = key.endsWith('|tjek') ? TJEK_SLEEP_CUTOFF_GRACE_MS : SLEEP_CUTOFF_GRACE_MS
+    cutoffs.set(key, new Date(ms - grace).toISOString())
   }
   return cutoffs
 }

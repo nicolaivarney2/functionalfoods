@@ -151,7 +151,7 @@ Analysér billedet og lav et kvalificeret bud på en opskrift på dansk.
 VIGTIGT:
 - Ingrediensnavne skal være rene basisnavne (fx "kyllingebryst", "broccoli", "olivenolie").
   Læg tilberedning/forklaring i "notes" (fx "i tern", "hakket").
-- Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk.
+- Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk. Husholdningsenheder: 1 skive rugbrød = 45 g, toast = 25 g, ost = 20 g.
 - Krydderier skal være nøgterne: ALTID 0,5 tsk salt og 0,25 tsk peber pr. opskrift.
   Aldrig mere (ikke 1–2 tsk). Folk justerer selv.
 - Estimér ernæring PR. PORTION så godt du kan.
@@ -187,6 +187,7 @@ VIGTIGT:
 - Ingrediensnavne skal være rene basisnavne som findes i danske næringsdatabaser (fx "hakket oksekød", "burgerbolle", "pommes frites", "havregryn", "skyr").
   Læg tilberedning i "notes".
 - Brug realistiske mængder i gram (g), ml, stk, spsk eller tsk. Undgå 1 stk uden gram for kalorietunge varer.
+- Husholdningsenheder: 1 skive rugbrød = 45 g, toast = 25 g, ost = 20 g, bacon/pålæg = 12 g, 1 æg = 56 g, 1 fed hvidløg = 3 g, 1 glas mælk = 200 ml. Du må bruge unit "skive" (antal skiver). Foretræk gram hvis du er i tvivl.
 - Krydderier: 0,5 tsk salt og 0,25 tsk peber. Ikke mere.
 - nutritionalInfo er PR. PORTION (typisk hele måltidet når servings=1). En voksen burger med pomfritter er typisk 700–1100 kcal — ALDRIG under 200 kcal for et hovedmåltid.
 - Stil 2-4 korte opklarende spørgsmål (størrelse, ost, sauce, drikkevarer).

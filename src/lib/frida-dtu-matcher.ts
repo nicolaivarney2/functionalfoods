@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { householdGramsFromMap, householdGramsFromName } from '@/lib/frida-household-units'
 
 // Types for Frida DTU data
 interface FridaFood {
@@ -466,25 +467,32 @@ export class FridaDTUMatcher {
         return 1.0
       }
       
-      // Common conversions to grams
+      const fromStored = householdGramsFromMap(data.household_units, targetUnit)
+      const fromName = householdGramsFromName(String(data.name || ingredientName), targetUnit)
       const conversions: Record<string, number> = {
         'g': 1,
         'gram': 1,
         'kg': 1000,
         'kilo': 1000,
-        // Piece-based defaults (conservative)
         'stk': 80,
-        'st': 80, // alias often seen in imported data
+        'st': 80,
         'stykke': 80,
-        'spsk': 13, // Tablespoon (mere præcis dansk mål)
-        'tesk': 4,  // Teaspoon (mere præcis dansk mål)
-        'tsk': 4,   // Teaspoon (mere præcis dansk mål)
-        'dl': 100,  // Deciliter
-        'l': 1000,  // Liter
-        'ml': 1     // Milliliter
+        'skive': 45,
+        'skiver': 45,
+        'fed': 3,
+        'glas': 200,
+        'spsk': 13,
+        'tesk': 4,
+        'tsk': 4,
+        'dl': 100,
+        'l': 1000,
+        'ml': 1,
       }
-      
-      const gramsPerUnit = conversions[targetUnit.toLowerCase()] || 80 // Default to 80g per piece/unknown to avoid overcounting
+      const gramsPerUnit =
+        fromStored ??
+        fromName ??
+        conversions[targetUnit.toLowerCase()] ??
+        80
       const totalGrams = targetAmount * gramsPerUnit
       
       return totalGrams / 100 // Convert to per 100g basis

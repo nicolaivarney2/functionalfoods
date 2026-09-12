@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
               tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
             subscriptionSource: 'stripe',
           })
+          const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
+          void notifyOpsPaid(supabase, userId, { tier, source: 'Stripe (web)' })
         }
       } else if (typeof session.amount_total === 'number') {
         // Legacy engangsbetaling → tier ud fra beløb
@@ -95,6 +97,10 @@ export async function POST(request: NextRequest) {
         monthlyAmountOre: tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
         subscriptionSource: 'stripe',
       })
+      if (tier === 'plus' || tier === 'premium') {
+        const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
+        void notifyOpsPaid(supabase, userId, { tier, source: 'Stripe (web)' })
+      }
     }
   }
 

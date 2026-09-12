@@ -19,11 +19,36 @@ export interface SleepStaleOffersOptions {
   sourceNotLike?: string
 }
 
+/** Date-only / UTC-midnight timestamps mean the last calendar day in Denmark. */
+export function endOfCopenhagenDayMs(ymd: string): number {
+  const noonUtc = new Date(`${ymd}T12:00:00.000Z`)
+  const hourInCph = Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Copenhagen',
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(noonUtc),
+  )
+  const offsetHours = hourInCph - 12
+  const sign = offsetHours >= 0 ? '+' : '-'
+  const abs = String(Math.abs(offsetHours)).padStart(2, '0')
+  return Date.parse(`${ymd}T23:59:59.999${sign}${abs}:00`)
+}
+
 /** Promo tilbud past offer_until (offer row stays with last price). */
-export function isPromoOfferExpired(offerUntil: string | null | undefined): boolean {
+export function isPromoOfferExpired(
+  offerUntil: string | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
   if (!offerUntil) return false
-  const until = Date.parse(offerUntil)
-  return Number.isFinite(until) && until < Date.now()
+  const trimmed = offerUntil.trim()
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+  const utcMidnight = /^\d{4}-\d{2}-\d{2}T00:00:00(\.\d+)?Z$/.test(trimmed)
+  if (dateOnly || utcMidnight) {
+    return endOfCopenhagenDayMs(trimmed.slice(0, 10)) < nowMs
+  }
+  const until = Date.parse(trimmed)
+  return Number.isFinite(until) && until < nowMs
 }
 
 /**

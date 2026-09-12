@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  void import('@/lib/ops-user-alerts').then(({ notifyOpsSignup }) =>
+    notifyOpsSignup(supabase, user.id, { clientHint: 'web-signup' }),
+  )
+
   try {
     const stripeCustomerId = await ensureStripeCustomerForUser(supabase, user)
     if (referralCode) {

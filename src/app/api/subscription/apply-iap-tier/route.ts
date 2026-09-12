@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
     const lifetime = await profileHasLifetimeAccess(supabase, user.id)
     const nextTier = lifetime && tier !== 'premium' ? 'plus' : tier
 
+    const { data: before } = await supabase
+      .from('user_profiles')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .maybeSingle()
+
     const { error } = await supabase
       .from('user_profiles')
       .update({
@@ -47,6 +53,12 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('apply-iap-tier:', error)
       return NextResponse.json({ error: 'Failed to update subscription' }, { status: 500 })
+    }
+
+    const prev = String(before?.subscription_tier || 'free')
+    if (prev !== 'plus' && prev !== 'premium') {
+      const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
+      void notifyOpsPaid(supabase, user.id, { tier: nextTier, source: 'App Store / Play' })
     }
 
     return NextResponse.json({ ok: true, tier })

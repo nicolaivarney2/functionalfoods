@@ -48,6 +48,19 @@ export function normalizeEan(raw: string | number | null | undefined): string | 
 }
 
 /** FF product id er typisk `{chain}-{source_id}` — source_id er ofte EAN hos Goma/Netto. */
+const FF_CHAINS_BY_LENGTH = [...FF_PRODUCT_ID_CHAINS].sort((a, b) => b.length - a.length)
+
+/** `{chain}-{source_id}` → source_id, also for hyphenated chains like rema-1000. */
+export function storeProductIdFromFfId(ffId: string): string {
+  for (const chain of FF_CHAINS_BY_LENGTH) {
+    if (ffId === chain) return ffId
+    const prefix = `${chain}-`
+    if (ffId.startsWith(prefix)) return ffId.slice(prefix.length)
+  }
+  const dash = ffId.indexOf('-')
+  return dash > 0 ? ffId.slice(dash + 1) : ffId
+}
+
 export function extractEanFromFfProductId(productId: string | null | undefined): string | null {
   if (!productId) return null
   const dash = productId.lastIndexOf('-')

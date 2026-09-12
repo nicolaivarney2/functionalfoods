@@ -8,6 +8,11 @@ import { databaseService } from '@/lib/database-service'
 import { revalidateRecipeCollectionPaths } from '@/lib/cache-revalidation'
 import { FridaDTUMatcher } from '@/lib/frida-dtu-matcher'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import {
+  householdGramsFromMap,
+  householdGramsFromName,
+  type HouseholdUnitMap,
+} from '@/lib/frida-household-units'
 
 type RecipeIngredient = {
   id?: string
@@ -19,7 +24,7 @@ type RecipeIngredient = {
 function cleanRecipeIngredientName(raw: string): string {
   let s = String(raw || '').toLowerCase().trim()
   s = s
-    .replace(/^\d+[.,]?\d*\s*(stk|st|styk|stykker|dl|ml|l|g|gram|kg|mg|tsk|tesk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/i, '')
+    .replace(/^\d+[.,]?\d*\s*(stk|st|styk|stykker|skive|skiver|fed|glas|kop|dl|ml|l|g|gram|kg|mg|tsk|tesk|spsk|bdt|bundt|håndfuld|håndfulde)\s+/i, '')
     .replace(/^\d+[.,]?\d*\s*/, '')
     .trim()
   return s
@@ -34,14 +39,24 @@ function parseFridaFoodId(ref: string | undefined): number | null {
 export type ConvertToGramsOptions = {
   /** Fra `ingredients.grams_per_unit` — vægt i gram for præcis én stk (fx hvidløgsfed 3 g). */
   gramsPerPiece?: number | null
+  /** Fra `frida_ingredients.household_units` (skive, stk, fed, glas). */
+  householdUnits?: HouseholdUnitMap | null
+  /** Fødevare-/ingrediensnavn til fallback-mønstre. */
+  foodName?: string | null
 }
 
 /**
- * Konverterer mængde + enhed til gram. For stk/st/stykke: brug `gramsPerPiece` fra ingrediens-kataloget når sat;
- * ellers falder vi tilbage til 80 g/stk (grovt gennemsnit for fx mellemstore løg).
+ * Konverterer mængde + enhed til gram.
+ * Husholdningsenheder (skive, stk, fed, glas) bruger Frida-rækkens household_units
+ * eller navnemønstre (fx 1 skive rugbrød = 45 g).
  */
 export function convertToGrams(amount: number, unit: string, options?: ConvertToGramsOptions): number {
   const u = (unit || '').toLowerCase().trim()
+  const fromFrida = householdGramsFromMap(options?.householdUnits, u)
+  if (fromFrida != null) return amount * fromFrida
+  const fromName = options?.foodName ? householdGramsFromName(options.foodName, u) : null
+  if (fromName != null) return amount * fromName
+
   const pieceUnits = new Set(['stk', 'st', 'stykke', 'stykker', 'styk'])
   const perPiece =
     options?.gramsPerPiece != null && Number.isFinite(Number(options.gramsPerPiece)) && Number(options.gramsPerPiece) > 0
@@ -62,6 +77,11 @@ export function convertToGrams(amount: number, unit: string, options?: ConvertTo
     stykke: 80,
     stykker: 80,
     styk: 80,
+    skive: 45,
+    skiver: 45,
+    fed: 3,
+    glas: 200,
+    kop: 150,
     spsk: 13,
     tesk: 4,
     tsk: 4,
@@ -119,13 +139,15 @@ async function getNutritionFromFridaRef(
   fiber: number
   vitamins: Record<string, number>
   minerals: Record<string, number>
+  householdUnits: HouseholdUnitMap
+  name: string
 } | null> {
   const fid = parseFridaFoodId(fridaRef)
   if (fid == null) return null
 
   const { data, error } = await supabase
     .from('frida_ingredients')
-    .select('calories, protein, carbs, fat, fiber, vitamins, minerals')
+    .select('calories, protein, carbs, fat, fiber, vitamins, minerals, household_units, name')
     .eq('id', `frida-${fid}`)
     .maybeSingle()
 
@@ -139,6 +161,8 @@ async function getNutritionFromFridaRef(
     fiber: data.fiber || 0,
     vitamins: (data.vitamins as Record<string, number>) || {},
     minerals: (data.minerals as Record<string, number>) || {},
+    householdUnits: (data.household_units as HouseholdUnitMap) || {},
+    name: String(data.name || ''),
   }
 }
 
@@ -306,7 +330,21 @@ export async function calculateNutritionFromIngredientLines(
       if (result.nutrition) {
         const catalogForGrams = catalogIdFromName || ''
         const gramsPerPiece = catalogForGrams ? gramsPerUnitByCatalogId.get(catalogForGrams) : undefined
-        const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '', { gramsPerPiece })
+        const householdUnits =
+          result.nutrition && typeof result.nutrition === 'object' && 'householdUnits' in result.nutrition
+            ? (result.nutrition.householdUnits as HouseholdUnitMap)
+            : undefined
+        const foodName =
+          (result.nutrition && typeof result.nutrition === 'object' && 'name' in result.nutrition
+            ? String(result.nutrition.name || '')
+            : '') ||
+          result.match ||
+          matchQuery
+        const grams = convertToGrams(ingredient.amount || 0, ingredient.unit || '', {
+          gramsPerPiece,
+          householdUnits,
+          foodName,
+        })
         const scaleFactor = grams / 100
 
         totalCalories += result.nutrition.calories * scaleFactor

@@ -1,5 +1,5 @@
 import type { ProductInsert, ProductOfferInsert, SourceChain } from '../../types'
-import { isPromoOfferExpired } from '../../sync/catalog-retention'
+import { endOfCopenhagenDayMs, isPromoOfferExpired } from '../../sync/catalog-retention'
 import { isLiveSallingOfferSignal, pickRepresentativeStore } from './pricing'
 import type { SallingAlgoliaHit, SallingChain } from './types'
 
@@ -207,6 +207,9 @@ function toIsoOrNull(value: string): string | null {
   if (!value) return null
   const trimmed = value.trim()
   if (!trimmed) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return new Date(endOfCopenhagenDayMs(trimmed)).toISOString()
+  }
   const parsed = Date.parse(trimmed)
   if (Number.isNaN(parsed)) return null
   return new Date(parsed).toISOString()

@@ -6,6 +6,8 @@ const KEY_PARAMETERS = {
   'Protein': 'protein',
   'Fedt': 'fat',
   'Kulhydrat': 'carbs',
+  'Kulhydrat difference': 'carbs',
+  'Kostfibre': 'fiber',
   'Fiber': 'fiber',
   'C-vitamin': 'vitaminC',
   'D-vitamin': 'vitaminD',
