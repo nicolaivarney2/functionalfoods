@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
-import { applyCookAhead, type CookAheadDays } from '@/lib/madbudget/cook-ahead'
+import { applyCookAhead, type CookAheadDays, type CookAheadGrid } from '@/lib/madbudget/cook-ahead'
 import { loadHouseholdForUser } from '@/lib/household-access'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 type MealType = 'breakfast' | 'lunch' | 'dinner'
 
 const VALID_DAYS = new Set<string>([
@@ -23,7 +22,7 @@ const VALID_DAYS = new Set<string>([
 ])
 const VALID_MEALS = new Set<string>(['breakfast', 'lunch', 'dinner'])
 
-function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
+function emptyGrid(): CookAheadGrid {
   return {
     monday: { breakfast: null, lunch: null, dinner: null },
     tuesday: { breakfast: null, lunch: null, dinner: null },
@@ -36,7 +35,7 @@ function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
 }
 
 function parseMealPlanData(raw: unknown): {
-  grid: Record<DayKey, Record<MealType, unknown | null>>
+  grid: CookAheadGrid
   slotLocks: Record<string, boolean>
 } {
   if (!raw || typeof raw !== 'object') return { grid: emptyGrid(), slotLocks: {} }
@@ -45,13 +44,13 @@ function parseMealPlanData(raw: unknown): {
     const g = o.grid as Record<string, unknown>
     if (g.monday) {
       return {
-        grid: o.grid as Record<DayKey, Record<MealType, unknown | null>>,
+        grid: o.grid as CookAheadGrid,
         slotLocks: (o.slotLocks as Record<string, boolean>) ?? {},
       }
     }
   }
   if ('monday' in o) {
-    return { grid: raw as Record<DayKey, Record<MealType, unknown | null>>, slotLocks: {} }
+    return { grid: raw as CookAheadGrid, slotLocks: {} }
   }
   return { grid: emptyGrid(), slotLocks: {} }
 }

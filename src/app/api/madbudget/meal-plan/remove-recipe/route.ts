@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 import { loadHouseholdForUser } from '@/lib/household-access'
-import { clearLeftoversFromSource } from '@/lib/madbudget/cook-ahead'
+import { clearLeftoversFromSource, type CookAheadGrid } from '@/lib/madbudget/cook-ahead'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseMealPlanData(plan.meal_plan_data)
     const dayKey = day as DayKey
     const mealKey = meal as MealType
-    const grid = clearLeftoversFromSource(parsed.grid, dayKey, mealKey) as typeof parsed.grid
+    const grid = clearLeftoversFromSource(parsed.grid as CookAheadGrid, dayKey, mealKey) as typeof parsed.grid
     const slotLocks = parsed.slotLocks
     grid[dayKey][mealKey] = null
     delete slotLocks[`${dayKey}_${mealKey}`]
