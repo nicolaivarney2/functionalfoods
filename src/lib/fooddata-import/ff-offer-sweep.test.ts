@@ -178,6 +178,24 @@ describe('sweepFfProductOffers', () => {
     assert.deepEqual(writes.slept, [])
   })
 
+  it('sletter legacy store_id (fotex/lovbjerg) selv uden cutoff fra ny import', async () => {
+    const { ff, writes } = fakeFf([
+      row({ id: 'old-sale', store_id: 'fotex', source: 'goma', is_on_sale: true, last_seen_at: '2026-06-04T16:56:00Z' }),
+      row({ id: 'old-cat', store_id: 'fotex', source: 'goma', is_on_sale: false }),
+      row({ id: 'old-lov', store_id: 'lovbjerg', source: 'goma', is_on_sale: false }),
+    ])
+    const result = await sweepFfProductOffers({
+      ff,
+      cutoffs: buildSleepCutoffs([
+        { store_id: 'foetex', source: 'salling-algolia:foetex', is_on_sale: true, last_seen_at: iso(-2 * HOUR) },
+      ]),
+      gomaImportEnabled: true,
+      log: NOISE,
+    })
+    assert.deepEqual(writes.deleted.sort(), ['old-cat', 'old-lov', 'old-sale'])
+    assert.equal(result.deletedByReason['legacy store_id alias'], 3)
+  })
+
   it('lader goma-rækker stå når Goma-import er slået fra', async () => {
     const { ff, writes } = fakeFf([
       row({ id: 'a', store_id: 'bilka', source: 'goma', is_on_sale: true }),

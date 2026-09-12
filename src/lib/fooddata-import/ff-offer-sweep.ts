@@ -21,6 +21,12 @@ import { isMangledHyphenChainStoreProductId } from '@/lib/product-match-snapshot
 /** Salling/REMA har fuldt katalog fra fooddata-native — aldrig source=goma. */
 export const SALLING_REMA_STORE_IDS = ['netto', 'bilka', 'foetex', 'rema-1000'] as const
 
+/**
+ * Gamle Goma-slugs. Import og health tjekker kun `foetex` / `loevbjerg`,
+ * så alias-rækker aldrig fik sleep-cutoff og kunne ligge som tilbud i måneder.
+ */
+export const LEGACY_STORE_ID_ALIASES = ['fotex', 'lovbjerg'] as const
+
 /** Kæder hvor Goma er primærkilde — gammel Tjek-data skal ikke vises der. */
 export const GOMA_CHAIN_STORE_IDS = [
   'lidl',
@@ -143,6 +149,10 @@ function decide(
   const storeId = row.store_id ?? ''
   const source = String(row.source ?? '').toLowerCase()
   const expired = !!row.sale_valid_to && row.sale_valid_to < ctx.nowIso
+
+  if ((LEGACY_STORE_ID_ALIASES as readonly string[]).includes(storeId)) {
+    return { action: 'delete', reason: 'legacy store_id alias' }
+  }
 
   if (ctx.gomaImportEnabled) {
     if (source === 'goma' && ctx.sallingRema.has(storeId)) {

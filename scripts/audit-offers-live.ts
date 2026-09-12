@@ -15,6 +15,7 @@ import { resolveRemaOfferPricing } from '../src/grocery/adapters/rema1000/mapper
 const STORES = [
   'netto',
   'foetex',
+  'fotex',
   'bilka',
   'rema-1000',
   'lidl',
@@ -25,6 +26,7 @@ const STORES = [
   'superbrugsen',
   'brugsen',
   'loevbjerg',
+  'lovbjerg',
   'abc-lavpris',
   'min-koebmand',
   'nemlig',
