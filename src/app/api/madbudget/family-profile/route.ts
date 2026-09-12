@@ -67,6 +67,12 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { loadHouseholdForUser } = await import('@/lib/household-access')
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
     
     // Use service role client for database operations
     const { createClient } = await import('@supabase/supabase-js')
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest) {
     const { data: familyProfile, error } = await supabase
       .from('family_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .single()
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
@@ -88,7 +94,7 @@ export async function GET(request: NextRequest) {
     const { data: adultProfiles, error: adultError } = await supabase
       .from('adult_weight_loss_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .order('adult_index')
 
     if (adultError) {
@@ -171,6 +177,12 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { loadHouseholdForUser } = await import('@/lib/household-access')
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
     
     // Use service role client for database operations
     const { createClient } = await import('@supabase/supabase-js')
@@ -183,7 +195,7 @@ export async function POST(request: NextRequest) {
     const { error: familyError } = await supabase
       .from('family_profiles')
       .upsert({
-        user_id: user.id,
+        user_id: ownerId,
         adults: familyProfile.adults,
         children: familyProfile.children,
         children_ages: familyProfile.childrenAges || [],
@@ -230,7 +242,7 @@ export async function POST(request: NextRequest) {
           .from('adult_weight_loss_profiles')
           .upsert(
             {
-              user_id: user.id,
+              user_id: ownerId,
               adult_index: index,
               gender: p.gender,
               age: p.age,

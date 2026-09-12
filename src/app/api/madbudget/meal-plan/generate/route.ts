@@ -144,6 +144,12 @@ export async function POST(request: NextRequest) {
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { loadHouseholdForUser } = await import('@/lib/household-access')
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
 
     const {
       assertMealPlanGenerationAllowed,
@@ -152,7 +158,7 @@ export async function POST(request: NextRequest) {
     } = await import('@/lib/subscription-entitlements')
 
     try {
-      await assertMealPlanGenerationAllowed(supabase, user.id)
+      await assertMealPlanGenerationAllowed(supabase, ownerId)
     } catch (err) {
       if (err instanceof SubscriptionLimitError) {
         return NextResponse.json(
@@ -166,16 +172,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}))
 
     const [profileResult, adultResult, recentResult] = await Promise.all([
-      supabase.from('family_profiles').select('*').eq('user_id', user.id).single(),
+      supabase.from('family_profiles').select('*').eq('user_id', ownerId).single(),
       supabase
         .from('adult_weight_loss_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .order('adult_index'),
       supabase
         .from('user_meal_plans')
         .select('week_start_date, meal_plan_data, updated_at')
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .order('week_start_date', { ascending: false })
         .limit(4),
     ])
@@ -316,13 +322,13 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('user_meal_plans')
       .update({ is_active: false })
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('is_active', true)
 
     const { data: existing } = await supabase
       .from('user_meal_plans')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('week_start_date', weekStartDate)
       .single()
 
@@ -354,7 +360,7 @@ export async function POST(request: NextRequest) {
     } else {
       const { data, error } = await supabase
         .from('user_meal_plans')
-        .insert({ user_id: user.id, week_start_date: weekStartDate, ...rowValues })
+        .insert({ user_id: ownerId, week_start_date: weekStartDate, ...rowValues })
         .select()
         .single()
       saved = data

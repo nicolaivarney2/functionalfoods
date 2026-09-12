@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { User, Lock, Save, CheckCircle, AlertCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
+import PartnerInvitePanel from '@/components/PartnerInvitePanel'
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -115,6 +116,10 @@ export default function ProfilePage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Min profil</h1>
             <p className="text-gray-600">Administrer din konto og personlige oplysninger</p>
+          </div>
+
+          <div className="mb-8">
+            <PartnerInvitePanel />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

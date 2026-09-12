@@ -909,11 +909,16 @@ export class MealPlanGenerator {
         const cell = row[mt];
         if (cell == null || typeof cell !== 'object') continue;
         const c = cell as Record<string, unknown>;
-        const peopleEating = family
-          ? this.resolvePeopleEatingForPlannerCell(c, mt, family)
-          : Number(c.householdServings) > 0
-            ? Number(c.householdServings)
-            : Math.max(1, Number(c.servings) || 1);
+        if (c.leftoverFromDay || c.isLeftover === true) continue;
+        const cookDays = Number(c.cookAheadDays);
+        const peopleEating =
+          Number.isFinite(cookDays) && cookDays > 1 && Number(c.servings) > 0
+            ? Number(c.servings)
+            : family
+              ? this.resolvePeopleEatingForPlannerCell(c, mt, family)
+              : Number(c.householdServings) > 0
+                ? Number(c.householdServings)
+                : Math.max(1, Number(c.servings) || 1);
         meals.push({
           mealType: mt as MealType,
           recipe: this.normalizePlannerCellToRecipe(c),

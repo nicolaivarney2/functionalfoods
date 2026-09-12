@@ -42,10 +42,16 @@ export async function GET(request: NextRequest) {
     if (!isValidDate(date)) return NextResponse.json({ error: 'Ugyldig dato' }, { status: 400 })
     const adultIndex = Number.parseInt(searchParams.get('adultIndex') ?? '0', 10) || 0
 
-    const [{ data: entries, error }, target] = await Promise.all([
+    const [{ data: entries, error }, { data: activities, error: actErr }, target] = await Promise.all([
       supabase
         .from('food_log_entries')
         .select(FOOD_LOG_ENTRY_SELECT)
+        .eq('user_id', user.id)
+        .eq('logged_date', date)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('diary_activity_entries')
+        .select('id, logged_date, title, calories, created_at')
         .eq('user_id', user.id)
         .eq('logged_date', date)
         .order('created_at', { ascending: true }),
@@ -56,8 +62,14 @@ export async function GET(request: NextRequest) {
       console.error('diary/day entries', error)
       return NextResponse.json({ error: 'Kunne ikke hente dag', details: error.message }, { status: 500 })
     }
+    if (actErr) console.warn('diary/day activities', actErr)
 
-    const payload = buildDiaryDayPayload(date, (entries ?? []) as Record<string, unknown>[], target)
+    const payload = buildDiaryDayPayload(
+      date,
+      (entries ?? []) as Record<string, unknown>[],
+      target,
+      (activities ?? []) as Record<string, unknown>[]
+    )
 
     return NextResponse.json({ success: true, ...payload })
   } catch (e) {

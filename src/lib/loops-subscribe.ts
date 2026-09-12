@@ -94,3 +94,92 @@ export async function subscribeEmailToLoops(
 
   return { ok: true }
 }
+
+const LOOPS_TRANSACTIONAL_URL = `${LOOPS_BASE}/transactional`
+
+export async function sendLoopsTransactional(params: {
+  transactionalId: string
+  email: string
+  dataVariables?: Record<string, string>
+  addToAudience?: boolean
+}): Promise<LoopsSubscribeResult> {
+  const apiKey = process.env.LOOPS_API_KEY?.trim()
+  if (!apiKey) {
+    return { ok: false, error: 'LOOPS_API_KEY er ikke sat' }
+  }
+  if (!params.transactionalId?.trim()) {
+    return { ok: false, error: 'transactionalId mangler' }
+  }
+  if (!params.email?.trim()) {
+    return { ok: false, error: 'email mangler' }
+  }
+
+  const body: Record<string, unknown> = {
+    transactionalId: params.transactionalId.trim(),
+    email: params.email.trim(),
+  }
+  if (params.dataVariables && Object.keys(params.dataVariables).length > 0) {
+    body.dataVariables = params.dataVariables
+  }
+  if (typeof params.addToAudience === 'boolean') {
+    body.addToAudience = params.addToAudience
+  }
+
+  const res = await fetch(LOOPS_TRANSACTIONAL_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  const data = (await res.json().catch(() => ({}))) as { success?: boolean; message?: string }
+
+  if (res.status === 429) {
+    return { ok: false, error: 'Loops rate limit — prøv igen om lidt' }
+  }
+  if (!res.ok || data.success === false) {
+    return { ok: false, error: data.message || res.statusText || 'Loops kunne ikke sende e-mail' }
+  }
+  return { ok: true }
+}
+
+export async function sendLoopsPartnerInviteEmail(params: {
+  email: string
+  inviterName: string
+  inviteUrl: string
+}): Promise<LoopsSubscribeResult> {
+  const inviterName = params.inviterName.trim() || 'Din partner'
+  const inviteUrl = params.inviteUrl.trim()
+  if (!inviteUrl) {
+    return { ok: false, error: 'inviteUrl mangler' }
+  }
+
+  const dedicatedId = process.env.LOOPS_TRANSACTIONAL_PARTNER_INVITE_ID?.trim()
+  if (dedicatedId) {
+    return sendLoopsTransactional({
+      transactionalId: dedicatedId,
+      email: params.email,
+      addToAudience: true,
+      dataVariables: { inviterName, inviteUrl },
+    })
+  }
+
+  const { sendTransactionalEmail } = await import('@/lib/send-transactional-email')
+  const sent = await sendTransactionalEmail({
+    to: params.email,
+    subject: `${inviterName} inviterer dig til Functional Foods`,
+    text: [
+      `${inviterName} har inviteret dig som partner-bruger til ${inviterName}.`,
+      '',
+      'Du kan se samme madplan, men har din egen madlog. Din bruger er gratis og koblet op på ' +
+        `${inviterName}.`,
+      '',
+      `Opret dig her: ${inviteUrl}`,
+      '',
+      'Linket virker i 14 dage.',
+    ].join('\n'),
+  })
+  return sent.ok ? { ok: true } : { ok: false, error: sent.error }
+}

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { loadHouseholdForUser } from '@/lib/household-access'
 
 export const dynamic = 'force-dynamic'
+
+async function ownerIdFor(request: NextRequest): Promise<string | null> {
+  const user = await getAuthenticatedUser(request)
+  if (!user) return null
+  const household = await loadHouseholdForUser(user)
+  return household?.ownerId ?? null
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,12 +18,16 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const supabase = createSupabaseServiceClient()
     const { data, error } = await supabase
       .from('user_manual_shopping_items')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', household.ownerId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -32,8 +44,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request)
-    if (!user) {
+    const ownerId = await ownerIdFor(request)
+    if (!ownerId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -64,7 +76,7 @@ export async function POST(request: NextRequest) {
       const { data, error } = await supabase
         .from('user_manual_shopping_items')
         .insert({
-          user_id: user.id,
+          user_id: ownerId,
           name: offer.name_store ?? 'Produkt',
           quantity: body.quantity ?? 1,
           unit: p.unit ?? 'stk',
@@ -92,7 +104,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('user_manual_shopping_items')
       .insert({
-        user_id: user.id,
+        user_id: ownerId,
         name,
         quantity: body.quantity ?? 1,
         unit: body.unit ?? 'stk',
@@ -114,8 +126,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request)
-    if (!user) {
+    const ownerId = await ownerIdFor(request)
+    if (!ownerId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -129,7 +141,7 @@ export async function PATCH(request: NextRequest) {
       .from('user_manual_shopping_items')
       .update({ is_checked: isChecked, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .select('*')
       .single()
 
@@ -147,8 +159,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(request)
-    if (!user) {
+    const ownerId = await ownerIdFor(request)
+    if (!ownerId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -162,7 +174,7 @@ export async function DELETE(request: NextRequest) {
       .from('user_manual_shopping_items')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
 
     if (error) {
       console.error('manual-shopping-items DELETE:', error)

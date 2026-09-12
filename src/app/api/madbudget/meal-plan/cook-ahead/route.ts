@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
+import { applyCookAhead, type CookAheadDays } from '@/lib/madbudget/cook-ahead'
+import { loadHouseholdForUser } from '@/lib/household-access'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
-import { loadHouseholdForUser } from '@/lib/household-access'
-import { clearLeftoversFromSource } from '@/lib/madbudget/cook-ahead'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -35,7 +35,6 @@ function emptyGrid(): Record<DayKey, Record<MealType, unknown | null>> {
   }
 }
 
-/** meal_plan_data er enten { v, grid, slotLocks } eller legacy (dag-nøgler i toppen). */
 function parseMealPlanData(raw: unknown): {
   grid: Record<DayKey, Record<MealType, unknown | null>>
   slotLocks: Record<string, boolean>
@@ -60,18 +59,14 @@ function parseMealPlanData(raw: unknown): {
 export async function POST(request: NextRequest) {
   try {
     const user = await getAuthenticatedUser(request)
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const household = await loadHouseholdForUser(user)
-    if (!household) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const ownerId = household.ownerId
+    if (!household) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
     const day = body.day as string | undefined
     const meal = (body.meal as string | undefined) ?? 'dinner'
+    const days = Number(body.days) as CookAheadDays
 
     if (!day || !VALID_DAYS.has(day)) {
       return NextResponse.json({ error: 'Invalid day' }, { status: 400 })
@@ -79,56 +74,53 @@ export async function POST(request: NextRequest) {
     if (!VALID_MEALS.has(meal)) {
       return NextResponse.json({ error: 'Invalid meal' }, { status: 400 })
     }
+    if (days !== 2 && days !== 3) {
+      return NextResponse.json({ error: 'days skal være 2 eller 3' }, { status: 400 })
+    }
 
     const supabase = createSupabaseServiceClient()
-
-    // Fjern fra den aktive plan (den brugeren ser i appen).
     const { data: plan, error: planError } = await supabase
       .from('user_meal_plans')
       .select('id, meal_plan_data')
-      .eq('user_id', ownerId)
+      .eq('user_id', household.ownerId)
       .eq('is_active', true)
       .order('week_start_date', { ascending: false })
       .limit(1)
       .maybeSingle()
 
     if (planError) {
-      console.error('remove-recipe load:', planError)
       return NextResponse.json({ error: 'Failed to load meal plan' }, { status: 500 })
     }
     if (!plan) {
       return NextResponse.json({ error: 'Ingen aktiv madplan' }, { status: 404 })
     }
 
-    const parsed = parseMealPlanData(plan.meal_plan_data)
-    const dayKey = day as DayKey
-    const mealKey = meal as MealType
-    const grid = clearLeftoversFromSource(parsed.grid, dayKey, mealKey) as typeof parsed.grid
-    const slotLocks = parsed.slotLocks
-    grid[dayKey][mealKey] = null
-    delete slotLocks[`${dayKey}_${mealKey}`]
-
-    // Genopbyg indkøbslisten så priserne følger den ændrede madplan. Slår fejl ikke
-    // ud over hele kaldet — grid-ændringen gemmes uanset (listen markeres stale i app'en).
-    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any)
+    const { grid, slotLocks } = parseMealPlanData(plan.meal_plan_data)
+    const nextGrid = applyCookAhead(grid, day, meal as MealType, days, (d, m) =>
+      Boolean(slotLocks[`${d}_${m}`])
+    )
+    const shoppingList = await rebuildShoppingListForUser(
+      supabase,
+      household.ownerId,
+      nextGrid as any
+    )
 
     const { error: updateError } = await supabase
       .from('user_meal_plans')
       .update({
-        meal_plan_data: { v: 2, grid, slotLocks },
+        meal_plan_data: { v: 2, grid: nextGrid, slotLocks },
         ...(shoppingList != null ? { shopping_list: shoppingList } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', plan.id)
 
     if (updateError) {
-      console.error('remove-recipe update:', updateError)
       return NextResponse.json({ error: 'Failed to update meal plan' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('POST /api/madbudget/meal-plan/remove-recipe:', err)
+    console.error('POST /api/madbudget/meal-plan/cook-ahead:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

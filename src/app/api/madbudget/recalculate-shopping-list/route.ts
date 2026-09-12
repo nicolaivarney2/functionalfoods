@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       const { data: plan } = await service
         .from('user_meal_plans')
         .select('shopping_list')
-        .eq('user_id', user.id)
+        .eq('user_id', (await (await import('@/lib/household-access')).loadHouseholdForUser(user))?.ownerId ?? user.id)
         .eq('is_active', true)
         .maybeSingle()
       const fromList = extractLeftoversFromShoppingList(plan?.shopping_list)

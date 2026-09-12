@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { hydrateGridIngredientsFromRecipes } from '@/lib/madbudget/meal-plan-ingredients'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
+import { loadHouseholdForUser } from '@/lib/household-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -50,13 +51,18 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
 
     const supabase = createSupabaseServiceClient()
 
     const { data: plan, error: planError } = await supabase
       .from('user_meal_plans')
       .select('id, meal_plan_data')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('is_active', true)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -72,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     const grid = parseGrid(plan.meal_plan_data)
     const hydratedGrid = await hydrateGridIngredientsFromRecipes(supabase, grid as any)
-    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, hydratedGrid as any)
+    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, hydratedGrid as any)
 
     if (shoppingList == null) {
       return NextResponse.json({ error: 'Failed to rebuild shopping list' }, { status: 500 })

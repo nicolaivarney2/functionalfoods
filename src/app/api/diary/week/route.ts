@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const dateList = datesInRange(start, days)
     const end = dateList[dateList.length - 1]
 
-    const [{ data: entries, error }, target] = await Promise.all([
+    const [{ data: entries, error }, { data: activities, error: actErr }, target] = await Promise.all([
       supabase
         .from('food_log_entries')
         .select(FOOD_LOG_ENTRY_SELECT)
@@ -57,6 +57,13 @@ export async function GET(request: NextRequest) {
         .lte('logged_date', end)
         .order('logged_date', { ascending: true })
         .order('created_at', { ascending: true }),
+      supabase
+        .from('diary_activity_entries')
+        .select('id, logged_date, title, calories, created_at')
+        .eq('user_id', user.id)
+        .gte('logged_date', start)
+        .lte('logged_date', end)
+        .order('created_at', { ascending: true }),
       computeDailyTargets(supabase, user.id, adultIndex),
     ])
 
@@ -64,6 +71,7 @@ export async function GET(request: NextRequest) {
       console.error('diary/week entries', error)
       return NextResponse.json({ error: 'Kunne ikke hente uge', details: error.message }, { status: 500 })
     }
+    if (actErr) console.warn('diary/week activities', actErr)
 
     const byDate = new Map<string, Array<Record<string, unknown>>>()
     for (const row of entries ?? []) {
@@ -73,8 +81,18 @@ export async function GET(request: NextRequest) {
       list.push(row as Record<string, unknown>)
       byDate.set(d, list)
     }
+    const actByDate = new Map<string, Array<Record<string, unknown>>>()
+    for (const row of activities ?? []) {
+      const d = String((row as { logged_date?: string }).logged_date ?? '')
+      if (!d) continue
+      const list = actByDate.get(d) ?? []
+      list.push(row as Record<string, unknown>)
+      actByDate.set(d, list)
+    }
 
-    const items = dateList.map((date) => buildDiaryDayPayload(date, byDate.get(date) ?? [], target))
+    const items = dateList.map((date) =>
+      buildDiaryDayPayload(date, byDate.get(date) ?? [], target, actByDate.get(date) ?? [])
+    )
 
     return NextResponse.json({
       success: true,

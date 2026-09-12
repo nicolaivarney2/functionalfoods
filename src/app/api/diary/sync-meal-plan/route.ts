@@ -20,6 +20,8 @@ type Cell = {
   fiber?: number
   vitamins?: Record<string, number>
   minerals?: Record<string, number>
+  leftoverFromDay?: unknown
+  isLeftover?: unknown
 }
 
 function getServiceClient() {
@@ -61,6 +63,10 @@ export async function POST(request: NextRequest) {
 
     const user = await getSupabaseRouteUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { loadHouseholdForUser } = await import('@/lib/household-access')
+    const household = await loadHouseholdForUser(user)
+    if (!household) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const ownerId = household.ownerId
 
     const body = await request.json().catch(() => ({}))
     const mealPlanId = typeof body.mealPlanId === 'string' ? body.mealPlanId : null
@@ -107,7 +113,7 @@ export async function POST(request: NextRequest) {
       const { data, error: planErr } = await supabase
         .from('user_meal_plans')
         .select('id, week_start_date, week_end_date, meal_plan_data, is_active')
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .eq('id', mealPlanId)
         .maybeSingle()
       if (planErr) {
@@ -120,7 +126,7 @@ export async function POST(request: NextRequest) {
       const { data: planRows, error: planErr } = await supabase
         .from('user_meal_plans')
         .select('id, week_start_date, week_end_date, meal_plan_data, is_active')
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .order('week_start_date', { ascending: false })
         .limit(20)
       if (planErr) {
@@ -164,6 +170,7 @@ export async function POST(request: NextRequest) {
       for (const meal of PLAN_MEALS) {
         const cell = dayObj[meal] as Cell | null
         if (!cell || !cell.title) continue
+        if (cell.leftoverFromDay || cell.isLeftover === true) continue
         const micro = prepareStoredMicros(cell.vitamins, cell.minerals, 1)
         rows.push({
           user_id: user.id,

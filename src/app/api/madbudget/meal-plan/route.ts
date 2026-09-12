@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-payload'
 import { mergeMealPlanDataPreservingIngredients, countMealsInGrid } from '@/lib/madbudget/meal-plan-ingredients'
 import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
+import { loadHouseholdForUser } from '@/lib/household-access'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,11 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
 
     // Use service role client for DB operations
     const { createClient } = await import('@supabase/supabase-js')
@@ -94,14 +100,14 @@ export async function GET(request: NextRequest) {
       ({ data, error } = await supabase
         .from('user_meal_plans')
         .select(PLAN_LIST_COLUMNS)
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .eq('id', mealPlanId)
         .single())
     } else if (active) {
       ({ data, error } = await supabase
         .from('user_meal_plans')
         .select(PLAN_LIST_COLUMNS)
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .eq('is_active', true)
         .order('week_start_date', { ascending: false })
         .limit(1))
@@ -109,7 +115,7 @@ export async function GET(request: NextRequest) {
       ({ data, error } = await supabase
         .from('user_meal_plans')
         .select(PLAN_LIST_COLUMNS)
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .order('week_start_date', { ascending: false })
         .limit(10))
     }
@@ -186,6 +192,11 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
 
     // Use service role client for DB writes
     const { createClient } = await import('@supabase/supabase-js')
@@ -210,14 +221,14 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('user_meal_plans')
       .update({ is_active: false })
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('is_active', true)
 
     // Check if meal plan for this week already exists
     const { data: existingPlan } = await supabase
       .from('user_meal_plans')
       .select('id, meal_plan_data, shopping_list')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('week_start_date', weekStartDate)
       .single()
 
@@ -261,7 +272,7 @@ export async function POST(request: NextRequest) {
       const { data: inserted, error: insertError } = await supabase
         .from('user_meal_plans')
         .insert({
-          user_id: user.id,
+          user_id: ownerId,
           name: name || `Madplan ${weekStartDate}`,
           week_start_date: weekStartDate,
           week_end_date: weekEndDate,

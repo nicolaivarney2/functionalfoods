@@ -55,7 +55,8 @@ export function isVisibleFoodLogEntry(entry: Record<string, unknown>): boolean {
 export function buildDiaryDayPayload(
   date: string,
   entries: Array<Record<string, unknown>>,
-  target: unknown
+  target: unknown,
+  activities: Array<Record<string, unknown>> = []
 ) {
   const visible = entries.filter(isVisibleFoodLogEntry)
   const totals = sumMacroTotals(visible)
@@ -65,5 +66,6 @@ export function buildDiaryDayPayload(
     target,
     totals: { ...totals, vitamins: microTotals.vitamins, minerals: microTotals.minerals },
     entries: visible,
+    activities,
   }
 }

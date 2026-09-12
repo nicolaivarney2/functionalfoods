@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coffee,
+  Dumbbell,
   Loader2,
   Plus,
   RefreshCw,
@@ -23,6 +24,9 @@ import HealthInformationNotice from '@/components/HealthInformationNotice'
 import AddMealSheet from '@/components/diary/AddMealSheet'
 import FeedbackCta from '@/components/FeedbackCta'
 import {
+  addDiaryActivity,
+  applyActivityToTargets,
+  deleteDiaryActivity,
   deleteDiaryEntry,
   isoDate,
   loadDiaryDay,
@@ -132,6 +136,9 @@ export default function DagbogPage() {
   const [moveBusy, setMoveBusy] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncMsg, setSyncMsg] = useState<string | null>(null)
+  const [actTitle, setActTitle] = useState('Styrketræning')
+  const [actKcal, setActKcal] = useState('250')
+  const [actBusy, setActBusy] = useState(false)
   /** Invalidér in-flight loads uden at lade `loading` hænge på true (AbortController-bug). */
   const loadGenRef = useRef(0)
   const accessToken = session?.access_token
@@ -212,6 +219,37 @@ export default function DagbogPage() {
       next.setDate(next.getDate() + delta * 7)
       return next
     })
+  }
+
+  const saveActivity = async () => {
+    const calories = Math.round(Number(actKcal.replace(',', '.')))
+    if (!actTitle.trim()) {
+      setError('Skriv hvad du har trænet.')
+      return
+    }
+    if (!Number.isFinite(calories) || calories < 1 || calories > 5000) {
+      setError('Angiv kcal mellem 1 og 5000.')
+      return
+    }
+    setActBusy(true)
+    setError(null)
+    try {
+      await addDiaryActivity({ date: dateKey, title: actTitle.trim(), calories })
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunne ikke gemme aktiviteten.')
+    } finally {
+      setActBusy(false)
+    }
+  }
+
+  const removeActivity = async (id: string) => {
+    try {
+      await deleteDiaryActivity(id)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Kunne ikke slette aktiviteten.')
+    }
   }
 
   const removeEntry = async (id: string) => {
@@ -298,7 +336,9 @@ export default function DagbogPage() {
     )
   }
 
-  const target = day?.target ?? null
+  const activities = day?.activities ?? []
+  const activityKcal = activities.reduce((s, a) => s + a.calories, 0)
+  const target = applyActivityToTargets(day?.target ?? null, activityKcal)
   const totals = day?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
   const remaining = target ? Math.round(target.calories - totals.calories) : null
   const progress = target && target.calories > 0 ? Math.min(1, Math.max(0, totals.calories / target.calories)) : 0
@@ -378,6 +418,11 @@ export default function DagbogPage() {
         <p className="text-sm text-gray-500 lg:mt-1">
           {remaining == null ? 'kcal indtaget' : remaining >= 0 ? 'kcal tilbage' : 'kcal over mål'}
         </p>
+        {activityKcal > 0 ? (
+          <p className="mt-1 text-xs text-gray-500">
+            +{activityKcal.toLocaleString('da-DK')} kcal lagt til målet fra aktivitet
+          </p>
+        ) : null}
       </div>
       <div className="mt-4 flex justify-center gap-6 text-sm text-gray-600 lg:justify-start">
         <span>
@@ -631,6 +676,86 @@ export default function DagbogPage() {
                 )
               })}
             </div>
+
+            <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/5 lg:p-5">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                  <Dumbbell size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-semibold text-gray-900">Aktivitet og træning</h2>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Lægges oven i dagens kalorie- og makromål. Log ikke det samme to gange, hvis det allerede tælles et andet sted.
+                  </p>
+                  {activities.length ? (
+                    <ul className="mt-3 divide-y divide-gray-50">
+                      {activities.map((a) => (
+                        <li key={a.id} className="flex items-center justify-between gap-3 py-2">
+                          <p className="truncate text-sm font-medium text-gray-900">
+                            {a.title} · {a.calories.toLocaleString('da-DK')} kcal
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => void removeActivity(a.id)}
+                            className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                            aria-label="Slet aktivitet"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[
+                      { title: 'Løbetur', kcal: '350' },
+                      { title: 'Styrketræning', kcal: '250' },
+                      { title: 'Cykling', kcal: '400' },
+                      { title: 'Gang', kcal: '200' },
+                    ].map((p) => (
+                      <button
+                        key={p.title}
+                        type="button"
+                        onClick={() => {
+                          setActTitle(p.title)
+                          setActKcal(p.kcal)
+                        }}
+                        className={`rounded-full px-3 py-1 text-xs font-medium ring-1 ${
+                          actTitle === p.title
+                            ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                            : 'bg-gray-50 text-gray-700 ring-gray-200'
+                        }`}
+                      >
+                        {p.title}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <input
+                      value={actTitle}
+                      onChange={(e) => setActTitle(e.target.value)}
+                      placeholder="Fx løbetur"
+                      className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    />
+                    <input
+                      value={actKcal}
+                      onChange={(e) => setActKcal(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="kcal"
+                      className="w-28 rounded-xl border border-gray-200 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      disabled={actBusy}
+                      onClick={() => void saveActivity()}
+                      className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+                    >
+                      {actBusy ? 'Gemmer…' : 'Gem'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
 
             <div className="lg:hidden">{quickLinks}</div>
             <FeedbackCta screen="dagbog" />

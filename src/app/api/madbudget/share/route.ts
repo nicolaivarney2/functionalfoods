@@ -42,6 +42,11 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const { loadHouseholdForUser } = await import('@/lib/household-access')
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
     const body = await request.json()
     const mealPlanId = body.mealPlanId
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
       .from('user_meal_plans')
       .select('id, user_id, share_token, shopping_list, family_profile_snapshot')
       .eq('id', mealPlanId)
-      .eq('user_id', user.id)
+      .eq('user_id', household.ownerId)
       .single()
 
     if (fetchError || !plan) {
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', mealPlanId)
-      .eq('user_id', user.id)
+      .eq('user_id', household.ownerId)
 
     if (updateError) {
       console.error('Error sharing plan:', updateError)
@@ -117,7 +122,7 @@ export async function POST(request: NextRequest) {
               .from('user_meal_plans')
               .update({ shopping_list_prices: shoppingListPrices, updated_at: new Date().toISOString() })
               .eq('id', mealPlanId)
-              .eq('user_id', user.id)
+              .eq('user_id', household.ownerId)
           }
         } catch (e) {
           // Timeout eller fejl – linket virker stadig, bare uden priser

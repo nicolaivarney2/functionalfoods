@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 import { getWeekInfo } from '@/lib/madbudget/week-dates'
+import { loadHouseholdForUser } from '@/lib/household-access'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -112,6 +113,11 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const household = await loadHouseholdForUser(user)
+    if (!household) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const ownerId = household.ownerId
 
     const body = await request.json()
     const slug = body.slug as string | undefined
@@ -145,7 +151,7 @@ export async function POST(request: NextRequest) {
     const { data: existingPlan } = await supabase
       .from('user_meal_plans')
       .select('id, meal_plan_data')
-      .eq('user_id', user.id)
+      .eq('user_id', ownerId)
       .eq('week_start_date', weekStartDate)
       .maybeSingle()
 
@@ -158,7 +164,7 @@ export async function POST(request: NextRequest) {
     const mealPlanData = { v: 2, grid, slotLocks }
 
     // Genopbyg indkøbslisten så priserne følger den ændrede madplan.
-    const shoppingList = await rebuildShoppingListForUser(supabase, user.id, grid as any)
+    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any)
 
     if (existingPlan) {
       const { error: updateError } = await supabase
@@ -179,11 +185,11 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('user_meal_plans')
         .update({ is_active: false })
-        .eq('user_id', user.id)
+        .eq('user_id', ownerId)
         .eq('is_active', true)
 
       const { error: insertError } = await supabase.from('user_meal_plans').insert({
-        user_id: user.id,
+        user_id: ownerId,
         name: `Madplan ${weekStartDate}`,
         week_start_date: weekStartDate,
         week_end_date: weekEndDate,

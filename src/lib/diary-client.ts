@@ -3,6 +3,7 @@
  */
 
 import { authFetch } from '@/lib/auth-fetch'
+import { applyActivityToTargets, mapActivityRow, sumActivityCalories } from '@/lib/diary-activity'
 import type { ProvisionalRecipeRow } from '@/lib/provisional-recipes'
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
@@ -46,12 +47,22 @@ export type DiaryTotals = {
   minerals?: Record<string, number>
 }
 
+export type DiaryActivity = {
+  id: string
+  loggedDate: string
+  title: string
+  calories: number
+}
+
 export type DiaryDay = {
   date: string
   target: DiaryTarget | null
   totals: DiaryTotals
   entries: DiaryEntry[]
+  activities: DiaryActivity[]
 }
+
+export { applyActivityToTargets, mapActivityRow, sumActivityCalories }
 
 function num(v: unknown): number {
   const n = Number(v)
@@ -138,13 +149,35 @@ export async function loadDiaryDay(
     target: DiaryTarget | null
     totals: DiaryTotals
     entries: Record<string, unknown>[]
+    activities?: Record<string, unknown>[]
   }>(res)
   return {
     date: data.date,
     target: data.target ?? null,
     totals: data.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
     entries: (data.entries ?? []).map(mapEntry),
+    activities: (data.activities ?? []).map(mapActivityRow),
   }
+}
+
+export async function addDiaryActivity(input: {
+  date: string
+  title: string
+  calories: number
+}): Promise<DiaryActivity> {
+  const res = await authFetch('/api/diary/activity', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  const data = await readJson<{ data: Record<string, unknown> }>(res)
+  return mapActivityRow(data.data)
+}
+
+export async function deleteDiaryActivity(id: string): Promise<void> {
+  const res = await authFetch(`/api/diary/activity?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+  await readJson(res)
 }
 
 export type AddEntryInput = {

@@ -11,6 +11,7 @@ import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFacto
 import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
 import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
+import { applyCookAhead, clearLeftoversFromSource, isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
@@ -2262,11 +2263,22 @@ export default function MadbudgetPage() {
 
   const slotKey = (d: DayKey, m: MealType) => `${d}_${m}`
 
+  const handleCookAhead = (dayKey: DayKey, mealKey: MealType, days: 2 | 3) => {
+    const next = applyCookAhead(mealPlan, dayKey, mealKey, days, (d, m) =>
+      Boolean(slotLocks[`${d}_${m}`])
+    ) as typeof mealPlan
+    setMealPlan(next)
+    setShoppingListStale(true)
+    void saveMealPlanToDb(next)
+  }
+
   const clearMealSlot = (dayKey: DayKey, mealKey: MealType) => {
     const lk = slotKey(dayKey, mealKey)
     setMealPlan((prev) => {
-      const next = { ...prev }
-      next[dayKey] = { ...prev[dayKey], [mealKey]: null }
+      const cleared = clearLeftoversFromSource(prev, dayKey, mealKey) as typeof prev
+      const next = { ...cleared }
+      next[dayKey] = { ...cleared[dayKey], [mealKey]: null }
+      void saveMealPlanToDb(next)
       return next
     })
     setShoppingListStale(true)
@@ -5342,7 +5354,38 @@ export default function MadbudgetPage() {
               )}
             </div>
             {recipeViewSlot && (
-              <div className="p-4 border-t border-gray-100 flex-shrink-0">
+              <div className="p-4 border-t border-gray-100 flex-shrink-0 space-y-2">
+                {!isLeftoverMealCell(mealPlan[recipeViewSlot.dayKey]?.[recipeViewSlot.mealKey]) ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { dayKey, mealKey } = recipeViewSlot
+                        handleCookAhead(dayKey, mealKey, 2)
+                        setRecipeViewSlugOrId(null)
+                        setRecipeViewSlot(null)
+                      }}
+                      className="py-2.5 px-4 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg hover:bg-emerald-50"
+                    >
+                      +2 dage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { dayKey, mealKey } = recipeViewSlot
+                        handleCookAhead(dayKey, mealKey, 3)
+                        setRecipeViewSlugOrId(null)
+                        setRecipeViewSlot(null)
+                      }}
+                      className="py-2.5 px-4 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg hover:bg-emerald-50"
+                    >
+                      +3 dage
+                    </button>
+                  </div>
+                ) : null}
+                <p className="text-xs text-gray-500">
+                  Lav maden dag 1. De næste dage bliver rester, og indkøbet skaleres til husstanden.
+                </p>
                 <button
                   type="button"
                   onClick={() => {
