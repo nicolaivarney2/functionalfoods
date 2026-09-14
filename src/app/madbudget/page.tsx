@@ -11,6 +11,7 @@ import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFacto
 import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
 import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
+import { cheapestStoreKeyFromPrices } from '@/lib/madbudget/shopping-list-display'
 import { applyCookAhead, clearLeftoversFromSource, isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
@@ -1026,6 +1027,18 @@ export default function MadbudgetPage() {
           : `fundet i ${mockStores.find((store) => store.id === storeIdFromTabKey(selectedStoreTab))?.name || 'butikken'}`,
     }
   }, [mainShoppingListView, storePrices, selectedStoreTab, familyProfile.selectedStores, useGuidePrices])
+
+  const cheapestStoreTab = useMemo(() => {
+    const keys = (familyProfile.selectedStores ?? [])
+      .map((storeId: number) => STORE_KEY_BY_ID[storeId] ?? '')
+      .filter(Boolean)
+    return cheapestStoreKeyFromPrices(
+      storePrices,
+      keys,
+      mainShoppingListView.allItems.map((item) => ({ name: item.name, isBasis: item.isBasis })),
+      useGuidePrices
+    )
+  }, [familyProfile.selectedStores, storePrices, mainShoppingListView, useGuidePrices])
 
   const openSmartShoppingFlow = async () => {
     if (!displayShoppingList) return
@@ -4578,6 +4591,11 @@ export default function MadbudgetPage() {
                                   ({storeTotal.toFixed(2).replace('.', ',')} kr)
                                 </span>
                               )}
+                              {storeKey === cheapestStoreTab ? (
+                                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+                                  Billigst
+                                </span>
+                              ) : null}
                             </button>
                           )
                         })}

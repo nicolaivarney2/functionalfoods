@@ -3,7 +3,7 @@
  * Bruges af madbudget-siden (web). App-repo spejler denne fil i src/lib/shopping-list.ts.
  */
 
-import { resolveProductForDisplay } from '@/lib/madbudget/guide-prices'
+import { resolveProductForDisplay, storeNeedsGuidePrices } from '@/lib/madbudget/guide-prices'
 
 export { resolveProductForDisplay, productDisplayTotal } from '@/lib/madbudget/guide-prices'
 export { formatPurchaseHint } from '@/lib/smart-shopping-display'
@@ -112,4 +112,34 @@ export function guidePriceCountFromPrices(
     if (p?.isGuidePrice) n += 1
   }
   return n
+}
+
+/** Mindst så stor andel rigtige (ikke-vejledende) varer for at kunne vinde «billigst». */
+export const CHEAPEST_MIN_REAL_COVERAGE_PCT = 15
+export const CHEAPEST_MIN_REAL_ITEMS = 2
+
+export function storeQualifiesForCheapest(
+  storePrices: StorePricesMap,
+  storeKey: string,
+  items: ShoppingListDisplayItem[]
+): boolean {
+  const cov = storeCoverageFromPrices(storePrices, storeKey, items)
+  return cov.found >= CHEAPEST_MIN_REAL_ITEMS && cov.percentage >= CHEAPEST_MIN_REAL_COVERAGE_PCT
+}
+
+/** Billigste butik blandt dem med nok rigtig dækning. Tilbuds-butikker med kun vejledende priser vinder ikke. */
+export function cheapestStoreKeyFromPrices(
+  storePrices: StorePricesMap,
+  storeKeys: string[],
+  items: ShoppingListDisplayItem[],
+  useGuidePrices = true
+): string | undefined {
+  const eligible = storeKeys.filter((key) => storeQualifiesForCheapest(storePrices, key, items))
+  const pool = eligible.length > 0 ? eligible : storeKeys.filter((key) => !storeNeedsGuidePrices(key))
+  if (pool.length === 0) return undefined
+  return [...pool].sort(
+    (a, b) =>
+      storeTotalFromPrices(storePrices, a, items, useGuidePrices) -
+      storeTotalFromPrices(storePrices, b, items, useGuidePrices)
+  )[0]
 }

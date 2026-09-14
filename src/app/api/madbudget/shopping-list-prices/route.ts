@@ -22,7 +22,10 @@ import {
   parseAmountFromNameStore,
   parseProductAmount,
   selectMatchesForStore,
+  foldLiveOffer,
+  type PricedOfferState,
 } from '@/lib/madbudget/shopping-list-pricing'
+import { liveOffersForCuratedSnapshots } from '@/lib/madbudget/leaflet-name-match'
 
 const priceResponseCache = new Map<string, { body: object; expiresAt: number }>()
 const PRICE_RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000
@@ -702,6 +705,53 @@ export async function POST(request: NextRequest) {
     console.log(`🔍 Step 5: Found ${totalOffersFound} total offers from product_offers table`)
     console.log(`🔍 Step 6: Product offers map has ${productOffersMap.size} products with offers`)
 
+    // Ugens tilbudsaviser (Goma) skifter product_id hver uge — hent live rækker
+    // og match på navn når kuraterede matches er forældede.
+    const leafletOffersByStore = new Map<string, any[]>()
+    const offerOnlyForLeaflet = requestedStores.filter((s) => storeNeedsGuidePrices(s.key))
+    if (offerOnlyForLeaflet.length > 0) {
+      const leafletStoreIds = Array.from(new Set(offerOnlyForLeaflet.flatMap((s) => s.candidates)))
+      const { data: leafletRows, error: leafletError } = await supabase
+        .from('product_offers')
+        .select(
+          `
+          product_id,
+          store_id,
+          name_store,
+          current_price,
+          normal_price,
+          is_on_sale,
+          is_offer_active,
+          discount_percentage,
+          amount,
+          unit
+        `
+        )
+        .in('store_id', leafletStoreIds)
+        .eq('is_available', true)
+        .eq('is_on_sale', true)
+        .limit(4000)
+
+      if (leafletError) {
+        console.warn('Leaflet-tilbud kunne ikke hentes:', leafletError.message)
+      } else {
+        for (const row of leafletRows ?? []) {
+          const key = canonicalStoreKey(String(row.store_id || ''))
+          if (!key) continue
+          const list = leafletOffersByStore.get(key) ?? []
+          list.push({
+            ...row,
+            product_external_id: row.product_id,
+            store_id: key,
+          })
+          leafletOffersByStore.set(key, list)
+        }
+        console.log(
+          `📰 Leaflet offers: ${[...leafletOffersByStore.entries()].map(([k, v]) => `${k}:${v.length}`).join(', ') || 'none'}`
+        )
+      }
+    }
+
     // Index offers by product external id + store id to avoid repeated filtering
     const productOffersByStore = new Map<string, Map<string, any[]>>()
     for (const [externalId, offers] of productOffersMap.entries()) {
@@ -728,13 +778,11 @@ export async function POST(request: NextRequest) {
 
       // Use ingredientId directly from shopping list item, or fallback to name lookup
       let ingredientId = item.ingredientId || shoppingListNameToIngredientId.get(shoppingItemName)
-      if (!ingredientId) {
-        // No ingredientId provided and no match found - skip this item
-        continue
-      }
 
       // Find all product matches for this ingredient
-      let matchesForIngredient = matchesByIngredient.get(String(ingredientId)) || []
+      let matchesForIngredient = ingredientId
+        ? matchesByIngredient.get(String(ingredientId)) || []
+        : []
       // If an item has a stale/invalid ID, retry with name-resolved ID
       if (matchesForIngredient.length === 0) {
         const fallbackId = shoppingListNameToIngredientId.get(shoppingItemName)
@@ -743,7 +791,8 @@ export async function POST(request: NextRequest) {
           matchesForIngredient = matchesByIngredient.get(String(ingredientId)) || []
         }
       }
-      if (matchesForIngredient.length === 0) {
+      const hasLeafletStores = requestedStoreKeys.some((k) => storeNeedsGuidePrices(k))
+      if (matchesForIngredient.length === 0 && !hasLeafletStores) {
         continue
       }
 
@@ -900,6 +949,30 @@ export async function POST(request: NextRequest) {
               bestProduct = built.product
               break
             }
+          }
+        }
+
+        if (!bestProduct && storeNeedsGuidePrices(storeKey)) {
+          const leafletState: PricedOfferState | null = liveOffersForCuratedSnapshots(
+            storeMatches.map((m) => m.product_name_snapshot),
+            leafletOffersByStore.get(storeKey) ?? []
+          ).reduce(
+            (prev, offer) =>
+              foldLiveOffer(offer, prev, {
+                neededAmount,
+                neededUnit,
+                gramsPerUnit:
+                  (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
+                  gramsPerUnitByNameMap.get(normalizeName(String(item.name || ''))),
+                organicPrefs,
+                productOrganicTags: productOrganicTagsMap.get(
+                  String(offer.product_external_id || offer.product_id || '')
+                ),
+              }),
+            null as PricedOfferState | null
+          )
+          if (leafletState) {
+            bestProduct = { ...leafletState.product, isLeafletNameMatch: true }
           }
         }
 

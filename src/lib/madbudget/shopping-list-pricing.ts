@@ -347,3 +347,98 @@ export function matchBelongsToStore(
   const aliases = storeAliases[storeKey] || [storeKey]
   return aliases.some((alias) => snap.includes(alias))
 }
+
+export type LiveOfferRow = {
+  product_id?: string
+  product_external_id?: string
+  name_store?: string
+  current_price?: number | null
+  normal_price?: number | null
+  is_on_sale?: boolean
+  is_offer_active?: boolean
+  discount_percentage?: number | null
+  amount?: unknown
+  unit?: string | null
+}
+
+export type PricedOfferState = {
+  product: Record<string, unknown>
+  comparisonPrice: number
+  excess: number
+}
+
+/** Vurdér et live tilbud mod nuværende bedste (samme regler som shopping-list-prices). */
+export function foldLiveOffer(
+  offer: LiveOfferRow,
+  prev: PricedOfferState | null,
+  opts: {
+    neededAmount: number
+    neededUnit: string
+    gramsPerUnit?: number
+    organicPrefs: OrganicPreferenceInput
+    productOrganicTags?: string[] | null
+  }
+): PricedOfferState | null {
+  let productAmount = parseProductAmount(offer.amount as string | number | null, offer.unit ?? null)
+  if (!productAmount) {
+    productAmount = parseAmountFromNameStore(String(offer.name_store || ''))
+  }
+  if (!productAmount) return prev
+
+  const packQty = computePackageQuantity(
+    opts.neededAmount,
+    opts.neededUnit,
+    productAmount.value,
+    productAmount.unit,
+    opts.gramsPerUnit
+  )
+  if (!packQty) return prev
+
+  const { quantityNeeded, convertedAmount } = packQty
+  const totalPrice = (offer.current_price || 0) * quantityNeeded
+  if (!offer.current_price || totalPrice === 0) return prev
+
+  const excess = convertedAmount * quantityNeeded - opts.neededAmount
+  const offerIsActive =
+    offer.is_offer_active === true
+      ? true
+      : !!offer.is_on_sale ||
+        !!(offer.normal_price && offer.current_price && offer.normal_price > offer.current_price)
+
+  const organicTags = resolveProductOrganicTags(opts.productOrganicTags, offer.name_store)
+  const comparisonPrice = comparisonPriceForOrganicPreference(
+    totalPrice,
+    opts.organicPrefs,
+    organicTags
+  )
+
+  const nextProduct = {
+    product_external_id: offer.product_external_id || offer.product_id,
+    name: offer.name_store,
+    price: offer.current_price,
+    totalPrice,
+    normalPrice: offer.normal_price,
+    totalNormalPrice: offer.normal_price ? offer.normal_price * quantityNeeded : null,
+    isOnSale: offerIsActive,
+    discountPercentage: offer.discount_percentage,
+    amount: offer.amount,
+    unit: offer.unit,
+    productAmount: convertedAmount,
+    neededAmount: opts.neededAmount,
+    quantityNeeded,
+    isSufficient: convertedAmount >= opts.neededAmount,
+    pricingSource: 'fooddata_offer',
+    isOrganicMatch: organicTags.length > 0,
+  }
+
+  if (!prev || comparisonPrice < prev.comparisonPrice - 0.01) {
+    return { product: nextProduct, comparisonPrice, excess }
+  }
+  if (Math.abs(comparisonPrice - prev.comparisonPrice) < 0.01) {
+    if (excess < prev.excess) return { product: nextProduct, comparisonPrice, excess }
+    if (excess === prev.excess && offerIsActive && !prev.product.isOnSale) {
+      return { product: nextProduct, comparisonPrice, excess }
+    }
+  }
+  return prev
+}
