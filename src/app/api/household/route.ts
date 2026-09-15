@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { displayNameFromUser, loadHouseholdForUser } from '@/lib/household-access'
 import { createSupabaseServiceClient } from '@/lib/supabase'
@@ -8,7 +8,6 @@ import {
   normalizeInviteEmail,
   ownerHasPartner,
   partnerInviteUrl,
-  sendPartnerInviteEmail,
 } from '@/lib/partner-invite'
 
 export const dynamic = 'force-dynamic'
@@ -99,6 +98,19 @@ export async function GET(request: NextRequest) {
   })
 }
 
+async function revokePendingInvite(ownerId: string) {
+  const supabase = createSupabaseServiceClient()
+  const { error } = await supabase
+    .from('partner_invitations')
+    .update({ status: 'revoked' })
+    .eq('owner_id', ownerId)
+    .eq('status', 'pending')
+  if (error) {
+    console.error('partner invite revoke', error)
+    throw error
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getAuthenticatedUser(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -109,6 +121,15 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}))
+  if (body?.action === 'revoke-invite') {
+    try {
+      await revokePendingInvite(user.id)
+    } catch {
+      return NextResponse.json({ error: 'Kunne ikke annullere invitationen.' }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  }
+
   const email = normalizeInviteEmail(typeof body?.email === 'string' ? body.email : '')
   if (!email) {
     return NextResponse.json({ error: 'Skriv en gyldig e-mailadresse.' }, { status: 400 })
@@ -129,7 +150,7 @@ export async function POST(request: NextRequest) {
   const { data: existingUser } = await supabase
     .from('user_profiles')
     .select('id, account_kind')
-    .ilike('email', email)
+    .eq('email', email)
     .maybeSingle()
 
   if (existingUser) {
@@ -142,11 +163,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  await supabase
-    .from('partner_invitations')
-    .update({ status: 'revoked' })
-    .eq('owner_id', user.id)
-    .eq('status', 'pending')
+  await revokePendingInvite(user.id)
 
   const token = newInviteToken()
   const { error } = await supabase.from('partner_invitations').insert({
@@ -163,8 +180,6 @@ export async function POST(request: NextRequest) {
   }
 
   const inviteUrl = partnerInviteUrl(token)
-  const inviterName = displayNameFromUser(user)
-  after(() => sendPartnerInviteEmail({ toEmail: email, inviterName, inviteUrl }))
 
   return NextResponse.json({
     success: true,
@@ -197,11 +212,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   if (action === 'invite') {
-    await supabase
-      .from('partner_invitations')
-      .update({ status: 'revoked' })
-      .eq('owner_id', user.id)
-      .eq('status', 'pending')
+    try {
+      await revokePendingInvite(user.id)
+    } catch {
+      return NextResponse.json({ error: 'Kunne ikke annullere invitationen.' }, { status: 500 })
+    }
     return NextResponse.json({ success: true })
   }
 
