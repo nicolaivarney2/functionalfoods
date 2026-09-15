@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Users } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import PartnerInviteShare from '@/components/PartnerInviteShare'
 
 type HouseholdPayload = {
   accountKind: 'primary' | 'partner'
@@ -14,7 +15,6 @@ type HouseholdPayload = {
 export default function PartnerInvitePanel() {
   const { user } = useAuth()
   const [data, setData] = useState<HouseholdPayload | null>(null)
-  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -30,24 +30,18 @@ export default function PartnerInvitePanel() {
 
   if (!user || !data) return null
 
-  async function invite(e: React.FormEvent) {
-    e.preventDefault()
+  async function createLink() {
     setLoading(true)
     setMessage('')
     try {
       const res = await fetch('/api/household', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({}),
       })
       const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.error || 'Kunne ikke sende invitation.')
-      setEmail('')
-      setMessage(
-        body.emailSent
-          ? `Invitation sendt til ${body.email}.`
-          : `Invitation oprettet. Send linket: ${body.inviteUrl}`
-      )
+      if (!res.ok) throw new Error(body.error || 'Kunne ikke oprette linket.')
+      setMessage('Linket er klar. Send det til din partner via SMS, mail eller Del.')
       await load()
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Der opstod en fejl.')
@@ -78,15 +72,15 @@ export default function PartnerInvitePanel() {
           {data.accountKind === 'partner' || data.partner
             ? 'Partner'
             : data.pendingInvite
-              ? 'Invitation sendt'
+              ? 'Invitationslink'
               : 'Inviter din partner (gratis)'}
         </h2>
       </div>
       {data.accountKind === 'partner' ? (
         <div className="space-y-3">
           <p className="text-sm text-gray-600">
-            Du er en partner-bruger til {data.owner.name}. I kan redigere i samme madplan, men har
-            hver jeres madlog.
+            Du er en partner-bruger til {data.owner.name}. I kan redigere i samme madplan, men
+            har hver jeres madlog.
           </p>
           <button
             type="button"
@@ -115,36 +109,33 @@ export default function PartnerInvitePanel() {
       ) : data.pendingInvite ? (
         <div className="space-y-3">
           <p className="text-sm text-gray-600">
-            Invitation sendt til {data.pendingInvite.email}. Partneren skal oprette en ny, tom konto
-            via linket.
+            Send linket til din partner. De opretter deres eget login — uden at vente på e-mail fra
+            os.
           </p>
-          <p className="break-all text-sm text-gray-600">Link: {data.pendingInvite.inviteUrl}</p>
+          <PartnerInviteShare
+            inviteUrl={data.pendingInvite.inviteUrl}
+            inviterName={data.owner.name}
+            productName="Functional Foods"
+          />
           <button type="button" className="text-sm text-red-600 underline" onClick={() => remove('invite')}>
             Annullér invitation
           </button>
         </div>
       ) : (
-        <form onSubmit={invite} className="space-y-3">
+        <div className="space-y-3">
           <p className="text-sm text-gray-600">
             Inviter én partner. I får hver jeres login og madlog, men samme madplan, indkøbsliste og
-            familieindstillinger. Partneren skal oprette en ny, tom konto via linket.
+            familieindstillinger. Du får et link, du selv sender via SMS, mail eller Del.
           </p>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="partner@email.dk"
-            className="w-full rounded-lg border px-3 py-2"
-            required
-          />
           <button
-            type="submit"
+            type="button"
             disabled={loading}
+            onClick={() => void createLink()}
             className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {loading ? 'Sender…' : 'Inviter din partner (gratis)'}
+            {loading ? 'Opretter link…' : 'Lav invitationslink'}
           </button>
-        </form>
+        </div>
       )}
       {message ? <p className="mt-3 text-sm text-gray-700">{message}</p> : null}
     </div>

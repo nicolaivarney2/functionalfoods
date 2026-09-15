@@ -5,7 +5,6 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 import {
   inviteExpiryIso,
   newInviteToken,
-  normalizeInviteEmail,
   ownerHasPartner,
   partnerInviteUrl,
 } from '@/lib/partner-invite'
@@ -130,14 +129,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true })
   }
 
-  const email = normalizeInviteEmail(typeof body?.email === 'string' ? body.email : '')
-  if (!email) {
-    return NextResponse.json({ error: 'Skriv en gyldig e-mailadresse.' }, { status: 400 })
-  }
-  if (user.email && email === user.email.trim().toLowerCase()) {
-    return NextResponse.json({ error: 'Du kan ikke invitere dig selv.' }, { status: 400 })
-  }
-
   const supabase = createSupabaseServiceClient()
 
   if (await ownerHasPartner(supabase, user.id)) {
@@ -147,28 +138,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: existingUser } = await supabase
-    .from('user_profiles')
-    .select('id, account_kind')
-    .eq('email', email)
-    .maybeSingle()
-
-  if (existingUser) {
-    return NextResponse.json(
-      {
-        error:
-          'Den e-mail har allerede en Functional Foods-konto. Partneren skal oprette sig med en ny mail via invitationslinket.',
-      },
-      { status: 409 }
-    )
-  }
-
   await revokePendingInvite(user.id)
 
   const token = newInviteToken()
   const { error } = await supabase.from('partner_invitations').insert({
     owner_id: user.id,
-    email,
+    email: '',
     token,
     status: 'pending',
     expires_at: inviteExpiryIso(),
@@ -184,7 +159,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     success: true,
     inviteUrl,
-    email,
     emailSent: false,
   })
 }

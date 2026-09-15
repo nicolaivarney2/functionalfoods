@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
@@ -11,16 +11,18 @@ type InviteInfo = { email: string; inviterName: string }
 export default function PartnerInvitePage() {
   const params = useParams<{ token: string }>()
   const token = params?.token || ''
-  const { user, loading: authLoading, signUp, signIn, signOut } = useAuth()
+  const { user, loading: authLoading, signIn, signOut } = useAuth()
 
   const [info, setInfo] = useState<InviteInfo | null>(null)
   const [loadError, setLoadError] = useState('')
+  const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'signup' | 'login'>('signup')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  const autoAcceptTried = useRef(false)
 
   useEffect(() => {
     if (!token) return
@@ -54,14 +56,12 @@ export default function PartnerInvitePage() {
   }
 
   useEffect(() => {
-    if (!user || !info || done || authLoading) return
-    const email = (user.email || '').toLowerCase()
-    if (email && email === info.email.toLowerCase()) {
-      setSubmitting(true)
-      accept()
-        .catch((e: Error) => setError(e.message))
-        .finally(() => setSubmitting(false))
-    }
+    if (!user || !info || done || authLoading || autoAcceptTried.current) return
+    autoAcceptTried.current = true
+    setSubmitting(true)
+    accept()
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setSubmitting(false))
   }, [user, info, done, authLoading])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -71,19 +71,20 @@ export default function PartnerInvitePage() {
     setSubmitting(true)
     try {
       if (mode === 'signup') {
-        if (name.trim().length < 2) throw new Error('Skriv dit navn.')
-        if (password.length < 6) throw new Error('Adgangskoden skal være mindst 6 tegn.')
-        const { error: signError, session } = await signUp(info.email, password, name.trim())
+        const res = await fetch('/api/household/partner-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, email, password, name }),
+        })
+        const body = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(body.error || 'Kunne ikke oprette kontoen.')
+        const { error: signError } = await signIn(email.trim(), password)
         if (signError) throw new Error(signError.message)
-        if (!session) {
-          setError('Tjek din e-mail og bekræft kontoen. Bagefter åbner du dette link igen.')
-          setSubmitting(false)
-          return
-        }
-      } else {
-        const { error: signError } = await signIn(info.email, password)
-        if (signError) throw new Error(signError.message)
+        setDone(true)
+        return
       }
+      const { error: signError } = await signIn(email.trim(), password)
+      if (signError) throw new Error(signError.message)
       await accept()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Der opstod en fejl.')
@@ -113,7 +114,7 @@ export default function PartnerInvitePage() {
             <div className="space-y-4">
               <p>
                 Du er nu partner-bruger til {info.inviterName}. I kan redigere i samme madplan, men
-                har hver jeres madlog. Log ind med <strong>{info.email}</strong>.
+                har hver jeres madlog.
               </p>
               <p className="text-sm text-gray-500">
                 Fortsæt i appen eller på{' '}
@@ -126,25 +127,28 @@ export default function PartnerInvitePage() {
           ) : (
             <>
               <p className="mb-6 text-gray-700">
-                {info.inviterName} har inviteret dig. Opret en ny, tom konto med denne e-mail. I
-                deler madplan og indkøb, men har hver jeres madlog.
+                {info.inviterName} har inviteret dig. Opret dit eget login her — du behøver ikke
+                vente på en bekræftelsesmail.
               </p>
-              {user && user.email?.toLowerCase() !== info.email.toLowerCase() ? (
+              {user ? (
                 <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
-                  Du er logget ind som {user.email}. Invitationen er til {info.email}.{' '}
+                  Du er logget ind som {user.email}.{' '}
                   <button type="button" className="underline" onClick={() => signOut()}>
                     Log ud
                   </button>{' '}
-                  og opret dig med den rigtige mail.
+                  hvis du vil oprette en ny partner-konto.
                 </div>
               ) : null}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium">E-mail</label>
                   <input
-                    value={info.email}
-                    readOnly
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-500"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3"
+                    autoComplete="email"
+                    required
                   />
                 </div>
                 {mode === 'signup' ? (
@@ -171,7 +175,7 @@ export default function PartnerInvitePage() {
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
                 <button
                   type="submit"
-                  disabled={submitting || authLoading}
+                  disabled={submitting || authLoading || Boolean(user)}
                   className="w-full rounded-xl bg-emerald-700 py-3 font-semibold text-white disabled:opacity-60"
                 >
                   {submitting

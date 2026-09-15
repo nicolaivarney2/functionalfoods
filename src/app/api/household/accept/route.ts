@@ -33,12 +33,6 @@ export async function POST(request: NextRequest) {
   }
 
   const userEmail = (user.email || '').trim().toLowerCase()
-  if (userEmail !== invite.email.trim().toLowerCase()) {
-    return NextResponse.json(
-      { error: 'Log ind eller opret dig med den e-mail, invitationen blev sendt til.' },
-      { status: 403 }
-    )
-  }
 
   const { data: profile } = await supabase
     .from('user_profiles')
