@@ -164,11 +164,7 @@ export async function POST(request: NextRequest) {
 
   const inviteUrl = partnerInviteUrl(token)
   const inviterName = displayNameFromUser(user)
-  after(() =>
-    sendPartnerInviteEmail({ toEmail: email, inviterName, inviteUrl }).then((mailed) => {
-      if (!mailed.ok) console.warn('partner invite email:', mailed.error)
-    })
-  )
+  after(() => sendPartnerInviteEmail({ toEmail: email, inviterName, inviteUrl }))
 
   return NextResponse.json({
     success: true,
