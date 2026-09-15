@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { displayNameFromUser, loadHouseholdForUser } from '@/lib/household-access'
 import { createSupabaseServiceClient } from '@/lib/supabase'
@@ -164,13 +164,17 @@ export async function POST(request: NextRequest) {
 
   const inviteUrl = partnerInviteUrl(token)
   const inviterName = displayNameFromUser(user)
-  const mailed = await sendPartnerInviteEmail({ toEmail: email, inviterName, inviteUrl })
+  after(() =>
+    sendPartnerInviteEmail({ toEmail: email, inviterName, inviteUrl }).then((mailed) => {
+      if (!mailed.ok) console.warn('partner invite email:', mailed.error)
+    })
+  )
 
   return NextResponse.json({
     success: true,
     inviteUrl,
     email,
-    emailSent: mailed.ok === true,
+    emailSent: false,
   })
 }
 

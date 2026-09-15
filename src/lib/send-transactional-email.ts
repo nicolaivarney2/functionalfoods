@@ -11,6 +11,7 @@
  */
 
 const LOOPS_TRANSACTIONAL_URL = 'https://app.loops.so/api/v1/transactional'
+const LOOPS_FETCH_MS = 8_000
 
 export type SendEmailResult = { ok: true; id?: string } | { ok: false; error: string }
 
@@ -42,9 +43,11 @@ export async function sendTransactionalEmail(input: {
   }
 
   let lastId: string | undefined
+  try {
   for (const email of recipients) {
     const res = await fetch(LOOPS_TRANSACTIONAL_URL, {
       method: 'POST',
+      signal: AbortSignal.timeout(LOOPS_FETCH_MS),
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -81,4 +84,12 @@ export async function sendTransactionalEmail(input: {
   }
 
   return { ok: true, id: lastId }
+  } catch (err) {
+    const timedOut =
+      err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    return {
+      ok: false,
+      error: timedOut ? 'Loops svarede ikke i tide' : err instanceof Error ? err.message : 'Loops-fejl',
+    }
+  }
 }
