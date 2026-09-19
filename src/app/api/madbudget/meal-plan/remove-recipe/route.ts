@@ -4,6 +4,7 @@ import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 import { loadHouseholdForUser } from '@/lib/household-access'
 import { clearLeftoversFromSource, type CookAheadGrid } from '@/lib/madbudget/cook-ahead'
+import { resolveHouseholdMealPlan } from '@/lib/madbudget/resolve-meal-plan'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -40,21 +41,34 @@ function parseMealPlanData(raw: unknown): {
   grid: Record<DayKey, Record<MealType, unknown | null>>
   slotLocks: Record<string, boolean>
 } {
-  if (!raw || typeof raw !== 'object') return { grid: emptyGrid(), slotLocks: {} }
+  const grid = emptyGrid()
+  if (!raw || typeof raw !== 'object') return { grid, slotLocks: {} }
   const o = raw as Record<string, unknown>
-  if ('grid' in o && o.grid && typeof o.grid === 'object') {
-    const g = o.grid as Record<string, unknown>
-    if (g.monday) {
-      return {
-        grid: o.grid as Record<DayKey, Record<MealType, unknown | null>>,
-        slotLocks: (o.slotLocks as Record<string, boolean>) ?? {},
+  const source =
+    'grid' in o && o.grid && typeof o.grid === 'object'
+      ? (o.grid as Record<string, unknown>)
+      : 'monday' in o || 'tuesday' in o
+        ? o
+        : null
+  if (source) {
+    for (const day of VALID_DAYS) {
+      const dayObj = source[day]
+      if (!dayObj || typeof dayObj !== 'object') continue
+      const d = dayObj as Record<string, unknown>
+      grid[day as DayKey] = {
+        breakfast: (d.breakfast as unknown) ?? null,
+        lunch: (d.lunch as unknown) ?? null,
+        dinner: (d.dinner as unknown) ?? null,
       }
     }
   }
-  if ('monday' in o) {
-    return { grid: raw as Record<DayKey, Record<MealType, unknown | null>>, slotLocks: {} }
+  return {
+    grid,
+    slotLocks:
+      o.slotLocks && typeof o.slotLocks === 'object'
+        ? { ...(o.slotLocks as Record<string, boolean>) }
+        : {},
   }
-  return { grid: emptyGrid(), slotLocks: {} }
 }
 
 export async function POST(request: NextRequest) {
@@ -72,6 +86,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const day = body.day as string | undefined
     const meal = (body.meal as string | undefined) ?? 'dinner'
+    const mealPlanId = typeof body.mealPlanId === 'string' ? body.mealPlanId : undefined
+    const weekStartDateArg =
+      typeof body.weekStartDate === 'string' ? body.weekStartDate : undefined
 
     if (!day || !VALID_DAYS.has(day)) {
       return NextResponse.json({ error: 'Invalid day' }, { status: 400 })
@@ -82,17 +99,13 @@ export async function POST(request: NextRequest) {
 
     const supabase = createSupabaseServiceClient()
 
-    // Fjern fra den aktive plan (den brugeren ser i appen).
-    const { data: plan, error: planError } = await supabase
-      .from('user_meal_plans')
-      .select('id, meal_plan_data')
-      .eq('user_id', ownerId)
-      .eq('is_active', true)
-      .order('week_start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (planError) {
+    let plan
+    try {
+      plan = await resolveHouseholdMealPlan(supabase, ownerId, {
+        mealPlanId,
+        weekStartDate: weekStartDateArg,
+      })
+    } catch (planError) {
       console.error('remove-recipe load:', planError)
       return NextResponse.json({ error: 'Failed to load meal plan' }, { status: 500 })
     }

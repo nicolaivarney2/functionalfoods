@@ -105,6 +105,8 @@ export async function rebuildShoppingListForUser(
       .select('shopping_list')
       .eq('user_id', userId)
       .eq('is_active', true)
+      .order('week_start_date', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     const availableIngredients = extractLeftoversFromShoppingList(activePlan?.shopping_list)
