@@ -14,22 +14,54 @@ function sanitizeDietFilter(value: string | null): string | null {
   return normalized
 }
 
+/** Liste-kort til appen. Uden slim er svaret ~4,6 MB og vælter Android-fetch. */
+function slimRecipeForList(recipe: Record<string, unknown>) {
+  return {
+    id: recipe.id,
+    slug: recipe.slug,
+    title: recipe.title,
+    status: recipe.status,
+    imageUrl: recipe.imageUrl ?? recipe.image,
+    image: recipe.imageUrl ?? recipe.image,
+    rating: recipe.rating,
+    reviewCount: recipe.reviewCount,
+    totalTime: recipe.totalTime,
+    preparationTime: recipe.preparationTime,
+    cookingTime: recipe.cookingTime,
+    prepTime: recipe.prepTime,
+    calories: recipe.calories,
+    protein: recipe.protein,
+    carbs: recipe.carbs,
+    fat: recipe.fat,
+    fiber: recipe.fiber,
+    mainCategory: recipe.mainCategory,
+    dietaryCategories: recipe.dietaryCategories,
+    pageViews: recipe.pageViews,
+    publishedAt: recipe.publishedAt,
+    updatedAt: recipe.updatedAt,
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const diet = sanitizeDietFilter(searchParams.get('diet'))
+    const slim = searchParams.get('slim') === '1' || searchParams.get('slim') === 'true'
 
     const allRecipes = await databaseService.getRecipes()
     const recipes = diet
       ? allRecipes.filter((recipe) => recipeMatchesDiet(recipe, diet))
       : allRecipes
+    const payload = slim
+      ? recipes.map((recipe) => slimRecipeForList(recipe as unknown as Record<string, unknown>))
+      : recipes
 
     const cacheControl = diet
       ? 'public, s-maxage=600, stale-while-revalidate=43200'
       : RECIPES_CACHE_CONTROL
 
     return NextResponse.json(
-      { success: true, recipes },
+      { success: true, recipes: payload },
       { headers: { 'Cache-Control': cacheControl } }
     )
   } catch (error) {
