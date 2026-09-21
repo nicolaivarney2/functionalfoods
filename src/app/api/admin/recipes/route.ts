@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const page = parseBoundedInt(searchParams.get('page'), 0, 0, 100_000)
     const limit = parseBoundedInt(searchParams.get('limit'), MAX_ADMIN_PAGE_SIZE, 1, MAX_ADMIN_PAGE_SIZE)
     const offset = page * limit
+    const lite = searchParams.get('lite') === '1' || searchParams.get('lite') === 'true'
     
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -55,10 +56,14 @@ export async function GET(request: NextRequest) {
       },
     })
     
-    // Use service role client to fetch recipes with pagination
+    // lite: kun felter til AI-generering (undgår 4–10 MB JSON og 413 Request Entity Too Large)
+    const selectCols = lite
+      ? 'id, title, description, dietaryCategories, ingredients'
+      : '*'
+
     const { data: recipes, error } = await supabase
       .from('recipes')
-      .select('*')
+      .select(selectCols)
       .order('updatedAt', { ascending: false })
       .range(offset, offset + limit - 1)
     

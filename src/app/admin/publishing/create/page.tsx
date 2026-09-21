@@ -171,6 +171,62 @@ interface FiveTwoParameters {
   dayType: '5' | '2'
 }
 
+function slimExistingRecipeForGenerate(r: any) {
+  const ingredients = Array.isArray(r?.ingredients)
+    ? r.ingredients.slice(0, 8).map((ing: any) =>
+        typeof ing === 'string' ? { name: ing } : { name: String(ing?.name || '') }
+      )
+    : []
+  const description = typeof r?.description === 'string' ? r.description.slice(0, 220) : ''
+  return {
+    id: r?.id,
+    title: r?.title || '',
+    description,
+    dietaryCategories: Array.isArray(r?.dietaryCategories)
+      ? r.dietaryCategories
+      : Array.isArray(r?.dietary_categories)
+        ? r.dietary_categories
+        : [],
+    ingredients,
+  }
+}
+
+async function readResponseBody(res: Response): Promise<unknown> {
+  const text = await res.text()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+function messageFromApiBody(parsed: unknown, status: number, fallback: string): string {
+  const asText = typeof parsed === 'string' ? parsed.replace(/\s+/g, ' ').trim() : ''
+  const looksTooLarge =
+    status === 413 ||
+    /^request entity too large/i.test(asText) ||
+    /entity too large/i.test(asText)
+
+  if (looksTooLarge) {
+    return 'Forespørgslen var for stor til serveren (typisk for mange eksisterende opskrifter). Prøv igen.'
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const err = 'error' in parsed ? (parsed as { error?: unknown }).error : null
+    const det = 'details' in parsed ? (parsed as { details?: unknown }).details : null
+    if (typeof err === 'string' && err.trim()) {
+      return typeof det === 'string' && det.trim() && det !== err ? `${err} (${det})` : err
+    }
+  }
+
+  if (asText) {
+    return `${fallback} (${asText.slice(0, 160)})`
+  }
+
+  return `${fallback} (${status})`
+}
+
 export default function CreateRecipePage() {
   const { isAdmin, checking } = useAdminAuth()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -438,16 +494,17 @@ export default function CreateRecipePage() {
         body: JSON.stringify(requestBody)
       })
 
+      const generatePayload = await readResponseBody(generateResponse)
       if (!generateResponse.ok) {
-        const errorData = await generateResponse.json()
-        const genMsg = errorData.error || 'Fejl ved generering af opskrift'
-        const genDet = typeof errorData.details === 'string' ? errorData.details : ''
         throw new Error(
-          genDet && genDet !== genMsg ? `${genMsg} (${genDet})` : genMsg
+          messageFromApiBody(generatePayload, generateResponse.status, 'Fejl ved generering af opskrift')
         )
       }
+      if (!generatePayload || typeof generatePayload !== 'object') {
+        throw new Error('Uventet svar fra serveren ved generering')
+      }
 
-      const recipeData = await generateResponse.json()
+      const recipeData = generatePayload as any
 
       setMidjourneyPrompt(
         typeof recipeData.midjourneyPrompt === 'string' ? recipeData.midjourneyPrompt : ''
@@ -595,20 +652,29 @@ export default function CreateRecipePage() {
   const loadExistingRecipes = async () => {
     const allRecipes = []
     let page = 0
-    const limit = 1000 // Supabase limit
-    
-    while (true) {
-      const response = await fetch(`/api/admin/recipes?page=${page}&limit=${limit}`)
-      const data = await response.json()
-      
-      if (!data.recipes || data.recipes.length === 0) break
-      
-      allRecipes.push(...data.recipes)
+    const limit = 80
+    const maxRecipes = 120
+
+    while (allRecipes.length < maxRecipes) {
+      const remaining = maxRecipes - allRecipes.length
+      const pageSize = Math.min(limit, remaining)
+      const response = await fetch(
+        `/api/admin/recipes?page=${page}&limit=${pageSize}&lite=1`
+      )
+      const data = await readResponseBody(response)
+      if (!response.ok) {
+        throw new Error(
+          messageFromApiBody(data, response.status, 'Kunne ikke hente eksisterende opskrifter')
+        )
+      }
+      const recipes = Array.isArray((data as any)?.recipes) ? (data as any).recipes : []
+      if (recipes.length === 0) break
+
+      allRecipes.push(...recipes.map(slimExistingRecipeForGenerate))
       page++
-      
-      if (data.recipes.length < limit) break // No more data
+      if (recipes.length < pageSize) break
     }
-    
+
     return allRecipes
   }
 

@@ -44,7 +44,7 @@ interface SenseParameters {
 
 interface GenerateRecipeRequest {
   categoryName: string
-  existingRecipes: ExistingRecipe[]
+  existingRecipes?: ExistingRecipe[]
   parameters?: SenseParameters
   sourceRecipe?: SourceRecipePayload | null
 }
@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
   try {
     const { categoryName, existingRecipes, parameters, sourceRecipe }: GenerateRecipeRequest =
       await request.json()
+    const existingList = Array.isArray(existingRecipes) ? existingRecipes : []
 
     if (!categoryName) {
       return NextResponse.json({ success: false, error: 'categoryName is required' }, { status: 400 })
@@ -79,12 +80,15 @@ export async function POST(request: NextRequest) {
       inspiration: '',
     }
     const resolvedMaaltid = params.maaltid ?? 'aftensmad'
-    const existingTitles = existingRecipes.map((r) => r.title.toLowerCase())
+    const existingTitles = existingList
+      .slice(0, 80)
+      .map((r) => (r.title || '').toLowerCase())
+      .filter(Boolean)
     const systemPrompt = createSenseSystemPrompt(existingTitles, resolvedMaaltid)
     const parameterInstructions = buildSenseParameterInstructions(params)
     const variationPrompt = buildRecipeVariationPrompt({
       niche: 'sense',
-      existingRecipes,
+      existingRecipes: existingList.slice(0, 80),
       mealType: params.maaltid,
       requestedRecipeType: params.recipeType,
       inspiration: params.inspiration,
