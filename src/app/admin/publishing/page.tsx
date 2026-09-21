@@ -113,7 +113,39 @@ export default function AdminPublishingPage() {
   const [rebuildingSenseGroups, setRebuildingSenseGroups] = useState(false)
   /** Sense: parallel med `editedIngredients` — spisekasse-rubrik pr. linje. */
   const [ingredientSenseGroups, setIngredientSenseGroups] = useState<string[]>([])
-  const lastInstructionFocusRef = useRef(0)
+  const instructionCaretRef = useRef({ index: 0, start: 0, end: 0 })
+  const instructionTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([])
+
+  const rememberInstructionCaret = (index: number, el: HTMLTextAreaElement) => {
+    instructionCaretRef.current = {
+      index,
+      start: el.selectionStart ?? el.value.length,
+      end: el.selectionEnd ?? el.selectionStart ?? el.value.length,
+    }
+  }
+
+  const insertIngredientTagAtCaret = (tag: string) => {
+    const caret = instructionCaretRef.current
+    setEditedInstructions((prev) => {
+      if (!prev.length) return prev
+      const safeIndex = Math.min(Math.max(caret.index, 0), prev.length - 1)
+      const current = String(prev[safeIndex].instruction || '')
+      const start = Math.min(Math.max(caret.start, 0), current.length)
+      const end = Math.min(Math.max(caret.end, start), current.length)
+      const next = `${current.slice(0, start)}${tag}${current.slice(end)}`
+      const updated = [...prev]
+      updated[safeIndex] = { ...prev[safeIndex], instruction: next }
+      const newPos = start + tag.length
+      instructionCaretRef.current = { index: safeIndex, start: newPos, end: newPos }
+      queueMicrotask(() => {
+        const el = instructionTextareaRefs.current[safeIndex]
+        if (!el) return
+        el.focus()
+        el.setSelectionRange(newPos, newPos)
+      })
+      return updated
+    })
+  }
 
   useEffect(() => {
     loadRecipes()
@@ -2210,7 +2242,7 @@ export default function AdminPublishingPage() {
                 <p className="text-sm text-gray-600 mb-4">
                   Skriv <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">[[ing:valnødder]]</code> — ikke statiske gram.
                   Mængden kommer fra listen og skalerer med portioner (2 pers. → 25 g, 4 pers. → 50 g).
-                  Klik på en ingrediens til højre for at indsætte tagget i det trin, du redigerer.
+                  Klik på en ingrediens til højre for at indsætte tagget der, hvor markøren står.
                 </p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4 mb-6">
@@ -2229,12 +2261,17 @@ export default function AdminPublishingPage() {
                         </div>
                         <div className="flex-1">
                           <textarea
+                            ref={(el) => {
+                              instructionTextareaRefs.current[index] = el
+                            }}
                             rows={3}
                             value={instruction.instruction || ''}
-                            onFocus={() => {
-                              lastInstructionFocusRef.current = index
-                            }}
+                            onFocus={(e) => rememberInstructionCaret(index, e.currentTarget)}
+                            onSelect={(e) => rememberInstructionCaret(index, e.currentTarget)}
+                            onKeyUp={(e) => rememberInstructionCaret(index, e.currentTarget)}
+                            onClick={(e) => rememberInstructionCaret(index, e.currentTarget)}
                             onChange={(e) => {
+                              rememberInstructionCaret(index, e.currentTarget)
                               const updated = [...editedInstructions]
                               updated[index] = { ...instruction, instruction: e.target.value }
                               setEditedInstructions(updated)
@@ -2276,20 +2313,8 @@ export default function AdminPublishingPage() {
                         <button
                           key={ing.rowId || ing.id || i}
                           type="button"
-                          onClick={() => {
-                            const idx = lastInstructionFocusRef.current
-                            setEditedInstructions((prev) => {
-                              if (!prev.length) return prev
-                              const safeIndex = Math.min(Math.max(idx, 0), prev.length - 1)
-                              const current = String(prev[safeIndex].instruction || '')
-                              const next = current
-                                ? `${current.replace(/\s+$/, '')} ${tag}`
-                                : tag
-                              const updated = [...prev]
-                              updated[safeIndex] = { ...prev[safeIndex], instruction: next }
-                              return updated
-                            })
-                          }}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => insertIngredientTagAtCaret(tag)}
                           className="w-full text-left rounded-md px-2 py-1.5 text-sm text-gray-800 hover:bg-white hover:ring-1 hover:ring-blue-200"
                         >
                           <span className="block">{formatPublishingIngredientLine(ing)}</span>
