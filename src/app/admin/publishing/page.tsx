@@ -15,6 +15,12 @@ import {
   recipeHasSenseSpisekasse,
   senseGroupAssignmentsFromRecipeGroups,
 } from '@/lib/sense-spisekasse'
+import { formatIngredientQuantityLabel } from '@/lib/recipe-ingredient-amount'
+import {
+  collectRecipeIngredients,
+  instructionTextForAdminEdit,
+  instructionsForAdminEdit,
+} from '@/lib/recipe-ingredient-tags'
 import { Pencil, Plus, X } from 'lucide-react'
 
 interface RecipeWithTips extends Recipe {
@@ -28,6 +34,24 @@ interface Schedule {
   scheduledDate: Date
   status: 'scheduled' | 'published'
   scheduledTime?: string
+}
+
+function formatPublishingIngredientLine(ing: {
+  amount?: number
+  unit?: string
+  name?: string
+  notes?: string | null
+}): string {
+  const label = formatIngredientQuantityLabel(
+    {
+      amount: Number(ing.amount) || 0,
+      unit: String(ing.unit || ''),
+      name: String(ing.name || '').trim(),
+    },
+    1
+  )
+  const notes = String(ing.notes || '').trim()
+  return notes ? `${label} — ${notes}` : label
 }
 
 export default function AdminPublishingPage() {
@@ -428,8 +452,13 @@ export default function AdminPublishingPage() {
             typeof ing.id === 'string' && String(ing.id).trim().length > 0
               ? String(ing.id)
               : crypto.randomUUID()
+          const rowId =
+            typeof ing.rowId === 'string' && String(ing.rowId).trim().length > 0
+              ? String(ing.rowId)
+              : undefined
           return {
             id,
+            ...(rowId ? { rowId } : {}),
             name: String(ing.name ?? ''),
             amount: Number(ing.amount) || 0,
             unit: String(ing.unit ?? ''),
@@ -1519,8 +1548,13 @@ export default function AdminPublishingPage() {
                           </button>
                           <button
                             onClick={() => {
-                              // Sørg for at instruktioner er sat før modal åbnes
-                              setEditedInstructions(selectedRecipe.instructions || [])
+                              const ingredients = collectRecipeIngredients(selectedRecipe)
+                              setEditedInstructions(
+                                instructionsForAdminEdit(
+                                  selectedRecipe.instructions || [],
+                                  ingredients
+                                )
+                              )
                               setEditingInstructions(true)
                             }}
                             className="text-blue-600 hover:text-blue-700 text-sm"
@@ -1529,9 +1563,63 @@ export default function AdminPublishingPage() {
                           </button>
                         </div>
                       </div>
-                      <div className="text-sm text-gray-600">
-                        <p>Ingredienser: {selectedRecipe.ingredients?.length || 0} stk</p>
-                        <p>Fremgangsmåde: {selectedRecipe.instructions?.length || 0} steps</p>
+                      <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm text-gray-800">
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <p className="font-medium text-gray-900 mb-2">
+                            Ingredienser ({collectRecipeIngredients(selectedRecipe).length})
+                          </p>
+                          {recipeHasSenseSpisekasse(selectedRecipe) &&
+                          selectedRecipe.ingredientGroups?.length ? (
+                            <div className="space-y-3">
+                              {selectedRecipe.ingredientGroups.map((group, gi) => (
+                                <div key={group.id || group.name || gi}>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-purple-800 mb-1">
+                                    {group.name}
+                                  </p>
+                                  <ol className="space-y-1 list-decimal list-inside">
+                                    {(group.ingredients || []).map((ing, ii) => (
+                                      <li key={ing.rowId || ing.id || `${gi}-${ii}`}>
+                                        {formatPublishingIngredientLine(ing)}
+                                      </li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              ))}
+                            </div>
+                          ) : collectRecipeIngredients(selectedRecipe).length > 0 ? (
+                            <ol className="space-y-1 list-decimal list-inside">
+                              {collectRecipeIngredients(selectedRecipe).map((ing, i) => (
+                                <li key={ing.rowId || ing.id || i}>{formatPublishingIngredientLine(ing)}</li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <p className="text-gray-500 italic">Ingen ingredienser.</p>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <p className="font-medium text-gray-900 mb-2">
+                            Fremgangsmåde ({selectedRecipe.instructions?.length || 0})
+                          </p>
+                          {selectedRecipe.instructions?.length ? (
+                            <ol className="space-y-2">
+                              {selectedRecipe.instructions.map((step, i) => (
+                                <li key={step.id || i} className="flex gap-2">
+                                  <span className="flex-shrink-0 w-5 h-5 mt-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold flex items-center justify-center">
+                                    {step.stepNumber || i + 1}
+                                  </span>
+                                  <span className="leading-relaxed">
+                                    {instructionTextForAdminEdit(
+                                      step.instruction,
+                                      collectRecipeIngredients(selectedRecipe)
+                                    )}
+                                  </span>
+                                </li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <p className="text-gray-500 italic">Ingen trin.</p>
+                          )}
+                        </div>
                       </div>
                       {selectedRecipe.dietaryCategories?.some(
                         (c) => String(c).toLowerCase() === 'sense'
@@ -2100,9 +2188,9 @@ export default function AdminPublishingPage() {
         {/* Edit Instructions Modal */}
         {editingInstructions && selectedRecipe && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-2">
                   <h2 className="text-2xl font-bold text-gray-900">
                     Rediger Fremgangsmåde - {selectedRecipe.title}
                   </h2>
@@ -2116,8 +2204,13 @@ export default function AdminPublishingPage() {
                     <X size={24} />
                   </button>
                 </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Skriv som læseren skal se det (fx «Bland pastaskruer med pesto»). Brug navnene fra listen til højre.
+                  Ved gem bindes de automatisk til ingredienserne, så mængder vises rigtigt på opskriften.
+                </p>
 
-                <div className="space-y-3 mb-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 mb-6">
+                <div className="space-y-3">
                   {editedInstructions.map((instruction, index) => (
                     <div key={index} className="p-3 border border-gray-200 rounded-lg">
                       <div className="flex items-start gap-3">
@@ -2153,6 +2246,17 @@ export default function AdminPublishingPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+                <aside className="rounded-lg border border-gray-200 bg-gray-50 p-3 h-fit lg:sticky lg:top-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                    Ingredienser
+                  </p>
+                  <ol className="space-y-1.5 text-sm text-gray-800 list-decimal list-inside">
+                    {collectRecipeIngredients(selectedRecipe).map((ing, i) => (
+                      <li key={ing.rowId || ing.id || i}>{formatPublishingIngredientLine(ing)}</li>
+                    ))}
+                  </ol>
+                </aside>
                 </div>
 
                 <div className="flex gap-3">

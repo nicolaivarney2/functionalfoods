@@ -568,6 +568,67 @@ export function expandIngredientTagsInInstruction(
     .trim()
 }
 
+function tidyAdminInstructionProse(text: string): string {
+  return text
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+,/g, ',')
+    .replace(/,(?:\s*,)+/g, ',')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s+([.,;:!?])/g, '$1')
+    .replace(/^[,.\s]+/, '')
+    .trim()
+}
+
+/**
+ * Læsbar fremgangsmåde til admin-redigering: `{{ing:rowId}}` / `[[ing:navn]]`
+ * bliver til den tekst læseren ser (fx "150 g pastaskruer"). Forældreløse
+ * UUID-tags efter omskrevet ingrediensliste fjernes, så feltet ikke er sort.
+ * Ved gem kører `linkIngredientTagsInInstructions` og binder navnene igen.
+ */
+export function instructionTextForAdminEdit(
+  instruction: string,
+  ingredients: LinkableIngredient[],
+  multiplier = 1
+): string {
+  let text = String(instruction || '')
+  if (!text) return ''
+
+  // `[[:{{ing:id}}]]` / `[[{{ing:id}}]]` → gemt tag
+  text = text.replace(/\[\[:?(\{\{ing:[^}]+\}\})\]\]/g, '$1')
+
+  text = text.replace(INGREDIENT_TAG_REGEX, (_full, id: string) => {
+    const ingredient = resolveTaggedIngredient(String(id || ''), ingredients)
+    if (!ingredient) return ''
+    return formatIngredientTagLabel(ingredient, multiplier)
+  })
+
+  text = text.replace(INGREDIENT_NAME_TAG_REGEX, (_full, rawName: string) => {
+    const found = findIngredientByName(String(rawName || ''), ingredients)
+    if (found) return formatIngredientTagLabel(found, multiplier)
+    return String(rawName || '')
+      .trim()
+      .replace(/#\d+$/, '')
+      .trim()
+  })
+
+  // Efterladte `[[roastbeef]` / `[[roastbeef]]`
+  text = text.replace(/\[\[([^\]]*)\]\]?/g, '$1')
+
+  return tidyAdminInstructionProse(text)
+}
+
+export function instructionsForAdminEdit<T extends { instruction: string }>(
+  steps: T[] | null | undefined,
+  ingredients: LinkableIngredient[],
+  multiplier = 1
+): T[] {
+  if (!Array.isArray(steps)) return []
+  return steps.map((step) => ({
+    ...step,
+    instruction: instructionTextForAdminEdit(step.instruction, ingredients, multiplier),
+  }))
+}
+
 export function expandIngredientTagsInSteps(
   steps: RecipeStep[],
   ingredients: LinkableIngredient[],
