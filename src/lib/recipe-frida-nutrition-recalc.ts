@@ -224,7 +224,7 @@ export async function calculateNutritionFromIngredientLines(
   servings = 1
 ): Promise<IngredientNutritionResult> {
   const supabase = createSupabaseServiceClient()
-  const matcher = new FridaDTUMatcher()
+  const matcher = new FridaDTUMatcher(supabase)
   const safeServings = Math.max(1, Number(servings) || 1)
 
   let totalCalories = 0

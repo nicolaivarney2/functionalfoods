@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { householdGramsFromMap, householdGramsFromName } from '@/lib/frida-household-units'
 
@@ -25,13 +26,16 @@ interface NutritionalInfo {
   fiber: number
   vitamins: Record<string, number>
   minerals: Record<string, number>
+  householdUnits?: Record<string, number>
+  name?: string
 }
 
 export class FridaDTUMatcher {
   private ingredientCache: Map<string, NutritionalInfo> = new Map()
-  
-  constructor() {
-    // Supabase connection is ready to use
+  private client: SupabaseClient
+
+  constructor(client?: SupabaseClient) {
+    this.client = client ?? supabase
   }
 
   /**
@@ -47,17 +51,17 @@ export class FridaDTUMatcher {
       console.log(`🔍 Looking for manual match for: ${ingredientName}`)
       
       // Use singleton Supabase client
-      const { data, error } = await supabase
-        .from('frida_ingredients')
-        .select('*')
-        .ilike('name', `%${ingredientName}%`)
-        .limit(1)
-        .single()
-      
-      if (error) {
-        console.log(`❌ No manual match found for: ${ingredientName}`)
-        return null
-      }
+        const { data, error } = await this.client
+          .from('frida_ingredients')
+          .select('*')
+          .ilike('name', `%${ingredientName}%`)
+          .limit(1)
+          .maybeSingle()
+
+        if (error || !data) {
+          console.log(`❌ No manual match found for: ${ingredientName}`)
+          return null
+        }
       
       console.log(`✅ Manual match found: ${data.name}`)
       
@@ -96,7 +100,7 @@ export class FridaDTUMatcher {
       console.log(`🔍 Searching for: "${term}" in frida_ingredients`)
 
       const fetchByPattern = async (pattern: string) => {
-        const { data, error } = await supabase
+        const { data, error } = await this.client
           .from('frida_ingredients')
           .select('id, name, category')
           .ilike('name', `%${pattern}%`)
@@ -111,13 +115,22 @@ export class FridaDTUMatcher {
 
       let data = await fetchByPattern(term)
 
+      const words = term
+        .split(/[\s,/%]+/)
+        .filter((w) => w.length >= 3 && !/^\d+$/.test(w))
+
+      // "mørk chokolade" skal ramme "Chokolade  mørk" — kræv alle væsentlige ord.
+      if (!data.length && words.length >= 2) {
+        let q = this.client.from('frida_ingredients').select('id, name, category').limit(20)
+        for (const w of words) q = q.ilike('name', `%${w}%`)
+        const res = await q
+        if (!res.error && res.data?.length) data = res.data
+      }
+
       // Flere ord / komma: prøv enkeltord — længste ord først (fx "hakkede tomater" → "tomater" før "hakkede")
       if (!data.length) {
-        const words = term
-          .split(/[\s,]+/)
-          .filter((w) => w.length >= 3)
-          .sort((a, b) => b.length - a.length)
-        for (const w of words) {
+        const sorted = [...words].sort((a, b) => b.length - a.length)
+        for (const w of sorted) {
           if (w === term) continue
           data = await fetchByPattern(w)
           if (data.length) break
@@ -239,7 +252,7 @@ export class FridaDTUMatcher {
    */
   private async getNutritionalValues(foodId: number): Promise<FridaNutritionValue[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await this.client
         .from('frida_nutrition_values')
         .select('food_id, parameter_id, parameter_name_da, parameter_name_en, value, sort_key')
         .eq('food_id', foodId)
@@ -258,11 +271,38 @@ export class FridaDTUMatcher {
   }
 
   /**
-   * Get nutritional info for a specific food ID from Supabase
+   * Næring pr. 100 g. Primær kilde er `frida_ingredients` (kalorier/makro ligger der).
+   * `frida_nutrition_values` er et ufuldstændigt dump og må ikke være eneste kilde.
    */
   private async getNutritionalInfo(foodId: number): Promise<NutritionalInfo | null> {
+    const { data, error } = await this.client
+      .from('frida_ingredients')
+      .select('name, calories, protein, carbs, fat, fiber, vitamins, minerals, household_units')
+      .eq('id', `frida-${foodId}`)
+      .maybeSingle()
+
+    if (!error && data) {
+      const calories = Number(data.calories) || 0
+      const protein = Number(data.protein) || 0
+      const carbs = Number(data.carbs) || 0
+      const fat = Number(data.fat) || 0
+      const fiber = Number(data.fiber) || 0
+      if (calories > 0 || protein > 0 || carbs > 0 || fat > 0) {
+        return {
+          calories,
+          protein,
+          carbs,
+          fat,
+          fiber,
+          vitamins: (data.vitamins as Record<string, number>) || {},
+          minerals: (data.minerals as Record<string, number>) || {},
+          householdUnits: (data.household_units as Record<string, number>) || {},
+          name: String(data.name || ''),
+        }
+      }
+    }
+
     const nutritionValues = await this.getNutritionalValues(foodId)
-    
     if (nutritionValues.length === 0) return null
 
     const nutrition: NutritionalInfo = {
@@ -455,7 +495,7 @@ export class FridaDTUMatcher {
       console.log(`⚖️ Getting scale factor for: ${ingredientName} (${targetAmount} ${targetUnit})`)
       
       // Use singleton Supabase client
-      const { data, error } = await supabase
+      const { data, error } = await this.client
         .from('frida_ingredients')
         .select('*')
         .ilike('name', `%${ingredientName}%`)
