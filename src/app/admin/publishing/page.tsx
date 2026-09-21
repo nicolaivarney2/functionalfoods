@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ChangeEvent, useMemo } from 'react'
+import { useState, useEffect, ChangeEvent, useMemo, useRef } from 'react'
 import type { IngredientGroup, Recipe } from '@/types/recipe'
 import AutoPublisher from '@/components/AutoPublisher'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
@@ -18,8 +18,10 @@ import {
 import { formatIngredientQuantityLabel } from '@/lib/recipe-ingredient-amount'
 import {
   collectRecipeIngredients,
-  instructionTextForAdminEdit,
+  expandIngredientTagsInInstruction,
+  ingredientNameTagForLine,
   instructionsForAdminEdit,
+  linkIngredientTagsInText,
 } from '@/lib/recipe-ingredient-tags'
 import { Pencil, Plus, X } from 'lucide-react'
 
@@ -111,6 +113,7 @@ export default function AdminPublishingPage() {
   const [rebuildingSenseGroups, setRebuildingSenseGroups] = useState(false)
   /** Sense: parallel med `editedIngredients` — spisekasse-rubrik pr. linje. */
   const [ingredientSenseGroups, setIngredientSenseGroups] = useState<string[]>([])
+  const lastInstructionFocusRef = useRef(0)
 
   useEffect(() => {
     loadRecipes()
@@ -1608,7 +1611,7 @@ export default function AdminPublishingPage() {
                                     {step.stepNumber || i + 1}
                                   </span>
                                   <span className="leading-relaxed">
-                                    {instructionTextForAdminEdit(
+                                    {expandIngredientTagsInInstruction(
                                       step.instruction,
                                       collectRecipeIngredients(selectedRecipe)
                                     )}
@@ -2205,13 +2208,20 @@ export default function AdminPublishingPage() {
                   </button>
                 </div>
                 <p className="text-sm text-gray-600 mb-4">
-                  Skriv som læseren skal se det (fx «Bland pastaskruer med pesto»). Brug navnene fra listen til højre.
-                  Ved gem bindes de automatisk til ingredienserne, så mængder vises rigtigt på opskriften.
+                  Skriv <code className="rounded bg-gray-100 px-1 py-0.5 text-xs">[[ing:valnødder]]</code> — ikke statiske gram.
+                  Mængden kommer fra listen og skalerer med portioner (2 pers. → 25 g, 4 pers. → 50 g).
+                  Klik på en ingrediens til højre for at indsætte tagget i det trin, du redigerer.
                 </p>
 
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 mb-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4 mb-6">
                 <div className="space-y-3">
-                  {editedInstructions.map((instruction, index) => (
+                  {editedInstructions.map((instruction, index) => {
+                    const recipeIngredients = collectRecipeIngredients(selectedRecipe)
+                    const preview = expandIngredientTagsInInstruction(
+                      linkIngredientTagsInText(String(instruction.instruction || ''), recipeIngredients),
+                      recipeIngredients
+                    )
+                    return (
                     <div key={index} className="p-3 border border-gray-200 rounded-lg">
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-bold">
@@ -2221,19 +2231,26 @@ export default function AdminPublishingPage() {
                           <textarea
                             rows={3}
                             value={instruction.instruction || ''}
+                            onFocus={() => {
+                              lastInstructionFocusRef.current = index
+                            }}
                             onChange={(e) => {
                               const updated = [...editedInstructions]
                               updated[index] = { ...instruction, instruction: e.target.value }
                               setEditedInstructions(updated)
                             }}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Skriv instruktion..."
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                            placeholder="Tilsæt [[ing:valnødder]] og rør rundt…"
                           />
+                          {preview ? (
+                            <p className="mt-1.5 text-xs text-gray-500">
+                              Ved {selectedRecipe.servings || 2} pers.: {preview}
+                            </p>
+                          ) : null}
                         </div>
                         <button
                           onClick={() => {
                             const updated = editedInstructions.filter((_, i) => i !== index)
-                            // Re-number steps
                             updated.forEach((inst, i) => {
                               inst.stepNumber = i + 1
                             })
@@ -2245,17 +2262,42 @@ export default function AdminPublishingPage() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
                 <aside className="rounded-lg border border-gray-200 bg-gray-50 p-3 h-fit lg:sticky lg:top-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                    Ingredienser
+                    Indsæt ingrediens-tag
                   </p>
-                  <ol className="space-y-1.5 text-sm text-gray-800 list-decimal list-inside">
-                    {collectRecipeIngredients(selectedRecipe).map((ing, i) => (
-                      <li key={ing.rowId || ing.id || i}>{formatPublishingIngredientLine(ing)}</li>
-                    ))}
-                  </ol>
+                  <div className="space-y-1">
+                    {collectRecipeIngredients(selectedRecipe).map((ing, i, list) => {
+                      const tag = ingredientNameTagForLine(list, i)
+                      return (
+                        <button
+                          key={ing.rowId || ing.id || i}
+                          type="button"
+                          onClick={() => {
+                            const idx = lastInstructionFocusRef.current
+                            setEditedInstructions((prev) => {
+                              if (!prev.length) return prev
+                              const safeIndex = Math.min(Math.max(idx, 0), prev.length - 1)
+                              const current = String(prev[safeIndex].instruction || '')
+                              const next = current
+                                ? `${current.replace(/\s+$/, '')} ${tag}`
+                                : tag
+                              const updated = [...prev]
+                              updated[safeIndex] = { ...prev[safeIndex], instruction: next }
+                              return updated
+                            })
+                          }}
+                          className="w-full text-left rounded-md px-2 py-1.5 text-sm text-gray-800 hover:bg-white hover:ring-1 hover:ring-blue-200"
+                        >
+                          <span className="block">{formatPublishingIngredientLine(ing)}</span>
+                          <span className="block font-mono text-[11px] text-blue-700">{tag}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
                 </aside>
                 </div>
 

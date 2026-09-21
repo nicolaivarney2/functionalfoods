@@ -579,16 +579,44 @@ function tidyAdminInstructionProse(text: string): string {
     .trim()
 }
 
+function displayNameForIngredientTag(ingredient: Pick<LinkableIngredient, 'name'>): string {
+  return String(ingredient.name || '')
+    .trim()
+    .split(',')[0]
+    ?.trim() || ''
+}
+
+/** AI/admin-tag: `[[ing:valnødder]]` eller `[[ing:smør#2]]` ved dubletter. */
+export function ingredientNameTagForLine(
+  ingredients: LinkableIngredient[],
+  index: number
+): string {
+  const ingredient = ingredients[index]
+  if (!ingredient) return ''
+  const name = displayNameForIngredientTag(ingredient)
+  if (!name) return ''
+  const occurrence = duplicateNameOccurrenceIndex(ingredients, index)
+  return occurrence ? `[[ing:${name}#${occurrence}]]` : `[[ing:${name}]]`
+}
+
+function nameTagForStoredIngredientId(id: string, ingredients: LinkableIngredient[]): string {
+  const found = resolveTaggedIngredient(id, ingredients)
+  if (!found) return ''
+  const tagId = ingredientTagId(found)
+  const index = ingredients.findIndex((ingredient) => ingredientTagId(ingredient) === tagId)
+  if (index >= 0) return ingredientNameTagForLine(ingredients, index)
+  const name = displayNameForIngredientTag(found)
+  return name ? `[[ing:${name}]]` : ''
+}
+
 /**
- * Læsbar fremgangsmåde til admin-redigering: `{{ing:rowId}}` / `[[ing:navn]]`
- * bliver til den tekst læseren ser (fx "150 g pastaskruer"). Forældreløse
- * UUID-tags efter omskrevet ingrediensliste fjernes, så feltet ikke er sort.
- * Ved gem kører `linkIngredientTagsInInstructions` og binder navnene igen.
+ * Admin-redigering: gemte `{{ing:rowId}}` vises som `[[ing:valnødder]]`.
+ * Mængden står kun i ingredienslisten og skalerer med portioner ved visning.
+ * Forældreløse UUID-tags (efter slettede linjer) fjernes.
  */
 export function instructionTextForAdminEdit(
   instruction: string,
-  ingredients: LinkableIngredient[],
-  multiplier = 1
+  ingredients: LinkableIngredient[]
 ): string {
   let text = String(instruction || '')
   if (!text) return ''
@@ -596,36 +624,30 @@ export function instructionTextForAdminEdit(
   // `[[:{{ing:id}}]]` / `[[{{ing:id}}]]` → gemt tag
   text = text.replace(/\[\[:?(\{\{ing:[^}]+\}\})\]\]/g, '$1')
 
-  text = text.replace(INGREDIENT_TAG_REGEX, (_full, id: string) => {
-    const ingredient = resolveTaggedIngredient(String(id || ''), ingredients)
-    if (!ingredient) return ''
-    return formatIngredientTagLabel(ingredient, multiplier)
-  })
+  text = text.replace(INGREDIENT_TAG_REGEX, (_full, id: string) =>
+    nameTagForStoredIngredientId(String(id || ''), ingredients)
+  )
 
-  text = text.replace(INGREDIENT_NAME_TAG_REGEX, (_full, rawName: string) => {
+  // `[[valnødder]]` / `[[valnødder]` uden `ing:` → rigtigt navne-tag
+  text = text.replace(/\[\[(?!ing:)([^\]]+?)\]\]?/gi, (_full, rawName: string) => {
     const found = findIngredientByName(String(rawName || ''), ingredients)
-    if (found) return formatIngredientTagLabel(found, multiplier)
-    return String(rawName || '')
-      .trim()
-      .replace(/#\d+$/, '')
-      .trim()
+    if (!found) return String(rawName || '').trim()
+    const tagId = ingredientTagId(found)
+    const index = ingredients.findIndex((ingredient) => ingredientTagId(ingredient) === tagId)
+    return index >= 0 ? ingredientNameTagForLine(ingredients, index) : `[[ing:${displayNameForIngredientTag(found)}]]`
   })
-
-  // Efterladte `[[roastbeef]` / `[[roastbeef]]`
-  text = text.replace(/\[\[([^\]]*)\]\]?/g, '$1')
 
   return tidyAdminInstructionProse(text)
 }
 
 export function instructionsForAdminEdit<T extends { instruction: string }>(
   steps: T[] | null | undefined,
-  ingredients: LinkableIngredient[],
-  multiplier = 1
+  ingredients: LinkableIngredient[]
 ): T[] {
   if (!Array.isArray(steps)) return []
   return steps.map((step) => ({
     ...step,
-    instruction: instructionTextForAdminEdit(step.instruction, ingredients, multiplier),
+    instruction: instructionTextForAdminEdit(step.instruction, ingredients),
   }))
 }
 
