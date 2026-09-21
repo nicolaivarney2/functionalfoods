@@ -407,9 +407,6 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < productExternalIds.length; i += chunkSize) {
       const chunk = productExternalIds.slice(i, i + chunkSize)
       const fooddataChunk = chunk.filter((id) => isFooddataProductExternalId(id))
-      const legacyChunk = isGomaLegacyDataEnabled()
-        ? chunk.filter((id) => !isFooddataProductExternalId(id))
-        : []
 
       if (fooddataChunk.length > 0) {
         const { data: byId } = await supabase
@@ -421,21 +418,6 @@ export async function POST(request: NextRequest) {
             row.id,
             resolveProductOrganicTags(row.organic_tags)
           )
-        })
-      }
-
-      if (legacyChunk.length > 0) {
-        const { data: byExternal } = await supabase
-          .from('products')
-          .select('external_id, organic_tags')
-          .in('external_id', legacyChunk)
-        byExternal?.forEach((row) => {
-          if (row.external_id) {
-            productOrganicTagsMap.set(
-              row.external_id,
-              resolveProductOrganicTags(row.organic_tags)
-            )
-          }
         })
       }
     }
@@ -512,69 +494,7 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        const legacyChunk = isGomaLegacyDataEnabled()
-          ? chunk.filter((id) => !isFooddataProductExternalId(id))
-          : []
-        const { data: products, error: productsError } = legacyChunk.length > 0
-          ? await supabase
-              .from('products')
-              .select('id, external_id, amount, unit')
-              .in('external_id', legacyChunk)
-          : { data: [], error: null }
-
-        if (!productsError && products && products.length > 0) {
-          const productIdToExternalId = new Map<string, string>()
-          const productIdToAmount = new Map<string, { amount: string | null; unit: string | null }>()
-          products.forEach((p) => {
-            productIdToExternalId.set(p.id, p.external_id)
-            productIdToAmount.set(p.id, { amount: p.amount, unit: p.unit })
-          })
-
-          const productIds = Array.from(productIdToExternalId.keys())
-          if (productIds.length > 0) {
-            const { data: offers, error: offersError } = await supabase
-              .from('product_offers')
-              .select(`
-              id,
-              product_id,
-              store_id,
-              name_store,
-              current_price,
-              normal_price,
-              is_on_sale,
-              is_offer_active,
-              discount_percentage,
-              is_available,
-              amount,
-              unit
-            `)
-              .in('product_id', productIds)
-              .in('store_id', dbStoreIds)
-              .eq('is_available', true)
-
-            if (!offersError && offers) {
-              localTotal += offers.length
-              offers.forEach((offer) => {
-                const externalId = productIdToExternalId.get(offer.product_id)
-                if (!externalId) return
-
-                if (!localMap.has(externalId)) {
-                  localMap.set(externalId, [])
-                }
-
-                const amountInfo = productIdToAmount.get(offer.product_id)
-                localMap.get(externalId)!.push({
-                  ...offer,
-                  product_external_id: externalId,
-                  store_id: canonicalStoreKey(String(offer.store_id || '')),
-                  amount: amountInfo?.amount ?? offer.amount,
-                  unit: amountInfo?.unit ?? offer.unit,
-                })
-              })
-            }
-          }
-        }
-
+        // products.external_id findes ikke — legacy Goma slås op via store_product_id.
         if (isGomaLegacyDataEnabled()) {
           const legacyStoreProductChunk = chunk.filter((id) => !isFooddataProductExternalId(id))
           if (legacyStoreProductChunk.length > 0) {
