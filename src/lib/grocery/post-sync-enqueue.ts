@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
 import type { SourceChain } from '@/grocery/types'
 import { enqueueUnmatchedFooddataProducts } from '@/lib/product-match-queue'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
@@ -61,8 +62,11 @@ export async function loadProductIdsCreatedSince(
       query = query.in('source_chain', sourceChains as SourceChain[])
     }
 
-    const { data, error } = await query
-    if (error) throw error
+    const { data } = await retryGroceryDb('enqueue load new product ids', async () => {
+      const res = await query
+      if (res.error) throw new Error(groceryDbErrorMessage(res.error))
+      return res
+    })
     if (!data?.length) break
 
     for (const row of data) {

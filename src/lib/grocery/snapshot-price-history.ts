@@ -1,5 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
+import {
+  groceryDbErrorMessage,
+  isTransientGatewayError,
+  retryGroceryDb,
+} from '@/grocery/db/retry'
 
 const RPC_BATCH = 1500
 const REST_PAGE = 400
@@ -16,6 +20,10 @@ function sleep(ms: number): Promise<void> {
 
 function isTimeout(err: unknown): boolean {
   return /timeout|57014|canceling statement|upstream request/i.test(groceryDbErrorMessage(err))
+}
+
+function shouldShrinkBatch(err: unknown): boolean {
+  return isTimeout(err) || isTransientGatewayError(err)
 }
 
 /** Function truly absent from PostgREST schema cache (PGRST202). */
@@ -50,11 +58,11 @@ async function listStoreIds(supabase: SupabaseClient): Promise<string[]> {
     .filter((id): id is string => Boolean(id))
   if (ids.length > 0) return ids
 
-  const { data: offers, error: offerErr } = await supabase
-    .from('product_offers')
-    .select('store_id')
-    .limit(5000)
-  if (offerErr) throw new Error(offerErr.message)
+  const { data: offers } = await retryGroceryDb('list offer store ids', async () => {
+    const res = await supabase.from('product_offers').select('store_id').limit(5000)
+    if (res.error) throw new Error(groceryDbErrorMessage(res.error))
+    return res
+  })
   return [...new Set((offers ?? []).map((r) => r.store_id).filter(Boolean))]
 }
 
@@ -75,10 +83,10 @@ async function snapshotStoreViaRpc(
       })
       if (!error) return parseBatchResult(data)
       if (isMissingRpc(error)) throw error
-      if (isTimeout(error) && limit > 250) {
+      if (shouldShrinkBatch(error) && limit > 250) {
         limit = Math.max(250, Math.floor(limit / 2))
       }
-      throw new Error(error.message)
+      throw new Error(groceryDbErrorMessage(error))
     })
 
     total += page.rows_affected
@@ -113,7 +121,7 @@ async function snapshotStoreViaRest(
         .limit(REST_PAGE)
       if (after) query = query.gt('product_id', after)
       const { data, error } = await query
-      if (error) throw new Error(error.message)
+      if (error) throw new Error(groceryDbErrorMessage(error))
       return data ?? []
     })
     if (rows.length === 0) break
@@ -131,7 +139,7 @@ async function snapshotStoreViaRest(
       const { error } = await supabase.from('price_history').upsert(payload, {
         onConflict: 'product_id,store_id,snapshot_date',
       })
-      if (error) throw new Error(error.message)
+      if (error) throw new Error(groceryDbErrorMessage(error))
     })
 
     total += rows.length

@@ -26,7 +26,7 @@ import {
 } from '@/lib/grocery/sync-schedule'
 import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
 import { snapshotPriceHistory } from '@/lib/grocery/snapshot-price-history'
-import { retryGroceryDb } from '@/grocery/db/retry'
+import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
 import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 
@@ -105,7 +105,7 @@ async function runStep(
     const result = await fn()
     return { ...result, step } as GroceryCronStepResult
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = groceryDbErrorMessage(err)
     return {
       step,
       status: 'failed',
@@ -149,7 +149,7 @@ export async function runScheduledGrocerySync(
     } catch (err) {
       console.warn(
         '[grocery/cron] catch-up lookup failed:',
-        err instanceof Error ? err.message : err,
+        groceryDbErrorMessage(err),
       )
     }
   }
@@ -278,7 +278,7 @@ export async function runScheduledGrocerySync(
         })
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = groceryDbErrorMessage(err)
       console.warn('[grocery/cron] enqueue failed (non-fatal):', message)
       steps.push({
         step: 'enqueue',
