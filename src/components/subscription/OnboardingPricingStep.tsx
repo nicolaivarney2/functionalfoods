@@ -6,6 +6,7 @@ import PremiumConsiderationNote from '@/components/subscription/PremiumConsidera
 import {
   TIER_LABELS,
   TIER_PRICES_KR,
+  TRIAL_DAYS,
   type SubscriptionTier,
 } from '@/lib/subscription-tiers'
 
@@ -24,18 +25,18 @@ const TIERS: {
   {
     tier: 'free',
     priceLabel: '0 kr',
-    tagline: '3 madplaner og 3 prisalarmer om ugen',
+    tagline: `${TRIAL_DAYS} dage med det hele, derefter 3 madplaner/uge`,
   },
   {
     tier: 'plus',
     priceLabel: `${TIER_PRICES_KR.plus} kr/md`,
-    tagline: 'Ubegrænset madplan og prisalarmer',
-    recommended: true,
+    tagline: 'Efter prøven: ubegrænset madplan og madlog',
   },
   {
     tier: 'premium',
     priceLabel: `${TIER_PRICES_KR.premium} kr/md`,
-    tagline: 'Alt i Madbudget + personlig vejledning',
+    tagline: 'Efter prøven: det hele + personlig vejledning',
+    recommended: true,
   },
 ]
 
@@ -49,7 +50,7 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
     <div className="space-y-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Vælg plan</p>
-        <h2 className="mt-1 text-2xl font-bold">Hvad passer til dig?</h2>
+        <h2 className="mt-1 text-2xl font-bold">Prøv det hele i {TRIAL_DAYS} dage</h2>
       </div>
 
       <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
@@ -63,8 +64,8 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
           ))}
         </ul>
         <p className="mt-4 text-sm leading-relaxed text-emerald-100/85">
-          Værktøjerne samler <strong className="font-semibold text-white">plan, indkøb og opskrifter</strong> — så du
-          slipper for at gætte hver aften.
+          De første {TRIAL_DAYS} dage får du <strong className="font-semibold text-white">fuld adgang</strong> — madplan,
+          madlog, community og personlig vejledning. Så kan du se om 249 kr er det, der får dig til at blive.
         </p>
       </div>
 
@@ -89,7 +90,9 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
               ) : null}
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-white">{TIER_LABELS[plan.tier]}</p>
+                  <p className="text-sm font-bold text-white">
+                    {plan.tier === 'free' ? `${TRIAL_DAYS} dages prøve` : TIER_LABELS[plan.tier]}
+                  </p>
                   <p className="mt-0.5 text-xs leading-relaxed text-emerald-100/85">{plan.tagline}</p>
                 </div>
                 <p className="shrink-0 text-base font-extrabold text-amber-200">{plan.priceLabel}</p>
@@ -102,7 +105,8 @@ export default function OnboardingPricingStep({ selected, onSelect }: Props) {
       {selected === 'premium' ? <PremiumConsiderationNote variant="dark" /> : null}
 
       <p className="text-xs leading-relaxed text-emerald-100/70">
-        Abonnement kan opsiges når som helst. Betaling først efter du har oprettet konto i næste trin.
+        Du kan starte prøven uden at betale. Vælger du Madbudget eller Premium, betaler du efter kontooprettelse.
+        Opsig når som helst.
       </p>
 
       <HealthInformationNotice variant="dark" />

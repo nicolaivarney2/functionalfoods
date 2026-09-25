@@ -73,6 +73,7 @@ export async function ensureStripeCustomerForUser(
       role: 'user',
       email: email ?? null,
       stripe_customer_id: customer.id,
+      trial_ends_at: new Date(Date.now() + 14 * 86_400_000).toISOString(),
       updated_at: now,
     })
 

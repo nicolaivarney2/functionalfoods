@@ -4,8 +4,11 @@ import {
   FREE_MEAL_PLANS_PER_WEEK,
   FREE_PRICE_ALERTS_MAX,
   TIER_PRICES_KR,
+  TRIAL_DAYS,
   currentWeekStartIso,
   entitlementsForTier,
+  higherSubscriptionTier,
+  isTrialActive,
   normalizeSubscriptionTier,
   tierFromMonthlyAmountKr,
   type SubscriptionTier,
@@ -23,12 +26,17 @@ export type SubscriptionStatus = TierEntitlements & {
   mealPlansRemainingThisWeek: number | null
   priceAlertsRemaining: number | null
   lifetimeAccess: boolean
+  billedTier: SubscriptionTier
+  onTrial: boolean
+  trialEndsAt: string | null
 }
 
 type ProfileRow = {
   subscription_tier?: string | null
   last_contribution_amount_ore?: number | null
   lifetime_access?: boolean | null
+  trial_ends_at?: string | null
+  created_at?: string | null
 }
 
 function tierFromProfileRow(row: ProfileRow | null): SubscriptionTier {
@@ -38,38 +46,83 @@ function tierFromProfileRow(row: ProfileRow | null): SubscriptionTier {
   return 'free'
 }
 
-export async function getUserSubscriptionTier(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<SubscriptionTier> {
-  const first = await supabase
-    .from('user_profiles')
-    .select('subscription_tier, last_contribution_amount_ore, lifetime_access')
-    .eq('id', userId)
-    .maybeSingle()
-
-  let row = first.data as ProfileRow | null
-  if (first.error && String(first.error.message || '').includes('lifetime_access')) {
-    const fallback = await supabase
-      .from('user_profiles')
-      .select('subscription_tier, last_contribution_amount_ore')
-      .eq('id', userId)
-      .maybeSingle()
-    row = fallback.data as ProfileRow | null
-  }
-
+function billedTierFromRow(row: ProfileRow | null): SubscriptionTier {
   const fromRow = tierFromProfileRow(row)
-  if (fromRow !== 'free' || row?.subscription_tier) {
-    return fromRow
-  }
-
-  // Legacy: pay-what-you-can beløb → tier (indtil alle er migreret).
+  if (fromRow !== 'free' || row?.subscription_tier) return fromRow
   const ore = row?.last_contribution_amount_ore
   if (typeof ore === 'number' && ore > 0) {
     return tierFromMonthlyAmountKr(Math.round(ore / 100))
   }
-
   return 'free'
+}
+
+function resolveTrialEndsAt(row: ProfileRow | null): string | null {
+  if (row?.trial_ends_at) return row.trial_ends_at
+  if (!row?.created_at) return null
+  const start = new Date(row.created_at)
+  if (Number.isNaN(start.getTime())) return null
+  start.setUTCDate(start.getUTCDate() + TRIAL_DAYS)
+  return start.toISOString()
+}
+
+type AccessSnapshot = {
+  billed: SubscriptionTier
+  effective: SubscriptionTier
+  onTrial: boolean
+  trialEndsAt: string | null
+  lifetimeAccess: boolean
+}
+
+async function loadProfileAccess(supabase: SupabaseClient, userId: string): Promise<AccessSnapshot> {
+  const first = await supabase
+    .from('user_profiles')
+    .select('subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at')
+    .eq('id', userId)
+    .maybeSingle()
+
+  let row = first.data as ProfileRow | null
+  if (first.error) {
+    const msg = String(first.error.message || '')
+    const cols = msg.includes('trial_ends_at')
+      ? 'subscription_tier, last_contribution_amount_ore, lifetime_access, created_at'
+      : msg.includes('lifetime_access')
+        ? 'subscription_tier, last_contribution_amount_ore'
+        : null
+    if (cols) {
+      const fallback = await supabase.from('user_profiles').select(cols).eq('id', userId).maybeSingle()
+      row = fallback.data as ProfileRow | null
+    }
+  }
+
+  const billed = billedTierFromRow(row)
+  const trialEndsAt = resolveTrialEndsAt(row)
+  const onTrial = isTrialActive(trialEndsAt)
+  const effective = onTrial ? higherSubscriptionTier(billed, 'premium') : billed
+  return {
+    billed,
+    effective,
+    onTrial,
+    trialEndsAt,
+    lifetimeAccess: Boolean(row?.lifetime_access),
+  }
+}
+
+/** Betalt/gemt trin — uden trial-overlay. */
+export async function getUserSubscriptionTier(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SubscriptionTier> {
+  const access = await loadProfileAccess(supabase, userId)
+  return access.billed
+}
+
+/** Det brugeren faktisk må: trial giver Premium i 14 dage. */
+export async function getEffectiveSubscriptionTier(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SubscriptionTier> {
+  const access = await loadProfileAccess(supabase, userId)
+  return access.effective
 }
 
 export async function getSubscriptionUsage(
@@ -101,12 +154,11 @@ export async function getSubscriptionStatus(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<SubscriptionStatus> {
-  const [tier, lifetimeAccess, usage] = await Promise.all([
-    getUserSubscriptionTier(supabase, userId),
-    profileHasLifetimeAccess(supabase, userId),
+  const [access, usage] = await Promise.all([
+    loadProfileAccess(supabase, userId),
     getSubscriptionUsage(supabase, userId),
   ])
-  const ent = entitlementsForTier(tier)
+  const ent = entitlementsForTier(access.effective)
 
   const mealPlansRemainingThisWeek =
     ent.mealPlansPerWeek == null
@@ -121,7 +173,10 @@ export async function getSubscriptionStatus(
     usage,
     mealPlansRemainingThisWeek,
     priceAlertsRemaining,
-    lifetimeAccess,
+    lifetimeAccess: access.lifetimeAccess,
+    billedTier: access.billed,
+    onTrial: access.onTrial,
+    trialEndsAt: access.trialEndsAt,
   }
 }
 

@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient, type User } from '@supabase/supabase
 import { dietaryApproachLabel } from '@/lib/dietary-approach-options'
 import { sendLoopsEvent } from '@/lib/loops-subscribe'
 import { sendExpoPush, type ExpoPushMessage } from '@/lib/push/send-expo-push'
-import { getUserSubscriptionTier } from '@/lib/subscription-entitlements'
+import { getEffectiveSubscriptionTier } from '@/lib/subscription-entitlements'
 
 import {
   addDaysIso,
@@ -128,9 +128,9 @@ export async function joinCommunityRoom(params: {
   roomId: string
 }): Promise<{ room: CommunityRoomRow; alreadyMember: boolean }> {
   const service = communityServiceClient()
-  const tier = await getUserSubscriptionTier(service, params.user.id)
+  const tier = await getEffectiveSubscriptionTier(service, params.user.id)
   if (tier !== 'plus' && tier !== 'premium') {
-    throw Object.assign(new Error('Community kræver Madbudget eller Premium.'), { status: 403 })
+    throw Object.assign(new Error('Community kræver en aktiv prøveperiode, Madbudget eller Premium.'), { status: 403 })
   }
 
   const today = copenhagenTodayIso()

@@ -20,6 +20,30 @@ export const FREE_MEAL_PLANS_PER_WEEK = 3
 export const FREE_MEAL_PLANS_PER_WEEK_LIMIT = 5
 export const FREE_PRICE_ALERTS_MAX = 3
 
+/** Alle nye profiler får fuld adgang (inkl. Premium-vejledning) i så mange dage. */
+export const TRIAL_DAYS = 14
+
+export function isTrialActive(trialEndsAt: string | null | undefined, now = new Date()): boolean {
+  if (!trialEndsAt) return false
+  const ends = Date.parse(trialEndsAt)
+  return Number.isFinite(ends) && ends > now.getTime()
+}
+
+export function trialDaysLeft(trialEndsAt: string | null | undefined, now = new Date()): number {
+  if (!isTrialActive(trialEndsAt, now)) return 0
+  return Math.max(0, Math.ceil((Date.parse(trialEndsAt!) - now.getTime()) / 86_400_000))
+}
+
+function tierRank(tier: SubscriptionTier): number {
+  if (tier === 'premium') return 2
+  if (tier === 'plus') return 1
+  return 0
+}
+
+export function higherSubscriptionTier(a: SubscriptionTier, b: SubscriptionTier): SubscriptionTier {
+  return tierRank(a) >= tierRank(b) ? a : b
+}
+
 export const PREMIUM_GUIDANCE_HOURS =
   'Personlig vejledning i dagstimerne 7.30–21.30'
 

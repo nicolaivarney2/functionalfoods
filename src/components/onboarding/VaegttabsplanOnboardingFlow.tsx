@@ -1007,10 +1007,10 @@ function VaegttabsplanOnboardingInner() {
                 <h2 className="mt-1 text-2xl font-bold">Opret din konto</h2>
                 <p className="mt-2 text-sm text-emerald-100/85">
                   {selectedTier === 'free'
-                    ? 'Du starter på gratis-planen med 3 madplaner og 3 prisalarmer om ugen.'
+                    ? 'Du får 14 dage med fuld adgang — også personlig vejledning. Ingen betaling nu.'
                     : selectedTier === 'plus'
-                      ? 'Du valgte Madbudget (29 kr/md) — vi sender dig til betaling efter oprettelse.'
-                      : 'Du valgte Premium (249 kr/md) — vi sender dig til betaling efter oprettelse.'}
+                      ? 'Du får 14 dage med det hele, og vælger Madbudget (29 kr/md) bagefter — vi sender dig til betaling efter oprettelse.'
+                      : 'Du får 14 dage med det hele og vælger Premium (249 kr/md) — vi sender dig til betaling efter oprettelse.'}
                 </p>
               </div>
 

@@ -246,7 +246,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        'Opskrifter og meget indhold er gratis. Med en gratis profil får du 3 madplaner og 3 prisalarmer om ugen. Madbudget (29 kr/md) giver ubegrænset madplaner og prisalarmer. Premium (249 kr/md) tilføjer personlig vejledning i dagstimerne 7.30–21.30 på Messenger.',
+        'Du får 14 dage med fuld adgang — madplan, madlog, community og personlig vejledning. Bagefter er Madbudget 29 kr/md (ubegrænset plan og log) og Premium 249 kr/md (plus vejledning i dagstimerne 7.30–21.30 på Messenger). Uden abonnement går du tilbage til 3 madplaner og 3 prisalarmer om ugen.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',
