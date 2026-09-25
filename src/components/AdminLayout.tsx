@@ -96,6 +96,12 @@ const adminNavItems = [
     description: 'Brugere, abonnement og opsigelse'
   },
   {
+    name: 'Community',
+    href: '/admin/community',
+    icon: MessageSquare,
+    description: 'Rum, nicher og vægttabsguidance'
+  },
+  {
     name: 'Dagligvarer',
     href: '/admin/dagligvarer',
     icon: Database,

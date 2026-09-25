@@ -160,6 +160,46 @@ export async function sendLoopsTransactional(params: {
   }
 }
 
+/** Loops-event til automations (mail dagen før start, guidance, mentions). */
+export async function sendLoopsEvent(params: {
+  email: string
+  eventName: string
+  eventProperties?: Record<string, string | number | boolean>
+}): Promise<LoopsSubscribeResult> {
+  const apiKey = process.env.LOOPS_API_KEY?.trim()
+  if (!apiKey) return { ok: false, error: 'LOOPS_API_KEY er ikke sat' }
+  if (!params.email.trim() || !params.eventName.trim()) {
+    return { ok: false, error: 'email eller eventName mangler' }
+  }
+
+  try {
+    const res = await loopsFetch(`${LOOPS_BASE}/events/send`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: params.email.trim(),
+        eventName: params.eventName.trim(),
+        eventProperties: params.eventProperties,
+      }),
+    })
+    if (res.status === 429) return { ok: false, error: 'Loops rate limit — prøv igen om lidt' }
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { message?: string }
+      return { ok: false, error: data.message || res.statusText || 'Loops event fejlede' }
+    }
+    return { ok: true }
+  } catch (err) {
+    const timedOut = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
+    return {
+      ok: false,
+      error: timedOut ? 'Loops svarede ikke i tide' : err instanceof Error ? err.message : 'Loops-fejl',
+    }
+  }
+}
+
 export async function sendLoopsPartnerInviteEmail(params: {
   email: string
   inviterName: string
