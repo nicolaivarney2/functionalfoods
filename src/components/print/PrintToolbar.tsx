@@ -8,10 +8,12 @@ export function PrintToolbar({
   autoprint = false,
   backHref,
   backLabel,
+  children,
 }: {
   autoprint?: boolean
   backHref: string
   backLabel: string
+  children?: React.ReactNode
 }) {
   useEffect(() => {
     if (!autoprint) return
@@ -32,6 +34,7 @@ export function PrintToolbar({
       <Link href={backHref} className="text-sm font-medium text-gray-600 hover:text-gray-900">
         {backLabel}
       </Link>
+      {children}
     </div>
   )
 }

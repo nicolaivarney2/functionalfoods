@@ -1,4 +1,4 @@
-import { applyPendingOnboarding, markAutoFirstPlanPending } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { applyPendingOnboarding } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import type { CheckoutPlan } from '@/lib/subscription-tiers'
 
 export type CompleteSignupResult =
@@ -26,7 +26,6 @@ export async function completeSignupAfterAuth(
   }
 
   await applyPendingOnboarding(accessToken)
-  markAutoFirstPlanPending()
 
   if (tier === 'plus' || tier === 'premium' || tier === 'community') {
     const payRes = await fetch('/api/stripe/create-subscription-checkout', {
@@ -41,7 +40,7 @@ export async function completeSignupAfterAuth(
     if (!payRes.ok || !payJson.url) {
       return {
         ok: false,
-        error: (payJson.error as string) || 'Kunne ikke starte betaling — din profil er gemt, gå til Madbudget.',
+        error: (payJson.error as string) || 'Kunne ikke starte betaling. Prøv igen.',
       }
     }
     return { ok: true, redirectUrl: payJson.url as string, external: true }

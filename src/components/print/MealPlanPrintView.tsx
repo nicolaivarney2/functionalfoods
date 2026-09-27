@@ -1,6 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { PrintToolbar } from '@/components/print/PrintToolbar'
+
+const HIDE_MICRO_KEY = 'ff-print-hide-micro'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
 
 type MealSlot = {
@@ -221,10 +224,32 @@ export function MealPlanPrintView({
   const title = typeof plan.name === 'string' && plan.name.trim() ? plan.name.trim() : 'Madplan'
   const people = householdLine(plan)
   const subtitle = [weekNumber ? `Uge ${weekNumber}` : '', range, people].filter(Boolean).join(' · ')
+  const [hideMicro, setHideMicro] = useState(false)
+  const [prefReady, setPrefReady] = useState(false)
+
+  useEffect(() => {
+    setHideMicro(window.localStorage.getItem(HIDE_MICRO_KEY) === '1')
+    setPrefReady(true)
+  }, [])
+
+  const toggleHideMicro = (checked: boolean) => {
+    setHideMicro(checked)
+    window.localStorage.setItem(HIDE_MICRO_KEY, checked ? '1' : '0')
+  }
 
   return (
     <article className="mx-auto max-w-[720px] px-5 py-8 text-gray-950 print:max-w-none print:px-0 print:py-0">
-      <PrintToolbar autoprint={autoprint} backHref="/madbudget" backLabel="Tilbage til madplanen" />
+      <PrintToolbar autoprint={autoprint && prefReady} backHref="/madbudget" backLabel="Tilbage til madplanen">
+        <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-gray-300"
+            checked={hideMicro}
+            onChange={(event) => toggleHideMicro(event.target.checked)}
+          />
+          Slå mikro fra
+        </label>
+      </PrintToolbar>
 
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Functional Foods</p>
       <h1 className="mt-1 text-3xl font-bold leading-tight">{title}</h1>
@@ -288,6 +313,8 @@ export function MealPlanPrintView({
             </tbody>
           </table>
 
+          {!hideMicro ? (
+          <>
           <h2 className="mt-8 border-b border-gray-300 pb-1 text-xl font-bold">Mikro pr. person</h2>
           <p className="mt-2 text-xs text-gray-600">Snit pr. dag for de samme dage som makroen.</p>
           {vitaminAvg.length > 0 ? (
@@ -322,6 +349,8 @@ export function MealPlanPrintView({
           ) : null}
           {vitaminAvg.length === 0 && mineralAvg.length === 0 ? (
             <p className="mt-2 text-sm text-gray-600">Retterne i den her plan har ingen gemte vitaminer eller mineraler.</p>
+          ) : null}
+          </>
           ) : null}
         </>
       ) : null}

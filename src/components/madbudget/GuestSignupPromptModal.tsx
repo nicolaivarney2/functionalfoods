@@ -7,12 +7,16 @@ type GuestSignupPromptModalProps = {
   open: boolean
   message: string
   onClose: () => void
+  title?: string
+  ctaLabel?: string
 }
 
 export default function GuestSignupPromptModal({
   open,
   message,
   onClose,
+  title = 'Opret bruger for at fortsætte',
+  ctaLabel = 'Opret bruger her',
 }: GuestSignupPromptModalProps) {
   if (!open) return null
 
@@ -27,7 +31,7 @@ export default function GuestSignupPromptModal({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 id="guest-signup-prompt-title" className="text-lg font-semibold text-gray-900">
-            Opret bruger for at fortsætte
+            {title}
           </h3>
           <button
             type="button"
@@ -51,7 +55,7 @@ export default function GuestSignupPromptModal({
             href="/lav-din-plan"
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700"
           >
-            Opret bruger her
+            {ctaLabel}
             <ArrowRight size={16} aria-hidden />
           </Link>
         </div>

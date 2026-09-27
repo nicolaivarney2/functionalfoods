@@ -1,23 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
 import { getStripe } from '@/lib/stripe-server'
-import { normalizeSubscriptionTier, tierFromMonthlyAmountKr } from '@/lib/subscription-tiers'
-import { setUserSubscriptionTier } from '@/lib/subscription-entitlements'
+import {
+  grantStripeSubscription,
+  revokeStripeSubscription,
+  subscriptionIsEntitled,
+} from '@/lib/stripe-subscription-sync'
+import { tierFromMonthlyAmountKr } from '@/lib/subscription-tiers'
 
 export const dynamic = 'force-dynamic'
 
-function tierFromSubscription(sub: Stripe.Subscription): 'free' | 'plus' | 'premium' {
-  const meta = sub.metadata?.subscription_tier
-  if (meta === 'plus' || meta === 'premium') return meta
-
-  const item = sub.items.data[0]
-  const unitAmount = item?.price?.unit_amount
-  if (typeof unitAmount === 'number') {
-    return tierFromMonthlyAmountKr(Math.round(unitAmount / 100))
+async function applySubscription(supabase: SupabaseClient, sub: Stripe.Subscription) {
+  const userId = sub.metadata?.supabase_user_id
+  if (!userId) return
+  if (subscriptionIsEntitled(sub.status)) {
+    await grantStripeSubscription(supabase, userId, sub)
+    const plan = sub.metadata?.subscription_tier
+    if (plan === 'plus' || plan === 'premium' || plan === 'community') {
+      const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
+      void notifyOpsPaid(supabase, userId, { tier: plan === 'community' ? 'plus' : plan, source: 'Stripe (web)' })
+    }
+    return
   }
-  return 'free'
+  if (sub.status === 'canceled' || sub.status === 'unpaid' || sub.status === 'incomplete_expired') {
+    await revokeStripeSubscription(supabase, userId)
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -61,26 +71,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (session.mode === 'subscription') {
-        if (session.metadata?.subscription_tier === 'community') {
-          await setUserSubscriptionTier(supabase, userId, 'plus', {
-            stripeSubscriptionId:
-              typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
-            monthlyAmountOre: 4900,
-            subscriptionSource: 'stripe',
-          })
-          await supabase.from('user_profiles').update({ community_access: true }).eq('id', userId)
-        }
-        const tier = normalizeSubscriptionTier(session.metadata?.subscription_tier)
-        if (tier === 'plus' || tier === 'premium') {
-          await setUserSubscriptionTier(supabase, userId, tier, {
-            stripeSubscriptionId:
-              typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
-            monthlyAmountOre:
-              tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
-            subscriptionSource: 'stripe',
-          })
-          const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
-          void notifyOpsPaid(supabase, userId, { tier, source: 'Stripe (web)' })
+        const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id
+        if (userId && subId) {
+          const stripe = getStripe()
+          const sub = await stripe.subscriptions.retrieve(subId)
+          if (!sub.metadata?.supabase_user_id) {
+            sub.metadata = { ...sub.metadata, supabase_user_id: userId }
+          }
+          await applySubscription(supabase, sub)
         }
       } else if (typeof session.amount_total === 'number') {
         // Legacy engangsbetaling → tier ud fra beløb
@@ -98,42 +96,13 @@ export async function POST(request: NextRequest) {
     event.type === 'customer.subscription.created'
   ) {
     const sub = event.data.object as Stripe.Subscription
-    const userId = sub.metadata?.supabase_user_id
-    if (userId && ['active', 'trialing'].includes(sub.status)) {
-      if (sub.metadata?.subscription_tier === 'community') {
-        await setUserSubscriptionTier(supabase, userId, 'plus', {
-          stripeSubscriptionId: sub.id,
-          monthlyAmountOre: 4900,
-          subscriptionSource: 'stripe',
-        })
-        await supabase.from('user_profiles').update({ community_access: true }).eq('id', userId)
-      }
-      const tier = tierFromSubscription(sub)
-      await setUserSubscriptionTier(supabase, userId, tier, {
-        stripeSubscriptionId: sub.id,
-        monthlyAmountOre: tier === 'premium' ? 24900 : tier === 'plus' ? 2900 : null,
-        subscriptionSource: 'stripe',
-      })
-      if (tier === 'plus' || tier === 'premium') {
-        const { notifyOpsPaid } = await import('@/lib/ops-user-alerts')
-        void notifyOpsPaid(supabase, userId, { tier, source: 'Stripe (web)' })
-      }
-    }
+    await applySubscription(supabase, sub)
   }
 
   if (event.type === 'customer.subscription.deleted') {
     const sub = event.data.object as Stripe.Subscription
     const userId = sub.metadata?.supabase_user_id
-    if (userId) {
-      await setUserSubscriptionTier(supabase, userId, 'free', {
-        stripeSubscriptionId: null,
-        monthlyAmountOre: null,
-        subscriptionSource: 'none',
-      })
-      if (sub.metadata?.subscription_tier === 'community') {
-        await supabase.from('user_profiles').update({ community_access: false }).eq('id', userId)
-      }
-    }
+    if (userId) await revokeStripeSubscription(supabase, userId)
   }
 
   return NextResponse.json({ received: true })

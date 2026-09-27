@@ -66,6 +66,10 @@ export async function POST(request: NextRequest) {
     const supabase = createSupabaseServerClient()
     const customerId = await ensureStripeCustomerForUser(supabase, user)
     const origin = siteOrigin(request)
+    await supabase
+      .from('user_profiles')
+      .update({ checkout_started: true, updated_at: new Date().toISOString() })
+      .eq('id', user.id)
     const amountKr = tier === 'community' ? 49 : TIER_PRICES_KR[tier]
     const product =
       tier === 'community'

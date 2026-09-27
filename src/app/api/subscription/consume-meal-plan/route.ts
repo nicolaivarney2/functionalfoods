@@ -8,6 +8,7 @@ import {
   getSubscriptionStatus,
   logMealPlanGeneration,
 } from '@/lib/subscription-entitlements'
+import { syncStripeAccessForUser } from '@/lib/stripe-subscription-sync'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,14 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSupabaseServiceClient()
+    const preview = await getSubscriptionStatus(supabase, user.id)
+    if (preview.stripeCustomerId) {
+      try {
+        await syncStripeAccessForUser(supabase, user.id, preview.stripeCustomerId)
+      } catch (syncError) {
+        console.error('consume-meal-plan stripe sync', syncError)
+      }
+    }
     const status = await assertMealPlanGenerationAllowed(supabase, user.id)
     await logMealPlanGeneration(supabase, user.id)
     const refreshed = await getSubscriptionStatus(supabase, user.id)

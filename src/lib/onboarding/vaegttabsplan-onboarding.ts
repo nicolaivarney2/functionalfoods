@@ -4,6 +4,7 @@ import { MADBUDGET_STORE_CATALOG } from '@/lib/madbudget-stores'
 import { mealsPerDayFromScope } from '@/lib/adult-plan-profile'
 
 export const ONBOARDING_STORAGE_KEY = 'ff_vaegttabsplan_onboarding_v1'
+export const CHECKOUT_PLAN_KEY = 'ff_checkout_plan'
 
 /** @deprecated Use DIETARY_APPROACH_OPTIONS — kept for existing imports */
 export const ONBOARDING_DIETARY_OPTIONS = DIETARY_APPROACH_OPTIONS
@@ -153,6 +154,27 @@ export function saveOnboardingData(data: VaegttabsplanOnboardingData): void {
   }
 }
 
+export function saveCheckoutPlan(plan: string): void {
+  if (plan !== 'plus' && plan !== 'premium' && plan !== 'community') return
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(CHECKOUT_PLAN_KEY, plan)
+  } catch {
+    /* ignore quota */
+  }
+}
+
+export function loadCheckoutPlan(): 'plus' | 'premium' | 'community' | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const value = window.localStorage.getItem(CHECKOUT_PLAN_KEY)
+    if (value === 'plus' || value === 'premium' || value === 'community') return value
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
 export function clearOnboardingData(): void {
   if (typeof window === 'undefined') return
   try {
@@ -271,7 +293,6 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
 
   if (!res.ok) return false
   clearOnboardingData()
-  markAutoFirstPlanPending()
   return true
 }
 

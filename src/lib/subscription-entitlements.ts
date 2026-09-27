@@ -29,6 +29,10 @@ export type SubscriptionStatus = TierEntitlements & {
   billedTier: SubscriptionTier
   onTrial: boolean
   trialEndsAt: string | null
+  checkoutStarted: boolean
+  communityAccess: boolean
+  subscriptionSource: string | null
+  stripeCustomerId: string | null
 }
 
 type ProfileRow = {
@@ -38,6 +42,10 @@ type ProfileRow = {
   trial_ends_at?: string | null
   created_at?: string | null
   community_access?: boolean | null
+  checkout_started?: boolean | null
+  subscription_source?: string | null
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
 }
 
 function tierFromProfileRow(row: ProfileRow | null): SubscriptionTier {
@@ -73,19 +81,27 @@ type AccessSnapshot = {
   trialEndsAt: string | null
   lifetimeAccess: boolean
   communityAccess: boolean
+  checkoutStarted: boolean
+  subscriptionSource: string | null
+  stripeCustomerId: string | null
+  stripeSubscriptionId: string | null
 }
 
 async function loadProfileAccess(supabase: SupabaseClient, userId: string): Promise<AccessSnapshot> {
   const first = await supabase
     .from('user_profiles')
-    .select('subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at, community_access')
+    .select(
+      'subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at, community_access, checkout_started, subscription_source, stripe_customer_id, stripe_subscription_id',
+    )
     .eq('id', userId)
     .maybeSingle()
 
   let row = first.data as ProfileRow | null
   if (first.error) {
     const msg = String(first.error.message || '')
-    const cols = msg.includes('trial_ends_at')
+    const cols = msg.includes('checkout_started')
+      ? 'subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at, community_access, subscription_source, stripe_customer_id, stripe_subscription_id'
+      : msg.includes('trial_ends_at')
       ? 'subscription_tier, last_contribution_amount_ore, lifetime_access, created_at'
       : msg.includes('lifetime_access')
         ? 'subscription_tier, last_contribution_amount_ore'
@@ -109,6 +125,10 @@ async function loadProfileAccess(supabase: SupabaseClient, userId: string): Prom
     trialEndsAt,
     lifetimeAccess: Boolean(row?.lifetime_access),
     communityAccess,
+    checkoutStarted: Boolean(row?.checkout_started),
+    subscriptionSource: row?.subscription_source ?? null,
+    stripeCustomerId: row?.stripe_customer_id ?? null,
+    stripeSubscriptionId: row?.stripe_subscription_id ?? null,
   }
 }
 
@@ -190,16 +210,20 @@ export async function getSubscriptionStatus(
     billedTier: access.billed,
     onTrial: access.onTrial,
     trialEndsAt: access.trialEndsAt,
+    checkoutStarted: access.checkoutStarted,
+    communityAccess: access.communityAccess,
+    subscriptionSource: access.subscriptionSource,
+    stripeCustomerId: access.stripeCustomerId,
   }
 }
 
 export class SubscriptionLimitError extends Error {
-  code: 'meal_plan_limit' | 'price_alert_limit' | 'messenger_premium_only'
+  code: 'meal_plan_limit' | 'price_alert_limit' | 'messenger_premium_only' | 'payment_required'
   tier: SubscriptionTier
   status: SubscriptionStatus
 
   constructor(
-    code: 'meal_plan_limit' | 'price_alert_limit' | 'messenger_premium_only',
+    code: 'meal_plan_limit' | 'price_alert_limit' | 'messenger_premium_only' | 'payment_required',
     tier: SubscriptionTier,
     status: SubscriptionStatus,
     message: string,
@@ -216,6 +240,7 @@ export async function assertMealPlanGenerationAllowed(
   userId: string,
 ): Promise<SubscriptionStatus> {
   const status = await getSubscriptionStatus(supabase, userId)
+  throwIfUnpaidCheckout(status, 'Madplanen')
   if (status.unlimitedMealPlans) return status
   if ((status.mealPlansRemainingThisWeek ?? 0) <= 0) {
     throw new SubscriptionLimitError(
@@ -239,6 +264,7 @@ export async function assertPriceAlertCreationAllowed(
   additionalAlerts = 1,
 ): Promise<SubscriptionStatus> {
   const status = await getSubscriptionStatus(supabase, userId)
+  throwIfUnpaidCheckout(status, 'Prisalarmer')
   if (status.unlimitedPriceAlerts) return status
   const remaining = status.priceAlertsRemaining ?? 0
   if (remaining < additionalAlerts) {
@@ -250,6 +276,26 @@ export async function assertPriceAlertCreationAllowed(
     )
   }
   return status
+}
+
+export async function assertDiaryWriteAllowed(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<SubscriptionStatus> {
+  const status = await getSubscriptionStatus(supabase, userId)
+  throwIfUnpaidCheckout(status, 'Madloggen')
+  return status
+}
+
+function throwIfUnpaidCheckout(status: SubscriptionStatus, feature: string) {
+  if (status.checkoutStarted && status.tier === 'free' && !status.communityAccess && !status.lifetimeAccess) {
+    throw new SubscriptionLimitError(
+      'payment_required',
+      status.tier,
+      status,
+      `${feature} åbner, når du har startet de ${TRIAL_DAYS} dages prøve. Der trækkes først efter ${TRIAL_DAYS} dage.`,
+    )
+  }
 }
 
 export async function assertMessengerGuidanceAllowed(
@@ -290,6 +336,9 @@ export async function setUserSubscriptionTier(
     monthlyAmountOre?: number | null
     subscriptionSource?: SubscriptionSource | null
     ignoreLifetime?: boolean
+    checkoutStarted?: boolean
+    communityAccess?: boolean
+    trialEndsAt?: string | null
   },
 ): Promise<void> {
   let nextTier = tier
@@ -317,6 +366,15 @@ export async function setUserSubscriptionTier(
   }
   if (extra?.subscriptionSource !== undefined) {
     patch.subscription_source = extra.subscriptionSource
+  }
+  if (extra?.checkoutStarted !== undefined) {
+    patch.checkout_started = extra.checkoutStarted
+  }
+  if (extra?.communityAccess !== undefined) {
+    patch.community_access = extra.communityAccess
+  }
+  if (extra?.trialEndsAt !== undefined) {
+    patch.trial_ends_at = extra.trialEndsAt
   }
 
   const { error } = await supabase.from('user_profiles').update(patch).eq('id', userId)

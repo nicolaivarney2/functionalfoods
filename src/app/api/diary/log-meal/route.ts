@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
+import { assertDiaryWriteAllowed, SubscriptionLimitError } from '@/lib/subscription-entitlements'
 import { prepareStoredMicros } from '@/lib/diary-food-log-micro'
 import { nutritionForProvisionalMeal } from '@/lib/provisional-nutrition'
 import { sanitizeIngredients } from '@/lib/provisional-recipes'
@@ -46,6 +47,15 @@ export async function POST(request: NextRequest) {
 
     const user = await getSupabaseRouteUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    try {
+      await assertDiaryWriteAllowed(supabase, user.id)
+    } catch (err) {
+      if (err instanceof SubscriptionLimitError) {
+        return NextResponse.json({ error: err.message, code: err.code }, { status: 402 })
+      }
+      throw err
+    }
 
     const body = await request.json().catch(() => ({}))
 

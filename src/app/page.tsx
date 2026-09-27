@@ -42,7 +42,7 @@ const PILLARS = [
   },
   {
     key: 'billigt',
-    label: 'Spar på indkøbet',
+    label: 'Spar 70-250 kr om ugen på maden',
     headline: 'Bygget på ugens tilbud',
     body: 'Din vægttabsplan tager udgangspunkt i, hvad der faktisk er på tilbud i de butikker du handler i - ikke fuldpris og specialvarer du skal jagte.',
     icon: Tag,
@@ -86,7 +86,10 @@ const PLAN_STEPS = [
 
 const HERO_LABELS = [
   { text: 'Nem at følge' },
-  { text: 'Spar på indkøbet' },
+  { text: 'Spar 70-250 kr om ugen på maden' },
+  { text: 'Madlogger (indtal eller tag billede af maden)' },
+  { text: 'Vægttabsforløb à 10 med startdato sammen' },
+  { text: 'Vægttabscoaching' },
   { text: 'Bygget til vægttab' },
 ] as const
 
@@ -246,7 +249,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        'De første 14 dage følger det abonnement, du vælger. Madbudget er 29 kr/md og giver ubegrænset madplan, madlog og prisalarmer. Community er 49 kr/md og lægger rummene i appen oveni. Premium er 249 kr/md og har også personlig vejledning på Messenger i dagstimerne 7.30-21.30. Uden abonnement er det 3 madplaner og 3 prisalarmer om ugen.',
+        '14 dage gratis. Madbudget er 29 kr/md og er madplan og madlog. Community er 49 kr/md og er vægttab sammen. Premium er 249 kr/md og er personlig vægttabscoaching.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',
@@ -312,7 +315,7 @@ export default function Home() {
                 <strong className="font-semibold text-white">30+ andre parametre</strong>. Gratis at starte.
               </p>
 
-              <ul className="mt-6 hidden flex-col gap-2.5 sm:flex">
+              <ul className="mt-6 flex flex-col gap-2.5">
                 {HERO_LABELS.map((item) => (
                   <li key={item.text} className="flex items-center gap-2.5 text-base text-emerald-50">
                     <Check className="h-5 w-5 shrink-0 text-amber-300" aria-hidden />
@@ -651,30 +654,29 @@ export default function Home() {
               Madplan, rum eller vejledning
             </h2>
             <p className="mt-4 text-lg text-gray-600">
-              De første 14 dage følger abonnementet. Madbudget er madplan og madlog. Community lægger rummene i appen
-              oveni. Premium har også personlig vejledning på Messenger.
+              14 dage gratis. Madbudget er madplan og madlog. Community er vægttab sammen. Premium er personlig
+              vægttabscoaching.
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              {
-                name: 'Uden abonnement',
-                price: '0 kr',
-                period: 'uden betaling',
-                points: ['3 madplaner om ugen', '3 prisalarmer', 'Ingen community-rum'],
-              },
               {
                 name: 'Madbudget',
                 price: '29 kr',
                 period: 'pr. måned',
-                points: ['Ubegrænset madplan og madlog', 'Prisalarmer', 'Åbner ikke rummene'],
+                points: ['Ubegrænset madplan og madlog', 'Prisalarmer', 'Madlogger'],
               },
               {
                 name: 'Community',
                 price: '49 kr',
                 period: 'pr. måned',
-                points: ['Alt i Madbudget', 'Grupper à 10 i appen', 'Ingen personlig vejledning'],
+                points: [
+                  'Alt i Madbudget',
+                  'Grupper à 10 i appen',
+                  'Start vægttabsforløb sammen',
+                  '66 % holdt vægttabet sammen med andre. Alene var det 24 %',
+                ],
               },
               {
                 name: 'Premium',
@@ -708,13 +710,12 @@ export default function Home() {
                 <h3 className="text-xl font-bold text-gray-900">Et lille rum, samme startdato</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-700">
                   Community er ikke et åbent forum. Det er et rum med 10 personer på samme madstil, der starter samme
-                  dag og kører 30 dage sammen. I skriver i samme tråd i appen. Vejledningen lægges ind undervejs,
-                  tilpasset Sense, Keto eller den kost I har valgt.
+                  dag og kører 30 dage sammen. I skriver i samme tråd i appen.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-700">
-                  Det virker, fordi I står til ansvar over for hinanden. Det er sværere at springe dagen over, når de
-                  andre i rummet kan se det. I et studie fra 1999 holdt 66 % vægttabet, når de var med bekendte og fik
-                  social støtte. Blandt dem der kørte det alene, var det 24 %.
+                  Det virker, fordi I står til ansvar over for hinanden. Det er sværere at springe dagen over, når I
+                  støtter og står til ansvar for hinanden. 66 % holdt vægttabet, når de fik social støtte. Alene var
+                  det 24 %.
                 </p>
                 <a
                   href="https://pubmed.ncbi.nlm.nih.gov/10028217/"
@@ -939,7 +940,7 @@ export default function Home() {
               Start din vægttabsplan ud fra ugens tilbud - gratis
             </h2>
             <p className="mt-5 text-lg text-emerald-50 leading-relaxed">
-              Nem at følge. Spar på indkøbet. Effektivt mod dit mål.
+              Nem at følge. Spar 70-250 kr om ugen på maden. Bygget til vægttab.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link

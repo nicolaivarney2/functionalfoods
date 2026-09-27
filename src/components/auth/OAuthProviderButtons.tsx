@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth, type OAuthProvider } from '@/contexts/AuthContext'
-import { COMMUNITY_PRICE_KR, TIER_PRICES_KR, type CheckoutPlan } from '@/lib/subscription-tiers'
+import { TRIAL_DAYS, type CheckoutPlan } from '@/lib/subscription-tiers'
 
 function AppleLogo({ className }: { className?: string }) {
   return (
@@ -51,8 +51,7 @@ function actionLabel(provider: OAuthProvider, mode: Props['mode'], tier?: Checko
   if (mode === 'login') return `Fortsæt med ${providerName}`
 
   if (tier === 'plus' || tier === 'premium' || tier === 'community') {
-    const price = tier === 'community' ? COMMUNITY_PRICE_KR : TIER_PRICES_KR[tier]
-    return `Opret med ${providerName} (${price} kr/md)`
+    return `Fortsæt med ${providerName} · ${TRIAL_DAYS} dages prøve`
   }
   return `Opret med ${providerName}`
 }

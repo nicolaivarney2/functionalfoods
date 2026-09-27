@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { User, Lock, Save, CheckCircle, AlertCircle } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import PartnerInvitePanel from '@/components/PartnerInvitePanel'
+import AccountSubscriptionCard from '@/components/subscription/AccountSubscriptionCard'
 
 export default function ProfilePage() {
   const { user } = useAuth()
@@ -227,6 +228,8 @@ export default function ProfilePage() {
               </form>
             </div>
           </div>
+
+          <AccountSubscriptionCard />
 
           {/* Account Information */}
           <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">

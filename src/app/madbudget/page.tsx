@@ -472,6 +472,8 @@ export default function MadbudgetPage() {
   const [showRecalculatePrompt, setShowRecalculatePrompt] = useState(false)
   const [showWeekTargetPicker, setShowWeekTargetPicker] = useState(false)
   const [guestSignupPrompt, setGuestSignupPrompt] = useState<string | null>(null)
+  const [guestSignupTitle, setGuestSignupTitle] = useState<string | undefined>(undefined)
+  const [guestSignupCta, setGuestSignupCta] = useState<string | undefined>(undefined)
 
   const [profileReloadKey, setProfileReloadKey] = useState(0)
   useApplyPendingOnboarding(isGuest, () => setProfileReloadKey((k) => k + 1))
@@ -2650,6 +2652,8 @@ export default function MadbudgetPage() {
             j.error ||
               'Du har brugt dine gratis madplaner denne uge. Opgrader til Madbudget (29 kr/md) for ubegrænset.',
           )
+          setGuestSignupTitle(j.code === 'payment_required' ? 'Start prøven for at lave en madplan' : undefined)
+          setGuestSignupCta(j.code === 'payment_required' ? 'Start 14 dages prøve' : undefined)
           setIsGeneratingMealPlan(false)
           setGenerationProgress('')
           return
@@ -2921,45 +2925,69 @@ export default function MadbudgetPage() {
     if (typeof window === 'undefined') return
 
     const params = new URLSearchParams(window.location.search)
-    const fromQuery = params.get('ny') === '1' || params.get('autoGenerate') === '1'
-    let flagSet = false
+    const paymentOk = params.get('betaling') === 'ok'
+    const sessionId = params.get('session_id')
+    const fromQuery = params.get('ny') === '1' && paymentOk && Boolean(sessionId)
     try {
-      flagSet = window.localStorage.getItem(FF_AUTO_FIRST_PLAN_KEY) === '1'
+      window.localStorage.removeItem(FF_AUTO_FIRST_PLAN_KEY)
     } catch {
-      flagSet = false
+      /* ignore */
     }
-    if (!fromQuery && !flagSet) return
-
-    // Vent til diæt-profil er klar (kan lande et tick efter applyPendingOnboarding)
+    if (!fromQuery || !sessionId) return
     if (!allAdultsHaveProfiles() || !validateDietaryApproaches()) return
 
     autoFirstPlanStartedRef.current = true
     consumeAutoFirstPlanPending()
 
-    if (fromQuery) {
+    void (async () => {
+      const {
+        data: { session: confirmSession },
+      } = await supabase.auth.getSession()
+      if (!confirmSession?.access_token) return
+      const confirmRes = await fetch('/api/stripe/confirm-checkout', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${confirmSession.access_token}`,
+        },
+        body: JSON.stringify({ sessionId }),
+      })
+      if (!confirmRes.ok) {
+        const j = await confirmRes.json().catch(() => ({}))
+        setGuestSignupPrompt(
+          j.error || 'Betalingen er ikke gennemført. Start de 14 dages prøve for at lave en madplan.',
+        )
+        setGuestSignupTitle('Start prøven for at lave en madplan')
+        setGuestSignupCta('Start 14 dages prøve')
+        return
+      }
+
       const next = new URLSearchParams(params)
       next.delete('ny')
       next.delete('autoGenerate')
+      next.delete('betaling')
+      next.delete('session_id')
       const qs = next.toString()
       router.replace(qs ? `/madbudget?${qs}` : '/madbudget', { scroll: false })
-    }
 
-    const planHasMeals = Object.values(mealPlan).some((day) =>
-      Object.values(day).some((cell) => Boolean(cell?.title))
-    )
-    if (activePlanRef || planHasMeals || savedMealPlans.length > 0) {
-      try {
-        if (window.localStorage.getItem(FF_USER_TOUR_STORAGE_KEY) !== '1') {
-          window.setTimeout(() => setShowUserTour(true), 800)
+      const planHasMeals = Object.values(mealPlan).some((day) =>
+        Object.values(day).some((cell) => Boolean(cell?.title)),
+      )
+      if (activePlanRef || planHasMeals || savedMealPlans.length > 0) {
+        try {
+          if (window.localStorage.getItem(FF_USER_TOUR_STORAGE_KEY) !== '1') {
+            window.setTimeout(() => setShowUserTour(true), 800)
+          }
+        } catch {
+          /* ignore */
         }
-      } catch {
-        /* ignore */
+        return
       }
-      return
-    }
 
-    void generateMealPlan('current')
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- én auto-start efter signup når data er klar
+      void generateMealPlan('current')
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- én auto-start efter betaling når data er klar
   }, [
     isGuest,
     authLoading,
@@ -6677,7 +6705,13 @@ export default function MadbudgetPage() {
       <GuestSignupPromptModal
         open={guestSignupPrompt !== null}
         message={guestSignupPrompt ?? ''}
-        onClose={() => setGuestSignupPrompt(null)}
+        title={guestSignupTitle}
+        ctaLabel={guestSignupCta}
+        onClose={() => {
+          setGuestSignupPrompt(null)
+          setGuestSignupTitle(undefined)
+          setGuestSignupCta(undefined)
+        }}
       />
 
       <MadbudgetShopSurveyModal

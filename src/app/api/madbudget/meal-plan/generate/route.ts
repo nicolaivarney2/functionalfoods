@@ -153,11 +153,21 @@ export async function POST(request: NextRequest) {
 
     const {
       assertMealPlanGenerationAllowed,
+      getSubscriptionStatus,
       logMealPlanGeneration,
       SubscriptionLimitError,
     } = await import('@/lib/subscription-entitlements')
+    const { syncStripeAccessForUser } = await import('@/lib/stripe-subscription-sync')
 
     try {
+      const preview = await getSubscriptionStatus(supabase, ownerId)
+      if (preview.stripeCustomerId) {
+        try {
+          await syncStripeAccessForUser(supabase, ownerId, preview.stripeCustomerId)
+        } catch (syncError) {
+          console.error('generate stripe sync', syncError)
+        }
+      }
       await assertMealPlanGenerationAllowed(supabase, ownerId)
     } catch (err) {
       if (err instanceof SubscriptionLimitError) {

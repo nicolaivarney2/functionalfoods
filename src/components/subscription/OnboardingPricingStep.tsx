@@ -1,8 +1,6 @@
 'use client'
 
-import { Check } from 'lucide-react'
-import HealthInformationNotice from '@/components/HealthInformationNotice'
-import PremiumConsiderationNote from '@/components/subscription/PremiumConsiderationNote'
+import { Check, TrendingUp } from 'lucide-react'
 import {
   COMMUNITY_PRICE_KR,
   TIER_LABELS,
@@ -12,36 +10,45 @@ import {
 } from '@/lib/subscription-tiers'
 
 const PLANS: {
-  id: CheckoutPlan
+  id: Exclude<CheckoutPlan, 'free'>
   name: string
-  priceLabel: string
-  tagline: string
+  priceKr: number
+  points: string[]
+  note?: string
+  research?: string
   recommended?: boolean
 }[] = [
   {
-    id: 'premium',
-    name: TIER_LABELS.premium,
-    priceLabel: `${TIER_PRICES_KR.premium} kr/md`,
-    tagline: 'Alt i Community, plus personlig vejledning på Messenger',
-    recommended: true,
+    id: 'plus',
+    name: TIER_LABELS.plus,
+    priceKr: TIER_PRICES_KR.plus,
+    points: [
+      'Madplan ud fra tilbud og vægttabsplan',
+      'Struktureret og effektivt vægttab',
+      'Fuld adgang til madlog',
+      'Indtal eller tag billede af mad, så det logges automatisk',
+      'Spar 70-250 kr om ugen på mad med smarte madplaner',
+    ],
   },
   {
     id: 'community',
     name: 'Community',
-    priceLabel: `${COMMUNITY_PRICE_KR} kr/md`,
-    tagline: 'Rummene i appen og alt i Madbudget',
+    priceKr: COMMUNITY_PRICE_KR,
+    points: ['Alt fra Madbudget', 'Adgang til community'],
+    note: 'Start et struktureret vægttabsforløb med 10 andre i et fortroligt rum, kun for jer. Med faglig sparring fra os, og hjælp fra hinanden.',
+    research: 'Forskning viser, at 66 % holdt vægttabet, når de gjorde det sammen med andre. Alene var det 24 %.',
   },
   {
-    id: 'plus',
-    name: TIER_LABELS.plus,
-    priceLabel: `${TIER_PRICES_KR.plus} kr/md`,
-    tagline: 'Ubegrænset madplan, madlog og prisalarmer',
-  },
-  {
-    id: 'free',
-    name: 'Uden abonnement',
-    priceLabel: '0 kr',
-    tagline: '3 madplaner og 3 prisalarmer om ugen',
+    id: 'premium',
+    name: TIER_LABELS.premium,
+    priceKr: TIER_PRICES_KR.premium,
+    recommended: true,
+    points: [
+      'Alt fra Madbudget og Community',
+      'Faglig vægttabscoaching fra FF',
+      'Daglig sparring på messenger mellem 7.30 og 21.30 hver dag',
+    ],
+    note: 'Vi kender din plan, dine udfordringer, hjælper og støtter dig professionelt, så du lykkedes med dit vægttab. Telefonopkald også muligt.',
   },
 ]
 
@@ -51,97 +58,68 @@ type Props = {
 }
 
 export default function OnboardingPricingStep({ selected, onSelect }: Props) {
+  const plan = PLANS.find((item) => item.id === selected) ?? PLANS[0]
+
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Vælg plan</p>
-        <h2 className="mt-1 text-2xl font-bold">De første {TRIAL_DAYS} dage følger planen</h2>
+        <h2 className="text-2xl font-bold">Prøv {TRIAL_DAYS} dage gratis</h2>
+        <p className="mt-2 text-sm leading-relaxed text-emerald-100/85">Vælg den løsning, der passer dig.</p>
       </div>
 
-      <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/15">
-        <p className="text-sm leading-relaxed text-emerald-100/85">
-          Vælger du Madbudget, får du madplan og madlog. Vælger du Community, får du også rummene i appen.
-          Vælger du Premium, får du vejledning på Messenger oveni. Uden abonnement er det 3 madplaner og 3
-          prisalarmer om ugen.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        {PLANS.map((plan) => {
-          const active = selected === plan.id
+      <div className="space-y-3">
+        {PLANS.map((item) => {
+          const active = selected === item.id
           return (
             <button
-              key={plan.id}
+              key={item.id}
               type="button"
-              onClick={() => onSelect(plan.id)}
-              className={`relative w-full rounded-2xl border-2 px-4 py-3.5 text-left transition ${
+              onClick={() => onSelect(item.id)}
+              className={`relative w-full rounded-2xl border-2 px-4 py-4 text-left transition ${
                 active
-                  ? 'border-amber-300 bg-white/15 ring-2 ring-amber-300/40'
+                  ? 'border-amber-300 bg-white/15'
                   : 'border-white/15 bg-white/5 hover:border-white/30'
               }`}
             >
-              {plan.recommended ? (
+              {item.recommended ? (
                 <span className="absolute -top-2 right-4 rounded-full bg-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-950">
                   Mest valgt
                 </span>
               ) : null}
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white">{plan.name}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-emerald-100/85">{plan.tagline}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-white">{item.name}</p>
+                  <p className="mt-0.5 text-xs text-emerald-100/75">{TRIAL_DAYS} dages prøve</p>
                 </div>
-                <p className="shrink-0 text-base font-extrabold text-amber-200">{plan.priceLabel}</p>
+                <p className="shrink-0 text-lg font-extrabold text-amber-200">{item.priceKr} kr/md</p>
               </div>
-              {active ? (
-                <ul className="mt-3 space-y-1.5">
-                  {detailsFor(plan.id).map((line) => (
-                    <li key={line} className="flex items-start gap-2 text-xs text-emerald-50/95">
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
+              <ul className="mt-3 space-y-1.5">
+                {item.points.map((line, index) => (
+                  <li key={line} className="flex items-start gap-2 text-sm text-emerald-50/95">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" aria-hidden />
+                    <span>{index > 0 && item.note ? `+ ${line}` : line}</span>
+                  </li>
+                ))}
+              </ul>
+              {item.note ? <p className="mt-3 text-sm leading-relaxed text-emerald-50/95">{item.note}</p> : null}
+              {item.research ? (
+                <div className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2.5 text-emerald-900">
+                  <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <p className="text-sm font-medium leading-snug">{item.research}</p>
+                </div>
               ) : null}
             </button>
           )
         })}
       </div>
 
-      {selected === 'premium' ? <PremiumConsiderationNote variant="dark" /> : null}
-
-      <p className="text-xs leading-relaxed text-emerald-100/70">
-        Vælger du Madbudget, Community eller Premium, betaler du efter oprettelse. Opsig når som helst. Rummene
-        åbner du i appen.
+      <p className="text-sm font-bold leading-relaxed text-white">
+        Bemærk: Start {TRIAL_DAYS} dage gratis og se, hvad der fungerer for dig. Vi sender dig en mail dagen før, så
+        du husker at opsige, hvis det ikke er noget for dig.
       </p>
-
-      <HealthInformationNotice variant="dark" />
+      <p className="text-sm leading-relaxed text-white">
+        {plan.name}. {TRIAL_DAYS} dage gratis, derefter {plan.priceKr} kr pr. måned.
+      </p>
     </div>
   )
-}
-
-function detailsFor(plan: CheckoutPlan): string[] {
-  if (plan === 'premium') {
-    return [
-      `Først ${TRIAL_DAYS} dage med Premium`,
-      'Alt i Community og Madbudget',
-      'Personlig vejledning på Messenger, 7.30-21.30',
-    ]
-  }
-  if (plan === 'community') {
-    return [
-      `Først ${TRIAL_DAYS} dage med Community`,
-      'Grupper à 10 i appen, med fast startdato',
-      'Madplan, madlog og prisalarmer som i Madbudget',
-      'Personlig vejledning er Premium',
-    ]
-  }
-  if (plan === 'plus') {
-    return [
-      `Først ${TRIAL_DAYS} dage med Madbudget`,
-      'Ubegrænset madplan og madlog',
-      'Prisalarmer og indkøbsliste med tilbud',
-      'Åbner ikke community-rummene',
-    ]
-  }
-  return ['3 madplaner om ugen', '3 prisalarmer', 'Ingen community-rum og ingen Messenger-vejledning']
 }
