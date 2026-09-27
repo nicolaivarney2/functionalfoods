@@ -9,7 +9,6 @@ import {
   addDaysIso,
   copenhagenLocalToUtc,
   copenhagenTodayIso,
-  diffDaysIso,
   extractMentionHandles,
   renderCommunityTemplate,
   roomStatusForDates,
