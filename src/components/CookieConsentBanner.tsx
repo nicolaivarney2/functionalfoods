@@ -10,6 +10,7 @@ export default function CookieConsentBanner() {
 
   return (
     <div
+      data-site-chrome
       className="fixed inset-x-0 bottom-0 z-[240] border-t border-gray-200 bg-white px-4 py-4 shadow-[0_-4px_24px_rgba(0,0,0,0.08)] sm:px-6 sm:py-5"
       role="region"
       aria-label="Cookie-meddelelse"

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Heart, Share2, CalendarPlus, ChevronDown, Check } from 'lucide-react'
+import { Heart, Share2, Printer, CalendarPlus, ChevronDown, Check } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   isRecipeSaved,
@@ -88,6 +88,10 @@ export default function RecipeActions({
     }
   }
 
+  const handlePrint = () => {
+    window.open(`/opskrift/${recipeSlug}/print`, '_blank', 'noopener,noreferrer')
+  }
+
   const handleShare = async () => {
     if (navigator.share) {
       try {
@@ -155,6 +159,15 @@ export default function RecipeActions({
       >
         <Heart size={20} className={isSaved ? 'fill-current' : ''} />
         <span className="text-sm font-medium">Gem</span>
+      </button>
+
+      <button
+        onClick={handlePrint}
+        className="flex items-center space-x-2 p-2 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+        title="Print opskrift"
+      >
+        <Printer size={20} />
+        <span className="text-sm font-medium">Print</span>
       </button>
 
       <button

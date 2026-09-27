@@ -63,7 +63,7 @@ const BRAND_LOGO_URL = '/billeder/favicon/ff-logo favicon white logo.jpg.png'
 
 export default function Footer() {
   return (
-    <footer className="bg-black text-white">
+    <footer data-site-chrome className="bg-black text-white">
       <div className="container px-4 py-12 sm:py-14">
         <div className="mb-8">
           <Link href="/" className="inline-flex items-center gap-3">

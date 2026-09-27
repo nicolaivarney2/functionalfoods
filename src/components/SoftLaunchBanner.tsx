@@ -45,6 +45,7 @@ export default function SoftLaunchBanner() {
 
   return (
     <div
+      data-site-chrome
       role="region"
       aria-label="Meddelelse om soft launch"
       className="border-b border-amber-200/90 bg-gradient-to-r from-amber-50 via-emerald-50/80 to-amber-50"

@@ -115,6 +115,7 @@ export default function MessengerHumanGuidanceWidget() {
     <>
       <button
         type="button"
+        data-site-chrome
         onClick={() => setOpen(true)}
         className="fixed right-4 bottom-4 z-[95] flex h-14 w-14 items-center justify-center rounded-full bg-[#0084FF] text-white shadow-xl shadow-blue-900/25 transition hover:bg-[#006bcf] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2"
         aria-label="Aabn vejledning i Messenger"

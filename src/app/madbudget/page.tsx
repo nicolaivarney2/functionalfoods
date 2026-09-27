@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import MadbudgetShopSurveyModal from '@/components/MadbudgetShopSurveyModal'
-import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw, Loader2, BookOpen } from 'lucide-react'
+import { Calendar, Users, ShoppingCart, X, ChefHat, Coffee, Utensils, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Search, CheckCircle, LayoutGrid, Eye, Trash2, PieChart, Share2, Printer, Scale, Smartphone, ListChecks, Copy, Check, Lock, HelpCircle, RefreshCw, Loader2, BookOpen } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal, dietaryFactory } from '@/lib/dietary-system'
@@ -615,6 +615,7 @@ export default function MadbudgetPage() {
   const [selectedNutritionAdultIndex, setSelectedNutritionAdultIndex] = useState(0)
   const [shareLoading, setShareLoading] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [printLoading, setPrintLoading] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
 
   const router = useRouter()
@@ -1889,6 +1890,36 @@ export default function MadbudgetPage() {
       alert(`Kunne ikke genberegne indkøbslisten: ${msg}`)
     } finally {
       setRecalculatingShoppingList(false)
+    }
+  }
+
+  // Print madplan – samme del-link som Del, uden at hente priser, og åbn printsiden.
+  const handlePrintPlan = async () => {
+    const planId = activePlanRef?.id
+    if (!planId) return
+    setPrintLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        alert('Log ind for at printe din madplan')
+        return
+      }
+      const res = await fetch('/api/madbudget/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ mealPlanId: planId, skipPrices: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Kunne ikke gøre madplanen klar til print')
+      const token = data.token as string | undefined
+      const url = token ? `/madplan/${token}/print` : null
+      if (!url) throw new Error('Manglede print-link')
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      console.error('Print error:', e)
+      alert('Kunne ikke åbne madplanen til print. Prøv igen.')
+    } finally {
+      setPrintLoading(false)
     }
   }
 
@@ -3260,15 +3291,26 @@ export default function MadbudgetPage() {
                 </div>
                 <div className="flex flex-shrink-0 flex-nowrap items-center gap-2">
                 {activePlanRef?.id && !isGeneratingMealPlan && (
-                  <button
-                    onClick={handleSharePlan}
-                    disabled={shareLoading}
-                    className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
-                    title="Del madplan"
-                  >
-                    <Share2 size={18} />
-                    <span className="hidden sm:inline">{shareCopied ? 'Kopieret!' : 'Del'}</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={handlePrintPlan}
+                      disabled={printLoading || shareLoading}
+                      className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
+                      title="Print madplan"
+                    >
+                      <Printer size={18} />
+                      <span>{printLoading ? 'Forbereder…' : 'Print'}</span>
+                    </button>
+                    <button
+                      onClick={handleSharePlan}
+                      disabled={shareLoading || printLoading}
+                      className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
+                      title="Del madplan"
+                    >
+                      <Share2 size={18} />
+                      <span className="hidden sm:inline">{shareCopied ? 'Kopieret!' : 'Del'}</span>
+                    </button>
+                  </>
                 )}
                 <Link
                   href="/dagbog"
@@ -3381,6 +3423,18 @@ export default function MadbudgetPage() {
                       </label>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {activePlanRef?.id && !isGeneratingMealPlan && (
+                        <button
+                          type="button"
+                          onClick={handlePrintPlan}
+                          disabled={printLoading || shareLoading}
+                          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                          title="Print madplan"
+                        >
+                          <Printer size={16} aria-hidden />
+                          {printLoading ? 'Forbereder…' : 'Print madplan'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setLockDishesMode((v) => !v)}
@@ -4482,8 +4536,6 @@ export default function MadbudgetPage() {
                   pris matcher.
                 </div>
               )}
-              
-              <FeedbackCta screen="madbudget" />
 
               {!shoppingList ? (
                 <div className="text-center py-8 text-gray-500">
@@ -4943,6 +4995,8 @@ export default function MadbudgetPage() {
                   )}
                 </div>
               )}
+
+              <FeedbackCta screen="madbudget" />
             </div>
         </div>
       </div>

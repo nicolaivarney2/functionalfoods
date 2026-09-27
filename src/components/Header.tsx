@@ -71,7 +71,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="relative z-[130] bg-white border-b border-gray-200">
+      <header data-site-chrome className="relative z-[130] bg-white border-b border-gray-200">
         {/* Top Menu — samme mørkegrønne som app-ikonet (brand-950) */}
         <div className="bg-brand-950 text-white">
           <div className="container px-3 sm:px-4">

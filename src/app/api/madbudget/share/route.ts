@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const mealPlanId = body.mealPlanId
+    const skipPrices = body.skipPrices === true
     if (!mealPlanId) {
       return NextResponse.json({ error: 'mealPlanId required' }, { status: 400 })
     }
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
     let shoppingListPrices: Record<string, Record<string, any>> | null = null
     const storeIds = (plan.family_profile_snapshot as any)?.selectedStores
     const shoppingList = plan.shopping_list as any
-    if (storeIds?.length > 0 && shoppingList?.categories?.length > 0) {
+    if (!skipPrices && storeIds?.length > 0 && shoppingList?.categories?.length > 0) {
       const items: any[] = []
       shoppingList.categories.forEach((cat: any) => {
         cat.items?.forEach((item: any) => {

@@ -18,6 +18,7 @@ export default function AppLaunchTopBar() {
 
   return (
     <div
+      data-site-chrome
       role="region"
       aria-label="Nyhedsmeddelelse"
       className="bg-emerald-800 text-white"
