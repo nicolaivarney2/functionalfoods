@@ -7,6 +7,7 @@ import { getEffectiveSubscriptionTier } from '@/lib/subscription-entitlements'
 
 import {
   addDaysIso,
+  copenhagenLocalToUtc,
   copenhagenTodayIso,
   diffDaysIso,
   extractMentionHandles,
@@ -29,16 +30,29 @@ function staffNotifyEmail(): string {
   return process.env.COMMUNITY_STAFF_EMAIL?.trim() || 'nicolai@functionalfoods.dk'
 }
 
+function firstName(value: string): string {
+  const word = value.trim().split(/\s+/)[0] ?? ''
+  return word || 'Medlem'
+}
+
 async function displayNameFor(service: SupabaseClient, userId: string, fallbackUser?: User | null) {
+  const { data: chosen } = await service
+    .from('community_profiles')
+    .select('display_name')
+    .eq('user_id', userId)
+    .maybeSingle()
+  const saved = (chosen as { display_name?: string } | null)?.display_name?.trim()
+  if (saved) return firstName(saved)
+
   if (fallbackUser) {
     const meta = (fallbackUser.user_metadata ?? {}) as { name?: string }
-    if (meta.name?.trim()) return meta.name.trim()
-    if (fallbackUser.email) return fallbackUser.email.split('@')[0]
+    if (meta.name?.trim()) return firstName(meta.name)
+    if (fallbackUser.email) return firstName(fallbackUser.email.split('@')[0])
   }
   const { data } = await service.auth.admin.getUserById(userId)
   const meta = (data.user?.user_metadata ?? {}) as { name?: string }
-  if (meta.name?.trim()) return meta.name.trim()
-  if (data.user?.email) return data.user.email.split('@')[0]
+  if (meta.name?.trim()) return firstName(meta.name)
+  if (data.user?.email) return firstName(data.user.email.split('@')[0])
   return 'Medlem'
 }
 
@@ -105,6 +119,7 @@ async function insertMessage(
     kind: CommunityMessageKind
     body: string
     dayOffset?: number | null
+    templateId?: string | null
   }
 ): Promise<CommunityMessageRow> {
   const { data, error } = await service
@@ -116,6 +131,7 @@ async function insertMessage(
       kind: input.kind,
       body: input.body,
       day_offset: input.dayOffset ?? null,
+      template_id: input.templateId ?? null,
     })
     .select('*')
     .single()
@@ -129,8 +145,17 @@ export async function joinCommunityRoom(params: {
 }): Promise<{ room: CommunityRoomRow; alreadyMember: boolean }> {
   const service = communityServiceClient()
   const tier = await getEffectiveSubscriptionTier(service, params.user.id)
-  if (tier !== 'plus' && tier !== 'premium') {
-    throw Object.assign(new Error('Community kræver en aktiv prøveperiode, Madbudget eller Premium.'), { status: 403 })
+  const { data: accessRow } = await service
+    .from('user_profiles')
+    .select('community_access')
+    .eq('id', params.user.id)
+    .maybeSingle()
+  const communityAccess = Boolean((accessRow as { community_access?: boolean } | null)?.community_access)
+  if (tier !== 'premium' && !communityAccess) {
+    throw Object.assign(
+      new Error('Community kræver Community-abonnementet eller Premium. Madbudget er madplan og madlog.'),
+      { status: 403 }
+    )
   }
 
   const today = copenhagenTodayIso()
@@ -296,8 +321,13 @@ export async function runCommunityTick(now = new Date()) {
   const today = copenhagenTodayIso(now)
   const tomorrow = addDaysIso(today, 1)
 
-  const { data: rooms, error } = await service.from('community_rooms').select('*')
+  const [{ data: rooms, error }, { data: dayRows, error: tplError }] = await Promise.all([
+    service.from('community_rooms').select('*'),
+    service.from('community_guidance_templates').select('*').eq('trigger', 'day'),
+  ])
   if (error) return { ok: false as const, error: error.message }
+  if (tplError) return { ok: false as const, error: tplError.message }
+  const dayTemplates = (dayRows ?? []) as CommunityTemplateRow[]
 
   let activated = 0
   let archived = 0
@@ -347,57 +377,44 @@ export async function runCommunityTick(now = new Date()) {
     }
 
     if (room.status !== 'active') continue
-    const day = diffDaysIso(room.start_date, today)
-    if (day < 0) continue
-
-    const { data: tpl } = await service
-      .from('community_guidance_templates')
-      .select('*')
-      .eq('niche', room.niche)
-      .eq('trigger', 'day')
-      .eq('day_offset', day)
-      .maybeSingle()
-    if (!tpl) continue
-
-    const { data: already } = await service
-      .from('community_messages')
-      .select('id')
-      .eq('room_id', room.id)
-      .eq('kind', 'guidance')
-      .eq('day_offset', day)
-      .maybeSingle()
-    if (already) continue
-
-    const body = renderCommunityTemplate((tpl as CommunityTemplateRow).body, {
-      niche: room.niche,
-      members: '',
-      startDate: room.start_date,
-    })
-    try {
-      await insertMessage(service, {
-        roomId: room.id,
-        authorName: 'Functional Foods',
-        kind: 'guidance',
-        body,
-        dayOffset: day,
+    const posted = await postedTemplateIds(service, room.id)
+    const due = dueGuidance(templatesForNiche(dayTemplates, room.niche), room, now)
+    for (const item of due) {
+      if (posted.has(item.template.id)) continue
+      const body = renderCommunityTemplate(item.template.body, {
+        niche: room.niche,
+        members: '',
+        startDate: room.start_date,
       })
-    } catch {
-      continue
+      try {
+        await insertMessage(service, {
+          roomId: room.id,
+          authorName: 'Functional Foods',
+          kind: 'guidance',
+          body,
+          dayOffset: item.template.day_offset,
+          templateId: item.template.id,
+        })
+      } catch {
+        continue
+      }
+      posted.add(item.template.id)
+      guidance += 1
+      const day = item.template.day_offset ?? 0
+      const emails = await memberEmails(service, room.id)
+      await emitLoops(emails, 'community-guidance-posted', {
+        niche: room.niche,
+        day,
+        roomId: room.id,
+        startDate: room.start_date,
+      })
+      const ids = await memberIds(service, room.id)
+      await pushToUsers(service, ids, {
+        title: `${dietaryApproachLabel(room.niche)} · dag ${day}`,
+        body: body.slice(0, 100),
+        data: { type: 'community', roomId: room.id },
+      })
     }
-    guidance += 1
-    const emails = await memberEmails(service, room.id)
-    await emitLoops(emails, 'community-guidance-posted', {
-      niche: room.niche,
-      day,
-      roomId: room.id,
-      startDate: room.start_date,
-    })
-    const ids = await memberIds(service, room.id)
-    await pushToUsers(service, ids, {
-      title: `${dietaryApproachLabel(room.niche)} · dag ${day}`,
-      body: body.slice(0, 100),
-      data: { type: 'community', roomId: room.id },
-    })
   }
 
   return { ok: true as const, today, activated, archived, guidance, events }
@@ -445,7 +462,7 @@ export async function createCommunityRoom(input: {
     .insert({
       niche: input.niche,
       start_date: input.startDate,
-      capacity: input.capacity ?? 8,
+      capacity: input.capacity ?? 10,
       duration_days: duration,
       title: input.title?.trim() || null,
       status,
@@ -454,6 +471,68 @@ export async function createCommunityRoom(input: {
     .single()
   if (error || !data) throw new Error(error?.message || 'Kunne ikke oprette rum')
   return data as CommunityRoomRow
+}
+
+export async function addCommunityMember(params: { roomId: string; email: string }) {
+  const email = params.email.trim().replace(/[%_\\]/g, '')
+  if (!email.includes('@')) throw new Error('Skriv en e-mail.')
+
+  const service = communityServiceClient()
+  const { data: profile, error: profileErr } = await service
+    .from('user_profiles')
+    .select('id')
+    .ilike('email', email)
+    .maybeSingle()
+  if (profileErr) throw new Error(profileErr.message)
+  const userId = (profile as { id?: string } | null)?.id
+  if (!userId) throw new Error('Ingen konto med den e-mail.')
+
+  const { data: room, error: roomErr } = await service
+    .from('community_rooms')
+    .select('*')
+    .eq('id', params.roomId)
+    .maybeSingle()
+  if (roomErr || !room) throw new Error('Rummet findes ikke.')
+  const typed = room as CommunityRoomRow
+  if (typed.status === 'archived') throw new Error('Rummet er afsluttet.')
+  if (typed.member_count >= typed.capacity) throw new Error('Rummet er fyldt.')
+
+  const { data: existing } = await service
+    .from('community_memberships')
+    .select('user_id')
+    .eq('room_id', typed.id)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (existing) throw new Error('Personen er allerede med i rummet.')
+
+  const { data: mine } = await service.from('community_memberships').select('room_id').eq('user_id', userId)
+  const mineIds = (mine ?? []).map((row) => String((row as { room_id: string }).room_id))
+  if (mineIds.length) {
+    const { data: live } = await service
+      .from('community_rooms')
+      .select('id')
+      .in('id', mineIds)
+      .in('status', ['open', 'active'])
+    if ((live ?? []).length) throw new Error('Personen er allerede med i et andet rum.')
+  }
+
+  const name = await displayNameFor(service, userId)
+  const { error: joinErr } = await service.from('community_memberships').insert({
+    room_id: typed.id,
+    user_id: userId,
+    display_name: name,
+  })
+  if (joinErr) throw new Error(joinErr.message)
+
+  await insertMessage(service, {
+    roomId: typed.id,
+    userId,
+    authorName: 'Functional Foods',
+    kind: 'system',
+    body: `${name} er tilmeldt rummet.`,
+  })
+
+  return { displayName: name }
 }
 
 export async function updateCommunityRoom(
@@ -466,44 +545,81 @@ export async function updateCommunityRoom(
   return data as CommunityRoomRow
 }
 
+function templatesForNiche(templates: CommunityTemplateRow[], niche: string): CommunityTemplateRow[] {
+  return templates.filter((t) => t.niche === niche)
+}
+
+function dueGuidance(templates: CommunityTemplateRow[], room: CommunityRoomRow, now: Date) {
+  return templates
+    .filter((t) => t.trigger === 'day' && t.day_offset != null && t.send_time)
+    .map((template) => ({
+      template,
+      at: copenhagenLocalToUtc(addDaysIso(room.start_date, template.day_offset ?? 0), template.send_time ?? '08:00'),
+    }))
+    .filter((item) => item.at.getTime() <= now.getTime())
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+}
+
+async function postedTemplateIds(service: SupabaseClient, roomId: string): Promise<Set<string>> {
+  const { data } = await service
+    .from('community_messages')
+    .select('template_id')
+    .eq('room_id', roomId)
+    .not('template_id', 'is', null)
+  return new Set(
+    (data ?? [])
+      .map((row) => (row as { template_id: string | null }).template_id)
+      .filter((id): id is string => Boolean(id))
+  )
+}
+
+function normalizeSendTime(value: string | null | undefined): string {
+  const match = (value ?? '').trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) throw new Error('Skriv et tidspunkt, fx 08:00.')
+  const hh = Number(match[1])
+  const mm = Number(match[2])
+  if (hh > 23 || mm > 59) throw new Error('Tidspunktet er ikke gyldigt.')
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`
+}
+
+function templateWriteError(error: { code?: string; message?: string } | null, fallback: string): Error {
+  if (error?.code === '23505') {
+    return new Error('Der ligger allerede en besked den dag på det tidspunkt.')
+  }
+  return new Error(error?.message || fallback)
+}
+
 export async function upsertGuidanceTemplate(input: {
   id?: string
   niche: string
   trigger: 'on_join' | 'day'
   dayOffset?: number | null
+  sendTime?: string | null
   body: string
 }) {
   const service = communityServiceClient()
+  const body = input.body.trim()
+  if (!body) throw new Error('Skriv en besked.')
   const row = {
     niche: input.niche,
     trigger: input.trigger,
-    day_offset: input.trigger === 'on_join' ? null : input.dayOffset ?? 0,
-    body: input.body.trim(),
+    day_offset: input.trigger === 'on_join' ? null : Math.max(0, Math.floor(input.dayOffset ?? 0)),
+    send_time: input.trigger === 'on_join' ? null : normalizeSendTime(input.sendTime ?? '08:00'),
+    body,
     updated_at: new Date().toISOString(),
   }
-  let existingId = input.id
-  if (!existingId) {
-    let q = service
-      .from('community_guidance_templates')
-      .select('id')
-      .eq('niche', input.niche)
-      .eq('trigger', input.trigger)
-    q = input.trigger === 'on_join' ? q.is('day_offset', null) : q.eq('day_offset', row.day_offset)
-    const { data: existing } = await q.maybeSingle()
-    existingId = (existing as { id?: string } | null)?.id
-  }
-  if (existingId) {
+  if (input.id) {
     const { data, error } = await service
       .from('community_guidance_templates')
       .update(row)
-      .eq('id', existingId)
+      .eq('id', input.id)
       .select('*')
       .single()
-    if (error || !data) throw new Error(error?.message || 'Kunne ikke gemme skabelon')
+    if (error || !data) throw templateWriteError(error, 'Kunne ikke gemme skabelon')
     return data as CommunityTemplateRow
   }
   const { data, error } = await service.from('community_guidance_templates').insert(row).select('*').single()
-  if (error || !data) throw new Error(error?.message || 'Kunne ikke oprette skabelon')
+  if (error || !data) throw templateWriteError(error, 'Kunne ikke oprette skabelon')
   return data as CommunityTemplateRow
 }
 
@@ -511,6 +627,64 @@ export async function deleteGuidanceTemplate(id: string) {
   const service = communityServiceClient()
   const { error } = await service.from('community_guidance_templates').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+export async function listAdminRoomMessages(roomId: string): Promise<CommunityMessageRow[]> {
+  const service = communityServiceClient()
+  const { data, error } = await service
+    .from('community_messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CommunityMessageRow[]
+}
+
+/** Skriver i rummet som Nicolai. Tager ikke en plads og blokerer ikke andre rum. */
+export async function postAdminRoomMessage(params: { roomId: string; userId: string; body: string }) {
+  const text = params.body.trim()
+  if (!text) throw new Error('Skriv en besked.')
+  if (text.length > 2000) throw new Error('Beskeden er for lang.')
+
+  const service = communityServiceClient()
+  const { data: room } = await service.from('community_rooms').select('*').eq('id', params.roomId).maybeSingle()
+  if (!room) throw new Error('Rummet findes ikke.')
+  const typed = room as CommunityRoomRow
+  if (typed.status === 'archived') throw new Error('Forløbet er afsluttet.')
+
+  const { data: staff } = await service.from('community_staff').select('display_name').eq('handle', 'nicolai').maybeSingle()
+  const name = String((staff as { display_name?: string } | null)?.display_name || 'Nicolai')
+  const message = await insertMessage(service, {
+    roomId: typed.id,
+    userId: params.userId,
+    authorName: name,
+    kind: 'user',
+    body: text,
+  })
+
+  const ids = (await memberIds(service, typed.id)).filter((id) => id !== params.userId)
+  await pushToUsers(service, ids, {
+    title: name,
+    body: text.slice(0, 80),
+    data: { type: 'community', roomId: typed.id },
+  })
+  return message
+}
+
+/** Synlig komme/gå-besked, så rummet kan se at Nicolai er der, og når han går igen. */
+export async function postAdminPresence(params: { roomId: string; action: 'join' | 'leave' }) {
+  const service = communityServiceClient()
+  const { data: room } = await service.from('community_rooms').select('id, status').eq('id', params.roomId).maybeSingle()
+  if (!room) throw new Error('Rummet findes ikke.')
+  if ((room as { status: string }).status === 'archived') throw new Error('Forløbet er afsluttet.')
+
+  const body = params.action === 'join' ? 'Nicolai kom ind i rummet' : 'Nicolai forlod rummet'
+  return insertMessage(service, {
+    roomId: params.roomId,
+    authorName: 'Functional Foods',
+    kind: 'system',
+    body,
+  })
 }
 
 export async function updateCommunityStaff(handle: string, userId: string | null) {

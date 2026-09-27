@@ -37,6 +37,7 @@ type ProfileRow = {
   lifetime_access?: boolean | null
   trial_ends_at?: string | null
   created_at?: string | null
+  community_access?: boolean | null
 }
 
 function tierFromProfileRow(row: ProfileRow | null): SubscriptionTier {
@@ -71,12 +72,13 @@ type AccessSnapshot = {
   onTrial: boolean
   trialEndsAt: string | null
   lifetimeAccess: boolean
+  communityAccess: boolean
 }
 
 async function loadProfileAccess(supabase: SupabaseClient, userId: string): Promise<AccessSnapshot> {
   const first = await supabase
     .from('user_profiles')
-    .select('subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at')
+    .select('subscription_tier, last_contribution_amount_ore, lifetime_access, trial_ends_at, created_at, community_access')
     .eq('id', userId)
     .maybeSingle()
 
@@ -97,13 +99,16 @@ async function loadProfileAccess(supabase: SupabaseClient, userId: string): Prom
   const billed = billedTierFromRow(row)
   const trialEndsAt = resolveTrialEndsAt(row)
   const onTrial = isTrialActive(trialEndsAt)
-  const effective = onTrial ? higherSubscriptionTier(billed, 'premium') : billed
+  // Prøven følger det valgte abonnement. Butikkens prøve aktiverer samme entitlement.
+  const effective = billed
+  const communityAccess = Boolean(row?.community_access) || effective === 'premium'
   return {
     billed,
     effective,
     onTrial,
     trialEndsAt,
     lifetimeAccess: Boolean(row?.lifetime_access),
+    communityAccess,
   }
 }
 
@@ -116,7 +121,7 @@ export async function getUserSubscriptionTier(
   return access.billed
 }
 
-/** Det brugeren faktisk må: trial giver Premium i 14 dage. */
+/** Det brugeren faktisk må. Community inkluderer Madbudget, ikke personlig vejledning. */
 export async function getEffectiveSubscriptionTier(
   supabase: SupabaseClient,
   userId: string,
@@ -158,7 +163,15 @@ export async function getSubscriptionStatus(
     loadProfileAccess(supabase, userId),
     getSubscriptionUsage(supabase, userId),
   ])
-  const ent = entitlementsForTier(access.effective)
+  const mealTier =
+    access.communityAccess && access.effective !== 'premium'
+      ? higherSubscriptionTier(access.effective, 'plus')
+      : access.effective
+  const ent = entitlementsForTier(mealTier)
+  if (access.communityAccess && mealTier !== 'premium') {
+    ent.messengerGuidance = false
+    ent.tier = access.effective === 'free' ? 'plus' : access.effective
+  }
 
   const mealPlansRemainingThisWeek =
     ent.mealPlansPerWeek == null

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth, type OAuthProvider } from '@/contexts/AuthContext'
-import { TIER_PRICES_KR, type SubscriptionTier } from '@/lib/subscription-tiers'
+import { COMMUNITY_PRICE_KR, TIER_PRICES_KR, type CheckoutPlan } from '@/lib/subscription-tiers'
 
 function AppleLogo({ className }: { className?: string }) {
   return (
@@ -37,7 +37,7 @@ function GoogleLogo({ className }: { className?: string }) {
 
 type Props = {
   mode: 'signup' | 'login'
-  tier?: SubscriptionTier
+  tier?: CheckoutPlan
   redirectPath?: string
   disabled?: boolean
   onBeforeRedirect?: () => void
@@ -46,12 +46,12 @@ type Props = {
   variant?: 'dark' | 'light'
 }
 
-function actionLabel(provider: OAuthProvider, mode: Props['mode'], tier?: SubscriptionTier): string {
+function actionLabel(provider: OAuthProvider, mode: Props['mode'], tier?: CheckoutPlan): string {
   const providerName = provider === 'apple' ? 'Apple' : 'Google'
   if (mode === 'login') return `Fortsæt med ${providerName}`
 
-  if (tier === 'plus' || tier === 'premium') {
-    const price = TIER_PRICES_KR[tier]
+  if (tier === 'plus' || tier === 'premium' || tier === 'community') {
+    const price = tier === 'community' ? COMMUNITY_PRICE_KR : TIER_PRICES_KR[tier]
     return `Opret med ${providerName} (${price} kr/md)`
   }
   return `Opret med ${providerName}`

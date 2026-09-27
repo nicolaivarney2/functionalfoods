@@ -1,9 +1,9 @@
-import type { SubscriptionTier } from '@/lib/subscription-tiers'
+import type { CheckoutPlan } from '@/lib/subscription-tiers'
 
 export const OAUTH_SIGNUP_PENDING_KEY = 'ff_oauth_signup_pending_v1'
 
 export type OAuthSignupPending = {
-  tier: SubscriptionTier
+  tier: CheckoutPlan
   productUpdatesConsent: boolean
   source: 'onboarding'
   referralCode?: string | null
@@ -25,7 +25,9 @@ export function loadOAuthSignupPending(): OAuthSignupPending | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<OAuthSignupPending>
     if (parsed.source !== 'onboarding') return null
-    if (parsed.tier !== 'free' && parsed.tier !== 'plus' && parsed.tier !== 'premium') return null
+    if (parsed.tier !== 'free' && parsed.tier !== 'plus' && parsed.tier !== 'community' && parsed.tier !== 'premium') {
+      return null
+    }
     return {
       tier: parsed.tier,
       productUpdatesConsent: Boolean(parsed.productUpdatesConsent),

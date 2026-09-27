@@ -1,5 +1,5 @@
 import { applyPendingOnboarding, markAutoFirstPlanPending } from '@/lib/onboarding/vaegttabsplan-onboarding'
-import type { SubscriptionTier } from '@/lib/subscription-tiers'
+import type { CheckoutPlan } from '@/lib/subscription-tiers'
 
 export type CompleteSignupResult =
   | { ok: true; redirectUrl: string; external: boolean }
@@ -7,7 +7,7 @@ export type CompleteSignupResult =
 
 export async function completeSignupAfterAuth(
   accessToken: string,
-  tier: SubscriptionTier,
+  tier: CheckoutPlan,
   productUpdatesConsent: boolean,
   referralCode?: string | null
 ): Promise<CompleteSignupResult> {
@@ -28,7 +28,7 @@ export async function completeSignupAfterAuth(
   await applyPendingOnboarding(accessToken)
   markAutoFirstPlanPending()
 
-  if (tier === 'plus' || tier === 'premium') {
+  if (tier === 'plus' || tier === 'premium' || tier === 'community') {
     const payRes = await fetch('/api/stripe/create-subscription-checkout', {
       method: 'POST',
       headers: {

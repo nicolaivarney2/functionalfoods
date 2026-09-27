@@ -61,6 +61,15 @@ export async function POST(request: NextRequest) {
       }
 
       if (session.mode === 'subscription') {
+        if (session.metadata?.subscription_tier === 'community') {
+          await setUserSubscriptionTier(supabase, userId, 'plus', {
+            stripeSubscriptionId:
+              typeof session.subscription === 'string' ? session.subscription : session.subscription?.id,
+            monthlyAmountOre: 4900,
+            subscriptionSource: 'stripe',
+          })
+          await supabase.from('user_profiles').update({ community_access: true }).eq('id', userId)
+        }
         const tier = normalizeSubscriptionTier(session.metadata?.subscription_tier)
         if (tier === 'plus' || tier === 'premium') {
           await setUserSubscriptionTier(supabase, userId, tier, {
@@ -91,6 +100,14 @@ export async function POST(request: NextRequest) {
     const sub = event.data.object as Stripe.Subscription
     const userId = sub.metadata?.supabase_user_id
     if (userId && ['active', 'trialing'].includes(sub.status)) {
+      if (sub.metadata?.subscription_tier === 'community') {
+        await setUserSubscriptionTier(supabase, userId, 'plus', {
+          stripeSubscriptionId: sub.id,
+          monthlyAmountOre: 4900,
+          subscriptionSource: 'stripe',
+        })
+        await supabase.from('user_profiles').update({ community_access: true }).eq('id', userId)
+      }
       const tier = tierFromSubscription(sub)
       await setUserSubscriptionTier(supabase, userId, tier, {
         stripeSubscriptionId: sub.id,
@@ -113,6 +130,9 @@ export async function POST(request: NextRequest) {
         monthlyAmountOre: null,
         subscriptionSource: 'none',
       })
+      if (sub.metadata?.subscription_tier === 'community') {
+        await supabase.from('user_profiles').update({ community_access: false }).eq('id', userId)
+      }
     }
   }
 

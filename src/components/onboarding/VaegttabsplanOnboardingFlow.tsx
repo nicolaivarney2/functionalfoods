@@ -27,7 +27,7 @@ import HealthInformationNotice from '@/components/HealthInformationNotice'
 import { Cite } from '@/components/Cite'
 import { healthMethodologyAnchor } from '@/lib/health-sources'
 import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
-import type { SubscriptionTier } from '@/lib/subscription-tiers'
+import { COMMUNITY_PRICE_KR, TIER_PRICES_KR, TRIAL_DAYS, type CheckoutPlan } from '@/lib/subscription-tiers'
 import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
 import { readStoredReferralCode } from '@/lib/referral-client'
 import { normalizeReferralCode } from '@/lib/referral-shared'
@@ -72,6 +72,19 @@ const STEP = {
   SUMMARY: 14,
   SIGNUP: 15,
 } as const
+
+function signupPlanCopy(plan: CheckoutPlan): string {
+  if (plan === 'plus') {
+    return `Først ${TRIAL_DAYS} dage med Madbudget. Derefter ${TIER_PRICES_KR.plus} kr/md for ubegrænset madplan, madlog og prisalarmer. Vi sender dig til betaling efter oprettelse.`
+  }
+  if (plan === 'community') {
+    return `Først ${TRIAL_DAYS} dage med Community. Derefter ${COMMUNITY_PRICE_KR} kr/md. Du får rummene i appen og alt i Madbudget. Vi sender dig til betaling efter oprettelse.`
+  }
+  if (plan === 'premium') {
+    return `Først ${TRIAL_DAYS} dage med Premium. Derefter ${TIER_PRICES_KR.premium} kr/md, med rummene og personlig vejledning på Messenger. Vi sender dig til betaling efter oprettelse.`
+  }
+  return 'Uden abonnement får du 3 madplaner og 3 prisalarmer om ugen. Ingen betaling nu.'
+}
 
 const TOTAL_STEPS = 16
 const ALMOST_DONE_FROM_STEP = STEP.AGE
@@ -170,7 +183,7 @@ function VaegttabsplanOnboardingInner() {
 
   const [password, setPassword] = useState('')
   const [emailConfirm, setEmailConfirm] = useState('')
-  const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('free')
+  const [selectedTier, setSelectedTier] = useState<CheckoutPlan>('free')
   const [acceptTerms, setAcceptTerms] = useState(true)
   const [productUpdatesConsent, setProductUpdatesConsent] = useState(true)
   const [referralCode, setReferralCode] = useState('')
@@ -321,6 +334,30 @@ function VaegttabsplanOnboardingInner() {
         return true
     }
   }
+
+  useEffect(() => {
+    if (step >= STEP.SIGNUP) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return
+      const target = e.target
+      if (!(target instanceof HTMLInputElement)) return
+      if (target.type === 'checkbox' || target.type === 'radio' || target.type === 'hidden') return
+      e.preventDefault()
+      const inputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>(
+          'main input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"])'
+        )
+      )
+      const next = inputs[inputs.indexOf(target) + 1]
+      if (next) {
+        next.focus()
+        return
+      }
+      if (canContinue()) goNext()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   useEffect(() => {
     if (step !== STEP.SIGNUP || !turnstileSiteKey) return
@@ -1005,13 +1042,7 @@ function VaegttabsplanOnboardingInner() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Sidste trin</p>
                 <h2 className="mt-1 text-2xl font-bold">Opret din konto</h2>
-                <p className="mt-2 text-sm text-emerald-100/85">
-                  {selectedTier === 'free'
-                    ? 'Du får 14 dage med fuld adgang — også personlig vejledning. Ingen betaling nu.'
-                    : selectedTier === 'plus'
-                      ? 'Du får 14 dage med det hele, og vælger Madbudget (29 kr/md) bagefter — vi sender dig til betaling efter oprettelse.'
-                      : 'Du får 14 dage med det hele og vælger Premium (249 kr/md) — vi sender dig til betaling efter oprettelse.'}
-                </p>
+                <p className="mt-2 text-sm text-emerald-100/85">{signupPlanCopy(selectedTier)}</p>
               </div>
 
               {info && (

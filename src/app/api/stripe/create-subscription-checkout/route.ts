@@ -4,7 +4,12 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServerClient } from '@/lib/supabaseServer'
 import { ensureStripeCustomerForUser } from '@/lib/stripe-customers'
 import { getStripe } from '@/lib/stripe-server'
-import { TIER_PRICES_KR, PREMIUM_GUIDANCE_HOURS, type SubscriptionTier } from '@/lib/subscription-tiers'
+import {
+  PREMIUM_GUIDANCE_HOURS,
+  TIER_PRICES_KR,
+  TRIAL_DAYS,
+  type SubscriptionTier,
+} from '@/lib/subscription-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,22 +51,36 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const tier = body?.tier as SubscriptionTier
-    if (tier !== 'plus' && tier !== 'premium') {
-      return NextResponse.json({ error: 'tier skal være plus eller premium' }, { status: 400 })
+    const tier = body?.tier as SubscriptionTier | 'community'
+    if (tier !== 'plus' && tier !== 'premium' && tier !== 'community') {
+      return NextResponse.json({ error: 'tier skal være plus, community eller premium' }, { status: 400 })
+    }
+    if (tier === 'community' && !process.env.STRIPE_PRICE_COMMUNITY_MONTHLY) {
+      return NextResponse.json(
+        { error: 'Community på web mangler Stripe-prisen STRIPE_PRICE_COMMUNITY_MONTHLY.' },
+        { status: 503 },
+      )
     }
 
     const stripe = getStripe()
     const supabase = createSupabaseServerClient()
     const customerId = await ensureStripeCustomerForUser(supabase, user)
     const origin = siteOrigin(request)
-    const amountKr = TIER_PRICES_KR[tier]
-    const product = TIER_PRODUCT[tier]
+    const amountKr = tier === 'community' ? 49 : TIER_PRICES_KR[tier]
+    const product =
+      tier === 'community'
+        ? {
+            name: 'Functional Foods Community',
+            description: 'Vægttabsforløb i grupper à 10, plus madplaner, madlog og prisalarmer.',
+          }
+        : TIER_PRODUCT[tier]
 
     const configuredPriceId =
       tier === 'premium'
         ? process.env.STRIPE_PRICE_PREMIUM_MONTHLY
-        : process.env.STRIPE_PRICE_PLUS_MONTHLY
+        : tier === 'community'
+          ? process.env.STRIPE_PRICE_COMMUNITY_MONTHLY
+          : process.env.STRIPE_PRICE_PLUS_MONTHLY
 
     const lineItems = configuredPriceId
       ? [{ price: configuredPriceId, quantity: 1 }]
@@ -88,7 +107,9 @@ export async function POST(request: NextRequest) {
         supabase_user_id: user.id,
         subscription_tier: tier,
       },
+      payment_method_collection: 'always',
       subscription_data: {
+        trial_period_days: TRIAL_DAYS,
         metadata: {
           supabase_user_id: user.id,
           subscription_tier: tier,

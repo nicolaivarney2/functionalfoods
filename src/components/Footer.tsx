@@ -11,6 +11,7 @@ const columns = [
       { label: 'Madbudget (AI madplaner)', href: '/funktioner/madbudget-ai-madplaner' },
       { label: 'Madplaner ud fra tilbud', href: '/funktioner/madplaner-ud-fra-tilbud' },
       { label: 'Vægttabsrejse (50+ parametre)', href: '/funktioner/vaegttabsrejse' },
+      { label: 'Community', href: '/funktioner/community' },
       { label: 'Personlig vejledning', href: '/funktioner/personlig-vejledning' },
       { label: 'Makro + mikro opskrifter', href: '/funktioner/makro-mikro-opskrifter' },
       { label: '5000 opskrifter i 8 nicher', href: '/funktioner/5000-opskrifter-i-8-nicher' },

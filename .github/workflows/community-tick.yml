@@ -4,7 +4,8 @@ name: Community tick
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    # Hvert kvarter. Beskeder sendes første kørsel efter deres danske klokkeslæt.
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 concurrency:

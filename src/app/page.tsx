@@ -246,7 +246,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        'Du får 14 dage med fuld adgang — madplan, madlog, community og personlig vejledning. Bagefter er Madbudget 29 kr/md (ubegrænset plan og log) og Premium 249 kr/md (plus vejledning i dagstimerne 7.30–21.30 på Messenger). Uden abonnement går du tilbage til 3 madplaner og 3 prisalarmer om ugen.',
+        'De første 14 dage følger det abonnement, du vælger. Madbudget er 29 kr/md og giver ubegrænset madplan, madlog og prisalarmer. Community er 49 kr/md og lægger rummene i appen oveni. Premium er 249 kr/md og har også personlig vejledning på Messenger i dagstimerne 7.30-21.30. Uden abonnement er det 3 madplaner og 3 prisalarmer om ugen.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',
@@ -639,6 +639,106 @@ export default function Home() {
             <p className="mt-10 text-center text-base font-semibold text-emerald-800">
               Det er sådan du taber 5, 10 eller 20 kg - uden at starte forfra hver mandag.
             </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="abonnement" className="border-y border-emerald-100 bg-white py-16 lg:py-20">
+        <div className="container px-4">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">14 dage med den plan, du vælger</p>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
+              Madplan, rum eller vejledning
+            </h2>
+            <p className="mt-4 text-lg text-gray-600">
+              De første 14 dage følger abonnementet. Madbudget er madplan og madlog. Community lægger rummene i appen
+              oveni. Premium har også personlig vejledning på Messenger.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                name: 'Uden abonnement',
+                price: '0 kr',
+                period: 'uden betaling',
+                points: ['3 madplaner om ugen', '3 prisalarmer', 'Ingen community-rum'],
+              },
+              {
+                name: 'Madbudget',
+                price: '29 kr',
+                period: 'pr. måned',
+                points: ['Ubegrænset madplan og madlog', 'Prisalarmer', 'Åbner ikke rummene'],
+              },
+              {
+                name: 'Community',
+                price: '49 kr',
+                period: 'pr. måned',
+                points: ['Alt i Madbudget', 'Grupper à 10 i appen', 'Ingen personlig vejledning'],
+              },
+              {
+                name: 'Premium',
+                price: '249 kr',
+                period: 'pr. måned',
+                points: ['Alt i Community', 'Vejledning 7.30-21.30', 'Messenger med teamet'],
+              },
+            ].map((plan) => (
+              <div key={plan.name} className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+                <p className="text-sm font-semibold text-emerald-800">{plan.name}</p>
+                <p className="mt-2 text-3xl font-extrabold text-gray-900">{plan.price}</p>
+                <p className="text-sm text-gray-500">{plan.period}</p>
+                <ul className="mt-5 space-y-2 text-sm text-gray-700">
+                  {plan.points.map((point) => (
+                    <li key={point} className="flex items-start gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-emerald-200 bg-emerald-50 p-6 md:p-8">
+            <div className="flex items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700">
+                <Users className="h-5 w-5" aria-hidden />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Et lille rum, samme startdato</h3>
+                <p className="mt-2 text-sm leading-relaxed text-gray-700">
+                  Community er ikke et åbent forum. Det er et rum med 10 personer på samme madstil, der starter samme
+                  dag og kører 30 dage sammen. I skriver i samme tråd i appen. Vejledningen lægges ind undervejs,
+                  tilpasset Sense, Keto eller den kost I har valgt.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-gray-700">
+                  Det virker, fordi I står til ansvar over for hinanden. Det er sværere at springe dagen over, når de
+                  andre i rummet kan se det. I et studie fra 1999 holdt 66 % vægttabet, når de var med bekendte og fik
+                  social støtte. Blandt dem der kørte det alene, var det 24 %.
+                </p>
+                <a
+                  href="https://pubmed.ncbi.nlm.nih.gov/10028217/"
+                  className="mt-3 inline-block text-sm font-semibold text-emerald-800 underline"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Wing & Jeffery, 1999
+                </a>
+                <Link href="/funktioner/community" className="mt-3 block text-sm font-semibold text-emerald-800 underline">
+                  Læs om Community
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/lav-din-plan"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-800"
+            >
+              Start 14 dages prøve
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
         </div>
       </section>

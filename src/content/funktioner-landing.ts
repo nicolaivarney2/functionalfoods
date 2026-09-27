@@ -3,6 +3,7 @@ export type FunktionSlug =
   | 'madbudget-ai-madplaner'
   | 'madplaner-ud-fra-tilbud'
   | 'vaegttabsrejse'
+  | 'community'
   | 'personlig-vejledning'
   | 'makro-mikro-opskrifter'
   | '5000-opskrifter-i-8-nicher'
@@ -253,18 +254,59 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
     ],
   },
+  community: {
+    slug: 'community',
+    title: 'Community | Functional Foods',
+    shortTitle: 'Community',
+    description:
+      'Vægttabsforløb i grupper à 10 i appen. I starter samme dag, skriver i samme tråd i 30 dage, og madplan og madlog følger med.',
+    iconName: 'Users',
+    heroEyebrow: 'Community, 49 kr/md',
+    heroTitle: 'Et rum på 10, samme startdato',
+    heroLeadParagraphs: [
+      'Community er vægttabsforløb i små grupper. I er 10 personer på samme madstil, I starter samme dag, og forløbet kører 30 dage. I skriver i samme tråd. Vejledningen lægges ind undervejs.',
+      'Rummet ligger i appen. På websitet kan du lave madplan og madlog, som også er med i prisen. Personlig vejledning på Messenger hører til Premium.',
+    ],
+    bullets: [
+      {
+        title: 'Grupper à 10',
+        text: 'Ikke et åbent forum. Et rum med plads til 10, så I kan følge hinanden uden at det bliver en væg af beskeder.',
+      },
+      {
+        title: 'Fast startdato',
+        text: 'I går i gang sammen. Det gør det lettere at blive ved, fordi de andre i rummet er samme sted i forløbet.',
+      },
+      {
+        title: '30 dage i samme tråd',
+        text: 'Beskeder, vejledning og hverdagen ligger ét sted. Når forløbet er slut, kan I stadig læse med.',
+      },
+      {
+        title: 'Madplan og madlog er med',
+        text: '49 kr om måneden giver rummene og det, Madbudget kan: ubegrænset madplan, madlog og prisalarmer. Madbudget til 29 kr åbner ikke rummene.',
+      },
+      {
+        title: 'Vejledning er Premium',
+        text: 'Personlig vejledning på Messenger, i dagstimerne 7.30-21.30, er med i Premium til 249 kr om måneden. Premium har også rummene.',
+      },
+    ],
+    howItHelps:
+      'Forskning viser, at vægttab med forpligtelse til andre holdt hos 66 %, mod 24 % blandt dem der kørte det alene (Wing og Jeffery, 1999).',
+    ctaLabel: 'Vælg Community',
+    ctaHref: '/lav-din-plan',
+    secondaryCta: { label: 'Se abonnementerne', href: '/#abonnement' },
+  },
   'personlig-vejledning': {
     slug: 'personlig-vejledning',
-    title: 'Personlig vejledning og fællesskab | Functional Foods',
+    title: 'Personlig vejledning | Functional Foods',
     shortTitle: 'Personlig vejledning',
     description:
-      'Det tredje led i et vægttab der holder: struktur og madplaner er vigtige – men menneskelig vejledning og community gør det lettere at blive ved.',
+      'Premium giver personlig vejledning på Messenger i dagstimerne 7.30-21.30. Grupper à 10 er Community-abonnementet.',
     iconName: 'Users',
     heroEyebrow: 'Funktion',
-    heroTitle: 'Personlig vejledning – tredje led i et vægttab der holder',
+    heroTitle: 'Personlig vejledning på Messenger',
     heroLeadParagraphs: [
-      'Mange tænker vægttab som kalorier og træning. Det er centrale brikker – men for langt de fleste er det tredje led afgørende: vejledning, sparring og et sted, hvor du ikke står alene med beslutningerne.',
-      'Derfor stiller vi personlig vejledning og fællesskab til rådighed som en naturlig del af Functional Foods – så du kan få svar på tvivl, motivation i svære uger og et fællesskab, der forstår hverdagen med job, familie og indkøb.',
+      'Premium er personlig vejledning i dagstimerne 7.30-21.30. Du skriver med teamet på Messenger, når madplanen eller ugen ikke hænger sammen.',
+      'Grupperne à 10 er et andet abonnement: Community til 49 kr om måneden. Premium har begge dele.',
     ],
     bullets: [
       {
@@ -272,8 +314,8 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
         text: 'AI og madplaner kan spare dig tid – men rigtig fremgang handler også om at blive mødt, justeret og hørt, når virkeligheden ikke passer i et regneark.',
       },
       {
-        title: 'Mindre ensomhed om målet',
-        text: 'Vægttab er lettere, når du deler erfaringer med andre, der er i samme båd – og når du har et sted at vende tilbage, når vanerne glipper en uge.',
+        title: 'Et sted at spørge',
+        text: 'Når ugen skrider, kan du skrive til teamet i dagstimerne i stedet for at gætte dig frem alene.',
       },
       {
         title: 'Koblet til din madprofil',
@@ -281,14 +323,14 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
       {
         title: 'Holdbar adfærd',
-        text: 'Community og støtte hjælper dig med at normalisere små skridt, fejl og genstart – så ét dårligt valg ikke bliver til en hel måned væk fra målet.',
+        text: 'Vejledningen hjælper dig med små skridt, fejl og genstart, så ét dårligt valg ikke bliver til en hel måned væk fra målet.',
       },
     ],
     howItHelps:
-      'Brug personlig vejledning og fællesskab, når du har brug for mere end tal på skærmen: et tredje ben under dit vægttab, der gør det realistisk at blive ved året ud.',
+      'Personlig vejledning er Premium. Grupper à 10 er Community, og Premium har begge dele.',
     ctaLabel: 'Kom i gang',
     ctaHref: '/kom-i-gang',
-    secondaryCta: { label: 'Læs om vægttab', href: '/vaegttab' },
+    secondaryCta: { label: 'Læs om Community', href: '/funktioner/community' },
   },
   'makro-mikro-opskrifter': {
     slug: 'makro-mikro-opskrifter',
@@ -487,6 +529,7 @@ export const FUNKTION_OVERVIEW_ORDER: FunktionSlug[] = [
   'madbudget-ai-madplaner',
   'madplaner-ud-fra-tilbud',
   'vaegttabsrejse',
+  'community',
   'personlig-vejledning',
   'makro-mikro-opskrifter',
   '5000-opskrifter-i-8-nicher',

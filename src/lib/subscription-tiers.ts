@@ -14,13 +14,18 @@ export const TIER_PRICES_KR: Record<SubscriptionTier, number> = {
   premium: 249,
 }
 
+/** 49 kr. Gemmes som Madbudget-niveau plus community_access, ikke som et fjerde tier. */
+export const COMMUNITY_PRICE_KR = 49
+
+export type CheckoutPlan = SubscriptionTier | 'community'
+
 /** Gratis: vist som 3 madplaner/uge i UI — faktisk grænse er højere (buffer ved onboarding). */
 export const FREE_MEAL_PLANS_PER_WEEK = 3
 /** Faktisk ugentlig grænse for gratis (API). Brugeren ser FREE_MEAL_PLANS_PER_WEEK i copy. */
 export const FREE_MEAL_PLANS_PER_WEEK_LIMIT = 5
 export const FREE_PRICE_ALERTS_MAX = 3
 
-/** Alle nye profiler får fuld adgang (inkl. Premium-vejledning) i så mange dage. */
+/** Prøven følger det abonnement, man vælger. */
 export const TRIAL_DAYS = 14
 
 export function isTrialActive(trialEndsAt: string | null | undefined, now = new Date()): boolean {
