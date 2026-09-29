@@ -12,7 +12,9 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import {
+  isTjekEnabled,
   syncTjek,
+  TJEK_DISABLED_MESSAGE,
   TJEK_DEALER_TO_CHAIN,
   CHAINS_WITH_PRIMARY_CATALOG,
   type TjekSyncPreviewItem,
@@ -84,6 +86,7 @@ interface PageProps {
 
 export default async function TjekExplorerPage({ searchParams }: PageProps) {
   if (process.env.GROCERY_SUPABASE_URL == null) notFound()
+  if (!isTjekEnabled()) return <ErrorView message={TJEK_DISABLED_MESSAGE} />
 
   const params = await searchParams
   const showAll = params.all === '1'
@@ -172,11 +175,11 @@ export default async function TjekExplorerPage({ searchParams }: PageProps) {
 
         <footer className="mt-10 border-t border-slate-200 pt-3 text-xs text-slate-400">
           Genereret {new Date().toLocaleString('da-DK')} · Hver page-load = ét live API-kald.
-          Kør{' '}
+          Fjern{' '}
           <code className="rounded bg-slate-200/60 px-1 font-mono">
-            GROCERY_TJEK_DISABLED=true
+            GROCERY_TJEK_ENABLED=true
           </code>{' '}
-          for at slå al Tjek-trafik fra øjeblikkeligt.
+          for at slå al Tjek-trafik fra.
         </footer>
       </div>
     </div>

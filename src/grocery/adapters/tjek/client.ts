@@ -2,7 +2,7 @@
  * Tjek (Squid) HTTP client.
  *
  * Operational considerations baked in:
- *   - Kill-switch: env GROCERY_TJEK_DISABLED=true short-circuits all requests.
+ *   - Off by default: requests only run with GROCERY_TJEK_ENABLED=true.
  *   - Browser-realistic headers (UA, Accept-Language, Accept-Encoding).
  *   - Inter-request jitter sleep (default 600-1400ms) so a full nightly run
  *     spreads across a minute rather than bursting.
@@ -39,12 +39,23 @@ const DEFAULT_HEADERS: Record<string, string> = {
 const DEALERS_PAGE_LIMIT = 200
 const OFFERS_PAGE_LIMIT = 100
 
-/** Throws if the kill-switch is set. Call before every outbound request. */
+/**
+ * Tjek er slukket som standard: vi har ingen kommerciel aftale med Tjek, og
+ * deres vilkår kræver skriftlig godkendelse af al kommerciel brug.
+ * `GROCERY_TJEK_DISABLED=true` vinder altid over `GROCERY_TJEK_ENABLED`.
+ */
+export const TJEK_DISABLED_MESSAGE =
+  'Tjek er slået fra (ingen aftale med Tjek). Sæt GROCERY_TJEK_ENABLED=true kun med skriftlig tilladelse.'
+
+export function isTjekEnabled(): boolean {
+  if (process.env.GROCERY_TJEK_DISABLED === 'true') return false
+  return process.env.GROCERY_TJEK_ENABLED === 'true'
+}
+
+/** Throws unless Tjek is explicitly enabled. Call before every outbound request. */
 function ensureNotDisabled(): void {
-  if (process.env.GROCERY_TJEK_DISABLED === 'true') {
-    throw new TjekDisabledError(
-      'Tjek sync disabled via GROCERY_TJEK_DISABLED=true',
-    )
+  if (!isTjekEnabled()) {
+    throw new TjekDisabledError(TJEK_DISABLED_MESSAGE)
   }
 }
 

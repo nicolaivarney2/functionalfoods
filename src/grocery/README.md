@@ -165,7 +165,7 @@ The adapter is deliberately quiet:
 - Browser-realistic headers (`User-Agent`, `Accept-Language`, `Origin`/`Referer` mimic the eTilbudsavis web app).
 - 600-1400ms jitter sleep between requests (configurable).
 - Auto-pause after 3 consecutive 4xx/5xx responses (`TjekAutoPausedError`).
-- Hard kill-switch: set `GROCERY_TJEK_DISABLED=true` in Vercel env to abort all outbound requests immediately.
+- **Off by default (sep 2026):** no commercial agreement with Tjek, so every request is blocked unless `GROCERY_TJEK_ENABLED=true`. `GROCERY_TJEK_DISABLED=true` always wins.
 - Product `image_url` is set from Tjek's offer image (view → zoom → thumb). Full `images` object is also kept in `raw_data`.
 
 Sample size of a full nightly run (verified 27. May 2026): 11 dealers, 3,420 offers, ~43 seconds total, ~50-100 HTTP requests.

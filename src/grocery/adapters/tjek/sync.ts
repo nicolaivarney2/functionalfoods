@@ -16,7 +16,13 @@
 import { getGroceryServiceClient } from '../../db/client'
 import { sleepStaleOffersForChain } from '../../sync/catalog-retention'
 import type { ProductInsert, ProductOfferInsert, SyncLogInsert } from '../../types'
-import { TjekClient, TjekAutoPausedError, TjekDisabledError } from './client'
+import {
+  TjekClient,
+  TjekAutoPausedError,
+  TjekDisabledError,
+  TJEK_DISABLED_MESSAGE,
+  isTjekEnabled,
+} from './client'
 import {
   mapTjekOfferToOffer,
   mapTjekOfferToProduct,
@@ -158,8 +164,7 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
     }
   }
 
-  // Kill-switch check before opening any state.
-  if (process.env.GROCERY_TJEK_DISABLED === 'true') {
+  if (!isTjekEnabled()) {
     return {
       source: 'tjek:offers',
       status: 'disabled',
@@ -170,7 +175,7 @@ export async function syncTjek(options: TjekSyncOptions = {}): Promise<TjekSyncR
       offersUpserted: 0,
       errorsCount: 0,
       durationMs: Date.now() - startedAt,
-      errorMessage: 'Tjek sync disabled via GROCERY_TJEK_DISABLED=true',
+      errorMessage: TJEK_DISABLED_MESSAGE,
     }
   }
 

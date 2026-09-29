@@ -8,7 +8,7 @@ import { syncSallingChain } from '@/grocery/adapters/salling-algolia'
 import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
-import { syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
+import { isTjekEnabled, syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
 import {
   isTjekLeafletOverlayChain,
   TJEK_LEAFLET_OVERLAY_CHAINS,
@@ -223,7 +223,7 @@ export async function runScheduledGrocerySync(
     )
   }
 
-  const tjekKillSwitch = process.env.GROCERY_TJEK_DISABLED === 'true'
+  const tjekKillSwitch = !isTjekEnabled()
   const tjekOverlayChains: SourceChain[] = tjekChains
     ? tjekChains.filter(isTjekLeafletOverlayChain)
     : [...TJEK_LEAFLET_OVERLAY_CHAINS]

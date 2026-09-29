@@ -1,4 +1,10 @@
-export { TjekClient, TjekAutoPausedError, TjekDisabledError } from './client'
+export {
+  TjekClient,
+  TjekAutoPausedError,
+  TjekDisabledError,
+  TJEK_DISABLED_MESSAGE,
+  isTjekEnabled,
+} from './client'
 export {
   mapTjekOfferToOffer,
   mapTjekOfferToProduct,
