@@ -4,7 +4,7 @@
  * Native (fooddata direkte): Netto, Bilka, Føtex, REMA 1000.
  * Goma (via fooddata): Lidl, Coop-kæder, MENY, Spar, Nemlig, Min Købmand, …
  * Tjek: Salling papiravis-overlay (Algolia mangler slagtervarer). Øvrige kæder
- * via Goma. GROCERY_TJEK_DISABLED=true stopper al Tjek-trafik.
+ * via Goma. Tjek er slået fra som standard (kræver GROCERY_TJEK_ENABLED=true).
  */
 
 export const GOMA_SUNSET_MESSAGE =

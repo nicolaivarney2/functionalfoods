@@ -18,8 +18,8 @@
  *   # Also overlay REMA (Salling Føtex/Netto/Bilka already overlay by default)
  *   npx tsx scripts/grocery-sync-tjek.ts --include-primary
  *
- * Kill-switch:
- *   GROCERY_TJEK_DISABLED=true   # immediately aborts all requests
+ * Slået fra som standard (ingen aftale med Tjek). Kører kun med:
+ *   GROCERY_TJEK_ENABLED=true
  */
 
 import { config as loadEnv } from 'dotenv'
