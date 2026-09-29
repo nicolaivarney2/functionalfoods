@@ -1,12 +1,15 @@
 name: Goma Scheduled Sync
 
+# DEAKTIVERET (sep 2026): Goma har bedt om stop for API-trafik.
+# Workflow beholdes kun til manuel nød-genaktivering med force_run=true.
 # Goma → fooddata for offers-only kæder (Lidl, Coop, MENY, Nemlig, …).
-# Kører på GitHub-runner (ikke ét Vercel-request) så fuldt katalog ikke rammer 300s.
-# Catch-up henter kæder der er blevet sprunget over (fx Nemlig sidst i listen).
-# Vækkes af Cloudflare Worker `grocery-wake` (01:00 og 14:00 UTC) — ikke GitHub schedule.
 on:
   workflow_dispatch:
     inputs:
+      force_run:
+        description: Nød-genaktivering — kalder Goma API (kræver GOMA_IMPORT_ENABLED på runner)
+        type: boolean
+        default: false
       followup_import:
         description: Kick fooddata-import when this job succeeds
         type: boolean
@@ -22,11 +25,12 @@ concurrency:
 
 jobs:
   goma-scheduled-sync:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.force_run == true }}
     runs-on: ubuntu-latest
     environment: FF
     timeout-minutes: 40
     env:
-      GOMA_IMPORT_ENABLED: 'true'
+      GOMA_IMPORT_ENABLED: 'false'
       GOMA_API_KEY: ${{ secrets.GOMA_API_KEY }}
       GROCERY_SUPABASE_URL: ${{ secrets.GROCERY_SUPABASE_URL }}
       GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}

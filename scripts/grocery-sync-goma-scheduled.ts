@@ -15,7 +15,6 @@ import { resolve } from 'node:path'
 import { config as loadEnv } from 'dotenv'
 
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
-process.env.GOMA_IMPORT_ENABLED = 'true'
 
 import { syncGoma } from '../src/grocery/adapters/goma'
 import { cleanupExpiredOffers } from '../src/lib/dagligvarer-offer-cleanup'
