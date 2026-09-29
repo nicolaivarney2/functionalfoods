@@ -2,9 +2,8 @@
  * Punctual wake for grocery GitHub Actions (GitHub `schedule:` is often 4h late).
  *
  * Crons are UTC:
- *   01:00 — Goma (no import; scrape follows at 02:00)
  *   02:00 — native scrape → workflow kicks fooddata-import
- *   14:00 — Goma + followup import
+ *   (Goma 01:00 / 14:00 fjernet sep 2026 — ingen api.goma.gg-trafik)
  *
  * Secrets (wrangler secret put):
  *   GITHUB_TOKEN  PAT with `repo` + `workflow` (or fine-grained: Actions write)
@@ -20,22 +19,17 @@ export interface Env {
   WAKE_SECRET?: string
 }
 
-const GOMA = 'goma-scheduled-sync.yml'
 const NATIVE = 'grocery-native-sync.yml'
 
 export default {
   async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const cron = controller.cron
-    if (cron === '0 1 * * *') {
-      await dispatch(env, GOMA, { followup_import: false })
+    if (cron === '0 1 * * *' || cron === '0 14 * * *') {
+      console.log(`Skipping deprecated Goma wake for cron ${cron}`)
       return
     }
     if (cron === '0 2 * * *') {
       await dispatch(env, NATIVE, {})
-      return
-    }
-    if (cron === '0 14 * * *') {
-      await dispatch(env, GOMA, { followup_import: true })
       return
     }
     throw new Error(`Unknown cron: ${cron}`)

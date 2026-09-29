@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
 import { config as loadEnv } from 'dotenv'
 
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
-process.env.GOMA_IMPORT_ENABLED = 'true'
+// Respekter env — sæt GOMA_IMPORT_ENABLED=true kun ved bevidst manuel kørsel.
 
 import { syncGoma } from '../src/grocery/adapters/goma'
 import { defaultGomaImportStoreNames } from '../src/lib/goma-import-stores'

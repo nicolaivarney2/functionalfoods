@@ -8,7 +8,7 @@
  */
 
 export const GOMA_SUNSET_MESSAGE =
-  'Goma-import er slået fra. Sæt GOMA_IMPORT_ENABLED=true for tilbud på kæder uden fuldt fooddata-katalog.'
+  'Goma-import er slået fra (API stop sep 2026). Eksisterende fooddata/FF-rækker med source=goma bevares; ingen nye kald til api.goma.gg.'
 
 export const GOMA_SIMULATE_GONE_MESSAGE =
   'Simulerer at Goma-data er væk — kun fooddata-produktnøgler bruges til priser og matches.'
