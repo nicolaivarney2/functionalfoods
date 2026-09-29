@@ -7,7 +7,8 @@ name: Fooddata Daily Import (incl. price history)
 #
 # Primær kørsel: Cloudflare wake → native scrape (eller Goma 14:00) → dette workflow.
 # Backup 07:00 UTC skip-if-fresh hvis kæden missede.
-# Requires GOMA_IMPORT_ENABLED=true so import copies source=goma (not legacy tjek:*).
+# GOMA_IMPORT_ENABLED=false: source=goma kopieres ikke længere til FF (Goma-stop sep 2026).
+# Eksisterende goma-rækker slettes ikke af importen.
 
 on:
   schedule:
@@ -32,7 +33,7 @@ jobs:
       GROCERY_SUPABASE_SECRET_KEY: ${{ secrets.GROCERY_SUPABASE_SECRET_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      GOMA_IMPORT_ENABLED: 'true'
+      GOMA_IMPORT_ENABLED: 'false'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
