@@ -25,7 +25,7 @@ src/grocery/
 │   ├── salling-algolia/                Netto, Bilka, Føtex (shared Algolia index)
 │   ├── rema1000/                       REMA 1000 (direct public API)
 │   ├── lidl/                           Lidl — kædens egen tilbudsavis (kun madvarer)
-│   ├── meny/                           MENY — kædens egen tilbudsavis (kun madvarer)
+│   ├── dagrofa/                        MENY, SPAR, Min Købmand — kædens egen tilbudsavis (kun madvarer)
 │   ├── tjek/                           Tilbud (offers) for ALL DK chains via squid-api.tjek.com
 │   └── nemlig/TODO.md                  Nemlig.com full catalog (deferred — stateful API)
 ├── api/
@@ -70,7 +70,7 @@ npx tsx scripts/grocery-sync-netto.ts --chain=foetex
 npx tsx scripts/grocery-sync-netto.ts --chain=bilka
 npx tsx scripts/grocery-sync-rema.ts
 npx tsx scripts/grocery-sync-lidl.ts --dry-run   # Lidl-avis (preview)
-npx tsx scripts/grocery-sync-meny.ts --dry-run   # MENY-avis (preview)
+npx tsx scripts/grocery-sync-dagrofa.ts --chain=all --dry-run   # MENY-/SPAR-/Min Købmand-avis (preview)
 
 # 3. Pull weekly offers for the remaining DK chains via Tjek
 npx tsx scripts/grocery-sync-tjek.ts --dry-run --max=10   # preview
@@ -134,7 +134,7 @@ through the server-side secret key. Public/anon traffic must go through our
 | **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Native scrape → fooddata | **Primary** — fuldt katalog + tilbud |
 | **REMA 1000 API** | REMA 1000 | Native scrape → fooddata | **Primary** — fuldt katalog |
 | **Lidl tilbudsavis** (lidl.dk + `endpoints.leaflets.schwarz`) | Lidl | Native scrape → fooddata (`source=lidl-avis`) | **Primary** — kun ugens madvarer-tilbud |
-| **MENY tilbudsavis** (`ugensavis.meny.dk`, iPaper) | MENY | Native scrape → fooddata (`source=meny-avis`) | **Primary** — kun ugens madvarer-tilbud |
+| **Dagrofa tilbudsaviser** (`ugensavis.meny.dk`, `ugensavis.spar.dk`, `ugensavis.minkøbmand.dk`, iPaper) | MENY, SPAR, Min Købmand | Native scrape → fooddata (`source=<kæde>-avis`) | **Primary** — kun ugens madvarer-tilbud |
 | **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Nemlig, Min Købmand, … | Goma cron → fooddata (`source=goma`) | **Primary** for all non-Salling/REMA chains |
 | ~~**Tjek/Squid**~~ | (alle ikke-native) | Udfaset jul 2026 | Legacy rækker i DB — **importeres ikke** når `GOMA_IMPORT_ENABLED=true` |
 
@@ -161,28 +161,36 @@ Sidste uges avis-rækker (kun `source=lidl-avis`) slås fra efter en sync.
 
 Nødstop: `GROCERY_LIDL_AVIS_DISABLED=true`.
 
-### MENY adapter (`adapters/meny/`)
+### Dagrofa adapter (`adapters/dagrofa/`) — MENY, SPAR, Min Købmand
 
-Læser MENYs **egen** avis på `ugensavis.meny.dk` (hostet af iPaper). Kun fakta
-(navn, EAN, pris, pakning, periode); avisens billeder/layout kopieres ikke.
+Læser kædens **egen** avis (hostet af iPaper, samme format for alle tre):
+
+| Kæde | Avis | `source` | Nødstop |
+|---|---|---|---|
+| MENY | `ugensavis.meny.dk` | `meny-avis` | `GROCERY_MENY_AVIS_DISABLED=true` |
+| SPAR | `ugensavis.spar.dk` | `spar-avis` | `GROCERY_SPAR_AVIS_DISABLED=true` |
+| Min Købmand | `ugensavis.minkøbmand.dk` | `min-koebmand-avis` | `GROCERY_MIN_KOEBMAND_AVIS_DISABLED=true` |
+
+Kun fakta (navn, EAN, pris, pakning, periode); avisens billeder/layout kopieres ikke.
 `api.meny.dk` er forbudt i meny.dk/robots.txt og bruges ikke.
 
-1. `ugensavis.meny.dk` → `window.staticSettings`: sidetekster + signerede links til avisens "enrichments"
+1. `ugensavis.<kæde>.dk` → `window.staticSettings`: sidetekster + signerede links til avisens "enrichments"
 2. Enrichments type 13 = varer: EAN, navn ("Vare (Avisgruppe)"), beskrivelse ("Vare. 400 g (Max. kg pris 49,88)"), pris
-3. Periode fra teksten "Avisen gælder fra … til og med …" — kun hvis avisen gælder i dag (København)
+3. Periode fra teksten "gælder fra … til og med …" ("25.09.2026" eller "25. september") — kun hvis avisen gælder i dag (København)
 4. Kun madvarer, i rækkefølge: samme EAN i Salling-kataloget (netto/føtex/bilka) → alkohol-regler (vin, øl, spiritus) → søskende i samme avisgruppe → navne-regler (pleje, rengøring, dyremad, lys …)
-5. Afdeling: Salling-katalogets `category_lvl0` for samme EAN, ellers gæt ud fra navnet (MENY-egne mærker, slagter)
-6. fooddata: `products.source_id = avis-<EAN>` (rammer aldrig Goma-rækkerne), `products.gtin` kun for rigtige GS1-numre (ikke 2x-butiksnumre), `product_offers.source = meny-avis`
+5. Afdeling: Salling-katalogets `category_lvl0` for samme EAN, ellers gæt ud fra navnet (egne mærker, slagter)
+6. fooddata: `products.source_chain = <kæde>`, `products.source_id = avis-<EAN>` (rammer aldrig Goma-rækkerne), `products.gtin` kun for rigtige GS1-numre (ikke 2x-butiksnumre), `product_offers.source = <kæde>-avis`
 
 Pris = avisens pris (den alle betaler). "v/2 bægere" → `multibuy` ("2 for 29,95 kr").
 Medlemspris og "Max. 4 stk. pr. kunde" læses fra avisens tekst og står i
 `offer_description` ("Medlemspris 12,00 kr med MENY-appen · Max. 4 stk pr. kunde").
 
-Kører i `grocery-native-sync.yml` hver nat (step `meny`) og skriver kun når
-avisen har ændret sig. Sidste uges avis-rækker (kun `source=meny-avis`) slås fra
-efter en sync.
+Kører i `grocery-native-sync.yml` hver nat (steps `meny`, `spar`, `min-koebmand`)
+og skriver kun når avisen har ændret sig. Sidste uges avis-rækker (kun kædens
+`<kæde>-avis`) slås fra efter en sync.
 
-Nødstop: `GROCERY_MENY_AVIS_DISABLED=true`.
+Løvbjerg og Coop-kæderne (Kvickly, SuperBrugsen, Brugsen, 365discount) har kun
+deres avis hos Tjek, og ABC Lavpris har ingen avis online — de har ingen kilde.
 
 ### Goma adapter (`adapters/goma/`)
 

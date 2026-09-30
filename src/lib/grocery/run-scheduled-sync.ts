@@ -1,5 +1,5 @@
 /**
- * Native grocery orchestrator (Salling full/leaflet + REMA + Lidl-/MENY-avis).
+ * Native grocery orchestrator (Salling full/leaflet + REMA + Lidl-/MENY-/SPAR-/Min Købmand-avis).
  * Køres fra GitHub Actions — ikke Vercel cron (300s loft).
  */
 
@@ -9,7 +9,12 @@ import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 import { isLidlAvisEnabled, syncLidlAvis, type LidlAvisSyncResult } from '@/grocery/adapters/lidl'
-import { isMenyAvisEnabled, syncMenyAvis, type MenyAvisSyncResult } from '@/grocery/adapters/meny'
+import {
+  DAGROFA_CHAIN_IDS,
+  isDagrofaAvisEnabled,
+  syncDagrofaAvis,
+  type DagrofaAvisSyncResult,
+} from '@/grocery/adapters/dagrofa'
 import { isTjekEnabled, syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
 import {
   isTjekLeafletOverlayChain,
@@ -36,7 +41,7 @@ export type GroceryCronStepResult =
   | (SyncResult & { step: string })
   | (RemaSyncResult & { step: string })
   | (LidlAvisSyncResult & { step: string })
-  | (MenyAvisSyncResult & { step: string })
+  | (DagrofaAvisSyncResult & { step: string })
   | (TjekSyncResult & { step: string })
   | { step: string; status: 'failed'; errorMessage: string; durationMs: number }
   | { step: string; status: 'success'; rowsAffected: number; durationMs: number }
@@ -236,11 +241,12 @@ export async function runScheduledGrocerySync(
     )
   }
 
-  if (shouldRun('meny') && isMenyAvisEnabled()) {
+  for (const chainId of DAGROFA_CHAIN_IDS) {
+    if (!shouldRun(chainId) || !isDagrofaAvisEnabled(chainId)) continue
     steps.push(
-      await runStep('meny', async () => ({
-        ...(await syncMenyAvis({ log: (msg) => console.log(`[grocery/meny] ${msg}`) })),
-        step: 'meny',
+      await runStep(chainId, async () => ({
+        ...(await syncDagrofaAvis(chainId, { log: (msg) => console.log(`[grocery/${chainId}] ${msg}`) })),
+        step: chainId,
       })),
     )
   }

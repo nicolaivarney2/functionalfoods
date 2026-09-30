@@ -1,8 +1,10 @@
+import type { DagrofaAvisChain } from './chains'
+
 /** iPaper "enrichment" type 13 = produkt-hotspot i avisen. */
-export interface MenyEnrichmentProduct {
+export interface DagrofaEnrichmentProduct {
   type: 13
   id: number
-  /** EAN (for MENY-vejevarer et butiksnummer, fx 20…). */
+  /** EAN (for vejevarer et butiksnummer, fx 20…). */
   productId: string | number
   /** "Innocent Kids Jordbær4x150 (Innocent Juice, Shot eller Smoothie)" */
   name: string
@@ -15,7 +17,8 @@ export interface MenyEnrichmentProduct {
   packagesize?: number | null
 }
 
-export interface MenyAvis {
+export interface DagrofaAvis {
+  chain: DagrofaAvisChain
   paperId: number
   /** "MENY uge 4026" */
   name: string
@@ -25,26 +28,26 @@ export interface MenyAvis {
   /** YYYY-MM-DD, sidste dag (inklusive). */
   validTo: string
   pageTexts: string[]
-  products: MenyEnrichmentProduct[]
+  products: DagrofaEnrichmentProduct[]
 }
 
 /** Klassifikation fra samme EAN i Salling-kataloget (netto/føtex/bilka). */
-export interface MenyNativeCategory {
+export interface DagrofaNativeCategory {
   lvl0: string | null
   lvl1: string | null
 }
 
-export interface MenyPageNote {
+export interface DagrofaPageNote {
   memberPriceCents: number | null
   limitText: string | null
 }
 
-export interface MenyAvisItem {
-  avis: Pick<MenyAvis, 'paperId' | 'name' | 'url' | 'validFrom' | 'validTo'>
-  product: MenyEnrichmentProduct
+export interface DagrofaAvisItem {
+  avis: Pick<DagrofaAvis, 'chain' | 'paperId' | 'name' | 'url' | 'validFrom' | 'validTo'>
+  product: DagrofaEnrichmentProduct
   ean: string
-  native: MenyNativeCategory | null
-  note: MenyPageNote | null
+  native: DagrofaNativeCategory | null
+  note: DagrofaPageNote | null
   /** Afdeling til FF (category_lvl0). */
   department: string | null
   category: string | null

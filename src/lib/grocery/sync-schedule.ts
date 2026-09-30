@@ -11,6 +11,7 @@
  * (kataloget er ~1 min; en misset søndag må ikke efterlade ugens avis).
  */
 
+import { DAGROFA_CHAIN_IDS, type DagrofaChainId } from '@/grocery/adapters/dagrofa/chains'
 import { TJEK_LEAFLET_OVERLAY_CHAINS, type SourceChain } from '@/grocery/types'
 
 /** Steps the cron orchestrator can run (matches `?only=` ids). */
@@ -22,7 +23,7 @@ export type CronSyncStepId =
   | 'tjek'
   | 'salling-offers'
   | 'lidl'
-  | 'meny'
+  | DagrofaChainId
 
 /** Native scrapes that Vercel grocery-cron kører (ikke Goma/Tjek). */
 export type NativeCronChain = 'netto' | 'foetex' | 'bilka' | 'rema-1000'
@@ -199,8 +200,7 @@ export function scheduledStepIds(
   steps.push('rema-1000')
   // Kædernes egne aviser: tjekkes hver nat, men skrives kun når avisen har
   // ændret sig (fingerprint i sync_logs.metadata).
-  steps.push('lidl')
-  steps.push('meny')
+  steps.push('lidl', ...DAGROFA_CHAIN_IDS)
   if (schedule.tjekChains.length > 0) steps.push('tjek')
   steps.push('salling-offers')
   return steps

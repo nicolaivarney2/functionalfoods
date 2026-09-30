@@ -1,25 +1,26 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { shouldImportFooddataOfferSource } from '@/lib/goma-import-stores'
-import { collectMenyProducts, extractJsonObjectAfter, parseMenyAvisPage, parseMenyValidity } from './client'
+import { DAGROFA_AVIS_CHAINS, isDagrofaChainId, type DagrofaAvisChain } from './chains'
+import { collectDagrofaProducts, extractJsonObjectAfter, parseDagrofaAvisPage, parseDagrofaValidity } from './client'
 import {
-  guessMenyDepartment,
-  isMenyAlcohol,
-  mapMenyAvisOffer,
-  mapMenyAvisProduct,
-  menyOfferWindow,
-  menyProductName,
-  parseMenyDesc,
-  parseMenyGroupNotes,
-  selectMenyFoodItems,
-  validMenyGtin,
+  guessDagrofaDepartment,
+  isDagrofaAlcohol,
+  mapDagrofaAvisOffer,
+  mapDagrofaAvisProduct,
+  dagrofaOfferWindow,
+  dagrofaProductName,
+  parseDagrofaDesc,
+  parseDagrofaGroupNotes,
+  selectDagrofaFoodItems,
+  validDagrofaGtin,
 } from './mapper'
-import { isMenyAvisActiveOn, menyAvisFingerprint } from './sync'
-import type { MenyAvis, MenyEnrichmentProduct, MenyNativeCategory } from './types'
+import { isDagrofaAvisActiveOn, dagrofaAvisFingerprint } from './sync'
+import type { DagrofaAvis, DagrofaEnrichmentProduct, DagrofaNativeCategory } from './types'
 
 const SYNCED = '2026-09-26T02:00:00.000Z'
 
-function product(overrides: Partial<MenyEnrichmentProduct> = {}): MenyEnrichmentProduct {
+function product(overrides: Partial<DagrofaEnrichmentProduct> = {}): DagrofaEnrichmentProduct {
   return {
     type: 13,
     id: 1,
@@ -34,8 +35,13 @@ function product(overrides: Partial<MenyEnrichmentProduct> = {}): MenyEnrichment
   }
 }
 
-function avis(products: MenyEnrichmentProduct[], pageTexts: string[] = []): MenyAvis {
+function avis(
+  products: DagrofaEnrichmentProduct[],
+  pageTexts: string[] = [],
+  chain: DagrofaAvisChain = DAGROFA_AVIS_CHAINS.meny,
+): DagrofaAvis {
   return {
+    chain,
     paperId: 3058728,
     name: 'MENY uge 4026',
     url: 'https://ugensavis.meny.dk/',
@@ -60,18 +66,46 @@ describe('MENY avis page', () => {
       pageTexts: ['Uge 40. Avisen gælder fra fredag 25.09.2026 til og med torsdag 01.10.2026. Se åbningstider'],
       enrichments: { chunkUrls: { '1-17': 'https://cdn.ipaper.io/a.json?token=x' } },
     }
-    const { settings: s, validity } = parseMenyAvisPage(`<script>window.staticSettings = ${JSON.stringify(settings)};</script>`)
+    const { settings: s, validity } = parseDagrofaAvisPage(
+      `<script>window.staticSettings = ${JSON.stringify(settings)};</script>`,
+      DAGROFA_AVIS_CHAINS.meny,
+    )
     assert.equal(s.paperId, 3058728)
     assert.deepEqual(s.chunkUrls, ['https://cdn.ipaper.io/a.json?token=x'])
     assert.deepEqual(validity, { validFrom: '2026-09-25', validTo: '2026-10-01' })
   })
 
+  it('throws with the chain label when staticSettings is missing', () => {
+    assert.throws(() => parseDagrofaAvisPage('<html></html>', DAGROFA_AVIS_CHAINS.spar), /^Error: SPAR:/)
+  })
+
+  it('reads SPAR and Min Købmand validity with month names', () => {
+    assert.deepEqual(
+      parseDagrofaValidity(['AVISEN GÆLDER FRA FREDAG 25. SEPTEMBER TIL OG MED TORSDAG 1. OKTOBER 2026 Ret til trykfejl']),
+      { validFrom: '2026-09-25', validTo: '2026-10-01' },
+    )
+    assert.deepEqual(
+      parseDagrofaValidity(['Tilbuddene gælder fra fredag den 25. september til og med torsdag den 1. oktober 2026.']),
+      { validFrom: '2026-09-25', validTo: '2026-10-01' },
+    )
+    assert.deepEqual(
+      parseDagrofaValidity(['Avisen gælder fra fredag 26. december til og med torsdag 1. januar 2027']),
+      { validFrom: '2026-12-26', validTo: '2027-01-01' },
+    )
+  })
+
   it('returns null validity when the period is missing', () => {
-    assert.equal(parseMenyValidity(['Ingen dato her']), null)
+    assert.equal(parseDagrofaValidity(['Ingen dato her']), null)
+  })
+
+  it('knows the three Dagrofa chains', () => {
+    assert.equal(isDagrofaChainId('spar'), true)
+    assert.equal(isDagrofaChainId('min-koebmand'), true)
+    assert.equal(isDagrofaChainId('loevbjerg'), false)
   })
 
   it('collects type-13 products once per EAN', () => {
-    const products = collectMenyProducts([
+    const products = collectDagrofaProducts([
       { enrichments: [product(), { type: 6, id: 2 }, product({ id: 3 })] },
       { enrichments: [product({ productId: '57007007', name: 'Andet' })] },
     ])
@@ -84,47 +118,47 @@ describe('MENY avis page', () => {
 
 describe('MENY parsers', () => {
   it('strips the avis group from the name', () => {
-    assert.equal(menyProductName(product()), 'Innocent Æblejuice')
+    assert.equal(dagrofaProductName(product()), 'Innocent Æblejuice')
     assert.equal(
-      menyProductName(product({ name: 'Øko-Hokkaido (Gb) (Grøn Balance Dansk Økologisk Græskar)', alttext: 'Grøn Balance Dansk Økologisk Græskar' })),
+      dagrofaProductName(product({ name: 'Øko-Hokkaido (Gb) (Grøn Balance Dansk Økologisk Græskar)', alttext: 'Grøn Balance Dansk Økologisk Græskar' })),
       'Øko-Hokkaido (Gb)',
     )
-    assert.equal(menyProductName(product({ name: '*Villa Boheme Red (Villa Boheme)', alttext: 'Villa Boheme' })), 'Villa Boheme Red')
+    assert.equal(dagrofaProductName(product({ name: '*Villa Boheme Red (Villa Boheme)', alttext: 'Villa Boheme' })), 'Villa Boheme Red')
   })
 
   it('parses amount, unit and unit price', () => {
-    assert.deepEqual(parseMenyDesc('Merrild Koffeinlet 400 G. 400 g (Max. kg pris 299,75)'), {
+    assert.deepEqual(parseDagrofaDesc('Merrild Koffeinlet 400 G. 400 g (Max. kg pris 299,75)'), {
       amount: 400,
       unit: 'g',
       unitPrice: { cents: 29975, unit: 'kg', multibuyQty: null },
       unitPriceText: 'Max. kg pris 299,75',
     })
-    const faxe = parseMenyDesc('Faxe Kondi Pet. 150 cl (Literpris 6,63)')
+    const faxe = parseDagrofaDesc('Faxe Kondi Pet. 150 cl (Literpris 6,63)')
     assert.deepEqual([faxe.amount, faxe.unit, faxe.unitPrice?.cents, faxe.unitPrice?.unit], [150, 'cl', 663, 'L'])
-    const eggs = parseMenyDesc('Øko-Æbl. 70+ (Aa). 6 stk (Stk. pris 3,33)')
+    const eggs = parseDagrofaDesc('Øko-Æbl. 70+ (Aa). 6 stk (Stk. pris 3,33)')
     assert.deepEqual([eggs.amount, eggs.unit, eggs.unitPrice?.unit], [6, 'stk', 'stk'])
-    assert.equal(parseMenyDesc('Oksegrydesteg. 3.4 kg (Kg pris 159,90)').amount, 3.4)
-    assert.equal(parseMenyDesc('Aa Zaatar Øko. 50 g (Max. kg pris 1.000,00)').unitPrice?.cents, 100000)
+    assert.equal(parseDagrofaDesc('Oksegrydesteg. 3.4 kg (Kg pris 159,90)').amount, 3.4)
+    assert.equal(parseDagrofaDesc('Aa Zaatar Øko. 50 g (Max. kg pris 1.000,00)').unitPrice?.cents, 100000)
   })
 
   it('reads multibuy quantity from "v/N"', () => {
-    const k = parseMenyDesc('K-Salat Tunsalat. 150 g (Max. kg pris v/2 bægere 149,75)')
+    const k = parseDagrofaDesc('K-Salat Tunsalat. 150 g (Max. kg pris v/2 bægere 149,75)')
     assert.deepEqual(k.unitPrice, { cents: 14975, unit: 'kg', multibuyQty: 2 })
   })
 
   it('keeps only real GS1 numbers as gtin', () => {
-    assert.equal(validMenyGtin('5000112611878'), '5000112611878')
-    assert.equal(validMenyGtin('5000112611877'), null)
-    assert.equal(validMenyGtin('2014070000004'), null)
-    assert.equal(validMenyGtin('0027076'), null)
-    assert.equal(validMenyGtin('57007007'), '57007007')
+    assert.equal(validDagrofaGtin('5000112611878'), '5000112611878')
+    assert.equal(validDagrofaGtin('5000112611877'), null)
+    assert.equal(validDagrofaGtin('2014070000004'), null)
+    assert.equal(validDagrofaGtin('0027076'), null)
+    assert.equal(validDagrofaGtin('57007007'), '57007007')
   })
 })
 
 describe('MENY food filter', () => {
   it('flags wine, spirits and beer but not soft drinks or food with %', () => {
     const alcohol = (name: string, desc: string, alttext = '') =>
-      isMenyAlcohol({ name, desc, alttext })
+      isDagrofaAlcohol({ name, desc, alttext })
     assert.equal(alcohol('Nugan Stunt Bros Rødvin', 'Nugan Stunt Bros Rødvin. 75 cl (Literpris 59,93)'), true)
     assert.equal(alcohol('La Cuvee Rouge (La Cuvée eller Paddy\'s Creek)', 'La Cuvee Rouge. 300 cl (Literpris 33,32)'), true)
     assert.equal(alcohol('Tuborg Classic 4,6%', 'Tuborg Classic 4,6%. 33 cl (Literpris v/30 stk. 11,11)'), true)
@@ -138,14 +172,14 @@ describe('MENY food filter', () => {
   })
 
   it('uses catalog category, then group siblings, then name rules', () => {
-    const native = new Map<string, MenyNativeCategory>([
+    const native = new Map<string, DagrofaNativeCategory>([
       ['1', { lvl0: 'Kolonial', lvl1: 'Kaffe, te & kakao' }],
       ['2', { lvl0: 'Personlig pleje', lvl1: 'Kropspleje' }],
       ['3', { lvl0: 'Frost', lvl1: 'Is' }],
       ['4', { lvl0: 'Drikkevarer', lvl1: 'Spiritus & likør' }],
       ['5', { lvl0: 'Baby & børn', lvl1: 'Bleer & tilbehør' }],
     ])
-    const selection = selectMenyFoodItems(
+    const selection = selectDagrofaFoodItems(
       avis([
         product({ productId: '1', name: 'Merrild Gold', alttext: 'Merrild eller Lavazza' }),
         product({ productId: '1a', name: 'Lavazza Qualita Oro', alttext: 'Merrild eller Lavazza' }),
@@ -174,12 +208,12 @@ describe('MENY food filter', () => {
   })
 
   it('guesses departments for MENY own brands', () => {
-    assert.equal(guessMenyDepartment('Da Boller I Tomat', 'Delikatessen Anbefaler Middagsretter'), 'Nemt & hurtigt')
-    assert.equal(guessMenyDepartment('Pave Salami Med Peber', 'Sydeuropæisk Charcuteri eller Gestus Pizzabunde'), 'Kød & fisk')
-    assert.equal(guessMenyDepartment('Gestus Pavé 4 Stk', null), 'Brød')
-    assert.equal(guessMenyDepartment('Risifrutti Pink Lemonade', 'Risifrutti'), 'Mejeri & køl')
-    assert.equal(guessMenyDepartment('Øko-Hokkaido Grøn', 'Grøn Balance Dansk Økologisk Græskar'), 'Frugt & grønt')
-    assert.equal(guessMenyDepartment('Ukendt vare', null), null)
+    assert.equal(guessDagrofaDepartment('Da Boller I Tomat', 'Delikatessen Anbefaler Middagsretter'), 'Nemt & hurtigt')
+    assert.equal(guessDagrofaDepartment('Pave Salami Med Peber', 'Sydeuropæisk Charcuteri eller Gestus Pizzabunde'), 'Kød & fisk')
+    assert.equal(guessDagrofaDepartment('Gestus Pavé 4 Stk', null), 'Brød')
+    assert.equal(guessDagrofaDepartment('Risifrutti Pink Lemonade', 'Risifrutti'), 'Mejeri & køl')
+    assert.equal(guessDagrofaDepartment('Øko-Hokkaido Grøn', 'Grøn Balance Dansk Økologisk Græskar'), 'Frugt & grønt')
+    assert.equal(guessDagrofaDepartment('Ukendt vare', null), null)
   })
 })
 
@@ -188,7 +222,7 @@ describe('MENY page notes', () => {
     'SKARP PRIS DANSKE PORRER 3 stk. Stk. pris 4,67. 7 særlige medlemspriser KAROLINES KØKKEN SAUCE Flere varianter. 500 ml. Literpris 32,00. PR. STK. 16.- MEDLEMSPRIS* PR. STK. 12.- Literpris 24,00 Max. 4 Stk. pr. kunde ROSE DANSK KYLLING Ovnklare. PR. PAKKE 40.- MEDLEMSPRIS* PR. PAKKE 29 95 Max. 4 Pakker pr. kunde'
 
   it('reads member price and limit per group without leaking to neighbours', () => {
-    const notes = parseMenyGroupNotes([text], ['Danske Porrer', 'Karolines Køkken Sauce', 'Rose Dansk Kylling'])
+    const notes = parseDagrofaGroupNotes([text], ['Danske Porrer', 'Karolines Køkken Sauce', 'Rose Dansk Kylling'])
     assert.equal(notes.get('Danske Porrer'), undefined)
     assert.deepEqual(notes.get('Karolines Køkken Sauce'), {
       regularPriceCents: 1600,
@@ -199,7 +233,7 @@ describe('MENY page notes', () => {
   })
 
   it('only attaches the note when the avis price matches', () => {
-    const items = selectMenyFoodItems(
+    const items = selectDagrofaFoodItems(
       avis(
         [
           product({ productId: '1', name: 'Kk Mornay Sauce', desc: 'Kk Mornay Sauce. 500 ml (Literpris 32,00)', price: 16, alttext: 'Karolines Køkken Sauce' }),
@@ -215,7 +249,7 @@ describe('MENY page notes', () => {
 })
 
 describe('MENY mapping', () => {
-  const [item] = selectMenyFoodItems(
+  const [item] = selectDagrofaFoodItems(
     avis(
       [
         product({
@@ -231,7 +265,7 @@ describe('MENY mapping', () => {
   ).items
 
   it('maps the product with avis- prefix and no image', () => {
-    const row = mapMenyAvisProduct(item, SYNCED)
+    const row = mapDagrofaAvisProduct(item, SYNCED)
     assert.equal(row.source_chain, 'meny')
     assert.equal(row.source_id, 'avis-5701234567899')
     assert.equal(row.gtin, '5701234567899')
@@ -241,7 +275,7 @@ describe('MENY mapping', () => {
   })
 
   it('maps the offer with period, unit price and multibuy', () => {
-    const offer = mapMenyAvisOffer(item, 'uuid', SYNCED)!
+    const offer = mapDagrofaAvisOffer(item, 'uuid', SYNCED)!
     assert.equal(offer.store_id, 'meny')
     assert.equal(offer.source, 'meny-avis')
     assert.equal(offer.price_cents, 2995)
@@ -255,7 +289,7 @@ describe('MENY mapping', () => {
   })
 
   it('writes member price and limit into the description', () => {
-    const offer = mapMenyAvisOffer(
+    const offer = mapDagrofaAvisOffer(
       { ...item, note: { memberPriceCents: 1200, limitText: 'Max. 4 stk pr. kunde' } },
       'uuid',
       SYNCED,
@@ -265,15 +299,48 @@ describe('MENY mapping', () => {
 
   it('handles period and fingerprint', () => {
     const a = avis([product()])
-    assert.deepEqual(menyOfferWindow(a), { from: '2026-09-24T22:00:00.000Z', until: '2026-10-01T22:00:00.000Z' })
-    assert.equal(isMenyAvisActiveOn(a, '2026-10-01'), true)
-    assert.equal(isMenyAvisActiveOn(a, '2026-10-02'), false)
-    assert.equal(menyAvisFingerprint(a), menyAvisFingerprint(avis([product()])))
-    assert.notEqual(menyAvisFingerprint(a), menyAvisFingerprint(avis([product({ price: 18 })])))
+    assert.deepEqual(dagrofaOfferWindow(a), { from: '2026-09-24T22:00:00.000Z', until: '2026-10-01T22:00:00.000Z' })
+    assert.equal(isDagrofaAvisActiveOn(a, '2026-10-01'), true)
+    assert.equal(isDagrofaAvisActiveOn(a, '2026-10-02'), false)
+    assert.equal(dagrofaAvisFingerprint(a), dagrofaAvisFingerprint(avis([product()])))
+    assert.notEqual(dagrofaAvisFingerprint(a), dagrofaAvisFingerprint(avis([product({ price: 18 })])))
   })
 
   it('is imported to FF even though MENY was a Goma chain', () => {
     assert.equal(shouldImportFooddataOfferSource('meny', 'meny-avis', false), true)
     assert.equal(shouldImportFooddataOfferSource('meny', 'meny-avis', true), true)
+  })
+})
+
+describe('SPAR and Min Købmand mapping', () => {
+  const itemFor = (chain: DagrofaAvisChain) =>
+    selectDagrofaFoodItems(
+      avis([product({ productId: '5701234567899', name: 'Okseculotte', desc: 'Okseculotte. 1 kg (Kg pris 179,90)', alttext: 'Okseculotte' })], [], chain),
+      new Map(),
+    ).items[0]
+
+  it('writes rows under the chain’s own store and source', () => {
+    const spar = itemFor(DAGROFA_AVIS_CHAINS.spar)
+    assert.equal(mapDagrofaAvisProduct(spar, SYNCED).source_chain, 'spar')
+    const offer = mapDagrofaAvisOffer(spar, 'uuid', SYNCED)!
+    assert.deepEqual([offer.store_id, offer.source], ['spar', 'spar-avis'])
+
+    const mk = itemFor(DAGROFA_AVIS_CHAINS['min-koebmand'])
+    assert.equal(mapDagrofaAvisProduct(mk, SYNCED).source_chain, 'min-koebmand')
+    const mkOffer = mapDagrofaAvisOffer(mk, 'uuid', SYNCED)!
+    assert.deepEqual([mkOffer.store_id, mkOffer.source], ['min-koebmand', 'min-koebmand-avis'])
+  })
+
+  it('names the member app per chain', () => {
+    const note = { memberPriceCents: 1200, limitText: null }
+    const spar = mapDagrofaAvisOffer({ ...itemFor(DAGROFA_AVIS_CHAINS.spar), note }, 'uuid', SYNCED)!
+    assert.equal(spar.offer_description, 'Medlemspris 12,00 kr med SAMMEN-appen')
+    const mk = mapDagrofaAvisOffer({ ...itemFor(DAGROFA_AVIS_CHAINS['min-koebmand']), note }, 'uuid', SYNCED)!
+    assert.equal(mk.offer_description, 'Medlemspris 12,00 kr')
+  })
+
+  it('is imported to FF', () => {
+    assert.equal(shouldImportFooddataOfferSource('spar', 'spar-avis', true), true)
+    assert.equal(shouldImportFooddataOfferSource('min-koebmand', 'min-koebmand-avis', true), true)
   })
 })

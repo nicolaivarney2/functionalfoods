@@ -1,17 +1,15 @@
 import type { ProductInsert, ProductOfferInsert } from '../../types'
 import { copenhagenMidnightIso } from '../lidl/mapper'
 import type {
-  MenyAvis,
-  MenyAvisItem,
-  MenyEnrichmentProduct,
-  MenyNativeCategory,
-  MenyPageNote,
+  DagrofaAvis,
+  DagrofaAvisItem,
+  DagrofaEnrichmentProduct,
+  DagrofaNativeCategory,
+  DagrofaPageNote,
 } from './types'
 
-const SOURCE_CHAIN = 'meny' as const
-export const MENY_AVIS_SOURCE = 'meny-avis' as const
-/** Holder avis-varer adskilt fra de eksisterende Goma-rækker for MENY. */
-export const MENY_AVIS_SOURCE_ID_PREFIX = 'avis-'
+/** Holder avis-varer adskilt fra de eksisterende Goma-rækker for kæden. */
+export const DAGROFA_AVIS_SOURCE_ID_PREFIX = 'avis-'
 
 function parseDanishNumber(raw: string): number | null {
   const s = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw
@@ -24,7 +22,7 @@ const formatKr = (cents: number) => `${(cents / 100).toFixed(2).replace('.', ','
 const normalize = (s: string) => s.replace(/\s+/g, ' ').trim()
 
 /** "Innocent Æblejuice (Innocent Juice, Shot eller Smoothie)" → "Innocent Æblejuice". */
-export function menyProductName(product: Pick<MenyEnrichmentProduct, 'name' | 'alttext'>): string {
+export function dagrofaProductName(product: Pick<DagrofaEnrichmentProduct, 'name' | 'alttext'>): string {
   let name = normalize(product.name).replace(/^\*+/, '')
   const group = normalize(product.alttext ?? '')
   if (group && name.endsWith(`(${group})`)) name = name.slice(0, -group.length - 2).trim()
@@ -42,17 +40,17 @@ const DESC_UNIT: Record<string, string> = {
   stk: 'stk',
 }
 
-export interface MenyUnitPrice {
+export interface DagrofaUnitPrice {
   cents: number
   unit: 'kg' | 'L' | 'stk'
   /** "v/2 bægere" — prisen gælder for flere stk. */
   multibuyQty: number | null
 }
 
-export interface MenyDesc {
+export interface DagrofaDesc {
   amount: number | null
   unit: string | null
-  unitPrice: MenyUnitPrice | null
+  unitPrice: DagrofaUnitPrice | null
   unitPriceText: string | null
 }
 
@@ -62,11 +60,11 @@ const UNIT_PRICE_RE =
   /(?:max\.?\s*)?(kg|liter|stk)\.?\s*pris\s*(?:v\/(\d+)\s*[a-zæøå]+\.?\s*)?(\d[\d.]*,\d{2})/i
 
 /** "Merrild 400 G. 400 g (Max. kg pris 299,75)" → 400 g · 299,75 kr/kg. */
-export function parseMenyDesc(desc: string | null | undefined): MenyDesc {
+export function parseDagrofaDesc(desc: string | null | undefined): DagrofaDesc {
   const m = normalize(desc ?? '').match(DESC_RE)
   if (!m) return { amount: null, unit: null, unitPrice: null, unitPriceText: null }
   const unitPriceText = m[3]?.trim() || null
-  let unitPrice: MenyUnitPrice | null = null
+  let unitPrice: DagrofaUnitPrice | null = null
   const up = unitPriceText?.match(UNIT_PRICE_RE)
   if (up) {
     const value = parseDanishNumber(up[3])
@@ -88,7 +86,7 @@ export function parseMenyDesc(desc: string | null | undefined): MenyDesc {
  * Kun rigtige GS1-numre som gtin. 20–29-prefix er butikkens egne numre
  * (vejevarer) og må ikke matche andre kæders varer.
  */
-export function validMenyGtin(raw: string): string | null {
+export function validDagrofaGtin(raw: string): string | null {
   const digits = raw.trim()
   if (!/^\d+$/.test(digits) || ![8, 12, 13, 14].includes(digits.length)) return null
   if (digits.length === 13 && digits.startsWith('2')) return null
@@ -125,7 +123,7 @@ const SOFT_DRINK_RE =
 /** 75 cl / 3 l uden sodavandsord er vin (flaske/bag-in-box). */
 const WINE_VOLUMES_CL = new Set([37.5, 75, 300])
 
-export function isMenyAlcohol(product: Pick<MenyEnrichmentProduct, 'name' | 'alttext' | 'desc'>): boolean {
+export function isDagrofaAlcohol(product: Pick<DagrofaEnrichmentProduct, 'name' | 'alttext' | 'desc'>): boolean {
   const name = product.name
   const group = product.alttext ?? ''
   const text = `${name} ${group}`
@@ -133,7 +131,7 @@ export function isMenyAlcohol(product: Pick<MenyEnrichmentProduct, 'name' | 'alt
   if (SOFT_DRINK_RE.test(name)) return false
   if (ALCOHOL_RE.test(name)) return true
   if (ALCOHOL_RE.test(group) && !SOFT_DRINK_RE.test(group)) return true
-  const { amount, unit } = parseMenyDesc(product.desc)
+  const { amount, unit } = parseDagrofaDesc(product.desc)
   const volumeCl = unit === 'cl' ? amount : unit === 'L' && amount != null ? amount * 100 : null
   if (volumeCl == null || SOFT_DRINK_RE.test(text)) return false
   // "Tuborg Classic 4,6%" · "Light House 0,5%" — procent på en drik er alkohol.
@@ -168,7 +166,7 @@ const ALCOHOL_CATEGORY_RE = wordsRe(['spiritus', 'spiritus & likør', 'likør', 
 
 type NativeVerdict = { food: boolean; alcohol: boolean }
 
-function nativeVerdict(native: MenyNativeCategory): NativeVerdict | null {
+function nativeVerdict(native: DagrofaNativeCategory): NativeVerdict | null {
   const lvl0 = native.lvl0?.trim() ?? ''
   const lvl1 = native.lvl1?.trim() ?? ''
   if (!lvl0) return null
@@ -178,7 +176,7 @@ function nativeVerdict(native: MenyNativeCategory): NativeVerdict | null {
   return { food: true, alcohol: false }
 }
 
-/** Afdeling for varer uden katalog-match (MENY-egne mærker, slagter, vejevarer). */
+/** Afdeling for varer uden katalog-match (kædens egne mærker, slagter, vejevarer). */
 const DEPARTMENT_GUESSES: Array<[string, RegExp]> = [
   ['Nemt & hurtigt', /wrap|sandwich|smørrebrød|middagsret|nemme retter|weekendmenu|tærte|frikadeller|karbonade|butterchicken|tikka|pad thai|asia box|panderet|boller i\b/i],
   ['Brød', /brød|boller|baguette|ciabatta|pavé|croissant|tebirkes|kanelsnurre|pizzabund|rundstykke/i],
@@ -189,7 +187,7 @@ const DEPARTMENT_GUESSES: Array<[string, RegExp]> = [
   ['Frugt & grønt', /æble|pære|kål|tomat|porre|selleri|kartofl|avocado|græskar|hokkaido|gulerød|løg|spinat|ærter|bønner|broccoli|blomkål|karotte|haric|grøntsag|citron|banan/i],
 ]
 
-export function guessMenyDepartment(name: string, group: string | null): string | null {
+export function guessDagrofaDepartment(name: string, group: string | null): string | null {
   for (const text of [name, group ?? '']) {
     if (!text) continue
     for (const [department, re] of DEPARTMENT_GUESSES) if (re.test(text)) return department
@@ -207,7 +205,7 @@ const NOTE_WINDOW = 400
 
 const tokenCents = (kr: string, ore?: string) => Number(kr) * 100 + (ore ? Number(ore) : 0)
 
-export interface MenyGroupNote extends MenyPageNote {
+export interface DagrofaGroupNote extends DagrofaPageNote {
   regularPriceCents: number | null
 }
 
@@ -216,7 +214,7 @@ export interface MenyGroupNote extends MenyPageNote {
  * MEDLEMSPRIS* PR. STK. 12.- … Max. 4 Stk. pr. kunde"). Teksten stopper ved
  * næste gruppes navn, så priser ikke smitter over på nabovaren.
  */
-export function parseMenyGroupNotes(pageTexts: string[], groups: string[]): Map<string, MenyGroupNote> {
+export function parseDagrofaGroupNotes(pageTexts: string[], groups: string[]): Map<string, DagrofaGroupNote> {
   const text = normalize(pageTexts.join(' '))
   const upper = text.toUpperCase()
   const names = [...new Set(groups.map((g) => normalize(g)).filter((g) => g.length >= 4))]
@@ -229,7 +227,7 @@ export function parseMenyGroupNotes(pageTexts: string[], groups: string[]): Map<
   }
   positions.sort((a, b) => a.at - b.at)
 
-  const notes = new Map<string, MenyGroupNote>()
+  const notes = new Map<string, DagrofaGroupNote>()
   for (const pos of positions) {
     if (notes.has(pos.group)) continue
     const next = positions.find((p) => p.group !== pos.group && p.at >= pos.end)
@@ -249,7 +247,7 @@ export function parseMenyGroupNotes(pageTexts: string[], groups: string[]): Map<
   return notes
 }
 
-function noteForItem(note: MenyGroupNote | undefined, priceCents: number | null): MenyPageNote | null {
+function noteForItem(note: DagrofaGroupNote | undefined, priceCents: number | null): DagrofaPageNote | null {
   // Kun når gruppens avispris er varens pris — ellers hører teksten til en anden vare.
   if (!note || priceCents == null || note.regularPriceCents !== priceCents) return null
   const memberPriceCents =
@@ -260,14 +258,14 @@ function noteForItem(note: MenyGroupNote | undefined, priceCents: number | null)
 
 // ── Avis → items ───────────────────────────────────────────────────────────
 
-export function menyPriceCents(product: Pick<MenyEnrichmentProduct, 'price'>): number | null {
+export function dagrofaPriceCents(product: Pick<DagrofaEnrichmentProduct, 'price'>): number | null {
   const kr = product.price
   if (kr == null || !Number.isFinite(kr) || kr <= 0) return null
   return Math.round(kr * 100)
 }
 
-export interface MenyAvisSelection {
-  items: MenyAvisItem[]
+export interface DagrofaAvisSelection {
+  items: DagrofaAvisItem[]
   alcoholSkipped: number
   nonFoodSkipped: number
   noPriceSkipped: number
@@ -278,20 +276,20 @@ export interface MenyAvisSelection {
  * Madvarer fra avisen. Klassifikation i rækkefølge: samme EAN i
  * Salling-kataloget → alkohol-regler → søskende i samme avisgruppe → navne-regler.
  */
-export function selectMenyFoodItems(
-  avis: MenyAvis,
-  nativeByEan: Map<string, MenyNativeCategory>,
-): MenyAvisSelection {
-  const result: MenyAvisSelection = {
+export function selectDagrofaFoodItems(
+  avis: DagrofaAvis,
+  nativeByEan: Map<string, DagrofaNativeCategory>,
+): DagrofaAvisSelection {
+  const result: DagrofaAvisSelection = {
     items: [],
     alcoholSkipped: 0,
     nonFoodSkipped: 0,
     noPriceSkipped: 0,
     nativeMatched: 0,
   }
-  const groupOf = (p: MenyEnrichmentProduct) => normalize(p.alttext ?? '')
+  const groupOf = (p: DagrofaEnrichmentProduct) => normalize(p.alttext ?? '')
 
-  const siblings = new Map<string, Array<{ verdict: NativeVerdict; native: MenyNativeCategory }>>()
+  const siblings = new Map<string, Array<{ verdict: NativeVerdict; native: DagrofaNativeCategory }>>()
   for (const product of avis.products) {
     const native = nativeByEan.get(String(product.productId))
     const verdict = native ? nativeVerdict(native) : null
@@ -301,8 +299,9 @@ export function selectMenyFoodItems(
     siblings.set(groupOf(product), list)
   }
 
-  const notes = parseMenyGroupNotes(avis.pageTexts, [...new Set(avis.products.map(groupOf))])
+  const notes = parseDagrofaGroupNotes(avis.pageTexts, [...new Set(avis.products.map(groupOf))])
   const avisRef = {
+    chain: avis.chain,
     paperId: avis.paperId,
     name: avis.name,
     url: avis.url,
@@ -312,14 +311,14 @@ export function selectMenyFoodItems(
 
   for (const product of avis.products) {
     const ean = String(product.productId)
-    const name = menyProductName(product)
+    const name = dagrofaProductName(product)
     const group = groupOf(product) || null
     const native = nativeByEan.get(ean) ?? null
     const own = native ? nativeVerdict(native) : null
     if (native && own) result.nativeMatched++
 
     // Katalogets afdeling vinder over navne-regler ("Cdo Baileys" er is).
-    if (own ? own.alcohol : isMenyAlcohol(product)) {
+    if (own ? own.alcohol : isDagrofaAlcohol(product)) {
       result.alcoholSkipped++
       continue
     }
@@ -342,7 +341,7 @@ export function selectMenyFoodItems(
         category = foodSibs[0].native.lvl1
       } else {
         food = !NON_FOOD_NAME_RE.test(`${name} ${group ?? ''}`)
-        department = food ? guessMenyDepartment(name, group) : null
+        department = food ? guessDagrofaDepartment(name, group) : null
       }
     }
     if (!food) {
@@ -350,7 +349,7 @@ export function selectMenyFoodItems(
       continue
     }
 
-    const priceCents = menyPriceCents(product)
+    const priceCents = dagrofaPriceCents(product)
     if (priceCents == null) {
       result.noPriceSkipped++
       continue
@@ -368,8 +367,8 @@ export function selectMenyFoodItems(
   return result
 }
 
-export function menyAvisSourceId(ean: string): string {
-  return `${MENY_AVIS_SOURCE_ID_PREFIX}${ean}`
+export function dagrofaAvisSourceId(ean: string): string {
+  return `${DAGROFA_AVIS_SOURCE_ID_PREFIX}${ean}`
 }
 
 function addDays(date: string, days: number): string {
@@ -377,19 +376,19 @@ function addDays(date: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
-export function menyOfferWindow(avis: Pick<MenyAvis, 'validFrom' | 'validTo'>): { from: string; until: string } {
+export function dagrofaOfferWindow(avis: Pick<DagrofaAvis, 'validFrom' | 'validTo'>): { from: string; until: string } {
   return {
     from: copenhagenMidnightIso(avis.validFrom),
     until: copenhagenMidnightIso(addDays(avis.validTo, 1)),
   }
 }
 
-export function mapMenyAvisProduct(item: MenyAvisItem, syncedAt: string): ProductInsert {
+export function mapDagrofaAvisProduct(item: DagrofaAvisItem, syncedAt: string): ProductInsert {
   const { product } = item
-  const { amount, unit } = parseMenyDesc(product.desc)
+  const { amount, unit } = parseDagrofaDesc(product.desc)
   return {
-    gtin: validMenyGtin(item.ean),
-    name: menyProductName(product),
+    gtin: validDagrofaGtin(item.ean),
+    name: dagrofaProductName(product),
     brand: null,
     manufacturer: null,
     description: product.desc ? normalize(product.desc) : null,
@@ -400,8 +399,8 @@ export function mapMenyAvisProduct(item: MenyAvisItem, syncedAt: string): Produc
     category_lvl0: item.department,
     category_lvl1: item.category,
     category_lvl2: null,
-    source_chain: SOURCE_CHAIN,
-    source_id: menyAvisSourceId(item.ean),
+    source_chain: item.avis.chain.chain,
+    source_id: dagrofaAvisSourceId(item.ean),
     active: true,
     last_seen_at: syncedAt,
     raw_data: {
@@ -416,26 +415,26 @@ export function mapMenyAvisProduct(item: MenyAvisItem, syncedAt: string): Produc
   }
 }
 
-export function mapMenyAvisOffer(
-  item: MenyAvisItem,
+export function mapDagrofaAvisOffer(
+  item: DagrofaAvisItem,
   productUuid: string,
   syncedAt: string,
 ): ProductOfferInsert | null {
-  const priceCents = menyPriceCents(item.product)
+  const priceCents = dagrofaPriceCents(item.product)
   if (priceCents == null) return null
-  const desc = parseMenyDesc(item.product.desc)
+  const desc = parseDagrofaDesc(item.product.desc)
   const qty = desc.unitPrice?.multibuyQty ?? null
   const notes = [
     item.note?.memberPriceCents != null
-      ? `Medlemspris ${formatKr(item.note.memberPriceCents)} med MENY-appen`
+      ? `Medlemspris ${formatKr(item.note.memberPriceCents)}${item.avis.chain.memberApp ? ` med ${item.avis.chain.memberApp}` : ''}`
       : null,
     item.note?.limitText ?? null,
   ].filter(Boolean)
-  const { from, until } = menyOfferWindow(item.avis)
+  const { from, until } = dagrofaOfferWindow(item.avis)
 
   return {
     product_id: productUuid,
-    store_id: SOURCE_CHAIN,
+    store_id: item.avis.chain.chain,
     price_cents: priceCents,
     before_price_cents: null,
     unit_price_cents: desc.unitPrice?.cents ?? null,
@@ -447,7 +446,7 @@ export function mapMenyAvisOffer(
     multibuy: qty ? `${qty} for ${formatKr(priceCents)}` : null,
     discount_percentage: null,
     in_stock: true,
-    source: MENY_AVIS_SOURCE,
+    source: item.avis.chain.source,
     source_synced_at: syncedAt,
     raw_data: {
       avis_paper_id: item.avis.paperId,

@@ -1,18 +1,26 @@
 /**
- * MENY tilbudsavis → fooddata (kun madvarer).
- * Læser MENYs egen avis på ugensavis.meny.dk (varer, EAN, pris, periode).
+ * Dagrofa-kædernes tilbudsavis (MENY, SPAR, Min Købmand) → fooddata (kun madvarer).
+ * Læser kædens egen avis på ugensavis.<kæde>.dk (varer, EAN, pris, periode).
  *
  * Usage:
- *   npx tsx scripts/grocery-sync-meny.ts --dry-run
- *   npx tsx scripts/grocery-sync-meny.ts            # skriver til fooddata
- *   npx tsx scripts/grocery-sync-meny.ts --force    # også selvom avisen er uændret
+ *   npx tsx scripts/grocery-sync-dagrofa.ts --chain=meny --dry-run
+ *   npx tsx scripts/grocery-sync-dagrofa.ts --chain=spar          # skriver til fooddata
+ *   npx tsx scripts/grocery-sync-dagrofa.ts --chain=all --force   # alle tre, også selvom avisen er uændret
  */
 
 import { config as loadEnv } from 'dotenv'
 import { resolve } from 'node:path'
 loadEnv({ path: resolve(process.cwd(), '.env.local') })
 
-import { mapMenyAvisOffer, mapMenyAvisProduct, syncMenyAvis } from '../src/grocery/adapters/meny'
+import {
+  DAGROFA_AVIS_CHAINS,
+  DAGROFA_CHAIN_IDS,
+  isDagrofaChainId,
+  mapDagrofaAvisOffer,
+  mapDagrofaAvisProduct,
+  syncDagrofaAvis,
+  type DagrofaChainId,
+} from '../src/grocery/adapters/dagrofa'
 
 const args = new Map<string, string | boolean>()
 for (const arg of process.argv.slice(2)) {
@@ -25,20 +33,22 @@ const dryRun = Boolean(args.get('dry-run'))
 const force = Boolean(args.get('force'))
 const maxRaw = args.get('max')
 const maxProducts = typeof maxRaw === 'string' ? Number.parseInt(maxRaw, 10) : undefined
+const chainArg = typeof args.get('chain') === 'string' ? String(args.get('chain')) : 'all'
 
 const kr = (cents: number | null | undefined) =>
   cents == null ? '' : (cents / 100).toFixed(2).replace('.', ',')
 
-async function main() {
+async function syncChain(chainId: DagrofaChainId): Promise<boolean> {
+  const chain = DAGROFA_AVIS_CHAINS[chainId]
   console.log('────────────────────────────────────────')
-  console.log('▶ MENY tilbudsavis sync')
+  console.log(`▶ ${chain.label} tilbudsavis sync (${chain.avisUrl})`)
   console.log(`  dryRun     : ${dryRun}`)
   console.log(`  force      : ${force}`)
   console.log(`  maxProducts: ${maxProducts ?? 'unlimited'}`)
   if (!dryRun) console.log(`  target DB  : ${process.env.GROCERY_SUPABASE_URL}`)
   console.log('────────────────────────────────────────')
 
-  const result = await syncMenyAvis({
+  const result = await syncDagrofaAvis(chainId, {
     dryRun,
     force,
     maxProducts,
@@ -50,8 +60,8 @@ async function main() {
     console.log('')
     console.log('pris   | enhedspris     | pakning     | afdeling       | vare')
     for (const item of result.items) {
-      const p = mapMenyAvisProduct(item, syncedAt)
-      const o = mapMenyAvisOffer(item, 'dry-run', syncedAt)
+      const p = mapDagrofaAvisProduct(item, syncedAt)
+      const o = mapDagrofaAvisOffer(item, 'dry-run', syncedAt)
       const unitPrice = o?.unit_price_cents ? `${kr(o.unit_price_cents)}/${o.unit_price_unit ?? '?'}` : ''
       const pack = p.amount != null ? `${p.amount} ${p.unit}` : ''
       const extra = [o?.multibuy, o?.offer_description].filter(Boolean).join(' · ')
@@ -61,14 +71,14 @@ async function main() {
     }
     const first = result.items[0]
     if (first) {
-      const o = mapMenyAvisOffer(first, 'dry-run', syncedAt)
+      const o = mapDagrofaAvisOffer(first, 'dry-run', syncedAt)
       console.log('')
       console.log(`  periode: ${o?.offer_from} → ${o?.offer_until}`)
     }
   }
 
   console.log('')
-  console.log(`✓ Sync ${result.status}${result.skippedUnchanged ? ' (uændret avis — sprunget over)' : ''}`)
+  console.log(`✓ ${chain.label} sync ${result.status}${result.skippedUnchanged ? ' (uændret avis — sprunget over)' : ''}`)
   console.log(`  duration          : ${(result.durationMs / 1000).toFixed(1)}s`)
   console.log(`  avis              : ${result.avis ? `${result.avis.name} ${result.avis.validFrom} → ${result.avis.validTo} (${result.avis.products} varer)` : '-'}`)
   console.log(`  madvarer          : ${result.productsProcessed}`)
@@ -79,8 +89,19 @@ async function main() {
   console.log(`  offers processed  : ${result.offersProcessed}`)
   if (result.errorMessage) console.log(`  error             : ${result.errorMessage}`)
   if (result.syncLogId) console.log(`  sync_log id       : ${result.syncLogId}`)
+  console.log('')
+  return result.status !== 'failed'
+}
 
-  if (result.status === 'failed') process.exit(1)
+async function main() {
+  if (chainArg !== 'all' && !isDagrofaChainId(chainArg)) {
+    console.error(`Ukendt --chain=${chainArg}. Brug ${DAGROFA_CHAIN_IDS.join(' | ')} | all`)
+    process.exit(2)
+  }
+  const chains = chainArg === 'all' ? [...DAGROFA_CHAIN_IDS] : [chainArg as DagrofaChainId]
+  let ok = true
+  for (const chainId of chains) ok = (await syncChain(chainId)) && ok
+  if (!ok) process.exit(1)
 }
 
 main().catch((err) => {
