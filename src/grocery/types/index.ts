@@ -50,9 +50,10 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   bilka: 'full',
   'rema-1000': 'full',
 
-  // Øvrige kæder: Tjek udfaset — Goma er primær. Salling papiravis kører
-  // stadig som Tjek-overlay (se TJEK_LEAFLET_OVERLAY_CHAINS).
+  // Kædens egen tilbudsavis (adapters/lidl) — kun madvarer, kun ugens tilbud.
   lidl: 'offers-only',
+
+  // Øvrige kæder: ingen aktiv kilde siden Goma/Tjek blev slukket.
   meny: 'offers-only',
   spar: 'offers-only',
   'min-koebmand': 'offers-only',
@@ -99,6 +100,17 @@ export type SyncSource =
   | `tjek:offers`
   | `goma`
   | `goma:${string}`
+  | `lidl-avis`
+
+/**
+ * `product_offers.source` fra kædens egen tilbudsavis (ikke en tredjepart).
+ * Hele rækken er ugens tilbud — også uden bevist førpris.
+ */
+export const OWN_CHAIN_AVIS_SOURCES = ['lidl-avis'] as const
+
+export function isOwnChainAvisSource(source: string | null | undefined): boolean {
+  return (OWN_CHAIN_AVIS_SOURCES as readonly string[]).includes(String(source ?? ''))
+}
 
 export interface StoreRow {
   id: string

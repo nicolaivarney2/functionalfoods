@@ -21,6 +21,7 @@ export type CronSyncStepId =
   | 'rema-1000'
   | 'tjek'
   | 'salling-offers'
+  | 'lidl'
 
 /** Native scrapes that Vercel grocery-cron kører (ikke Goma/Tjek). */
 export type NativeCronChain = 'netto' | 'foetex' | 'bilka' | 'rema-1000'
@@ -195,6 +196,9 @@ export function scheduledStepIds(
   // REMA public API er hele kataloget på ~1 min. Kør hver dag — ikke kun
   // søndag — så en hung/failed cron ikke efterlader sidste uges priser.
   steps.push('rema-1000')
+  // Lidls egen avis: tjekkes hver nat, men produktsider hentes kun når avisen
+  // har ændret sig (fingerprint i sync_logs.metadata).
+  steps.push('lidl')
   if (schedule.tjekChains.length > 0) steps.push('tjek')
   steps.push('salling-offers')
   return steps

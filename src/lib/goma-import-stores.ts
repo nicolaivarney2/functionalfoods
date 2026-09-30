@@ -8,7 +8,7 @@
  *   Tjek øvrigt: importeres ikke til FF når GOMA_IMPORT_ENABLED=true
  */
 
-import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
+import { CHAIN_COVERAGE, isOwnChainAvisSource, type SourceChain } from '@/grocery/types'
 
 /** Goma RPC `p_store_filter` navne (exact casing from Goma API). */
 export type GomaStoreName =
@@ -204,6 +204,7 @@ export function shouldImportFooddataOfferSource(
   gomaImportEnabled: boolean,
 ): boolean {
   if (!isGomaImportChain(chain)) return true
+  if (isOwnChainAvisSource(offerSource)) return true
   if (gomaImportEnabled) return offerSource === 'goma'
   return offerSource.startsWith('tjek')
 }
