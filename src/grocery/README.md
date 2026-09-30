@@ -24,6 +24,7 @@ src/grocery/
 ├── adapters/
 │   ├── salling-algolia/                Netto, Bilka, Føtex (shared Algolia index)
 │   ├── rema1000/                       REMA 1000 (direct public API)
+│   ├── lidl/                           Lidl — kædens egen tilbudsavis (kun madvarer)
 │   ├── tjek/                           Tilbud (offers) for ALL DK chains via squid-api.tjek.com
 │   └── nemlig/TODO.md                  Nemlig.com full catalog (deferred — stateful API)
 ├── api/
@@ -67,6 +68,7 @@ npx tsx scripts/grocery-sync-netto.ts --chain=netto
 npx tsx scripts/grocery-sync-netto.ts --chain=foetex
 npx tsx scripts/grocery-sync-netto.ts --chain=bilka
 npx tsx scripts/grocery-sync-rema.ts
+npx tsx scripts/grocery-sync-lidl.ts --dry-run   # Lidl-avis (preview)
 
 # 3. Pull weekly offers for the remaining DK chains via Tjek
 npx tsx scripts/grocery-sync-tjek.ts --dry-run --max=10   # preview
@@ -129,10 +131,32 @@ through the server-side secret key. Public/anon traffic must go through our
 |---|---|---|---|
 | **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Native scrape → fooddata | **Primary** — fuldt katalog + tilbud |
 | **REMA 1000 API** | REMA 1000 | Native scrape → fooddata | **Primary** — fuldt katalog |
+| **Lidl tilbudsavis** (lidl.dk + `endpoints.leaflets.schwarz`) | Lidl | Native scrape → fooddata (`source=lidl-avis`) | **Primary** — kun ugens madvarer-tilbud |
 | **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Nemlig, Min Købmand, … | Goma cron → fooddata (`source=goma`) | **Primary** for all non-Salling/REMA chains |
 | ~~**Tjek/Squid**~~ | (alle ikke-native) | Udfaset jul 2026 | Legacy rækker i DB — **importeres ikke** når `GOMA_IMPORT_ENABLED=true` |
 
 Se også [PLANOMO_FOODDATA_GOMA_HANDOFF.md](../docs/PLANOMO_FOODDATA_GOMA_HANDOFF.md) for Planomo-spejl.
+
+### Lidl adapter (`adapters/lidl/`)
+
+Læser Lidls **egen** avis — ingen tredjepart. Kun fakta (navn, pris, pakning,
+periode); avisens billeder/layout kopieres ikke.
+
+1. `lidl.dk/c/tilbudsavis` → hvilke aviser er ude (`/l/da/tilbudsavis/<slug>/ar/<n>`)
+2. `endpoints.leaflets.schwarz/v4/flyer` → avisens varer (Lidl-koncernens avis-platform)
+3. Kun aviser der gælder i dag (København). Samme vare i to aviser → nyeste vinder.
+4. Kun madvarer: kategori "Mad og mad i nærheden" minus Husholdning / Drogeri & pleje, og `alcoholic=false`
+5. Varens side på lidl.dk (én ad gangen, 400 ms pause) → pakning, enhedspris, førpris, EAN, Lidl Plus
+6. fooddata: `products.source_id = avis-<lidl id>` (rammer aldrig Goma-rækkerne), `product_offers.source = lidl-avis`
+
+Pris = den pris alle betaler. Lavere Lidl Plus-pris står i `offer_description`
+("Lidl Plus: 29,00 kr"); varer der kun har Lidl Plus-pris får "Kræver Lidl Plus".
+
+Kører i `grocery-native-sync.yml` hver nat (step `lidl`). Er avisen uændret siden
+sidste succes (fingerprint i `sync_logs.metadata`), hentes produktsiderne ikke.
+Sidste uges avis-rækker (kun `source=lidl-avis`) slås fra efter en sync.
+
+Nødstop: `GROCERY_LIDL_AVIS_DISABLED=true`.
 
 ### Goma adapter (`adapters/goma/`)
 
