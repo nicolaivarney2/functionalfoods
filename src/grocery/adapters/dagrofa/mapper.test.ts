@@ -169,6 +169,16 @@ describe('MENY food filter', () => {
     assert.equal(alcohol('Gestus Græsk Yoghurt 10%', 'Gestus Græsk Yoghurt 10%. 1000 g (Kg pris 30,00)'), false)
     assert.equal(alcohol('Ovnkyll. Overlår M/Rygben (Rose Dansk Kylling)', 'x. 1000 g (Max. kg pris 114,29)', 'Rose Dansk Kylling'), false)
     assert.equal(alcohol('Kk Rødvinssauce', 'Kk Rødvinssauce. 500 ml (Literpris 32,00)'), false)
+    assert.equal(alcohol('Æblemost Ørskov 75 Cl', 'Æblemost Ørskov 75 Cl. 75 cl (Literpris 26,67)'), false)
+    assert.equal(alcohol('A.B. Marcipanbrød Baileys', 'A.B. Marcipanbrød Baileys. 150 g (Max. kg pris 333,33)'), false)
+  })
+
+  it('drops kitchen supplies kept in the food aisles', () => {
+    const selection = selectDagrofaFoodItems(
+      avis([product({ productId: '1', name: 'Fixa Fryseposer 4 Lt', desc: 'Fixa Fryseposer 4 Lt. 1 stk', alttext: 'Fixa' })]),
+      new Map(),
+    )
+    assert.deepEqual([selection.items.length, selection.nonFoodSkipped], [0, 1])
   })
 
   it('uses catalog category, then group siblings, then name rules', () => {
@@ -213,6 +223,12 @@ describe('MENY food filter', () => {
     assert.equal(guessDagrofaDepartment('Gestus Pavé 4 Stk', null), 'Brød')
     assert.equal(guessDagrofaDepartment('Risifrutti Pink Lemonade', 'Risifrutti'), 'Mejeri & køl')
     assert.equal(guessDagrofaDepartment('Øko-Hokkaido Grøn', 'Grøn Balance Dansk Økologisk Græskar'), 'Frugt & grønt')
+    assert.equal(guessDagrofaDepartment('Heinz Tomatketchup', null), 'Kolonial')
+    assert.equal(guessDagrofaDepartment('Gestus Middagskødboller', null), 'Nemt & hurtigt')
+    assert.equal(guessDagrofaDepartment('Dill & Parmesan Chips', null), 'Slik og snacks')
+    assert.equal(guessDagrofaDepartment('Premium Chokoladekage', null), null)
+    assert.equal(guessDagrofaDepartment('Arla Yogh Pære Banan Øko', null), 'Mejeri & køl')
+    assert.equal(guessDagrofaDepartment('Faxe Kondi 0 Kal. 12pk Pet', null), 'Drikkevarer')
     assert.equal(guessDagrofaDepartment('Ukendt vare', null), null)
   })
 })

@@ -119,7 +119,7 @@ const ALCOHOL_RE = wordsRe([
   'smirnoff', 'calvados', 'brandy', 'limoncello',
 ])
 const SOFT_DRINK_RE =
-  /juice|saft|lemonade|limonade|sodavand|brus|smoothie|vand(?![\p{L}])|kondi|cola|pepsi|fanta|sprite|iste|ice tea|drik|shot|kombucha|mælk|olie|eddike|sirup|sauce/iu
+  /juice|saft|most(?![\p{L}])|lemonade|limonade|sodavand|brus|smoothie|vand(?![\p{L}])|kondi|cola|pepsi|fanta|sprite|iste|ice tea|drik|shot|kombucha|mælk|olie|eddike|sirup|sauce/iu
 /** 75 cl / 3 l uden sodavandsord er vin (flaske/bag-in-box). */
 const WINE_VOLUMES_CL = new Set([37.5, 75, 300])
 
@@ -129,9 +129,11 @@ export function isDagrofaAlcohol(product: Pick<DagrofaEnrichmentProduct, 'name' 
   const text = `${name} ${group}`
   // "Coca Cola 24-Pak" i gruppen "Coca-Cola, Fanta eller Carlsberg" er ikke øl.
   if (SOFT_DRINK_RE.test(name)) return false
+  const { amount, unit } = parseDagrofaDesc(product.desc)
+  // "A.B. Marcipanbrød Baileys. 150 g" — drikke sælges ikke i gram.
+  if (unit === 'g' || unit === 'kg') return false
   if (ALCOHOL_RE.test(name)) return true
   if (ALCOHOL_RE.test(group) && !SOFT_DRINK_RE.test(group)) return true
-  const { amount, unit } = parseDagrofaDesc(product.desc)
   const volumeCl = unit === 'cl' ? amount : unit === 'L' && amount != null ? amount * 100 : null
   if (volumeCl == null || SOFT_DRINK_RE.test(text)) return false
   // "Tuborg Classic 4,6%" · "Light House 0,5%" — procent på en drik er alkohol.
@@ -147,6 +149,8 @@ const NON_FOOD_NAME_RE = wordsRe([
   'libero', 'pampers', 'bleer', 'ble', 'kattemad', 'hundemad', 'kattegrus', 'whiskas', 'sheba',
   'cesar', 'perfect fit', 'pedigree', 'wipes', 'vådservietter', 'toiletpapir', 'køkkenrulle',
   'batterier', 'hårkur', 'hårpleje', 'styling', 'plaster', 'affaldsposer',
+  'fryseposer', 'frysepose', 'frysebøtter', 'fixa', 'toppits', 'alufolie', 'bagepapir',
+  'husholdningsfilm', 'madpapir',
 ])
 
 const NON_FOOD_DEPARTMENTS = new Set([
@@ -178,11 +182,12 @@ function nativeVerdict(native: DagrofaNativeCategory): NativeVerdict | null {
 
 /** Afdeling for varer uden katalog-match (kædens egne mærker, slagter, vejevarer). */
 const DEPARTMENT_GUESSES: Array<[string, RegExp]> = [
-  ['Nemt & hurtigt', /wrap|sandwich|smørrebrød|middagsret|nemme retter|weekendmenu|tærte|frikadeller|karbonade|butterchicken|tikka|pad thai|asia box|panderet|boller i\b/i],
+  ['Nemt & hurtigt', /wrap|sandwich|smørrebrød|middagsret|nemme retter|weekendmenu|tærte|frikadeller|kødboller|karbonade|butterchicken|tikka|pad thai|asia box|panderet|boller i\b/i],
+  ['Slik og snacks', /chips|flødeboller|marcipan|lakrids|vingummi|chokolade(?!kage)|\bbarre\b/i],
   ['Brød', /brød|boller|baguette|ciabatta|pavé|croissant|tebirkes|kanelsnurre|pizzabund|rundstykke/i],
-  ['Mejeri & køl', /\bost\b|skæreost|flammeost|jagtost|grana padano|parmesan|yoghurt|skyr|mælk|smør\b|fløde(?!stuvet)|risifrutti|hytteost/i],
-  ['Drikkevarer', /juice|lemonade|limonade|sodavand|brus\b|saft\b|smoothie|shots?\b/i],
-  ['Kolonial', /pasta|fusilli|penne|spaghetti|tagliat|olivenolie|olie\b|eddike|krydderi|paprika|masala|karry|müsli|grød|sauce|\bris\b|sukker|kaffe|\bte\b/i],
+  ['Mejeri & køl', /\bost\b|skæreost|flammeost|jagtost|grana padano|parmesan|yogh|skyr|mælk|smør\b|fløde(?!stuvet)|risifrutti|hytteost/i],
+  ['Drikkevarer', /juice|most\b|kondi|pepsi|cola|fanta|capri|lemonade|limonade|sodavand|brus\b|saft\b|smoothie|shots?\b/i],
+  ['Kolonial', /ketchup|remoulade|dressing|mayonnaise|pasta|fusilli|penne|spaghetti|tagliat|olivenolie|olie\b|eddike|krydderi|paprika|masala|karry|müsli|grød|sauce|\bris\b|sukker|kaffe|\bte\b/i],
   ['Kød & fisk', /gris|svin|okse|kalv|kvie|kylling|kyll\b|kyll\.|\band\b|\blam\b|bøf|steg|kotelet|entrecote|culotte|gullasch|fars\b|skink|jambon|bacon|salami|salame|mortadella|bresaola|serrano|charcuteri|laks|rejer|fisk|torsk|hotwings|filet|mørbrad|medister|pølse|flæsk|nakke/i],
   ['Frugt & grønt', /æble|pære|kål|tomat|porre|selleri|kartofl|avocado|græskar|hokkaido|gulerød|løg|spinat|ærter|bønner|broccoli|blomkål|karotte|haric|grøntsag|citron|banan/i],
 ]
