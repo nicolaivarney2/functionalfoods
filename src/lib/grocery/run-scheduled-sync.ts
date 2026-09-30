@@ -1,5 +1,5 @@
 /**
- * Native grocery orchestrator (Salling full/leaflet + REMA + Lidl-avis).
+ * Native grocery orchestrator (Salling full/leaflet + REMA + Lidl-/MENY-avis).
  * Køres fra GitHub Actions — ikke Vercel cron (300s loft).
  */
 
@@ -9,6 +9,7 @@ import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
 import { isLidlAvisEnabled, syncLidlAvis, type LidlAvisSyncResult } from '@/grocery/adapters/lidl'
+import { isMenyAvisEnabled, syncMenyAvis, type MenyAvisSyncResult } from '@/grocery/adapters/meny'
 import { isTjekEnabled, syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
 import {
   isTjekLeafletOverlayChain,
@@ -35,6 +36,7 @@ export type GroceryCronStepResult =
   | (SyncResult & { step: string })
   | (RemaSyncResult & { step: string })
   | (LidlAvisSyncResult & { step: string })
+  | (MenyAvisSyncResult & { step: string })
   | (TjekSyncResult & { step: string })
   | { step: string; status: 'failed'; errorMessage: string; durationMs: number }
   | { step: string; status: 'success'; rowsAffected: number; durationMs: number }
@@ -230,6 +232,15 @@ export async function runScheduledGrocerySync(
       await runStep('lidl', async () => ({
         ...(await syncLidlAvis({ log: (msg) => console.log(`[grocery/lidl] ${msg}`) })),
         step: 'lidl',
+      })),
+    )
+  }
+
+  if (shouldRun('meny') && isMenyAvisEnabled()) {
+    steps.push(
+      await runStep('meny', async () => ({
+        ...(await syncMenyAvis({ log: (msg) => console.log(`[grocery/meny] ${msg}`) })),
+        step: 'meny',
       })),
     )
   }

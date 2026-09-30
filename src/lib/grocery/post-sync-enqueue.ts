@@ -30,6 +30,7 @@ export function sourceChainsForCronRun(options: {
     if (options.only.has('bilka')) addSalling('bilka')
     if (options.only.has('rema-1000')) chains.add('rema-1000')
     if (options.only.has('lidl')) chains.add('lidl')
+    if (options.only.has('meny')) chains.add('meny')
     if (options.only.has('tjek') && options.schedule?.tjekChains.length) {
       for (const c of options.schedule.tjekChains) chains.add(c)
     }
@@ -37,6 +38,7 @@ export function sourceChainsForCronRun(options: {
     for (const c of options.schedule.sallingChains) addSalling(c)
     if (options.schedule.rema1000) chains.add('rema-1000')
     chains.add('lidl')
+    chains.add('meny')
     for (const c of options.schedule.tjekChains) chains.add(c)
   }
 

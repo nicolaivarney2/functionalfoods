@@ -50,11 +50,11 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   bilka: 'full',
   'rema-1000': 'full',
 
-  // Kædens egen tilbudsavis (adapters/lidl) — kun madvarer, kun ugens tilbud.
+  // Kædens egen tilbudsavis (adapters/lidl, adapters/meny) — kun madvarer, kun ugens tilbud.
   lidl: 'offers-only',
+  meny: 'offers-only',
 
   // Øvrige kæder: ingen aktiv kilde siden Goma/Tjek blev slukket.
-  meny: 'offers-only',
   spar: 'offers-only',
   'min-koebmand': 'offers-only',
   loevbjerg: 'offers-only',
@@ -101,12 +101,13 @@ export type SyncSource =
   | `goma`
   | `goma:${string}`
   | `lidl-avis`
+  | `meny-avis`
 
 /**
  * `product_offers.source` fra kædens egen tilbudsavis (ikke en tredjepart).
  * Hele rækken er ugens tilbud — også uden bevist førpris.
  */
-export const OWN_CHAIN_AVIS_SOURCES = ['lidl-avis'] as const
+export const OWN_CHAIN_AVIS_SOURCES = ['lidl-avis', 'meny-avis'] as const
 
 export function isOwnChainAvisSource(source: string | null | undefined): boolean {
   return (OWN_CHAIN_AVIS_SOURCES as readonly string[]).includes(String(source ?? ''))
