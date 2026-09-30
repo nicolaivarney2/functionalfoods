@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { DAGROFA_CHAIN_IDS } from '@/grocery/adapters/dagrofa/chains'
 import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
 import type { SourceChain } from '@/grocery/types'
 import { enqueueUnmatchedFooddataProducts } from '@/lib/product-match-queue'
@@ -30,6 +31,7 @@ export function sourceChainsForCronRun(options: {
     if (options.only.has('bilka')) addSalling('bilka')
     if (options.only.has('rema-1000')) chains.add('rema-1000')
     if (options.only.has('lidl')) chains.add('lidl')
+    for (const c of DAGROFA_CHAIN_IDS) if (options.only.has(c)) chains.add(c)
     if (options.only.has('tjek') && options.schedule?.tjekChains.length) {
       for (const c of options.schedule.tjekChains) chains.add(c)
     }
@@ -37,6 +39,7 @@ export function sourceChainsForCronRun(options: {
     for (const c of options.schedule.sallingChains) addSalling(c)
     if (options.schedule.rema1000) chains.add('rema-1000')
     chains.add('lidl')
+    for (const c of DAGROFA_CHAIN_IDS) chains.add(c)
     for (const c of options.schedule.tjekChains) chains.add(c)
   }
 
