@@ -7,8 +7,9 @@
  * (02:00 UTC). En fredag-nat sync ville misse fredag-aften.
  *
  * GitHub Actions `grocery-native-sync.yml` kl. 02:00 UTC — fuldt katalog
- * efter kædens avisdag, plus daglig Salling-avis-refresh og daglig REMA
- * (kataloget er ~1 min; en misset søndag må ikke efterlade ugens avis).
+ * efter kædens avisdag, plus daglig Salling-avis-refresh, daglig REMA
+ * (kataloget er ~1 min; en misset søndag må ikke efterlade ugens avis) og
+ * dagligt Nemlig-katalog (~8 min).
  */
 
 import { DAGROFA_CHAIN_IDS, type DagrofaChainId } from '@/grocery/adapters/dagrofa/chains'
@@ -23,6 +24,7 @@ export type CronSyncStepId =
   | 'tjek'
   | 'salling-offers'
   | 'lidl'
+  | 'nemlig'
   | DagrofaChainId
 
 /** Native scrapes that Vercel grocery-cron kører (ikke Goma/Tjek). */
@@ -70,8 +72,6 @@ const TJEK_ONLY_BY_CRON_WEEKDAY: Record<number, SourceChain[]> = {
   6: ['brugsen'],
   // Søndag ← lørdag: REMA + Lidl
   0: ['lidl'],
-  // Mandag ← søndag: Nemlig (Tjek har sjældent data — billig no-op)
-  1: ['nemlig'],
 }
 
 const SALLING_BY_CRON_WEEKDAY: Record<number, Array<'netto' | 'foetex' | 'bilka'>> = {
@@ -93,7 +93,6 @@ const LABEL_BY_WEEKDAY: Record<number, string> = {
 
 const RELEASE_NOTE_BY_WEEKDAY: Record<number, string> = {
   0: 'Lørdagens REMA 1000 + Lidl',
-  1: 'Søndagens Nemlig',
   3: 'Tirsdagens ABC Lavpris',
   4: 'Onsdagens 365discount',
   5: 'Torsdagens MENY/Coop/Dagrofa (inkl. Min Købmand) + Føtex',
@@ -201,6 +200,8 @@ export function scheduledStepIds(
   // Kædernes egne aviser: tjekkes hver nat, men skrives kun når avisen har
   // ændret sig (fingerprint i sync_logs.metadata).
   steps.push('lidl', ...DAGROFA_CHAIN_IDS)
+  // Nemlig ændrer priser/kampagner løbende — fuldt katalog hver nat.
+  steps.push('nemlig')
   if (schedule.tjekChains.length > 0) steps.push('tjek')
   steps.push('salling-offers')
   return steps

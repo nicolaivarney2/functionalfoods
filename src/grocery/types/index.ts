@@ -29,7 +29,7 @@ export type SourceChain =
  *
  *   - `full`        Direct primary-source API: full product catalog with both
  *                   regular shelf prices and current offers. (Salling Algolia,
- *                   REMA 1000 API.)
+ *                   REMA 1000 API, Nemlig webapi.)
  *   - `offers-only` Only current weekly tilbud via Tjek/Squid. No regular
  *                   shelf prices, no out-of-campaign products. Treat the data
  *                   as "this week's offers" — the frontend should label these
@@ -49,6 +49,7 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   foetex: 'full',
   bilka: 'full',
   'rema-1000': 'full',
+  nemlig: 'full',
 
   // Kædens egen tilbudsavis (adapters/lidl, adapters/dagrofa) — kun madvarer, kun ugens tilbud.
   lidl: 'offers-only',
@@ -64,9 +65,6 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   brugsen: 'offers-only',
   '365discount': 'offers-only',
   'abc-lavpris': 'offers-only',
-
-  // Fuldt katalog via Goma (ikke Tjek)
-  nemlig: 'offers-only',
 }
 
 /**
