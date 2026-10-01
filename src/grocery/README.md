@@ -27,7 +27,7 @@ src/grocery/
 │   ├── lidl/                           Lidl — kædens egen tilbudsavis (kun madvarer)
 │   ├── dagrofa/                        MENY, SPAR, Min Købmand — kædens egen tilbudsavis (kun madvarer)
 │   ├── tjek/                           Tilbud (offers) for ALL DK chains via squid-api.tjek.com
-│   └── nemlig/TODO.md                  Nemlig.com full catalog (deferred — stateful API)
+│   └── nemlig/                         Nemlig.com — fuldt katalog via nemlig.com's webapi (dagligt)
 ├── api/
 │   ├── auth.ts                         Bearer token auth
 │   ├── mappers.ts                      DB row → DTO
@@ -69,6 +69,7 @@ npx tsx scripts/grocery-sync-netto.ts --chain=netto
 npx tsx scripts/grocery-sync-netto.ts --chain=foetex
 npx tsx scripts/grocery-sync-netto.ts --chain=bilka
 npx tsx scripts/grocery-sync-rema.ts
+npx tsx scripts/grocery-sync-nemlig.ts --dry-run   # Nemlig-katalog (preview, ~8 min)
 npx tsx scripts/grocery-sync-lidl.ts --dry-run   # Lidl-avis (preview)
 npx tsx scripts/grocery-sync-dagrofa.ts --chain=all --dry-run   # MENY-/SPAR-/Min Købmand-avis (preview)
 
@@ -133,9 +134,10 @@ through the server-side secret key. Public/anon traffic must go through our
 |---|---|---|---|
 | **Salling Algolia** (`F9VBJLR1BK`) | Netto, Bilka, Føtex | Native scrape → fooddata | **Primary** — fuldt katalog + tilbud |
 | **REMA 1000 API** | REMA 1000 | Native scrape → fooddata | **Primary** — fuldt katalog |
+| **Nemlig webapi** (`www.nemlig.com/webapi`) | Nemlig | Native scrape → fooddata (`source=nemlig-api`) | **Primary** — fuldt katalog + tilbud, dagligt |
 | **Lidl tilbudsavis** (lidl.dk + `endpoints.leaflets.schwarz`) | Lidl | Native scrape → fooddata (`source=lidl-avis`) | **Primary** — kun ugens madvarer-tilbud |
 | **Dagrofa tilbudsaviser** (`ugensavis.meny.dk`, `ugensavis.spar.dk`, `ugensavis.minkøbmand.dk`, iPaper) | MENY, SPAR, Min Købmand | Native scrape → fooddata (`source=<kæde>-avis`) | **Primary** — kun ugens madvarer-tilbud |
-| **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Nemlig, Min Købmand, … | Goma cron → fooddata (`source=goma`) | **Primary** for all non-Salling/REMA chains |
+| **Goma API** (`api.goma.gg`) | Lidl, Coop, MENY, SPAR, Min Købmand, … (slukket) | Goma cron → fooddata (`source=goma`) | **Primary** for all non-Salling/REMA chains |
 | ~~**Tjek/Squid**~~ | (alle ikke-native) | Udfaset jul 2026 | Legacy rækker i DB — **importeres ikke** når `GOMA_IMPORT_ENABLED=true` |
 
 Se også [PLANOMO_FOODDATA_GOMA_HANDOFF.md](../docs/PLANOMO_FOODDATA_GOMA_HANDOFF.md) for Planomo-spejl.
@@ -192,6 +194,43 @@ og skriver kun når avisen har ændret sig. Sidste uges avis-rækker (kun kæden
 Løvbjerg og Coop-kæderne (Kvickly, SuperBrugsen, Brugsen, 365discount) har kun
 deres avis hos Tjek, og ABC Lavpris har ingen avis online — de har ingen kilde.
 
+### Nemlig adapter (`adapters/nemlig/`)
+
+Samme webapi som nemlig.com selv bruger. robots.txt tillader `/webapi/`
+(undtagen `/webapi/order/`). User-Agent `functionalfoods-grocery-sync/1.0`,
+4 kald ad gangen med 100 ms pause, retry på 429/5xx.
+
+1. `GET /webapi/v2/AppSettings/Website` → timestamps; `GET /webapi/basket/GetBasket`
+   → standard-leveringstid (`TimeslotUtc`/`DeliveryZoneId`). Intet postnummer, login eller token.
+2. `GET /webapi/{stamp}/{slot}/{zone}/0/Menu/main` → bladsider under Dagligvarer og Vin
+3. `<side>?GetAsJson=1` → sidens `ProductGroupId`'er → `Products/GetByProductGroupId`
+   (kræver `Referer: https://www.nemlig.com/` — ellers 400/500)
+4. Varer i `/googleproductsitemap` som ingen liste viste (typisk udsolgte) → `Products/Get?id=`
+
+~1.900 liste-kald + ~4.400 enkeltkald, ~8 min, ~13.400 varer (sep 2026).
+
+fooddata: `products.source_id = nemlig-<id>` — samme nøgle som Goma brugte, så
+de eksisterende rækker (og ingrediens-matches) opdateres på stedet. Nemlig har
+ingen EAN → `gtin = null`. Afdeling fra Nemligs hovedgruppe, mappet til de
+navne rækkerne allerede havde (Tørvarer → Kolonial, Køl → Mejeri og køl, …).
+
+`product_offers.source = nemlig-api`, én række pr. vare (også uden tilbud):
+
+| Nemlig-kampagne | Pris | Tilbud |
+|---|---|---|
+| `ProductCampaignDiscount(Percent)` | kampagnepris, førpris = normalpris | ja |
+| `ProductCampaignMixOffer` / `BuyXForY` | normalpris, `multibuy` "2 for 32,00 kr" | kun hvis stykprisen bliver lavere |
+| `ProductCampaignFreeProduct`, `DiscountItem` uden kampagne | normalpris | nej |
+
+Periode = kampagnens `IntervalStart`/`IntervalEnd`. `CampaignAttribute`
+("Fast mixtilbud", "Storkøb", …) og "Maks N stk" står i `offer_description`.
+
+Kører i `grocery-native-sync.yml` hver nat (step `nemlig`). Varer der forsvandt
+fra Nemlig slås fra (`active=false`, slettes ikke) — men kun hvis crawlet var
+komplet (≥ 90 % af sitemap'et, ≤ 1 % fejlede kald).
+
+Nødstop: `GROCERY_NEMLIG_DISABLED=true`.
+
 ### Goma adapter (`adapters/goma/`)
 
 When `GOMA_IMPORT_ENABLED=true` (påkrævet på Vercel + GitHub Actions):
@@ -203,12 +242,11 @@ When `GOMA_IMPORT_ENABLED=true` (påkrævet på Vercel + GitHub Actions):
 
 Per-kæde Goma-strategi:
 - **Kun tilbud:** Lidl, Coop-kæder, Løvbjerg, ABC Lavpris, … (`p_on_sale_only=true`)
-- **Fuldt katalog:** MENY, Spar, Nemlig, Min Købmand (`p_on_sale_only=false`)
+- **Fuldt katalog:** MENY, Spar, Min Købmand (`p_on_sale_only=false`)
 - **Ugedagsplan:** første pass på udgivelsesdagen + morning-after dagen efter
   (Goma/Coop opdaterer ofte sent — torsdagens sync ramte ellers sidste uges
   udløbne `sale_valid_to`). Se `getGomaStoresForDanishWeekday()`.
-- **Nemlig hver dag:** ikke papiravis — "God pris" skifter løbende, så den kører
-  i begge Goma-slots (02:00 og 14:00 UTC), også mandag/tirsdag.
+- **Nemlig:** ikke længere fra Goma — FF's egen `adapters/nemlig` kører dagligt.
 
 Nød-fallback: `GOMA_IMPORT_ENABLED=false` — importerer `tjek:*` igen (ikke anbefalet).
 
@@ -243,8 +281,10 @@ are included). Schedule lives in `src/lib/grocery/sync-schedule.ts`.
 | Friday | Thursday | Føtex (Salling) + Tjek: MENY, SPAR, Kvickly, SuperBrugsen, Løvbjerg |
 | Saturday | Friday | Netto + Bilka (Salling) + Tjek: Brugsen |
 | Sunday | Saturday | REMA 1000 + Tjek: Lidl |
-| Monday | Sunday | Tjek: Nemlig |
-| Tuesday | — | Skipped (no HTTP work) |
+| Monday | Sunday | — |
+| Tuesday | — | — |
+
+Hver nat uanset ugedag: REMA 1000, Nemlig, Lidl-/MENY-/SPAR-/Min Købmand-avis og Salling-avis-refresh.
 
 Manual overrides: `?full=true` (all chains, like the old nightly job),
 `?only=netto,rema-1000` (explicit subset). Price snapshot runs only on days
@@ -257,7 +297,7 @@ See `docs/FF_HANDOFF_FOODDATA_INGREDIENT_MATCHING.md` §11 and
 `src/grocery/sync/catalog-retention.ts`:
 
 - Udløbet tilbud → `in_stock=false`, `is_on_sale=false`, pris bevares
-- Efter fuld REMA/Salling-sync: varer der forsvandt fra API → `products.active=false`
+- Efter fuld REMA/Salling/Nemlig-sync: varer der forsvandt fra API → `products.active=false`
 - Efter Tjek-sync per kæde: tilbud ikke rørt i run → `in_stock=false`
 - `/dagligvarer` (main Supabase) er uændret
 
@@ -296,9 +336,9 @@ hard-coding lists.
 
 | Coverage | Meaning | Chains |
 |---|---|---|
-| `full` | Direct primary-source API. Normal shelf prices **and** offers. | Netto, Bilka, Føtex, REMA 1000 |
+| `full` | Direct primary-source API. Normal shelf prices **and** offers. | Netto, Bilka, Føtex, REMA 1000, Nemlig |
 | `offers-only` | Tjek/Squid only — this week's tilbudsavis, no regular prices, no out-of-campaign products. | Lidl, MENY, SPAR, Min Købmand, Løvbjerg, Kvickly, SuperBrugsen, Brugsen, 365discount, ABC Lavpris |
-| `none` | No working adapter yet (chain is seeded for forward-compat). | Nemlig |
+| `none` | No working adapter yet (chain is seeded for forward-compat). | — |
 
 All Tjek offers are persisted with `is_on_sale = true` and `source = 'tjek:offers'`,
 so consumer queries can distinguish them from canonical catalog rows. Frontends
