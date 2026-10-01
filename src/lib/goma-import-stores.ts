@@ -2,7 +2,7 @@
  * Which chains get tilbud via Goma vs native fooddata scrapes.
  *
  * Strategi (jul 2026):
- *   Native scrape → fooddata: Netto, Bilka, Føtex, REMA 1000
+ *   Native scrape → fooddata: Netto, Bilka, Føtex, REMA 1000, Nemlig
  *   Goma → fooddata: alle øvrige kæder (source=goma)
  *   Tjek overlay: Salling papiravis (Føtex/Netto/Bilka slagtervarer)
  *   Tjek øvrigt: importeres ikke til FF når GOMA_IMPORT_ENABLED=true
@@ -31,7 +31,6 @@ export type GomaStoreName =
 /** Goma har fuldt katalog (ikke kun tilbudsavis) for disse kæder. */
 export const GOMA_FULL_CATALOG_CHAINS = [
   'min-koebmand',
-  'nemlig',
   'spar',
   'meny',
 ] as const satisfies readonly SourceChain[]
@@ -152,11 +151,9 @@ export function defaultGomaImportStoreNames(): GomaStoreName[] {
  * Goma/Coop opdaterer ofte sent torsdag, så torsdagens første pass rammer
  * sidste uges udløbne datoer. Fredag fanger den nye avis.
  *
- * Nemlig er ikke en ugentlig papiravis — "God pris" / prismatch skifter løbende.
- * Derfor med i hvert Goma-slot (02:00 og 14:00 UTC), også mandag/tirsdag.
+ * Nemlig hentes ikke fra Goma — FF's egen sync scraper hele kataloget dagligt
+ * (adapters/nemlig).
  */
-const GOMA_DAILY_STORES: readonly GomaStoreName[] = ['Nemlig']
-
 export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[] {
   let stores: GomaStoreName[]
   switch (dayIndex) {
@@ -183,11 +180,6 @@ export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[]
       break
     default:
       stores = []
-  }
-  // Nemlig først: fuld-katalog + daglig. Sidst i listen blev den oftest
-  // spist af Vercel 300s-timeout efter MENY/Spar/Min Købmand.
-  for (const name of GOMA_DAILY_STORES) {
-    if (!stores.includes(name)) stores.unshift(name)
   }
   return stores
 }

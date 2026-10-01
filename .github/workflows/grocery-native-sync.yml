@@ -1,4 +1,4 @@
-name: Grocery native sync (Salling + REMA + Lidl-/MENY-/SPAR-/Min Købmand-avis)
+name: Grocery native sync (Salling + REMA + Nemlig + Lidl-/MENY-/SPAR-/Min Købmand-avis)
 
 # Fuldt katalog + catch-up på GitHub-runner. Ikke Vercel (300s loft).
 # Vækkes af Cloudflare Worker `grocery-wake` kl. 02:00 UTC (ikke GitHub schedule —

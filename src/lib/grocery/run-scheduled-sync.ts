@@ -1,5 +1,5 @@
 /**
- * Native grocery orchestrator (Salling full/leaflet + REMA + Lidl-/MENY-/SPAR-/Min Købmand-avis).
+ * Native grocery orchestrator (Salling full/leaflet + REMA + Nemlig + Lidl-/MENY-/SPAR-/Min Købmand-avis).
  * Køres fra GitHub Actions — ikke Vercel cron (300s loft).
  */
 
@@ -8,6 +8,7 @@ import { syncSallingChain } from '@/grocery/adapters/salling-algolia'
 import type { SyncResult } from '@/grocery/adapters/salling-algolia/sync'
 import { syncRema1000 } from '@/grocery/adapters/rema1000'
 import type { RemaSyncResult } from '@/grocery/adapters/rema1000'
+import { isNemligEnabled, syncNemlig, type NemligSyncResult } from '@/grocery/adapters/nemlig'
 import { isLidlAvisEnabled, syncLidlAvis, type LidlAvisSyncResult } from '@/grocery/adapters/lidl'
 import {
   DAGROFA_CHAIN_IDS,
@@ -40,6 +41,7 @@ import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 export type GroceryCronStepResult =
   | (SyncResult & { step: string })
   | (RemaSyncResult & { step: string })
+  | (NemligSyncResult & { step: string })
   | (LidlAvisSyncResult & { step: string })
   | (DagrofaAvisSyncResult & { step: string })
   | (TjekSyncResult & { step: string })
@@ -228,6 +230,15 @@ export async function runScheduledGrocerySync(
       await runStep('rema-1000', async () => ({
         ...(await syncRema1000()),
         step: 'rema-1000',
+      })),
+    )
+  }
+
+  if (shouldRun('nemlig') && isNemligEnabled()) {
+    steps.push(
+      await runStep('nemlig', async () => ({
+        ...(await syncNemlig({ log: (msg) => console.log(`[grocery/nemlig] ${msg}`) })),
+        step: 'nemlig',
       })),
     )
   }
