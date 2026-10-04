@@ -30,12 +30,11 @@ export type SourceChain =
  *   - `full`        Direct primary-source API: full product catalog with both
  *                   regular shelf prices and current offers. (Salling Algolia,
  *                   REMA 1000 API, Nemlig webapi.)
- *   - `offers-only` Only current weekly tilbud via Tjek/Squid. No regular
- *                   shelf prices, no out-of-campaign products. Treat the data
- *                   as "this week's offers" — the frontend should label these
- *                   chains so users understand the difference.
- *   - `none`        No working adapter yet. The chain is seeded in `stores`
- *                   for forward-compatibility but produces zero rows.
+ *   - `offers-only` Only this week's grocery offers from the chain's own
+ *                   flyer. No regular shelf prices. The frontend should label
+ *                   these chains so users understand the difference.
+ *   - `none`        No source. The chain stays in `stores` so old rows still
+ *                   resolve, but it must not be offered as a store we cover.
  *
  * Single source of truth for both the sync layer and any UI that surfaces
  * chain-level coverage badges.
@@ -43,8 +42,8 @@ export type SourceChain =
 export type CatalogCoverage = 'full' | 'offers-only' | 'none'
 
 export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
-  // Direct primary-source adapters (Salling grocery Algolia misses paper-avis
-  // slagtervarer — Tjek overlay fills that; see TJEK_LEAFLET_OVERLAY_CHAINS)
+  // Direct primary-source adapters (Salling grocery Algolia, REMA, Nemlig).
+  // Tjek er lukket og må ikke bruges som overlay.
   netto: 'full',
   foetex: 'full',
   bilka: 'full',
@@ -57,14 +56,14 @@ export const CHAIN_COVERAGE: Record<SourceChain, CatalogCoverage> = {
   spar: 'offers-only',
   'min-koebmand': 'offers-only',
 
-  // Øvrige kæder: ingen aktiv kilde siden Goma/Tjek blev slukket
-  // (Løvbjerg og Coop-kæderne ligger kun hos Tjek; ABC Lavpris har ingen avis online).
-  loevbjerg: 'offers-only',
-  kvickly: 'offers-only',
-  superbrugsen: 'offers-only',
-  brugsen: 'offers-only',
-  '365discount': 'offers-only',
-  'abc-lavpris': 'offers-only',
+  // Ingen kilde. Coop-aviserne og Løvbjerg ligger kun hos Tjek.
+  // ABC Lavpris har ingen avis online. Goma og Tjek er lukket.
+  loevbjerg: 'none',
+  kvickly: 'none',
+  superbrugsen: 'none',
+  brugsen: 'none',
+  '365discount': 'none',
+  'abc-lavpris': 'none',
 }
 
 /**

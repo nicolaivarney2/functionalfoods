@@ -94,6 +94,38 @@ export function parseDagrofaValidity(pageTexts: string[]): { validFrom: string; 
   return null
 }
 
+function addUtcDays(date: Date, days: number): Date {
+  const next = new Date(date.getTime())
+  next.setUTCDate(next.getUTCDate() + days)
+  return next
+}
+
+/** Mandag i ISO-ugen, som UTC-midnat. */
+function isoWeekMondayUtc(week: number, year: number): Date {
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Dow = jan4.getUTCDay() || 7
+  return addUtcDays(jan4, 1 - jan4Dow + (week - 1) * 7)
+}
+
+/**
+ * "SPAR uge 4126" når avisen ikke skriver "gælder fra … til".
+ * Samme vindue som MENY: fredagen før ISO-ugens mandag til torsdag i ugen.
+ */
+export function dagrofaValidityFromPaperName(
+  name: string,
+): { validFrom: string; validTo: string } | null {
+  const match = name.match(/uge\s*(\d{2})(\d{2})\b/i)
+  if (!match) return null
+  const week = Number(match[1])
+  const year = 2000 + Number(match[2])
+  if (week < 1 || week > 53) return null
+  const monday = isoWeekMondayUtc(week, year)
+  return {
+    validFrom: addUtcDays(monday, -3).toISOString().slice(0, 10),
+    validTo: addUtcDays(monday, 3).toISOString().slice(0, 10),
+  }
+}
+
 export function parseDagrofaAvisPage(
   html: string,
   chain: Pick<DagrofaAvisChain, 'label' | 'avisUrl'>,
@@ -117,7 +149,7 @@ export function parseDagrofaAvisPage(
       pageTexts,
       chunkUrls: Object.values(settings.enrichments.chunkUrls),
     },
-    validity: parseDagrofaValidity(pageTexts),
+    validity: parseDagrofaValidity(pageTexts) ?? dagrofaValidityFromPaperName(settings.name ?? ''),
   }
 }
 

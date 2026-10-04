@@ -32,15 +32,18 @@ export async function GET(request: NextRequest) {
 
   if (error) return serverError('Stores query failed', error.message)
 
-  const stores: GroceryStoreDto[] = (data ?? []).map((row) => {
+  const stores: GroceryStoreDto[] = (data ?? []).flatMap((row) => {
     const coverage = (CHAIN_COVERAGE[row.id as SourceChain] ?? 'none') as CatalogCoverage
-    return {
-      id: row.id,
-      name: row.name,
-      type: row.type,
-      coverage,
-      coverageLabel: COVERAGE_LABEL[coverage],
-    }
+    if (coverage === 'none') return []
+    return [
+      {
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        coverage,
+        coverageLabel: COVERAGE_LABEL[coverage],
+      },
+    ]
   })
 
   return NextResponse.json(

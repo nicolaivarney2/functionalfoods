@@ -14,6 +14,9 @@ const FOOD_ROOT_PATH = '0/17/'
 /** Under "Mad og mad i nærheden", men ikke mad. */
 const NON_FOOD_LVL2_PATHS = new Set(['0/17/1745', '0/17/1747'])
 const NON_FOOD_NAME_RE = /drogeri|pleje|husholdning|rengøring|dyr|kæledyr|baby(?!mad)/i
+/** Hele ord. "vindruer" og "rødvinsauce" er mad; "Pinotage" er vin. */
+const ALCOHOL_RE =
+  /(?<![\p{L}\d])(?:vin|rødvin|hvidvin|rosévin|rosevin|prosecco|cava|champagne|portvin|øl|pilsner|cider|spiritus|whisky|whiskey|vodka|gin|rom|snaps|akvavit|pinotage|pinot|chardonnay|chenin|sauvignon|cabernet|merlot|riesling|shiraz|syrah)(?![\p{L}\d])/iu
 
 /**
  * Lidls kategorinavne → FF's afdelingsnavne (FOOD_CATALOG_LABELS i
@@ -47,6 +50,8 @@ export function isLidlFoodProduct(
   details: LidlProductDetails | null,
 ): boolean {
   if (details?.alcoholic === true) return false
+  const category = categoryParts(product).join(' ')
+  if (ALCOHOL_RE.test(`${product.title ?? ''} ${category}`)) return false
   const path = product.wonCategoryPrimaryPath ?? ''
   if (!path.startsWith(FOOD_ROOT_PATH)) return false
   const lvl2Path = path.split('/').slice(0, 3).join('/')

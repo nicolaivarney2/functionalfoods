@@ -127,6 +127,17 @@ describe('isLidlFoodProduct', () => {
     assert.equal(
       isLidlFoodProduct(
         flyerProduct({
+          title: 'Riddersberg Pinotage',
+          wonCategoryPrimary: 'Verdener i nød/Mad og mad i nærheden/Drikkevarer/Vin',
+          wonCategoryPrimaryPath: '0/17/1790/179010',
+        }),
+        details({ alcoholic: false }),
+      ),
+      false,
+    )
+    assert.equal(
+      isLidlFoodProduct(
+        flyerProduct({
           wonCategoryPrimary: 'Verdener i nød/Baby, barn og legetøj/Legetøj',
           wonCategoryPrimaryPath: '0/16/1610',
         }),

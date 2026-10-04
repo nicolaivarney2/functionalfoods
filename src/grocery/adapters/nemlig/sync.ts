@@ -3,7 +3,7 @@ import { retryGroceryDb } from '../../db/retry'
 import { applyCatalogRetentionAfterFullSync } from '../../sync/catalog-retention'
 import type { ProductOfferInsert, SyncLogInsert } from '../../types'
 import { fetchNemligCatalog, type NemligCatalog } from './client'
-import { mapNemligOffer, mapNemligProduct, NEMLIG_OFFER_SOURCE } from './mapper'
+import { isNemligWine, mapNemligOffer, mapNemligProduct, NEMLIG_OFFER_SOURCE } from './mapper'
 import type { NemligCatalogEntry } from './types'
 
 const SYNC_LOG_SOURCE = 'nemlig-api' as const
@@ -145,7 +145,10 @@ export async function syncNemlig(options: NemligSyncOptions = {}): Promise<Nemli
 
   errorsCount += catalog.failures.length
   for (const f of catalog.failures.slice(0, 10)) log(`fejl: ${f}`)
-  const entries = options.maxProducts ? catalog.entries.slice(0, options.maxProducts) : catalog.entries
+  const crawled = options.maxProducts ? catalog.entries.slice(0, options.maxProducts) : catalog.entries
+  const wineSkipped = crawled.filter(isNemligWine).length
+  const entries = crawled.filter((entry) => !isNemligWine(entry))
+  if (wineSkipped) log(`vin og spiritus sorteret fra: ${wineSkipped}`)
   const catalogSummary = {
     pages: catalog.pages,
     groups: catalog.groups,

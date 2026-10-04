@@ -118,7 +118,7 @@ export function avisFingerprint(items: LidlAvisItem[]): string {
   const keys = items
     .map((i) => `${i.flyer.id}:${i.product.productId}:${i.product.price ?? ''}`)
     .sort()
-  return createHash('sha256').update(keys.join('|')).digest('hex').slice(0, 32)
+  return createHash('sha256').update(`no-wine-1|${keys.join('|')}`).digest('hex').slice(0, 32)
 }
 
 function emptyResult(startedAt: number): LidlAvisSyncResult {

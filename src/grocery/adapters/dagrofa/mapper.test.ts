@@ -2,7 +2,13 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { shouldImportFooddataOfferSource } from '@/lib/goma-import-stores'
 import { DAGROFA_AVIS_CHAINS, isDagrofaChainId, type DagrofaAvisChain } from './chains'
-import { collectDagrofaProducts, extractJsonObjectAfter, parseDagrofaAvisPage, parseDagrofaValidity } from './client'
+import {
+  collectDagrofaProducts,
+  dagrofaValidityFromPaperName,
+  extractJsonObjectAfter,
+  parseDagrofaAvisPage,
+  parseDagrofaValidity,
+} from './client'
 import {
   guessDagrofaDepartment,
   isDagrofaAlcohol,
@@ -98,6 +104,27 @@ describe('MENY avis page', () => {
     assert.equal(parseDagrofaValidity(['Ingen dato her']), null)
   })
 
+  it('reads SPAR week numbers as Friday–Thursday when the period line is missing', () => {
+    assert.deepEqual(dagrofaValidityFromPaperName('SPAR uge 4026'), {
+      validFrom: '2026-09-25',
+      validTo: '2026-10-01',
+    })
+    assert.deepEqual(dagrofaValidityFromPaperName('SPAR uge 4126'), {
+      validFrom: '2026-10-02',
+      validTo: '2026-10-08',
+    })
+    const { validity } = parseDagrofaAvisPage(
+      `<script>window.staticSettings = ${JSON.stringify({
+        paperId: 3060504,
+        name: 'SPAR uge 4126',
+        pageTexts: ['Uge 41. Find din lokale SPAR på spar.dk.'],
+        enrichments: { chunkUrls: { '1': 'https://cdn.ipaper.io/a.json' } },
+      })};</script>`,
+      DAGROFA_AVIS_CHAINS.spar,
+    )
+    assert.deepEqual(validity, { validFrom: '2026-10-02', validTo: '2026-10-08' })
+  })
+
   it('knows the three Dagrofa chains', () => {
     assert.equal(isDagrofaChainId('spar'), true)
     assert.equal(isDagrofaChainId('min-koebmand'), true)
@@ -171,6 +198,8 @@ describe('MENY food filter', () => {
     assert.equal(alcohol('Kk Rødvinssauce', 'Kk Rødvinssauce. 500 ml (Literpris 32,00)'), false)
     assert.equal(alcohol('Æblemost Ørskov 75 Cl', 'Æblemost Ørskov 75 Cl. 75 cl (Literpris 26,67)'), false)
     assert.equal(alcohol('A.B. Marcipanbrød Baileys', 'A.B. Marcipanbrød Baileys. 150 g (Max. kg pris 333,33)'), false)
+    assert.equal(alcohol('Riddersberg Pinotage', 'Riddersberg Pinotage Sydafrika'), true)
+    assert.equal(alcohol('Riddersberg Chenin Blanc', 'Riddersberg Chenin Blanc Sydafrika'), true)
   })
 
   it('drops kitchen supplies kept in the food aisles', () => {

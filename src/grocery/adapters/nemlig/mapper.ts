@@ -40,6 +40,24 @@ const DEPARTMENT_BY_MAIN_GROUP: Record<string, string> = {
   'dyremad og tilbehør': 'Dyr',
 }
 
+const WINE_SHELF_RE =
+  /(?:^|[^a-zæøå])(?:vin og spiritus|spiritus|rødvin|hvidvin|rosévin|rosevin|mousserende|champagne|hedvin|portvin)(?:$|[^a-zæøå])|^vin(?:$|[^a-zæøå])/i
+
+/** Vin- og spiritus-hylder. Vindruer og rødvinssauce rammes ikke. */
+export function isNemligWine(entry: Pick<NemligCatalogEntry, 'product' | 'department'>): boolean {
+  const url = entry.product.Url ?? ''
+  if (url === '/vin' || url.startsWith('/vin/')) return true
+  const shelves = [
+    entry.department,
+    entry.product.ProductMainGroupName,
+    entry.product.ProductCategoryGroupName,
+    entry.product.ProductSubGroupName,
+    entry.product.Category,
+    entry.product.SubCategory,
+  ]
+  return shelves.some((shelf) => WINE_SHELF_RE.test((shelf ?? '').trim()))
+}
+
 export function nemligDepartment(product: NemligProduct, menuDepartment?: string | null): string {
   for (const name of [product.ProductMainGroupName, menuDepartment]) {
     const mapped = name ? DEPARTMENT_BY_MAIN_GROUP[name.trim().toLowerCase()] : undefined

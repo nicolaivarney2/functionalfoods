@@ -56,6 +56,8 @@ type ChainSpec = {
   maxStaleDays: number
   algolia?: 'netto' | 'foetex' | 'bilka'
   native?: NativeCronChain
+  /** Kædens egen avis. Health kigger på den kilde, ikke gamle Goma-rækker. */
+  avisSource?: string
 }
 
 const CHAINS: ChainSpec[] = [
@@ -63,21 +65,16 @@ const CHAINS: ChainSpec[] = [
   { chain: 'foetex', label: 'Føtex', warnBelow: 20, maxStaleDays: 8, algolia: 'foetex', native: 'foetex' },
   { chain: 'bilka', label: 'Bilka', warnBelow: 20, maxStaleDays: 8, algolia: 'bilka', native: 'bilka' },
   { chain: 'rema-1000', label: 'REMA 1000', warnBelow: 20, maxStaleDays: 8, native: 'rema-1000' },
-  { chain: 'lidl', label: 'Lidl', warnBelow: 20, maxStaleDays: 8 },
-  { chain: '365discount', label: '365discount', warnBelow: 15, maxStaleDays: 8 },
-  { chain: 'abc-lavpris', label: 'ABC Lavpris', warnBelow: 10, maxStaleDays: 8 },
-  { chain: 'kvickly', label: 'Kvickly', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'superbrugsen', label: 'SuperBrugsen', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'brugsen', label: 'Brugsen', warnBelow: 15, maxStaleDays: 8 },
-  { chain: 'loevbjerg', label: 'Løvbjerg', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'meny', label: 'MENY', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'spar', label: 'Spar', warnBelow: 20, maxStaleDays: 8 },
-  { chain: 'min-koebmand', label: 'Min Købmand', warnBelow: 20, maxStaleDays: 8 },
   { chain: 'nemlig', label: 'Nemlig', warnBelow: 20, maxStaleDays: 2 },
+  { chain: 'lidl', label: 'Lidl', warnBelow: 20, maxStaleDays: 8, avisSource: 'lidl-avis' },
+  { chain: 'meny', label: 'MENY', warnBelow: 20, maxStaleDays: 8, avisSource: 'meny-avis' },
+  { chain: 'spar', label: 'Spar', warnBelow: 20, maxStaleDays: 8, avisSource: 'spar-avis' },
+  { chain: 'min-koebmand', label: 'Min Købmand', warnBelow: 15, maxStaleDays: 8, avisSource: 'min-koebmand-avis' },
 ]
 
 const RPC_LIMIT = 51
-const ABSURD_UNTIL_MS = 60 * 24 * 60 * 60 * 1000
+/** Goma satte slutdatoer i 2037. Årets kampagner (fx blomster til 31/12) er ikke absurde. */
+const ABSURD_UNTIL_MS = 400 * 24 * 60 * 60 * 1000
 
 function ffClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -130,14 +127,17 @@ async function lastSeen(
   client: SupabaseClient,
   chain: SourceChain,
   column: 'last_seen_at' | 'source_synced_at' = 'last_seen_at',
+  sourceEq?: string,
 ): Promise<string | null> {
-  const { data } = await client
+  let query = client
     .from('product_offers')
     .select(column)
     .eq('store_id', chain)
     .not(column, 'is', null)
     .order(column, { ascending: false })
     .limit(1)
+  if (sourceEq) query = query.eq('source', sourceEq)
+  const { data } = await query
   const row = data?.[0] as Record<string, unknown> | undefined
   const value = row?.[column]
   return typeof value === 'string' ? value : null
@@ -146,13 +146,14 @@ async function lastSeen(
 async function countOnSale(
   client: SupabaseClient,
   chain: SourceChain,
-  source?: { like?: string; notLike?: string },
+  source?: { like?: string; notLike?: string; eq?: string },
 ): Promise<number | null> {
   let query = client
     .from('product_offers')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', chain)
     .eq('is_on_sale', true)
+  if (source?.eq) query = query.eq('source', source.eq)
   if (source?.like) query = query.like('source', source.like)
   if (source?.notLike) query = query.not('source', 'like', source.notLike)
   const { count, error } = await query
@@ -268,18 +269,31 @@ function classify(
       reason: 'Missede seneste planlagte scrape — fooddata har ikke den aktuelle avis',
     }
   }
-  if (input.rpcCount === 0) {
-    const isNative = Boolean(spec.native || spec.algolia)
-    // Goma-kæder (fx ABC): tom kilde ≠ nede site. Kun rød hvis fooddata HAR tilbud, FF ikke.
-    if (!isNative && (input.fooddataOnSale == null || input.fooddataOnSale === 0)) {
+  if (spec.avisSource) {
+    if (input.fooddataOnSale == null) {
+      return { level: 'warn', reason: 'Fooddata ikke tjekket' }
+    }
+    if (input.fooddataOnSale === 0) {
+      return { level: 'fail', reason: 'Ingen aktuelle avis-tilbud i fooddata' }
+    }
+    if (input.daysSinceSeen != null && input.daysSinceSeen > spec.maxStaleDays) {
       return {
-        level: 'warn',
-        reason:
-          input.fooddataOnSale === 0
-            ? 'Ingen madtilbud — Goma/fooddata er også tom'
-            : 'Ingen madtilbud (fooddata ikke tjekket)',
+        level: 'fail',
+        reason: `Avis sidst set for ${Math.round(input.daysSinceSeen)} dage siden`,
       }
     }
+    if (input.rpcCount === 0) {
+      return {
+        level: 'fail',
+        reason: `Fooddata har ${input.fooddataOnSale} avis-tilbud, men /dagligvarer viser ingen`,
+      }
+    }
+    if (input.rpcCount < spec.warnBelow) {
+      return { level: 'warn', reason: `Kun ${input.rpcCount} madtilbud på /dagligvarer` }
+    }
+    return { level: 'ok', reason: 'OK' }
+  }
+  if (input.rpcCount === 0) {
     const fd =
       input.fooddataOnSale != null ? ` (fooddata har ${input.fooddataOnSale})` : ''
     return { level: 'fail', reason: `Ingen madtilbud på /dagligvarer${fd}` }
@@ -287,7 +301,7 @@ function classify(
   if (input.absurdUntilCount > 0) {
     return {
       level: 'fail',
-      reason: `${input.absurdUntilCount} tilbud med slutdato > 60 dage (fx 2037/jul)`,
+      reason: `${input.absurdUntilCount} tilbud med slutdato mere end et år ude (fx 2037)`,
     }
   }
   // Sammenlign kun Algolia-avisen med Algolia-kilden. Tjek-overlayet (papiravisens
@@ -371,8 +385,17 @@ export async function runDagligvarerLaunchHealth(
 
     if (grocery) {
       // fooddata.product_offers bruger source_synced_at (ikke last_seen_at).
-      fooddataLastSeenAt = await lastSeen(grocery, spec.chain, 'source_synced_at')
-      fooddataOnSale = await countOnSale(grocery, spec.chain)
+      fooddataLastSeenAt = await lastSeen(
+        grocery,
+        spec.chain,
+        'source_synced_at',
+        spec.avisSource,
+      )
+      fooddataOnSale = await countOnSale(
+        grocery,
+        spec.chain,
+        spec.avisSource ? { eq: spec.avisSource } : undefined,
+      )
       if (spec.algolia) {
         fooddataTjekOnSale = await countOnSale(grocery, spec.chain, { like: 'tjek%' })
       }
@@ -393,7 +416,7 @@ export async function runDagligvarerLaunchHealth(
       }
     }
 
-    const daysSinceSeen = daysAgo(lastSeenAt)
+    const daysSinceSeen = daysAgo(spec.avisSource ? fooddataLastSeenAt : lastSeenAt)
     const { level, reason } = classify(spec, {
       rpcCount,
       daysSinceSeen,

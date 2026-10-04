@@ -69,6 +69,7 @@ import {
 import { MEAL_PLAN_SCOPE_OPTIONS, mealPlanScopeLabel } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
+import { selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 import {
   GUIDE_PRICES_STORAGE_KEY,
   productDisplayTotal,
@@ -363,16 +364,11 @@ const mockStores = [
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
   { id: 3, name: 'Føtex', color: 'bg-blue-500', isSelected: false },
   { id: 4, name: 'Bilka', color: 'bg-blue-700', isSelected: false },
+  { id: 5, name: 'Nemlig.com', color: 'bg-orange-500', isSelected: false },
   { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
   { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
-  { id: 9, name: 'Min Købmand', color: 'bg-orange-500', isSelected: false },
-  { id: 8, name: 'Løvbjerg', color: 'bg-green-600', isSelected: false },
+  { id: 9, name: 'Min Købmand', color: 'bg-orange-400', isSelected: false },
   { id: 10, name: 'Lidl', color: 'bg-yellow-400', isSelected: false },
-  { id: 11, name: '365 Discount', color: 'bg-amber-500', isSelected: false },
-  { id: 12, name: 'Kvickly', color: 'bg-red-700', isSelected: false },
-  { id: 13, name: 'Super Brugsen', color: 'bg-emerald-600', isSelected: false },
-  { id: 14, name: 'Brugsen', color: 'bg-emerald-500', isSelected: false },
-  { id: 15, name: 'ABC Lavpris', color: 'bg-sky-700', isSelected: false },
 ]
 
 interface AdultProfile {
@@ -485,7 +481,7 @@ export default function MadbudgetPage() {
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
-    selectedStores: [1, 2, 8], // REMA 1000, Netto, Løvbjerg
+    selectedStores: [1, 2, 10], // REMA 1000, Netto, Lidl
     adultsProfiles: [] as AdultProfile[], // New: profiles for each adult
   })
   
@@ -1047,7 +1043,7 @@ export default function MadbudgetPage() {
     if (!displayShoppingList) return
     setSmartShareError('')
     if (selectedStoreTab === 'all') {
-      setSmartShareError('Vælg en butik først — REMA, Netto eller Løvbjerg — så listen matcher den butik, du handler i.')
+      setSmartShareError('Vælg en butik først, så listen matcher den butik, du handler i.')
       return
     }
     const sid = storeIdFromTabKey(selectedStoreTab)
@@ -1231,7 +1227,10 @@ export default function MadbudgetPage() {
                 prioritizeOrganic: fp.prioritize_organic ?? prev.prioritizeOrganic,
                 prioritizeAnimalOrganic: fp.prioritize_animal_organic ?? prev.prioritizeAnimalOrganic,
                 excludedIngredients: fp.excluded_ingredients || prev.excludedIngredients,
-                selectedStores: fp.selected_stores || prev.selectedStores,
+                selectedStores: (() => {
+                  const ids = selectableMadbudgetStoreIds(fp.selected_stores || prev.selectedStores)
+                  return ids.length > 0 ? ids : [1, 2]
+                })(),
                 adultsProfiles: buildAdultsProfilesForFamily(adults, adultRows),
               }))
               setVariationLevel(fp.variation_level || 2)
@@ -4545,7 +4544,7 @@ export default function MadbudgetPage() {
                     </div>
                     {selectedStoreTab === 'all' && shoppingList && (
                       <p className="text-sm text-gray-600 max-w-md">
-                        Vælg en butik-fane (REMA, Netto eller Løvbjerg) før du sender listen til mobilen.
+                        Vælg en butik-fane, før du sender listen til mobilen.
                       </p>
                     )}
                     {smartShareError && (

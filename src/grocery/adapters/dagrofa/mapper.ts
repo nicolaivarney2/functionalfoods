@@ -110,6 +110,7 @@ const ALCOHOL_RE = wordsRe([
   'vin', 'rødvin', 'hvidvin', 'rosévin', 'rosevin', 'prosecco', 'cava', 'champagne', 'crémant',
   'portvin', 'chardonnay', 'chard', 'sauvignon', 'sauv', 'riesling', 'pinot', 'shiraz', 'syrah',
   'cabernet', 'cab', 'merlot', 'malbec', 'tempranillo', 'rioja', 'crianza', 'ripasso', 'amarone',
+  'pinotage', 'chenin',
   'appassimento', 'barbera', 'nebbiolo', 'montalcino', 'brunello', 'primitivo', 'chianti',
   String.raw`c[oô]tes?\s+du`, String.raw`rh[oô]ne`, String.raw`gr[uü]ner`, 'vermentino',
   'vermintino', 'cannonau', 'bordeaux', 'bourgogne', 'zinfandel', 'moscato', 'lambrusco', 'sherry',

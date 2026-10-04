@@ -440,19 +440,13 @@ const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
 const STORES = [
   { id: 'Netto', name: 'Netto', icon: '🟨' },
   { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
-  { id: '365discount', name: '365 Discount', icon: '3️⃣' }, // Goma uses "365discount" (no space)
   { id: 'Lidl', name: 'Lidl', icon: '🟡' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
   { id: 'Føtex', name: 'Føtex', icon: '🔵' },
   { id: 'Nemlig', name: 'Nemlig.com', icon: '🟠' },
-  { id: 'MENY', name: 'MENY', icon: '🔴' }, // Goma uses "MENY" (not "MENU")
+  { id: 'MENY', name: 'MENY', icon: '🔴' },
   { id: 'Spar', name: 'Spar', icon: '🔺' },
-  { id: 'min-koebmand', name: 'Min Købmand', icon: '🛒' }, // DB store_id "min-koebmand"
-  { id: 'Kvickly', name: 'Kvickly', icon: '🟥' },
-  { id: 'superbrugsen', name: 'Super Brugsen', icon: '🧺' }, // Goma uses "superbrugsen" (no space, lowercase)
-  { id: 'Brugsen', name: 'Brugsen', icon: '🧺' },
-  { id: 'Løvbjerg', name: 'Løvbjerg', icon: '💚' },
-  { id: 'ABC Lavpris', name: 'ABC Lavpris', icon: '🔤' }
+  { id: 'min-koebmand', name: 'Min Købmand', icon: '🛒' },
 ]
 
 const ALL_STORE_IDS = STORES.map((store) => store.id)

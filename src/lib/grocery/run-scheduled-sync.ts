@@ -16,13 +16,6 @@ import {
   syncDagrofaAvis,
   type DagrofaAvisSyncResult,
 } from '@/grocery/adapters/dagrofa'
-import { isTjekEnabled, syncTjek, type TjekSyncResult } from '@/grocery/adapters/tjek'
-import {
-  isTjekLeafletOverlayChain,
-  TJEK_LEAFLET_OVERLAY_CHAINS,
-  type SourceChain,
-} from '@/grocery/types'
-import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   getScheduledSyncForNow,
   missedLastScheduledSync,
@@ -35,6 +28,7 @@ import {
 import { enqueueAfterGrocerySync } from '@/lib/grocery/post-sync-enqueue'
 import { snapshotPriceHistory } from '@/lib/grocery/snapshot-price-history'
 import { groceryDbErrorMessage, retryGroceryDb } from '@/grocery/db/retry'
+import type { SourceChain } from '@/grocery/types'
 import type { EnqueueFooddataQueueResult } from '@/lib/product-match-queue'
 import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 
@@ -44,7 +38,6 @@ export type GroceryCronStepResult =
   | (NemligSyncResult & { step: string })
   | (LidlAvisSyncResult & { step: string })
   | (DagrofaAvisSyncResult & { step: string })
-  | (TjekSyncResult & { step: string })
   | { step: string; status: 'failed'; errorMessage: string; durationMs: number }
   | { step: string; status: 'success'; rowsAffected: number; durationMs: number }
   | (EnqueueFooddataQueueResult & { step: 'enqueue'; status: 'success'; durationMs: number })
@@ -175,10 +168,6 @@ export async function runScheduledGrocerySync(
         ])
 
   const shouldRun = (id: string) => !only || only.has(id)
-  const tjekChains =
-    mode === 'scheduled' && schedule && schedule.tjekChains.length > 0
-      ? schedule.tjekChains
-      : undefined
 
   if (shouldRun('netto')) {
     steps.push(
@@ -260,29 +249,6 @@ export async function runScheduledGrocerySync(
         step: chainId,
       })),
     )
-  }
-
-  const tjekKillSwitch = !isTjekEnabled()
-  const tjekOverlayChains: SourceChain[] = tjekChains
-    ? tjekChains.filter(isTjekLeafletOverlayChain)
-    : [...TJEK_LEAFLET_OVERLAY_CHAINS]
-
-  if (shouldRun('tjek') && !tjekKillSwitch) {
-    const tjekOpts = isGomaImportEnabled()
-      ? tjekOverlayChains.length > 0
-        ? { chains: tjekOverlayChains, includePrimary: true }
-        : null
-      : tjekChains
-        ? { chains: tjekChains, includePrimary: tjekChains.some(isTjekLeafletOverlayChain) }
-        : undefined
-    if (tjekOpts !== null) {
-      steps.push(
-        await runStep('tjek', async () => ({
-          ...(await syncTjek(tjekOpts)),
-          step: 'tjek',
-        })),
-      )
-    }
   }
 
   const ranProductSync = steps.some(

@@ -65,7 +65,7 @@ export function isDagrofaAvisActiveOn(avis: Pick<DagrofaAvis, 'validFrom' | 'val
 export function dagrofaAvisFingerprint(avis: DagrofaAvis): string {
   const keys = avis.products.map((p) => `${p.productId}:${p.price ?? ''}`).sort()
   return createHash('sha256')
-    .update(`${avis.paperId}|${avis.validFrom}|${avis.validTo}|${keys.join('|')}`)
+    .update(`no-wine-1|${avis.paperId}|${avis.validFrom}|${avis.validTo}|${keys.join('|')}`)
     .digest('hex')
     .slice(0, 32)
 }

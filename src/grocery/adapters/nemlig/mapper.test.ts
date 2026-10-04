@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { nemligIdsFromSitemap, nemligCategoryPages, productGroupIdsFromPage } from './client'
 import {
+  isNemligWine,
   mapNemligOffer,
   mapNemligProduct,
   nemligDepartment,
@@ -221,7 +222,7 @@ describe('parsers', () => {
     assert.deepEqual(nemligIdsFromSitemap(xml), ['5604565', '100008'])
   })
 
-  it('collects leaf pages under Dagligvarer and Vin, skipping inspiration', () => {
+  it('skips the wine catalog and inspiration pages', () => {
     const pages = nemligCategoryPages([
       {
         Id: '1',
@@ -235,10 +236,14 @@ describe('parsers', () => {
       { Id: '6', Url: '/vin', Text: 'Vin og spiritus', Children: [{ Id: '7', Url: '/vin/roedvin', Text: 'Rødvin' }] },
       { Id: '8', Url: '/opskrifter', Text: 'Opskrifter', Children: [{ Id: '9', Url: '/opskrifter/x', Text: 'X' }] },
     ])
-    assert.deepEqual(pages, [
-      { url: '/dagligvarer/frost/is', department: 'Frost' },
-      { url: '/vin/roedvin', department: 'Vin og spiritus' },
-    ])
+    assert.deepEqual(pages, [{ url: '/dagligvarer/frost/is', department: 'Frost' }])
+  })
+
+  it('treats the wine and spirits shelves as not food', () => {
+    assert.equal(isNemligWine({ product: product({ ProductMainGroupName: 'Vin og spiritus' }), department: 'Vin og spiritus' }), true)
+    assert.equal(isNemligWine({ product: product({ Url: '/vin/barolo-1', Category: 'Rødvin' }), department: 'Drikke' }), true)
+    assert.equal(isNemligWine({ product: product({ Name: 'Vindruer', ProductMainGroupName: 'Frugt og grønt' }), department: 'Frugt og grønt' }), false)
+    assert.equal(isNemligWine({ product: product({ Name: 'Rødvinssauce', ProductMainGroupName: 'Tørvarer' }), department: 'Kolonial' }), false)
   })
 
   it('finds product group ids anywhere in page content', () => {

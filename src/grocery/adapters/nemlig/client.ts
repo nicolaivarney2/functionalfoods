@@ -26,7 +26,8 @@ const PAGE_SIZE = 200
 const MAX_RETRIES = 3
 /** Inspirationssider gentager varer fra de rigtige afdelinger. */
 const SKIPPED_MENU_PREFIXES = ['/dagligvarer/nye-varer-inspiration']
-const CATALOG_ROOTS = ['/dagligvarer', '/vin']
+/** Vin og spiritus (`/vin`) er ikke mad og hentes ikke. */
+const CATALOG_ROOTS = ['/dagligvarer']
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -111,7 +112,7 @@ export async function openNemligSession(): Promise<NemligSession> {
   }
 }
 
-/** Bladsider under Dagligvarer og Vin, med topafdelingen de hører til. */
+/** Bladsider under Dagligvarer, med topafdelingen de hører til. */
 export function nemligCategoryPages(menu: NemligMenuItem[]): NemligCategoryPage[] {
   const pages = new Map<string, NemligCategoryPage>()
   const walk = (node: NemligMenuItem, department: string) => {
@@ -125,8 +126,7 @@ export function nemligCategoryPages(menu: NemligMenuItem[]): NemligCategoryPage[
   }
   for (const root of menu) {
     if (!CATALOG_ROOTS.includes(root.Url)) continue
-    if (root.Url === '/vin') walk(root, root.Text)
-    else for (const dept of root.Children ?? []) walk(dept, dept.Text.trim())
+    for (const dept of root.Children ?? []) walk(dept, dept.Text.trim())
   }
   return [...pages.values()]
 }

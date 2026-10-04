@@ -2,23 +2,17 @@
 export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set([
   'meny',
   'spar',
-  'løvbjerg',
   'min-koebmand',
   'lidl',
-  '365discount',
-  'kvickly',
-  'superbrugsen',
-  'brugsen',
-  'abc-lavpris',
 ])
 
 /**
  * Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores).
- * Id 5 (Nemlig.com) er fuldt katalog via Goma/fooddata (synk hver Goma-slot).
+ * Id 5 (Nemlig.com) er fuldt katalog via nemlig.com.
  *
- * Id 1–9 er de oprindelige kæder. Id 10–15 tilføjet efter /dagligvarer-udvidelsen
- * (Lidl, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris) — alle tilbuds-only,
- * men de indgår nu reelt i prissætningen via vejledende referencepriser.
+ * Id 8 og 11–15 (Løvbjerg, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris)
+ * bliver i kataloget, så gamle profiler stadig kan slå navnet op, men de kan ikke vælges.
+ * De har ingen kilde, efter Goma og Tjek er lukket.
  */
 export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 1, name: 'REMA 1000' },
@@ -38,8 +32,18 @@ export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 15, name: 'ABC Lavpris' },
 ]
 
+/** Gemte id'er uden tilbudskilde. Må ikke vises som butikker, vi dækker. */
+export const MADBUDGET_UNAVAILABLE_STORE_IDS = new Set([8, 11, 12, 13, 14, 15])
+
 /** Butikker brugeren kan vælge i madbudget/indkøbsundersøgelse. */
-export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG
+export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG.filter(
+  (store) => !MADBUDGET_UNAVAILABLE_STORE_IDS.has(store.id),
+)
+
+export function selectableMadbudgetStoreIds(ids: number[] | null | undefined): number[] {
+  const allowed = new Set(MADBUDGET_SELECTABLE_STORES.map((store) => store.id))
+  return (ids ?? []).filter((id) => allowed.has(id))
+}
 
 const MADBUDGET_NAME_TO_SLUG: Record<string, string> = {
   'REMA 1000': 'rema-1000',
@@ -72,7 +76,7 @@ export function madbudgetStoreIdsToSlugs(ids: number[]): string[] {
 }
 
 export function storesForSurvey(selectedStoreIds: number[] | null | undefined) {
-  const ids = selectedStoreIds?.filter((n) => typeof n === 'number') ?? []
-  if (ids.length === 0) return [...MADBUDGET_STORE_CATALOG]
-  return MADBUDGET_STORE_CATALOG.filter((s) => ids.includes(s.id))
+  const ids = selectableMadbudgetStoreIds(selectedStoreIds)
+  if (ids.length === 0) return [...MADBUDGET_SELECTABLE_STORES]
+  return MADBUDGET_SELECTABLE_STORES.filter((s) => ids.includes(s.id))
 }

@@ -13,7 +13,7 @@
  */
 
 import { DAGROFA_CHAIN_IDS, type DagrofaChainId } from '@/grocery/adapters/dagrofa/chains'
-import { TJEK_LEAFLET_OVERLAY_CHAINS, type SourceChain } from '@/grocery/types'
+import type { SourceChain } from '@/grocery/types'
 
 /** Steps the cron orchestrator can run (matches `?only=` ids). */
 export type CronSyncStepId =
@@ -57,21 +57,8 @@ export interface ScheduledGrocerySync {
   releaseNoteDa: string
   sallingChains: Array<'netto' | 'foetex' | 'bilka'>
   rema1000: boolean
-  /** Subset til Tjek; tom = ingen Tjek den dag. */
+  /** Tom. Tjek er lukket og må ikke køres. */
   tjekChains: SourceChain[]
-}
-
-const TJEK_ONLY_BY_CRON_WEEKDAY: Record<number, SourceChain[]> = {
-  // Onsdag morgen ← tirsdagens ABC Lavpris
-  3: ['abc-lavpris'],
-  // Torsdag ← onsdagens 365discount
-  4: ['365discount'],
-  // Fredag ← torsdag: Coop + Dagrofa (MENY/Spar/Min Købmand) m.fl. + Føtex (Salling separat)
-  5: ['meny', 'spar', 'kvickly', 'superbrugsen', 'loevbjerg', 'min-koebmand'],
-  // Lørdag ← fredag: Netto/Bilka (Salling) + Brugsen
-  6: ['brugsen'],
-  // Søndag ← lørdag: REMA + Lidl
-  0: ['lidl'],
 }
 
 const SALLING_BY_CRON_WEEKDAY: Record<number, Array<'netto' | 'foetex' | 'bilka'>> = {
@@ -92,11 +79,9 @@ const LABEL_BY_WEEKDAY: Record<number, string> = {
 }
 
 const RELEASE_NOTE_BY_WEEKDAY: Record<number, string> = {
-  0: 'Lørdagens REMA 1000 + Lidl',
-  3: 'Tirsdagens ABC Lavpris',
-  4: 'Onsdagens 365discount',
-  5: 'Torsdagens MENY/Coop/Dagrofa (inkl. Min Købmand) + Føtex',
-  6: 'Fredagens Netto/Bilka + Brugsen',
+  0: 'Lørdagens REMA 1000',
+  5: 'Torsdagens Føtex',
+  6: 'Fredagens Netto og Bilka',
 }
 
 /** Danish weekday in Europe/Copenhagen (0 = Sunday). */
@@ -121,13 +106,6 @@ export function getScheduledSyncForWeekday(
   cronWeekday: number,
 ): ScheduledGrocerySync | null {
   const sallingChains = SALLING_BY_CRON_WEEKDAY[cronWeekday] ?? []
-  // Salling paper-avis overlay every day (Algolia misses slagtervarer).
-  const tjekChains = [
-    ...new Set<SourceChain>([
-      ...(TJEK_ONLY_BY_CRON_WEEKDAY[cronWeekday] ?? []),
-      ...TJEK_LEAFLET_OVERLAY_CHAINS,
-    ]),
-  ]
   const rema1000 = REMA_BY_CRON_WEEKDAY.has(cronWeekday)
 
   return {
@@ -136,7 +114,7 @@ export function getScheduledSyncForWeekday(
     releaseNoteDa: RELEASE_NOTE_BY_WEEKDAY[cronWeekday] || 'Salling-avis refresh',
     sallingChains,
     rema1000,
-    tjekChains,
+    tjekChains: [],
   }
 }
 
@@ -202,7 +180,6 @@ export function scheduledStepIds(
   steps.push('lidl', ...DAGROFA_CHAIN_IDS)
   // Nemlig ændrer priser/kampagner løbende — fuldt katalog hver nat.
   steps.push('nemlig')
-  if (schedule.tjekChains.length > 0) steps.push('tjek')
   steps.push('salling-offers')
   return steps
 }

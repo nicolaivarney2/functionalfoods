@@ -25,23 +25,17 @@ type StoreDef = {
 }
 
 /**
- * The 13 stores we expect to see offers for. Order matches the admin UI.
+ * Kæder vi faktisk synker. Coop, Løvbjerg og ABC Lavpris har ingen kilde.
  */
 const KNOWN_STORES: StoreDef[] = [
   { storeId: 'netto', label: 'Netto', offerDay: 'Fredag' },
-  { storeId: 'rema-1000', label: 'REMA 1000', offerDay: 'Lørdag' },
-  { storeId: '365discount', label: '365 Discount', offerDay: 'Onsdag' },
-  { storeId: 'lidl', label: 'Lidl', offerDay: 'Lørdag' },
+  { storeId: 'foetex', label: 'Føtex', offerDay: 'Torsdag' },
   { storeId: 'bilka', label: 'Bilka', offerDay: 'Fredag' },
+  { storeId: 'rema-1000', label: 'REMA 1000', offerDay: 'Hver dag' },
   { storeId: 'nemlig', label: 'Nemlig', offerDay: 'Hver dag' },
+  { storeId: 'lidl', label: 'Lidl', offerDay: 'Lørdag' },
   { storeId: 'meny', label: 'MENY', offerDay: 'Torsdag' },
   { storeId: 'spar', label: 'Spar', offerDay: 'Torsdag' },
-  { storeId: 'kvickly', label: 'Kvickly', offerDay: 'Torsdag' },
-  { storeId: 'superbrugsen', label: 'SuperBrugsen', offerDay: 'Torsdag' },
-  { storeId: 'brugsen', label: 'Brugsen', offerDay: 'Fredag' },
-  { storeId: 'loevbjerg', label: 'Løvbjerg', offerDay: 'Torsdag' },
-  { storeId: 'abc-lavpris', label: 'ABC Lavpris', offerDay: 'Tirsdag' },
-  { storeId: 'foetex', label: 'Føtex', offerDay: 'Fredag' },
   { storeId: 'min-koebmand', label: 'Min Købmand', offerDay: 'Torsdag' },
 ]
 
@@ -167,7 +161,7 @@ function classify(input: Omit<StoreHealth, 'status' | 'statusReason'>): {
   if (input.offerDay === 'Hver dag' && input.daysSinceSync > 1.5) {
     return {
       status: 'late',
-      statusReason: `Forventet daglig Goma-sync – sidst opdateret for ${Math.round(input.daysSinceSync)} dage siden`,
+      statusReason: `Forventet daglig katalog-sync – sidst opdateret for ${Math.round(input.daysSinceSync)} dage siden`,
     }
   }
   // If the offer day was 1+ days ago and we still haven't synced since, mark as late
