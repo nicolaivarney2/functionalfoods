@@ -1,90 +1,114 @@
 /**
- * Launch watchdog for /dagligvarer + fooddata vs kilde (Algolia/REMA).
+ * Scrape-status for den seneste natlige grocery-sync.
  *
- * Bruges af:
- *   - `npm run dagligvarer:health`
- *   - GitHub Action / Vercel cron efter fooddata-import
- *   - `/api/admin/dagligvarer/launch-health`
+ * Kigger på fooddata `sync_logs` siden sidste 02:00 UTC-slot — samme vindue
+ * som `grocery-native-sync`. Én række pr. scrape: lykkedes, delvis eller fejlede.
+ * Gamle tilbud i databasen tæller ikke som succes, hvis selve scrapen fejlede.
  */
 
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { querySalling } from '@/grocery/adapters/salling-algolia/client'
-import { storedPriceMatchesAlgolia } from '@/grocery/adapters/salling-algolia/pricing'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getGroceryServiceClient } from '@/grocery/db/client'
-import type { SourceChain } from '@/grocery/types'
-import {
-  NATIVE_CRON_WEEKDAY,
-  NATIVE_SYNC_LOG_SOURCES,
-  missedLastScheduledSync,
-  type NativeCronChain,
-} from '@/lib/grocery/sync-schedule'
+import { NATIVE_CRON_UTC_HOUR } from '@/lib/grocery/sync-schedule'
 
 export type LaunchHealthLevel = 'ok' | 'warn' | 'fail'
 
+export type ScrapeOutcome = 'success' | 'partial' | 'failed' | 'missing'
+
 export type LaunchHealthChain = {
-  chain: SourceChain
+  chain: string
   label: string
+  /** Varer skrevet i seneste scrape. Feltnavnet beholdes til admin-siden. */
   rpcCount: number
   sample: string[]
   lastSeenAt: string | null
   daysSinceSeen: number | null
-  fooddataLastSeenAt: string | null
-  fooddataOnSale: number | null
-  /** Aktive tilbud fra Tjek-avisoverlayet (Salling-kæder). */
-  fooddataTjekOnSale: number | null
-  sourceLeafletCount: number | null
-  samplePriceMismatches: number | null
-  missedScheduledSlot: boolean
-  absurdUntilCount: number
-  algoliaError: string | null
   level: LaunchHealthLevel
   reason: string
+  scrapeStatus: ScrapeOutcome
+  errorMessage: string | null
 }
 
 export type LaunchHealthReport = {
   generatedAt: string
+  /** Start på det scrape-vindue rapporten dækker (sidste 02:00 UTC). */
+  windowStart: string
   ok: boolean
   failCount: number
   warnCount: number
   chains: LaunchHealthChain[]
 }
 
-type ChainSpec = {
-  chain: SourceChain
+type ScrapeCheck = {
+  chain: string
   label: string
-  warnBelow: number
-  maxStaleDays: number
-  algolia?: 'netto' | 'foetex' | 'bilka'
-  native?: NativeCronChain
-  /** Kædens egen avis. Health kigger på den kilde, ikke gamle Goma-rækker. */
-  avisSource?: string
+  /** `sync_logs.source`-værdier. Seneste række i vinduet vinder. */
+  sources: readonly string[]
 }
 
-const CHAINS: ChainSpec[] = [
-  { chain: 'netto', label: 'Netto', warnBelow: 20, maxStaleDays: 8, algolia: 'netto', native: 'netto' },
-  { chain: 'foetex', label: 'Føtex', warnBelow: 20, maxStaleDays: 8, algolia: 'foetex', native: 'foetex' },
-  { chain: 'bilka', label: 'Bilka', warnBelow: 20, maxStaleDays: 8, algolia: 'bilka', native: 'bilka' },
-  { chain: 'rema-1000', label: 'REMA 1000', warnBelow: 20, maxStaleDays: 8, native: 'rema-1000' },
-  { chain: 'nemlig', label: 'Nemlig', warnBelow: 20, maxStaleDays: 2 },
-  { chain: 'lidl', label: 'Lidl', warnBelow: 20, maxStaleDays: 8, avisSource: 'lidl-avis' },
-  { chain: 'meny', label: 'MENY', warnBelow: 20, maxStaleDays: 8, avisSource: 'meny-avis' },
-  { chain: 'spar', label: 'Spar', warnBelow: 20, maxStaleDays: 8, avisSource: 'spar-avis' },
-  { chain: 'min-koebmand', label: 'Min Købmand', warnBelow: 15, maxStaleDays: 8, avisSource: 'min-koebmand-avis' },
+/** Scrapes som `grocery-native-sync` kører hver nat. */
+export const SCRAPE_CHECKS: readonly ScrapeCheck[] = [
+  { chain: 'netto', label: 'Netto', sources: ['salling-algolia:netto:leaflet', 'salling-algolia:netto'] },
+  { chain: 'foetex', label: 'Føtex', sources: ['salling-algolia:foetex:leaflet', 'salling-algolia:foetex'] },
+  { chain: 'bilka', label: 'Bilka', sources: ['salling-algolia:bilka:leaflet', 'salling-algolia:bilka'] },
+  { chain: 'rema-1000', label: 'REMA 1000', sources: ['apify-rema', 'rema-1000-api'] },
+  { chain: 'nemlig', label: 'Nemlig', sources: ['nemlig-api'] },
+  { chain: 'lidl', label: 'Lidl', sources: ['lidl-avis'] },
+  { chain: 'meny', label: 'MENY', sources: ['meny-avis'] },
+  { chain: 'spar', label: 'SPAR', sources: ['spar-avis'] },
+  { chain: 'min-koebmand', label: 'Min Købmand', sources: ['min-koebmand-avis'] },
 ]
 
-const RPC_LIMIT = 51
-/** Goma satte slutdatoer i 2037. Årets kampagner (fx blomster til 31/12) er ikke absurde. */
-const ABSURD_UNTIL_MS = 400 * 24 * 60 * 60 * 1000
+type SyncLogRow = {
+  status?: string | null
+  started_at?: string | null
+  products_processed?: number | null
+  offers_processed?: number | null
+  error_message?: string | null
+  metadata?: { skippedUnchanged?: boolean } | null
+}
 
-function ffClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !key) {
-    throw new Error('Mangler NEXT_PUBLIC_SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY')
+/** Seneste 02:00 UTC, som er grocery-native-sync'ens faste slot. */
+export function lastDailyScrapeSlot(now: Date = new Date()): Date {
+  const slot = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      NATIVE_CRON_UTC_HOUR,
+      0,
+      0,
+      0,
+    ),
+  )
+  if (slot.getTime() > now.getTime()) {
+    slot.setUTCDate(slot.getUTCDate() - 1)
   }
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  return slot
+}
+
+export function classifyScrapeLog(row: SyncLogRow | null): {
+  level: LaunchHealthLevel
+  scrapeStatus: ScrapeOutcome
+  reason: string
+} {
+  if (!row?.status) {
+    return { level: 'fail', scrapeStatus: 'missing', reason: 'Scrape kørte ikke' }
+  }
+  const error = row.error_message?.trim() || null
+  if (row.status === 'failed') {
+    return { level: 'fail', scrapeStatus: 'failed', reason: error || 'Scrape fejlede' }
+  }
+  if (row.status === 'partial') {
+    return { level: 'warn', scrapeStatus: 'partial', reason: error ? `Delvis: ${error}` : 'Scrape delvist' }
+  }
+  if (row.status === 'success') {
+    return {
+      level: 'ok',
+      scrapeStatus: 'success',
+      reason: row.metadata?.skippedUnchanged ? 'Kørte — avisen var uændret' : 'Kørte',
+    }
+  }
+  return { level: 'warn', scrapeStatus: 'partial', reason: `Ukendt status: ${row.status}` }
 }
 
 function daysAgo(iso: string | null): number | null {
@@ -92,369 +116,54 @@ function daysAgo(iso: string | null): number | null {
   return (Date.now() - new Date(iso).getTime()) / 86_400_000
 }
 
-async function rpcOffers(
-  ff: SupabaseClient,
-  chain: SourceChain,
-): Promise<{ count: number; sample: string[]; absurdUntilCount: number }> {
-  const { data, error } = await ff.rpc('get_food_offers_v2', {
-    p_offers_only: true,
-    p_limit: RPC_LIMIT,
-    p_offset: 0,
-    p_stores: [chain],
-    p_organic_only: false,
-    p_goma_primary: true,
-  })
-  if (error) {
-    throw new Error(`${chain} RPC: ${error.message}`)
-  }
-  const rows = Array.isArray(data) ? data : []
-  const now = Date.now()
-  let absurdUntilCount = 0
-  const sample: string[] = []
-  for (const row of rows) {
-    const name = String((row as { name_store?: string }).name_store ?? '').trim()
-    if (name && sample.length < 3) sample.push(name.slice(0, 40))
-    const until = (row as { sale_valid_to?: string | null }).sale_valid_to
-    if (until) {
-      const t = new Date(until).getTime()
-      if (Number.isFinite(t) && t > now + ABSURD_UNTIL_MS) absurdUntilCount++
-    }
-  }
-  return { count: rows.length, sample, absurdUntilCount }
-}
-
-async function lastSeen(
-  client: SupabaseClient,
-  chain: SourceChain,
-  column: 'last_seen_at' | 'source_synced_at' = 'last_seen_at',
-  sourceEq?: string,
-): Promise<string | null> {
-  let query = client
-    .from('product_offers')
-    .select(column)
-    .eq('store_id', chain)
-    .not(column, 'is', null)
-    .order(column, { ascending: false })
-    .limit(1)
-  if (sourceEq) query = query.eq('source', sourceEq)
-  const { data } = await query
-  const row = data?.[0] as Record<string, unknown> | undefined
-  const value = row?.[column]
-  return typeof value === 'string' ? value : null
-}
-
-async function countOnSale(
-  client: SupabaseClient,
-  chain: SourceChain,
-  source?: { like?: string; notLike?: string; eq?: string },
-): Promise<number | null> {
-  let query = client
-    .from('product_offers')
-    .select('id', { count: 'exact', head: true })
-    .eq('store_id', chain)
-    .eq('is_on_sale', true)
-  if (source?.eq) query = query.eq('source', source.eq)
-  if (source?.like) query = query.like('source', source.like)
-  if (source?.notLike) query = query.not('source', 'like', source.notLike)
-  const { count, error } = await query
-  if (error) return null
-  return count ?? 0
-}
-
-async function lastSyncLogSuccess(
+async function latestLogSince(
   grocery: SupabaseClient,
-  chain: NativeCronChain,
-): Promise<string | null> {
-  const { data } = await grocery
+  sources: readonly string[],
+  sinceIso: string,
+): Promise<SyncLogRow | null> {
+  const { data, error } = await grocery
     .from('sync_logs')
-    .select('completed_at')
-    .in('source', [...NATIVE_SYNC_LOG_SOURCES[chain]])
-    .in('status', ['success', 'partial'])
-    .order('completed_at', { ascending: false })
+    .select('status, started_at, products_processed, offers_processed, error_message, metadata')
+    .in('source', [...sources])
+    .gte('started_at', sinceIso)
+    .order('started_at', { ascending: false })
     .limit(1)
-  return data?.[0]?.completed_at ?? null
-}
-
-async function probeAlgoliaLeaflet(chain: 'netto' | 'foetex' | 'bilka'): Promise<{
-  error: string | null
-  leafletCount: number | null
-  mismatches: number | null
-}> {
-  try {
-    const res = await querySalling(chain, {
-      hitsPerPage: 8,
-      page: 0,
-      filters: 'isInCurrentLeaflet:true',
-    })
-    return {
-      error: null,
-      leafletCount: typeof res.nbHits === 'number' ? res.nbHits : null,
-      mismatches: null,
-    }
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : String(err),
-      leafletCount: null,
-      mismatches: null,
-    }
-  }
-}
-
-async function sampleAlgoliaPriceMismatches(
-  grocery: SupabaseClient,
-  chain: 'netto' | 'foetex' | 'bilka',
-): Promise<number | null> {
-  try {
-    const res = await querySalling(chain, {
-      hitsPerPage: 8,
-      page: 0,
-      filters: 'isInCurrentLeaflet:true',
-    })
-    const hits = res.hits ?? []
-    if (hits.length === 0) return 0
-    const sourceIds = hits.map((h) => h.objectID)
-    const { data: products } = await grocery
-      .from('products')
-      .select('id, source_id')
-      .eq('source_chain', chain)
-      .in('source_id', sourceIds)
-    const idBySource = new Map((products ?? []).map((p) => [String(p.source_id), String(p.id)]))
-    const productIds = [...idBySource.values()]
-    if (productIds.length === 0) return hits.length
-    const { data: offers } = await grocery
-      .from('product_offers')
-      .select('product_id, price_cents')
-      .eq('store_id', chain)
-      .in('product_id', productIds)
-    const priceByProduct = new Map(
-      (offers ?? []).map((o) => [String(o.product_id), o.price_cents as number | null]),
-    )
-    let mismatches = 0
-    for (const hit of hits) {
-      const productId = idBySource.get(hit.objectID)
-      const ours = productId ? priceByProduct.get(productId) : null
-      // Ét repræsentativt storeId skifter mellem scrape og health-check.
-      // Match hvis fooddata-prisen stadig findes på en Algolia-butik.
-      if (!storedPriceMatchesAlgolia(hit.storeData, hit, ours)) {
-        mismatches++
-      }
-    }
-    return mismatches
-  } catch {
-    return null
-  }
-}
-
-function classify(
-  spec: ChainSpec,
-  input: {
-    rpcCount: number
-    daysSinceSeen: number | null
-    absurdUntilCount: number
-    algoliaError: string | null
-    missedScheduledSlot: boolean
-    sourceLeafletCount: number | null
-    fooddataOnSale: number | null
-    /** Kun primærkilden (Algolia) — uden Tjek-avisoverlay. */
-    fooddataNativeOnSale: number | null
-    samplePriceMismatches: number | null
-  },
-): { level: LaunchHealthLevel; reason: string } {
-  if (input.algoliaError) {
-    return { level: 'fail', reason: `Algolia: ${input.algoliaError.slice(0, 80)}` }
-  }
-  if (input.missedScheduledSlot) {
-    return {
-      level: 'fail',
-      reason: 'Missede seneste planlagte scrape — fooddata har ikke den aktuelle avis',
-    }
-  }
-  if (spec.avisSource) {
-    if (input.fooddataOnSale == null) {
-      return { level: 'warn', reason: 'Fooddata ikke tjekket' }
-    }
-    if (input.fooddataOnSale === 0) {
-      return { level: 'fail', reason: 'Ingen aktuelle avis-tilbud i fooddata' }
-    }
-    if (input.daysSinceSeen != null && input.daysSinceSeen > spec.maxStaleDays) {
-      return {
-        level: 'fail',
-        reason: `Avis sidst set for ${Math.round(input.daysSinceSeen)} dage siden`,
-      }
-    }
-    if (input.rpcCount === 0) {
-      return {
-        level: 'fail',
-        reason: `Fooddata har ${input.fooddataOnSale} avis-tilbud, men /dagligvarer viser ingen`,
-      }
-    }
-    if (input.rpcCount < spec.warnBelow) {
-      return { level: 'warn', reason: `Kun ${input.rpcCount} madtilbud på /dagligvarer` }
-    }
-    return { level: 'ok', reason: 'OK' }
-  }
-  if (input.rpcCount === 0) {
-    const fd =
-      input.fooddataOnSale != null ? ` (fooddata har ${input.fooddataOnSale})` : ''
-    return { level: 'fail', reason: `Ingen madtilbud på /dagligvarer${fd}` }
-  }
-  if (input.absurdUntilCount > 0) {
-    return {
-      level: 'fail',
-      reason: `${input.absurdUntilCount} tilbud med slutdato mere end et år ude (fx 2037)`,
-    }
-  }
-  // Sammenlign kun Algolia-avisen med Algolia-kilden. Tjek-overlayet (papiravisens
-  // slagtervarer) ligger på samme butik, men findes ikke i Algolia — regnes det med,
-  // sprænger loftet og kæden bliver rød selvom begge kilder er sunde.
-  const algoliaOnSale = input.fooddataNativeOnSale ?? input.fooddataOnSale
-  if (
-    input.sourceLeafletCount != null &&
-    input.sourceLeafletCount >= 50 &&
-    algoliaOnSale != null &&
-    (algoliaOnSale < input.sourceLeafletCount * 0.5 ||
-      algoliaOnSale > input.sourceLeafletCount * 1.35)
-  ) {
-    return {
-      level: 'fail',
-      reason: `Algolia avis ${input.sourceLeafletCount} vs fooddata on_sale ${algoliaOnSale}`,
-    }
-  }
-  if (input.samplePriceMismatches != null && input.samplePriceMismatches >= 3) {
-    // Butikspriser i Algolia varierer; missed cron er allerede rød ovenfor.
-    return {
-      level: 'warn',
-      reason: `${input.samplePriceMismatches}/8 stikprøver afviger fra Algolia (butiksvariance)`,
-    }
-  }
-  if (input.daysSinceSeen != null && input.daysSinceSeen > spec.maxStaleDays) {
-    return {
-      level: 'fail',
-      reason: `Sidst set for ${Math.round(input.daysSinceSeen)} dage siden`,
-    }
-  }
-  if (input.daysSinceSeen == null) {
-    return { level: 'warn', reason: 'Ingen last_seen_at' }
-  }
-  if (input.rpcCount < spec.warnBelow) {
-    return {
-      level: 'warn',
-      reason: `Kun ${input.rpcCount} madtilbud (tynd avis eller filter)`,
-    }
-  }
-  if (input.samplePriceMismatches != null && input.samplePriceMismatches > 0) {
-    return {
-      level: 'warn',
-      reason: `${input.samplePriceMismatches}/8 stikprøver afviger fra Algolia`,
-    }
-  }
-  return { level: 'ok', reason: 'OK' }
+  if (error) throw new Error(`${sources[0]}: ${error.message}`)
+  return (data?.[0] as SyncLogRow | undefined) ?? null
 }
 
 export async function runDagligvarerLaunchHealth(
-  ff: SupabaseClient = ffClient(),
+  grocery: SupabaseClient = getGroceryServiceClient(),
+  now: Date = new Date(),
 ): Promise<LaunchHealthReport> {
-  let grocery: SupabaseClient | null = null
-  try {
-    grocery = getGroceryServiceClient()
-  } catch {
-    grocery = null
-  }
-
+  const windowStart = lastDailyScrapeSlot(now).toISOString()
   const chains: LaunchHealthChain[] = []
 
-  for (const spec of CHAINS) {
-    const [{ count: rpcCount, sample, absurdUntilCount }, lastSeenAt] = await Promise.all([
-      rpcOffers(ff, spec.chain),
-      lastSeen(ff, spec.chain),
-    ])
-
-    let algoliaError: string | null = null
-    let sourceLeafletCount: number | null = null
-    let samplePriceMismatches: number | null = null
-    let fooddataLastSeenAt: string | null = null
-    let fooddataOnSale: number | null = null
-    let fooddataTjekOnSale: number | null = null
-    let missedScheduledSlot = false
-
-    if (spec.algolia) {
-      const probe = await probeAlgoliaLeaflet(spec.algolia)
-      algoliaError = probe.error
-      sourceLeafletCount = probe.leafletCount
-    }
-
-    if (grocery) {
-      // fooddata.product_offers bruger source_synced_at (ikke last_seen_at).
-      fooddataLastSeenAt = await lastSeen(
-        grocery,
-        spec.chain,
-        'source_synced_at',
-        spec.avisSource,
-      )
-      fooddataOnSale = await countOnSale(
-        grocery,
-        spec.chain,
-        spec.avisSource ? { eq: spec.avisSource } : undefined,
-      )
-      if (spec.algolia) {
-        fooddataTjekOnSale = await countOnSale(grocery, spec.chain, { like: 'tjek%' })
-      }
-      if (spec.native) {
-        const logAt = await lastSyncLogSuccess(grocery, spec.native)
-        // Samme evidens som grocery-cron catch-up: log ELLER sidst sete række.
-        const lastOk = [logAt, fooddataLastSeenAt, lastSeenAt]
-          .filter((v): v is string => typeof v === 'string')
-          .sort()
-          .at(-1)
-        missedScheduledSlot = missedLastScheduledSync(
-          lastOk,
-          NATIVE_CRON_WEEKDAY[spec.native],
-        )
-      }
-      if (spec.algolia && !algoliaError) {
-        samplePriceMismatches = await sampleAlgoliaPriceMismatches(grocery, spec.algolia)
-      }
-    }
-
-    const daysSinceSeen = daysAgo(spec.avisSource ? fooddataLastSeenAt : lastSeenAt)
-    const { level, reason } = classify(spec, {
-      rpcCount,
-      daysSinceSeen,
-      absurdUntilCount,
-      algoliaError,
-      missedScheduledSlot,
-      sourceLeafletCount,
-      fooddataOnSale,
-      fooddataNativeOnSale:
-        fooddataOnSale != null && fooddataTjekOnSale != null
-          ? fooddataOnSale - fooddataTjekOnSale
-          : fooddataOnSale,
-      samplePriceMismatches,
-    })
+  for (const spec of SCRAPE_CHECKS) {
+    const row = await latestLogSince(grocery, spec.sources, windowStart)
+    const classified = classifyScrapeLog(row)
+    const startedAt = row?.started_at ?? null
+    const age = daysAgo(startedAt)
+    const products = row?.products_processed ?? row?.offers_processed ?? 0
     chains.push({
       chain: spec.chain,
       label: spec.label,
-      rpcCount,
-      sample,
-      lastSeenAt,
-      daysSinceSeen: daysSinceSeen != null ? Math.round(daysSinceSeen * 10) / 10 : null,
-      fooddataLastSeenAt,
-      fooddataOnSale,
-      fooddataTjekOnSale,
-      sourceLeafletCount,
-      samplePriceMismatches,
-      missedScheduledSlot,
-      absurdUntilCount,
-      algoliaError,
-      level,
-      reason,
+      rpcCount: products,
+      sample: [],
+      lastSeenAt: startedAt,
+      daysSinceSeen: age != null ? Math.round(age * 10) / 10 : null,
+      level: classified.level,
+      reason: classified.reason,
+      scrapeStatus: classified.scrapeStatus,
+      errorMessage: row?.error_message?.trim() || null,
     })
   }
 
   const failCount = chains.filter((c) => c.level === 'fail').length
   const warnCount = chains.filter((c) => c.level === 'warn').length
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: now.toISOString(),
+    windowStart,
     ok: failCount === 0,
     failCount,
     warnCount,
@@ -462,40 +171,59 @@ export async function runDagligvarerLaunchHealth(
   }
 }
 
+function formatDk(iso: string | null): string {
+  if (!iso) return '-'
+  return new Intl.DateTimeFormat('da-DK', {
+    timeZone: 'Europe/Copenhagen',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
+}
+
+function daCount(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+export function launchHealthEmailSubject(report: LaunchHealthReport): string {
+  if (!report.ok) {
+    return `[FF dagligvarer] ${daCount(report.failCount, 'scrape fejlede', 'scrapes fejlede')}`
+  }
+  if (report.warnCount > 0) {
+    return `[FF dagligvarer] Scrapes OK (${daCount(report.warnCount, 'delvis', 'delvise')})`
+  }
+  return '[FF dagligvarer] Alle scrapes kørte'
+}
+
 export function formatLaunchHealthReport(report: LaunchHealthReport): string {
   const pad = (s: unknown, n: number) => String(s ?? '').padEnd(n)
   const lines = [
-    `Dagligvarer launch-health  ${report.generatedAt}`,
-    pad('kæde', 16) +
-      pad('rpc', 5) +
-      pad('avis', 6) +
-      pad('fd', 6) +
-      pad('tjek', 6) +
-      pad('alder', 8) +
-      pad('status', 6) +
-      'årsag',
+    `Scrape-status  ${formatDk(report.generatedAt)}`,
+    `Vindue siden ${formatDk(report.windowStart)} (seneste natlige kørsel)`,
+    '',
+    pad('kæde', 16) + pad('status', 8) + pad('varer', 8) + pad('kørt', 14) + 'note',
   ]
   for (const c of report.chains) {
-    const age = c.daysSinceSeen == null ? '-' : `${c.daysSinceSeen}d`
-    const avis = c.sourceLeafletCount == null ? '-' : String(c.sourceLeafletCount)
-    const fd = c.fooddataOnSale == null ? '-' : String(c.fooddataOnSale)
-    const tjek = c.fooddataTjekOnSale == null ? '-' : String(c.fooddataTjekOnSale)
     lines.push(
       pad(c.label, 16) +
-        pad(c.rpcCount, 5) +
-        pad(avis, 6) +
-        pad(fd, 6) +
-        pad(tjek, 6) +
-        pad(age, 8) +
-        pad(c.level, 6) +
+        pad(c.level, 8) +
+        pad(c.rpcCount, 8) +
+        pad(formatDk(c.lastSeenAt), 14) +
         c.reason,
     )
   }
   lines.push('')
-  lines.push(
-    report.ok
-      ? `OK — ${report.warnCount} advarsler`
-      : `FAIL — ${report.failCount} kæder røde, ${report.warnCount} advarsler`,
-  )
+  if (report.ok && report.warnCount === 0) {
+    lines.push('OK — alle scrapes kørte')
+  } else if (report.ok) {
+    lines.push(`OK — ${daCount(report.warnCount, 'delvis scrape', 'delvise scrapes')}`)
+  } else if (report.warnCount === 0) {
+    lines.push(`FAIL — ${daCount(report.failCount, 'scrape fejlede', 'scrapes fejlede')}`)
+  } else {
+    lines.push(
+      `FAIL — ${daCount(report.failCount, 'scrape fejlede', 'scrapes fejlede')}, ${daCount(report.warnCount, 'delvis', 'delvise')}`,
+    )
+  }
   return lines.join('\n')
 }

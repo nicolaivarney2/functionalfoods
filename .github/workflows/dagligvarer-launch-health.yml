@@ -1,6 +1,6 @@
 name: Dagligvarer launch health
 
-# Watchdog efter natlig scrape + fooddata-import.
+# Scrape-status efter natlig kørsel. Rød = en scrape fejlede eller kørte ikke.
 # 1) Sikrer FF-import (skip hvis allerede frisk) — fanger GitHubs skippede 03:00-cron.
 # 2) Health-check + mail.
 # 3) Ved røde kæder: native catch-up + import igen (ingen Goma).

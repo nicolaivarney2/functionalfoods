@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/admin-route-auth'
 import { sendDagligvarerOpsEmail } from '@/lib/dagligvarer-ops-email'
 import {
   formatLaunchHealthReport,
+  launchHealthEmailSubject,
   runDagligvarerLaunchHealth,
 } from '@/lib/dagligvarer-launch-health'
 
@@ -35,9 +36,7 @@ export async function GET(request: NextRequest) {
     const report = await runDagligvarerLaunchHealth()
     let email: { ok: boolean; error?: string } | undefined
     if (emailRequested) {
-      const subject = report.ok
-        ? `[FF dagligvarer] Rapport OK (${report.warnCount} advarsler)`
-        : `[FF dagligvarer] ${report.failCount} kæder røde`
+      const subject = launchHealthEmailSubject(report)
       const sent = await sendDagligvarerOpsEmail({
         subject,
         text: formatLaunchHealthReport(report),

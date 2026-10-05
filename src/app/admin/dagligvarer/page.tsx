@@ -94,9 +94,8 @@ export default function AdminDagligvarerPage() {
             </button>
           </div>
           <p className="text-sm text-gray-600 mb-4">
-            Tjekker det brugerne ser på /dagligvarer, plus Algolia vs fooddata for Netto/Føtex/Bilka.
-            Du får en rapport på mail hver morgen (~08:30 DK). Rød status udløser også mail med det samme
-            hvis natte-syncen fejler.
+            Viser om hver scrape i seneste natlige kørsel lykkedes. En kæde er rød, når scrapen
+            fejlede eller slet ikke kørte — også selvom gamle tilbud stadig ligger i databasen.
           </p>
 
           {error && (
@@ -110,7 +109,7 @@ export default function AdminDagligvarerPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">Status</p>
                 <p className={`text-lg font-semibold ${report.ok ? 'text-green-700' : 'text-red-700'}`}>
-                  {report.ok ? 'Stabil' : `${report.failCount} kæder fejler`}
+                  {report.ok ? 'Scrapes kørte' : `${report.failCount} scrapes fejlede`}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
@@ -130,7 +129,7 @@ export default function AdminDagligvarerPage() {
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Kæde</th>
                   <th className="px-3 py-2 text-left font-medium">Status</th>
-                  <th className="px-3 py-2 text-right font-medium">Tilbud</th>
+                  <th className="px-3 py-2 text-right font-medium">Varer</th>
                   <th className="px-3 py-2 text-right font-medium">Alder</th>
                   <th className="px-3 py-2 text-left font-medium">Årsag / sample</th>
                 </tr>

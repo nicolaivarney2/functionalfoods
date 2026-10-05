@@ -1,10 +1,10 @@
 /**
- * Launch watchdog — hvad /dagligvarer faktisk viser pr. kæde.
+ * Scrape-status for seneste natlige grocery-sync.
  *
  *   npm run dagligvarer:health
  *   npx tsx scripts/dagligvarer-launch-health.ts
  *
- * Exit 1 hvis en kæde er rød (tom liste, Algolia 403, absurd dato, stale > 8 dage).
+ * Exit 1 hvis en scrape i vinduet fejlede eller ikke kørte.
  */
 
 import { config as loadEnv } from 'dotenv'
@@ -15,6 +15,7 @@ loadEnv({ path: resolve(process.cwd(), '.env.local') })
 import { sendDagligvarerOpsEmail } from '../src/lib/dagligvarer-ops-email'
 import {
   formatLaunchHealthReport,
+  launchHealthEmailSubject,
   runDagligvarerLaunchHealth,
 } from '../src/lib/dagligvarer-launch-health'
 
@@ -25,9 +26,7 @@ async function main() {
   const text = formatLaunchHealthReport(report)
   console.log(text)
   if (sendEmail) {
-    const subject = report.ok
-      ? `[FF dagligvarer] Rapport OK (${report.warnCount} advarsler)`
-      : `[FF dagligvarer] ${report.failCount} kæder røde`
+    const subject = launchHealthEmailSubject(report)
     const sent = await sendDagligvarerOpsEmail({ subject, text })
     if (!sent.ok) console.warn('ops-mail fejlede:', sent.error)
   }
