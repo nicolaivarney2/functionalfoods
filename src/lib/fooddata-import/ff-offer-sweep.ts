@@ -16,6 +16,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isDisallowedUpstreamOfferSource } from '@/lib/goma-import-stores'
 import { isMangledHyphenChainStoreProductId } from '@/lib/product-match-snapshots'
 
 /** Salling/REMA har fuldt katalog fra fooddata-native — aldrig source=goma. */
@@ -43,7 +44,7 @@ export const GOMA_CHAIN_STORE_IDS = [
 ] as const
 
 const SWEEP_COLS =
-  'id, store_id, store_product_id, source, is_on_sale, normal_price, sale_valid_to, last_seen_at'
+  'id, store_id, store_product_id, source, is_on_sale, is_available, normal_price, sale_valid_to, last_seen_at'
 
 /**
  * Sider på PK: stor nok til få requests, lille nok til at ligge under timeout.
@@ -61,6 +62,7 @@ type SweepRow = {
   store_product_id: string | null
   source: string | null
   is_on_sale: boolean | null
+  is_available?: boolean | null
   normal_price: number | null
   sale_valid_to: string | null
   last_seen_at: string | null
@@ -77,6 +79,7 @@ export type FreshOfferRef = {
 export type FfOfferSweepResult = {
   scanned: number
   slept: number
+  retired: number
   normalPriceCleared: number
   deleted: number
   deletedByReason: Record<string, number>
@@ -85,11 +88,8 @@ export type FfOfferSweepResult = {
 }
 
 function sourceFamily(source: string | null | undefined): 'tjek' | 'native' {
-  return String(source ?? '')
-    .toLowerCase()
-    .startsWith('tjek')
-    ? 'tjek'
-    : 'native'
+  const s = String(source ?? '').toLowerCase()
+  return s.startsWith('tjek') || s.startsWith('leaflet') ? 'tjek' : 'native'
 }
 
 /**
@@ -133,6 +133,7 @@ export function buildSleepCutoffs(fresh: FreshOfferRef[]): Map<string, string> {
 type SweepDecision =
   | { action: 'delete'; reason: string }
   | { action: 'sleep'; reason: string }
+  | { action: 'retire'; reason: string }
   | { action: 'clear-normal-price' }
   | null
 
@@ -140,10 +141,7 @@ function decide(
   row: SweepRow,
   ctx: {
     cutoffs: Map<string, string>
-    gomaImportEnabled: boolean
     nowIso: string
-    sallingRema: Set<string>
-    gomaChains: Set<string>
   },
 ): SweepDecision {
   const storeId = row.store_id ?? ''
@@ -154,16 +152,9 @@ function decide(
     return { action: 'delete', reason: 'legacy store_id alias' }
   }
 
-  if (ctx.gomaImportEnabled) {
-    if (source === 'goma' && ctx.sallingRema.has(storeId)) {
-      return { action: 'delete', reason: 'goma på Salling/REMA' }
-    }
-    if (source === 'goma' && expired) {
-      return { action: 'delete', reason: 'udløbet goma-avis' }
-    }
-    if (source.startsWith('tjek') && ctx.gomaChains.has(storeId)) {
-      return { action: 'delete', reason: 'Tjek på Goma-kæde' }
-    }
+  if (isDisallowedUpstreamOfferSource(source)) {
+    if (row.is_available === false && row.is_on_sale !== true) return null
+    return { action: 'retire', reason: 'ikke tilladt kilde' }
   }
 
   if (row.is_on_sale) {
@@ -239,7 +230,6 @@ export async function sweepFfProductOffers(
   const {
     ff,
     cutoffs = new Map<string, string>(),
-    gomaImportEnabled,
     dryRun = false,
     log = console.log,
   } = options
@@ -248,15 +238,13 @@ export async function sweepFfProductOffers(
   const nowIso = new Date().toISOString()
   const ctx = {
     cutoffs,
-    gomaImportEnabled,
     nowIso,
-    sallingRema: new Set<string>(SALLING_REMA_STORE_IDS),
-    gomaChains: new Set<string>(GOMA_CHAIN_STORE_IDS),
   }
 
   const result: FfOfferSweepResult = {
     scanned: 0,
     slept: 0,
+    retired: 0,
     normalPriceCleared: 0,
     deleted: 0,
     deletedByReason: {},
@@ -293,6 +281,7 @@ export async function sweepFfProductOffers(
 
     const toDelete: string[] = []
     const toSleep: string[] = []
+    const toRetire: string[] = []
     const toClear: string[] = []
 
     for (const row of rows) {
@@ -304,6 +293,10 @@ export async function sweepFfProductOffers(
           (result.deletedByReason[decision.reason] ?? 0) + 1
       } else if (decision.action === 'sleep') {
         toSleep.push(row.id)
+        result.sleptByReason[decision.reason] =
+          (result.sleptByReason[decision.reason] ?? 0) + 1
+      } else if (decision.action === 'retire') {
+        toRetire.push(row.id)
         result.sleptByReason[decision.reason] =
           (result.sleptByReason[decision.reason] ?? 0) + 1
       } else {
@@ -335,6 +328,24 @@ export async function sweepFfProductOffers(
             .in('id', chunk),
         )
       }
+      for (let i = 0; i < toRetire.length; i += ID_CHUNK) {
+        const chunk = toRetire.slice(i, i + ID_CHUNK)
+        await withRetry(`sweep retire ${chunk.length}`, log, () =>
+          ff
+            .from('product_offers')
+            .update({
+              is_available: false,
+              is_on_sale: false,
+              is_offer_active: false,
+              normal_price: null,
+              discount_percentage: null,
+              sale_valid_from: null,
+              sale_valid_to: null,
+              updated_at: nowIso,
+            })
+            .in('id', chunk),
+        )
+      }
       for (let i = 0; i < toClear.length; i += ID_CHUNK) {
         const chunk = toClear.slice(i, i + ID_CHUNK)
         await withRetry(`sweep normal_price ${chunk.length}`, log, () =>
@@ -348,6 +359,7 @@ export async function sweepFfProductOffers(
 
     result.deleted += toDelete.length
     result.slept += toSleep.length
+    result.retired += toRetire.length
     result.normalPriceCleared += toClear.length
     result.scanned += rows.length
 
@@ -358,7 +370,7 @@ export async function sweepFfProductOffers(
     if (result.scanned % 20000 < rows.length) {
       log(
         `  sweep: ${result.scanned} scannet · ${result.slept} slukket · ` +
-          `${result.deleted} slettet · ${result.normalPriceCleared} normal_price ryddet`,
+          `${result.retired} utilgængelige · ${result.deleted} slettet · ${result.normalPriceCleared} normal_price ryddet`,
       )
     }
   }
@@ -371,6 +383,7 @@ export function formatSweepSummary(result: FfOfferSweepResult): string {
   const parts = [
     `${result.scanned} rækker scannet`,
     `${result.slept} slukket`,
+    `${result.retired} utilgængelige`,
     `${result.deleted} slettet`,
     `${result.normalPriceCleared} normal_price ryddet`,
     `${(result.durationMs / 1000).toFixed(1)}s`,

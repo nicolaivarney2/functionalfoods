@@ -20,6 +20,7 @@ import {
   type EnqueueFooddataQueueResult,
 } from '@/lib/product-match-queue'
 import { isFoodCatalogProduct } from '@/lib/product-food-classification'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import { extractEanFromFfProductId } from '@/lib/product-ean'
 import {
@@ -150,27 +151,6 @@ type ProductRef = {
   name: string
 }
 
-
-async function fetchGomaOfferProductUuids(fooddata: SupabaseClient): Promise<Set<string>> {
-  const ids = new Set<string>()
-  let from = 0
-  while (true) {
-    const { data, error } = await fooddata
-      .from('product_offers')
-      .select('product_id')
-      .eq('source', 'goma')
-      .order('product_id', { ascending: true })
-      .range(from, from + FETCH_PAGE_SIZE - 1)
-    if (error) throw new Error(`fetchGomaOfferProductUuids failed: ${error.message}`)
-    if (!data?.length) break
-    for (const row of data as { product_id: string }[]) {
-      if (row.product_id) ids.add(String(row.product_id))
-    }
-    if (data.length < FETCH_PAGE_SIZE) break
-    from += FETCH_PAGE_SIZE
-  }
-  return ids
-}
 
 const PRODUCT_SELECT_COLS =
   'id, source_chain, source_id, gtin, name, brand, manufacturer, description, amount, unit, image_url, category_path, category_lvl0, category_lvl1, category_lvl2, last_seen_at, active'
@@ -608,7 +588,7 @@ function mapProduct(p: Record<string, any>) {
     is_food: isFoodCatalogProduct({ department, category, subcategory, name: p.name }),
     amount: p.amount ?? null,
     unit: p.unit ?? null,
-    image_url: p.image_url ?? null,
+    image_url: toPublicCatalogImageUrl(p.image_url),
     metadata: {
       source_chain: p.source_chain,
       source_id: p.source_id,
@@ -856,12 +836,7 @@ export async function runFooddataImport(
   }
 
   const gomaImportEnabled = isGomaImportEnabled()
-  if (gomaImportEnabled) {
-    log('Goma aktiv — fooddata→FF bruger source=goma for offers-only kæder (Tjek cold backup i grocery-DB)')
-  }
-  const gomaOfferProductUuids = gomaImportEnabled
-    ? await fetchGomaOfferProductUuids(fooddata)
-    : new Set<string>()
+  const gomaOfferProductUuids = new Set<string>()
   const matchedFfIdSet = new Set<string>()
   const result: RunImportResult = {
     dryRun,
@@ -1040,7 +1015,7 @@ export async function runFooddataImport(
           gomaImportEnabled,
           log,
         })
-        result.offers.cleaned += sweep.slept + sweep.deleted + sweep.normalPriceCleared
+        result.offers.cleaned += sweep.slept + sweep.retired + sweep.deleted + sweep.normalPriceCleared
         log(`  sweep: ${formatSweepSummary(sweep)}`)
       } catch (err) {
         // Katalog + offers er skrevet — en sweep-fejl må ikke fejle hele importen.

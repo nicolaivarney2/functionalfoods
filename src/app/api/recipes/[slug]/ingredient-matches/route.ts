@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export const revalidate = 0
 
@@ -78,7 +79,12 @@ async function loadProductMatchesWithProducts(
       ingredient_id: String(r.ingredient_id),
       confidence: Number(r.confidence),
       match_type: String(r.match_type ?? ''),
-      supermarket_products: product as Record<string, unknown>,
+      supermarket_products: {
+        ...(product as Record<string, unknown>),
+        image_url: toPublicCatalogImageUrl(
+          typeof product.image_url === 'string' ? product.image_url : null,
+        ),
+      },
     })
   }
 

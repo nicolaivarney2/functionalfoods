@@ -11,6 +11,7 @@ import {
   summarizeMatches,
 } from '@/lib/price-alerts/match-offers-for-query'
 import { displayStoreName, normalizeDagligvarerStoreIds } from '@/lib/price-alerts/store-ids'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ async function createSingleAlert(
         store_id: match.storeId,
         product_offer_id: String(match.productOfferId),
         product_name: match.name,
-        image_url: match.imageUrl,
+        image_url: toPublicCatalogImageUrl(match.imageUrl),
         threshold_type: thresholdType,
         min_discount_pct: thresholdType === 'min_discount' ? minDiscountPct : null,
         is_active: true,
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
       store_id: m.storeId,
       product_offer_id: String(m.productOfferId),
       product_name: m.name,
-      image_url: m.imageUrl,
+      image_url: toPublicCatalogImageUrl(m.imageUrl),
       threshold_type: thresholdType,
       min_discount_pct: minDiscountPct,
       is_active: true,

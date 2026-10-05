@@ -199,9 +199,14 @@ const DIRECT_DAGLIGVARER_IMAGE_HOST_SUFFIXES = [
 export function resolveDagligvarerImageSrc(url: string | null | undefined): string {
   if (!url || !String(url).trim()) return ''
   const trimmed = String(url).trim()
+  if (trimmed.startsWith('/api/images/catalog/')) return trimmed
   if (!trimmed.startsWith('http')) return trimmed
   try {
-    const host = new URL(trimmed).hostname.toLowerCase()
+    const parsed = new URL(trimmed)
+    if (parsed.pathname.startsWith('/api/images/catalog/')) {
+      return `${parsed.pathname}${parsed.search}`
+    }
+    const host = parsed.hostname.toLowerCase()
     if (DIRECT_DAGLIGVARER_IMAGE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))) {
       return trimmed
     }

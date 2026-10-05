@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 import { databaseService } from '@/lib/database-service'
 
 export const maxDuration = 60
@@ -109,7 +110,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      products: result.products,
+      products: result.products.map((product) => ({
+        ...product,
+        image_url: toPublicCatalogImageUrl(product.image_url),
+      })),
       count: result.total,
       pagination: {
         page,

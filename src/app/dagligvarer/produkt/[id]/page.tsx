@@ -10,6 +10,7 @@ import {
   addToShoppingList,
   createPriceAlert,
 } from '@/lib/dagligvarer-actions'
+import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
 
 interface Product {
   id: string
@@ -602,10 +603,7 @@ export default function ProductPage() {
             <div className="flex justify-center">
               {product.image_url ? (
                 <img 
-                  src={product.image_url.startsWith('http') 
-                    ? `/api/images/proxy?url=${encodeURIComponent(product.image_url)}`
-                    : product.image_url
-                  } 
+                  src={resolveDagligvarerImageSrc(product.image_url)} 
                   alt={product.name}
                   className="w-80 h-80 object-cover rounded-lg shadow-lg"
                   onError={(e) => {

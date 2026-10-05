@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { loadHouseholdForUser } from '@/lib/household-access'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch items' }, { status: 500 })
     }
 
-    return NextResponse.json({ items: data ?? [] })
+    const items = (data ?? []).map((item) => ({
+      ...item,
+      image_url: toPublicCatalogImageUrl(
+        typeof item.image_url === 'string' ? item.image_url : null,
+      ),
+    }))
+    return NextResponse.json({ items })
   } catch (err) {
     console.error('GET /api/manual-shopping-items:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -83,7 +90,9 @@ export async function POST(request: NextRequest) {
           product_offer_id: String(offer.id),
           product_id: String(offer.product_id),
           store_id: String(offer.store_id),
-          image_url: p.image_url ?? null,
+          image_url: toPublicCatalogImageUrl(
+            typeof p.image_url === 'string' ? p.image_url : null,
+          ),
         })
         .select('*')
         .single()

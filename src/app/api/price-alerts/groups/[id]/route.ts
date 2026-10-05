@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
 import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       const discountPct = offer?.discount_percentage != null ? Number(offer.discount_percentage) : null
       return {
         ...alert,
+        image_url: toPublicCatalogImageUrl(
+          typeof alert.image_url === 'string' ? alert.image_url : null,
+        ),
         storeName: displayStoreName(alert.store_id),
         currentPrice,
         normalPrice,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +38,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to search products' }, { status: 500 })
     }
 
-    return NextResponse.json({ products })
+    return NextResponse.json({
+      products: (products ?? []).map((product) => ({
+        ...product,
+        image_url: toPublicCatalogImageUrl(product.image_url),
+      })),
+    })
   } catch (error) {
     console.error('Error in GET /api/products/search:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

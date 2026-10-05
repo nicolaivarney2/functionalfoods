@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSupabaseClient } from '@/lib/supabase'
 import { databaseService } from '@/lib/database-service'
 import { resolveProductImageUrlWithLookup } from '@/lib/product-image-fallback'
+import { publicStoreUrl, toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 const PRODUCT_DETAILS_CACHE_CONTROL = 'public, s-maxage=1800, stale-while-revalidate=86400'
 const PRODUCT_DETAILS_MEMORY_TTL_MS = 5 * 60 * 1000
@@ -163,8 +164,8 @@ export async function GET(
       sale_end_date: offer.sale_valid_to,
       currency: offer.currency || 'DKK',
       store: storeDisplay,
-      store_url: offer.product_url,
-      image_url: resolvedImageUrl,
+      store_url: publicStoreUrl(offer.product_url),
+      image_url: toPublicCatalogImageUrl(resolvedImageUrl),
       available: offer.is_available,
       temperature_zone: null,
       nutrition_info: null,
@@ -275,7 +276,7 @@ export async function GET(
           sale_end_date: o.sale_valid_to,
           currency: o.currency || 'DKK',
           store: storeName,
-          store_url: o.product_url,
+          store_url: publicStoreUrl(o.product_url),
           image_url: mainProduct.image_url,
           available: o.is_available,
           temperature_zone: null,

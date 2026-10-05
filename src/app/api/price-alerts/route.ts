@@ -7,6 +7,7 @@ import {
 } from '@/lib/subscription-entitlements'
 import { displayStoreName } from '@/lib/price-alerts/store-ids'
 import { isPriceAlertTriggered, offerIsOnSale } from '@/lib/price-alerts/trigger'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,9 @@ async function enrichAlerts(
 
       return {
         ...alert,
+        image_url: toPublicCatalogImageUrl(
+          typeof alert.image_url === 'string' ? alert.image_url : null,
+        ),
         store: displayStoreName(String(alert.store_id || '')),
         currentPrice,
         normalPrice,
@@ -228,7 +232,7 @@ export async function POST(request: NextRequest) {
           store_id: String(offer.store_id),
           product_offer_id: String(offer.id),
           product_name: offer.name_store ?? 'Produkt',
-          image_url: imageUrl,
+          image_url: toPublicCatalogImageUrl(imageUrl),
           threshold_type: thresholdType,
           min_discount_pct: thresholdType === 'min_discount' ? (minDiscountPct ?? 20) : null,
           is_active: true,

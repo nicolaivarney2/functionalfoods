@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Bell, Trash2, ArrowLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { authFetch } from '@/lib/auth-fetch'
+import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
 
 interface PriceAlert {
   id: string
@@ -184,7 +185,7 @@ export default function PrisalarmerPage() {
               >
                 <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
                   {alert.image_url ? (
-                    <img src={alert.image_url} alt="" className="w-full h-full object-contain" />
+                    <img src={resolveDagligvarerImageSrc(alert.image_url)} alt="" className="w-full h-full object-contain" />
                   ) : null}
                 </div>
 

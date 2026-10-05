@@ -80,8 +80,8 @@ export default async function GroceryVerifyPage() {
           <div>
             <h1 className="text-xl font-bold text-slate-900">Grocery verify</h1>
             <p className="mt-0.5 text-xs text-slate-500">
-              Daglig sync-health. Goma-sammenligning afsluttet 22. maj 2026 — vi har 100%
-              kilde-coverage. Dashboard'et detekterer nu regressioner.
+              Daglig sync-health. Sammenligningen med den gamle katalogkilde er afsluttet —
+              dækningen er 100%. Dashboard'et detekterer nu regressioner.
             </p>
           </div>
           <span

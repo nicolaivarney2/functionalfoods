@@ -383,12 +383,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {}, // No product matches found
-        gomaSunset,
         debug: {
           ingredientIdsCount: ingredientIds.length,
           sampleIngredientIds: ingredientIds.slice(0, 5),
           message: gomaSunset.simulateGone
-            ? 'Ingen fooddata-matches — legacy Goma matches ignoreres (GOMA_SIMULATE_GONE)'
+            ? 'Ingen katalog-matches — ældre produktnøgler ignoreres'
             : 'No product_ingredient_matches found for these ingredients',
         },
       })
@@ -937,7 +936,7 @@ export async function POST(request: NextRequest) {
       offersCount: totalOffersFound,
       storesSearched: dbStoreIds,
       message: gomaSunset.simulateGone
-        ? 'Ingen fooddata-priser fundet — tjek at matches og katalog-import er kørt'
+        ? 'Ingen katalogpriser fundet — tjek at matches og import er kørt'
         : 'No products found - check if product_ingredient_matches exist for these ingredients',
     } : undefined
 
@@ -945,7 +944,6 @@ export async function POST(request: NextRequest) {
       success: true,
       data: result,
       guideCount,
-      gomaSunset,
       ...(debugInfo && { debug: debugInfo }),
     }
 

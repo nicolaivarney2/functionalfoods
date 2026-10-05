@@ -9,6 +9,7 @@ type Row = {
   store_product_id: string | null
   source: string | null
   is_on_sale: boolean | null
+  is_available?: boolean | null
   normal_price: number | null
   sale_valid_to: string | null
   last_seen_at: string | null
@@ -16,6 +17,7 @@ type Row = {
 
 type Writes = {
   slept: string[]
+  retired: string[]
   deleted: string[]
   normalPriceCleared: string[]
   pageRequests: number
@@ -40,7 +42,7 @@ function row(partial: Partial<Row> & { id: string }): Row {
  * kunne verificeres uden at ramme FF.
  */
 function fakeFf(rows: Row[], pageLimit = 1000): { ff: SupabaseClient; writes: Writes } {
-  const writes: Writes = { slept: [], deleted: [], normalPriceCleared: [], pageRequests: 0 }
+  const writes: Writes = { slept: [], retired: [], deleted: [], normalPriceCleared: [], pageRequests: 0 }
   const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id))
 
   const selectBuilder = () => {
@@ -80,7 +82,11 @@ function fakeFf(rows: Row[], pageLimit = 1000): { ff: SupabaseClient; writes: Wr
       select: selectBuilder,
       update: (payload: Record<string, unknown>) =>
         writeBuilder(
-          payload.is_on_sale === false ? writes.slept : writes.normalPriceCleared,
+          payload.is_available === false
+            ? writes.retired
+            : payload.is_on_sale === false
+              ? writes.slept
+              : writes.normalPriceCleared,
         ),
       delete: () => writeBuilder(writes.deleted),
     }),
@@ -124,7 +130,7 @@ describe('buildSleepCutoffs', () => {
 })
 
 describe('sweepFfProductOffers', () => {
-  it('slukker forsvundne tilbud men lader friske og Tjek-overlay stå', async () => {
+  it('slukker forsvundne tilbud og gør Tjek-rækker utilgængelige', async () => {
     const { ff, writes } = fakeFf([
       row({ id: 'a', is_on_sale: true, last_seen_at: iso(-2 * HOUR) }),
       row({ id: 'b', is_on_sale: true, last_seen_at: iso(-14 * 24 * HOUR) }),
@@ -147,8 +153,11 @@ describe('sweepFfProductOffers', () => {
     })
 
     assert.deepEqual(writes.slept, ['b'])
+    assert.deepEqual(writes.retired, ['c'])
     assert.equal(result.slept, 1)
+    assert.equal(result.retired, 1)
     assert.equal(result.sleptByReason['væk fra fooddata'], 1)
+    assert.equal(result.sleptByReason['ikke tilladt kilde'], 1)
   })
 
   it('slukker udløbne tilbud uanset last_seen', async () => {
@@ -165,16 +174,18 @@ describe('sweepFfProductOffers', () => {
     assert.equal(result.sleptByReason['udløbet tilbud'], 1)
   })
 
-  it('sletter goma på Salling, udløbet goma og Tjek på Goma-kæder', async () => {
+  it('gør goma- og tjek-rækker utilgængelige uanset kæde og flag', async () => {
     const { ff, writes } = fakeFf([
       row({ id: 'a', store_id: 'bilka', source: 'goma', is_on_sale: true }),
       row({ id: 'b', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: iso(-30 * 24 * HOUR) }),
       row({ id: 'c', store_id: 'lidl', source: 'tjek:offers', is_on_sale: true }),
-      row({ id: 'd', store_id: 'meny', source: 'goma', is_on_sale: true, sale_valid_to: iso(365 * 24 * HOUR) }),
+      row({ id: 'd', store_id: 'meny', source: 'catalog', is_on_sale: true, sale_valid_to: iso(365 * 24 * HOUR) }),
+      row({ id: 'e', store_id: 'netto', source: 'leaflet:offers', is_on_sale: true }),
     ])
-    const result = await sweepFfProductOffers({ ff, gomaImportEnabled: true, log: NOISE })
-    assert.deepEqual(writes.deleted.sort(), ['a', 'b', 'c'])
-    assert.equal(result.deleted, 3)
+    const result = await sweepFfProductOffers({ ff, gomaImportEnabled: false, log: NOISE })
+    assert.deepEqual(writes.retired.sort(), ['a', 'b', 'c', 'd', 'e'])
+    assert.equal(result.retired, 5)
+    assert.deepEqual(writes.deleted, [])
     assert.deepEqual(writes.slept, [])
   })
 
@@ -196,13 +207,13 @@ describe('sweepFfProductOffers', () => {
     assert.equal(result.deletedByReason['legacy store_id alias'], 3)
   })
 
-  it('lader goma-rækker stå når Goma-import er slået fra', async () => {
+  it('rører ikke en allerede utilgængelig goma-række', async () => {
     const { ff, writes } = fakeFf([
-      row({ id: 'a', store_id: 'bilka', source: 'goma', is_on_sale: true }),
-      row({ id: 'b', store_id: 'lidl', source: 'tjek:offers', is_on_sale: true }),
+      row({ id: 'a', store_id: 'bilka', source: 'goma', is_on_sale: false, is_available: false }),
     ])
-    await sweepFfProductOffers({ ff, gomaImportEnabled: false, log: NOISE })
-    assert.deepEqual(writes.deleted, [])
+    const result = await sweepFfProductOffers({ ff, gomaImportEnabled: false, log: NOISE })
+    assert.deepEqual(writes.retired, [])
+    assert.equal(result.retired, 0)
   })
 
   it('rydder normal_price på rækker uden tilbud', async () => {
@@ -255,8 +266,10 @@ describe('sweepFfProductOffers', () => {
       }),
     ])
     const result = await sweepFfProductOffers({ ff, gomaImportEnabled: true, log: NOISE })
-    assert.deepEqual(writes.slept.sort(), ['abc-bad', 'rema-bad'])
-    assert.equal(result.sleptByReason['forkert kæde-prefix'], 2)
+    assert.deepEqual(writes.retired, ['abc-bad'])
+    assert.deepEqual(writes.slept, ['rema-bad'])
+    assert.equal(result.sleptByReason['forkert kæde-prefix'], 1)
+    assert.equal(result.sleptByReason['ikke tilladt kilde'], 1)
   })
 
   it('skriver intet i dry-run', async () => {
@@ -270,9 +283,9 @@ describe('sweepFfProductOffers', () => {
       dryRun: true,
       log: NOISE,
     })
-    assert.deepEqual(writes.deleted, [])
+    assert.deepEqual(writes.retired, [])
     assert.deepEqual(writes.normalPriceCleared, [])
-    assert.equal(result.deleted, 1)
+    assert.equal(result.retired, 1)
     assert.equal(result.normalPriceCleared, 1)
   })
 })

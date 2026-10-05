@@ -7,8 +7,7 @@ name: Fooddata Daily Import (incl. price history)
 #
 # Primær kørsel: Cloudflare wake → native scrape (eller Goma 14:00) → dette workflow.
 # Backup 07:00 UTC skip-if-fresh hvis kæden missede.
-# GOMA_IMPORT_ENABLED=false: source=goma kopieres ikke længere til FF (Goma-stop sep 2026).
-# Eksisterende goma-rækker slettes ikke af importen.
+# Goma og Tjek kopieres ikke til FF. Næste import slår eksisterende rækker fra.
 
 on:
   schedule:

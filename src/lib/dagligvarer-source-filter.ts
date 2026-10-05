@@ -1,16 +1,14 @@
 /**
- * Dagligvarer / Planomo: hvilke product_offers.source rækker der vises.
+ * Dagligvarer: hvilke product_offers.source rækker der vises.
  *
- * Strategi:
- *   - Native: Netto, Bilka, Føtex, REMA (Salling/REMA scrapes → fooddata)
- *   - Goma: alle øvrige kæder (source=goma i fooddata)
- *   - Tjek overlay: Salling papiravis (slagter/vejevarer som Algolia mangler)
- *   - Tjek øvrigt: udfaset når GOMA_IMPORT_ENABLED=true
+ * Egne kilder: Salling, REMA, Nemlig og kædernes egne aviser.
+ * Goma og Tjek (også catalog/leaflet) vises ikke.
  */
 
 import { CHAIN_COVERAGE, TJEK_LEAFLET_OVERLAY_CHAINS, type SourceChain } from '@/grocery/types'
-import { GOMA_FULL_CATALOG_CHAINS } from '@/lib/goma-import-stores'
-import { isGomaImportEnabled } from '@/lib/goma-sunset'
+import { GOMA_FULL_CATALOG_CHAINS, isDisallowedUpstreamOfferSource } from '@/lib/goma-import-stores'
+
+export { isDisallowedUpstreamOfferSource }
 
 /** store_id hvor Goma erstatter Tjek som primær tilbudskilde. */
 export const GOMA_PRIMARY_STORE_IDS: SourceChain[] = (
@@ -36,31 +34,43 @@ type PostgrestFilterQuery = {
   or(filters: string): PostgrestFilterQuery
 }
 
+/**
+ * Avis-overlay hedder `tjek…` indtil migrationen, derefter `leaflet…`.
+ * Begge skal matche, så listen virker før og efter kildenavnet er skjult.
+ */
+export function isLeafletOfferSource(source?: string | null): boolean {
+  const s = String(source ?? '').trim().toLowerCase()
+  return s.startsWith('tjek') || s.startsWith('leaflet')
+}
+
+/** Katalogkilden hedder `goma` indtil migrationen, derefter `catalog`. */
+export function isCatalogOfferSource(source?: string | null): boolean {
+  const s = String(source ?? '').trim().toLowerCase()
+  return s === 'goma' || s === 'catalog'
+}
+
+/** PostgREST .or() der fanger både det gamle og det neutrale avis-kildenavn. */
+export function leafletSourceOrFilter(): string {
+  return 'source.like.tjek%,source.like.leaflet%'
+}
+
 /** Tjek-rækker der må vises når Goma er primær (Salling papiravis-overlay). */
 export function dagligvarerTjekOverlayOrFilter(): string {
   const overlay = TJEK_OVERLAY_STORE_IDS.join(',')
-  return `source.not.like.tjek%,and(source.like.tjek%,store_id.in.(${overlay}))`
+  return [
+    'and(source.not.like.tjek%,source.not.like.leaflet%)',
+    `and(source.like.tjek%,store_id.in.(${overlay}))`,
+    `and(source.like.leaflet%,store_id.in.(${overlay}))`,
+  ].join(',')
 }
 
-/** PostgREST-filter på product_offers (app-side queries + fallback counts). */
+/** PostgREST-filter: Goma og Tjek er ikke med, uanset kæde. */
 export function applyDagligvarerSourceFilter<T>(query: T): T {
   const q = query as PostgrestFilterQuery
-  if (isGomaImportEnabled()) {
-    return q.or(dagligvarerTjekOverlayOrFilter()) as T
-  }
-  // Legacy/nød: skjul goma, behold Tjek + native
-  return q.neq('source', 'goma') as T
-}
-
-/** Begræns Tjek-tælling i fallback til overlay-kæder (Goma) eller Salling+REMA (legacy). */
-export function applyDagligvarerTjekStoreFilter<T>(query: T): T {
-  const stores = isGomaImportEnabled()
-    ? TJEK_OVERLAY_STORE_IDS
-    : SALLING_FOODDATA_STORE_IDS
-  return (query as { in(column: string, values: readonly string[]): T }).in(
-    'store_id',
-    stores,
-  )
+  return q
+    .not('source', 'in', '(goma,catalog)')
+    .not('source', 'like', 'tjek%')
+    .not('source', 'like', 'leaflet%') as T
 }
 
 export function isGomaOffersOnlyStoreId(storeId?: string | null): boolean {
@@ -68,14 +78,7 @@ export function isGomaOffersOnlyStoreId(storeId?: string | null): boolean {
   return (GOMA_OFFERS_ONLY_STORE_IDS as readonly string[]).includes(storeId)
 }
 
-/** PostgREST .or() til tilbuds-scan. */
+/** PostgREST .or() til tilbuds-scan. Kun rækker kilden selv har markeret som tilbud. */
 export function dagligvarerOfferScanOrFilter(): string {
-  const overlay = TJEK_OVERLAY_STORE_IDS.join(',')
-  const tjekOverlay = `and(source.like.tjek%,store_id.in.(${overlay}))`
-  if (isGomaImportEnabled()) {
-    const gomaOffers = GOMA_OFFERS_ONLY_STORE_IDS.join(',')
-    return `is_on_sale.eq.true,${tjekOverlay},and(source.eq.goma,store_id.in.(${gomaOffers}))`
-  }
-  const gomaStores = GOMA_OFFERS_ONLY_STORE_IDS.join(',')
-  return `is_on_sale.eq.true,source.like.tjek%,and(source.eq.goma,store_id.in.(${gomaStores}))`
+  return 'is_on_sale.eq.true'
 }

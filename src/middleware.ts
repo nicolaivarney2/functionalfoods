@@ -23,8 +23,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(url)
   }
 
-  // /api/images/proxy sætter selv CORS — undgå dublerede headers.
-  if (pathname.startsWith('/api/') && pathname !== '/api/images/proxy') {
+  // Billed-proxyerne sætter selv CORS — undgå dublerede headers.
+  if (
+    pathname.startsWith('/api/') &&
+    pathname !== '/api/images/proxy' &&
+    !pathname.startsWith('/api/images/catalog/')
+  ) {
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
     }

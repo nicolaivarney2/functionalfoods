@@ -1,0 +1,20 @@
+---
+description: Upstream-dataleverandører (Goma, Tjek) må ikke kunne ses udefra
+globs: src/**/*, supabase/migrations/**/*
+alwaysApply: false
+---
+
+- **Alt der kan ses udefra skal være fri for leverandørnavne** («goma», «tjek.com», «tjek:», «sgn-prd», «etilbudsavis»): API-svar, HTML, klient-JS og billed-URL'er. Det danske ord «tjek» i UI-tekst er fint.
+- **Kilde:** `goma`, `catalog`, `tjek…` og `leaflet…` importeres ikke og vises ikke ([goma-import-stores.ts](mdc:src/lib/goma-import-stores.ts)). Fooddata beholder de oprindelige navne.
+- **Billeder:** en adresse hos Goma eller Tjek bliver `null` ([catalog-image-url.ts](mdc:src/lib/catalog-image-url.ts)). Den hentes ikke. Modulet er kun til server-kode.
+- **Butikslink** der peger på en skjult vært sendes ikke med (`publicStoreUrl`).
+
+```typescript
+// ✅ DO
+image_url: toPublicCatalogImageUrl(row.image_url)
+store_url: publicStoreUrl(row.product_url)
+
+// ❌ DON'T
+<img src={product.image_url} />
+src={`/api/images/proxy?url=${encodeURIComponent(product.image_url)}`}
+```

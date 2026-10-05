@@ -1,11 +1,11 @@
 /**
  * Which chains get tilbud via Goma vs native fooddata scrapes.
  *
- * Strategi (jul 2026):
- *   Native scrape → fooddata: Netto, Bilka, Føtex, REMA 1000, Nemlig
- *   Goma → fooddata: alle øvrige kæder (source=goma)
- *   Tjek overlay: Salling papiravis (Føtex/Netto/Bilka slagtervarer)
- *   Tjek øvrigt: importeres ikke til FF når GOMA_IMPORT_ENABLED=true
+ * Strategi:
+ *   Egne kilder → FF: Salling, REMA, Nemlig og de fire aviser
+ *     (lidl-avis, meny-avis, spar-avis, min-koebmand-avis).
+ *   Goma og Tjek må ikke bruges som kilde — heller ikke som overlay,
+ *   og heller ikke når GOMA_IMPORT_ENABLED er sat.
  */
 
 import { CHAIN_COVERAGE, isOwnChainAvisSource, type SourceChain } from '@/grocery/types'
@@ -189,30 +189,39 @@ export function shouldSkipFooddataChainForGoma(chain: SourceChain): boolean {
   return isGomaImportChain(chain)
 }
 
-/** Which offer `source` values to copy fooddata → FF for offers-only chains. */
+/** Goma og Tjek (også de omdøbte navne catalog/leaflet) er ikke tilladte kilder. */
+export function isDisallowedUpstreamOfferSource(source?: string | null): boolean {
+  const s = String(source ?? '').trim().toLowerCase()
+  return s === 'goma' || s === 'catalog' || s.startsWith('tjek') || s.startsWith('leaflet')
+}
+
+function isOwnAvisProductId(ffProductId: string): boolean {
+  return ffProductId.includes('-avis-')
+}
+
+/**
+ * Hvilke offer-kilder der kopieres fooddata → FF.
+ * `gomaImportEnabled` ændrer ikke længere beslutningen: de to kilder er lukket.
+ */
 export function shouldImportFooddataOfferSource(
   chain: SourceChain,
   offerSource: string,
-  gomaImportEnabled: boolean,
+  _gomaImportEnabled: boolean,
 ): boolean {
+  if (isDisallowedUpstreamOfferSource(offerSource)) return false
   if (!isGomaImportChain(chain)) return true
-  if (isOwnChainAvisSource(offerSource)) return true
-  if (gomaImportEnabled) return offerSource === 'goma'
-  return offerSource.startsWith('tjek')
+  return isOwnChainAvisSource(offerSource)
 }
 
-/** Whether to copy a fooddata product row to FF for offers-only chains. */
+/** Om en fooddata-produkttrække kopieres til FF. Kun egne kilder. */
 export function shouldImportFooddataProduct(
   chain: SourceChain,
-  fooddataProductUuid: string,
-  gomaImportEnabled: boolean,
-  gomaOfferProductUuids: Set<string>,
-  matchedFfProductIds: Set<string>,
+  _fooddataProductUuid: string,
+  _gomaImportEnabled: boolean,
+  _gomaOfferProductUuids: Set<string>,
+  _matchedFfProductIds: Set<string>,
   ffProductId: string,
 ): boolean {
   if (!isGomaImportChain(chain)) return true
-  if (matchedFfProductIds.has(ffProductId)) return true
-  if (gomaImportEnabled && isGomaFullCatalogChain(chain)) return true
-  if (gomaImportEnabled) return gomaOfferProductUuids.has(fooddataProductUuid)
-  return true
+  return isOwnAvisProductId(ffProductId)
 }

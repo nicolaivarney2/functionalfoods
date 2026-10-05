@@ -6,11 +6,10 @@ import { getFoodCatalogLabelsForFilter, isFoodCatalogProduct } from '@/lib/produ
 import { dagligvarerSearchMatches } from '@/lib/dagligvarer-search'
 import {
   applyDagligvarerSourceFilter,
-  applyDagligvarerTjekStoreFilter,
   dagligvarerOfferScanOrFilter,
-  isGomaOffersOnlyStoreId,
-  TJEK_OVERLAY_STORE_IDS,
+  isDisallowedUpstreamOfferSource,
 } from '@/lib/dagligvarer-source-filter'
+import { isOwnChainAvisSource } from '@/grocery/types'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
 import {
   buildEanImageLookup,
@@ -35,17 +34,16 @@ export type OfferPricingFields = {
  * uden en bevist prisnedsættelse (Løvbjerg, Lidl, MENY, Spar, Kvickly, …).
  */
 export function isSaleOnlySource(source?: string | null): boolean {
-  return typeof source === 'string' && source.toLowerCase().startsWith('tjek')
+  return isOwnChainAvisSource(source)
 }
 
 export function isRealOfferFields(offer: OfferPricingFields): boolean {
+  if (isDisallowedUpstreamOfferSource(offer.source)) return false
   const price = Number(offer.current_price || 0)
   if (price <= 0) return false
   if (offer.sale_valid_to && new Date(offer.sale_valid_to) < new Date()) return false
   // Tilbudsavis-kilder uden førpris: stadig et reelt tilbud i gyldighedsvinduet.
   if (isSaleOnlySource(offer.source)) return true
-  // Goma offers-only sync (p_on_sale_only): hele rækken er ugens tilbud.
-  if (offer.source === 'goma' && isGomaOffersOnlyStoreId(offer.store_id)) return true
   // Native katalog (Salling/REMA): kun mapperens is_on_sale. En efterladt
   // normal_price fra maj/juni må ikke genoplive sidste uges avis.
   if (offer.is_on_sale === true) return true
@@ -95,9 +93,6 @@ export class DatabaseService {
   private publishedRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
   private allRecipesCache: { data: Recipe[]; expiresAt: number } | null = null
 
-  private readonly TJEK_OVERLAY_CACHE_TTL_MS = 120_000
-  private tjekOverlayCache: { expiresAt: number; byStore: Map<string, Record<string, any>[]> } | null =
-    null
   private readonly PRODUCT_COUNTS_CACHE_TTL_MS = 600_000
   private productCountsCache: {
     slot: 'food' | 'all'
@@ -376,7 +371,7 @@ export class DatabaseService {
     return { total, offers: offersCount, categories }
   }
 
-  /** Fast fallback when RPC unavailable: department-join head counts (+ tjek). */
+  /** Fast fallback when RPC unavailable: department-join head counts. */
   private async getProductCountsV2FastFallback(foodOnly: boolean = true): Promise<{
     total: number
     categories: { [key: string]: number }
@@ -405,45 +400,18 @@ export class DatabaseService {
       offersQuery = offersQuery.in('products.department', foodDepts)
     }
 
-    // Tilbudsavis-kilder (tjek) har forhandlernavn som department og fanges ikke
-    // af food-department-listen. Tæl dem separat og læg til (ingen overlap, da
-    // deres department aldrig er en food-kategori).
-    const tjekTotalQuery = applyDagligvarerTjekStoreFilter(
-      supabase
-        .from('product_offers')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_available', true)
-        .like('source', 'tjek%'),
-    )
-
-    const tjekOffersQuery = applyDagligvarerTjekStoreFilter(
-      supabase
-        .from('product_offers')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_available', true)
-        .like('source', 'tjek%')
-        .gt('current_price', 0),
-    )
-
     const [
       { count: totalCount, error: totalError },
       { count: offersCount, error: offersError },
-      { count: tjekTotal, error: tjekTotalError },
-      { count: tjekOffers, error: tjekOffersError },
-    ] = await Promise.all([totalQuery, offersQuery, tjekTotalQuery, tjekOffersQuery])
+    ] = await Promise.all([totalQuery, offersQuery])
 
     if (totalError) console.error('Fast counts total error:', totalError)
     if (offersError) console.error('Fast counts offers error:', offersError)
-    if (tjekTotalError) console.error('Fast counts tjek total error:', tjekTotalError)
-    if (tjekOffersError) console.error('Fast counts tjek offers error:', tjekOffersError)
-
-    const extraTotal = foodOnly ? tjekTotal || 0 : 0
-    const extraOffers = foodOnly ? tjekOffers || 0 : 0
 
     return {
-      total: (totalCount || 0) + extraTotal,
+      total: totalCount || 0,
       categories: {},
-      offers: (offersCount || 0) + extraOffers,
+      offers: offersCount || 0,
     }
   }
 
@@ -595,83 +563,14 @@ export class DatabaseService {
     return { ...row, is_on_sale: true, is_offer_active: true }
   }
 
-  /**
-   * Papiravis-overlay (Tjek) på Salling-kæder. Prod-RPC filtrerer tjek% væk
-   * når p_goma_primary=true, indtil 20260901140000 er kørt. Direkte query
-   * bruger dagligvarer-source-filteret, som allerede tillader overlayet.
-   * Efter migrationen er det et no-op (id-dedupe).
-   */
-  private async fetchTjekOverlayOfferRows(
-    opts: FoodOffersFetchOptions,
-    storeIds: string[] | undefined,
-  ): Promise<Record<string, any>[]> {
-    if (!isGomaImportEnabled()) return []
-    // Kategorifilter: Tjek-rækker har ofte department = kædenavn, så de matcher
-    // ikke "Kød og fisk". Søgeruten dækker dem. Browse uden kategori gør.
-    if (opts.departmentPatterns?.length) return []
-
-    const overlayStores = storeIds?.length
-      ? storeIds.filter((id) => (TJEK_OVERLAY_STORE_IDS as readonly string[]).includes(id))
-      : [...TJEK_OVERLAY_STORE_IDS]
-    if (overlayStores.length === 0) return []
-
-    const now = Date.now()
-    if (!this.tjekOverlayCache || this.tjekOverlayCache.expiresAt <= now) {
-      this.tjekOverlayCache = { expiresAt: now + this.TJEK_OVERLAY_CACHE_TTL_MS, byStore: new Map() }
-    }
-
-    try {
-      const supabase = createSupabaseServiceClient()
-      const merged: Record<string, any>[] = []
-      for (const storeId of overlayStores) {
-        let cached = this.tjekOverlayCache.byStore.get(storeId)
-        if (!cached) {
-          const { data, error } = await supabase
-            .from('product_offers')
-            .select(this.OFFER_SELECT_WITH_PRODUCT)
-            .eq('is_available', true)
-            .eq('store_id', storeId)
-            .like('source', 'tjek%')
-            .eq('is_on_sale', true)
-            .limit(1000)
-          if (error) {
-            console.warn(`Tjek overlay ${storeId}:`, error.message)
-            continue
-          }
-          cached = (data ?? []).map((row) => this.normalizeRpcOfferRow(row as Record<string, any>))
-          this.tjekOverlayCache.byStore.set(storeId, cached)
-        }
-        for (const normalized of cached) {
-          if (opts.offersOnly && !isRealOfferFields(normalized)) continue
-          merged.push(normalized)
-        }
-      }
-      return merged
-    } catch (err) {
-      console.warn('Tjek overlay fetch failed:', err)
-      return []
-    }
-  }
-
   private isFoodOfferRow(row: Record<string, any>): boolean {
-    if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
+    if (isDisallowedUpstreamOfferSource(row.source)) return false
     return isFoodCatalogProduct({
       department: row.products?.department,
       category: row.products?.category,
       subcategory: row.products?.subcategory,
       name: row.products?.name_generic ?? row.name_store,
     })
-  }
-
-  /** Samme rækkefølge som get_food_offers_v2: rabat DESC NULLS LAST, pris ASC. */
-  private compareOfferRows = (a: Record<string, any>, b: Record<string, any>): number => {
-    const da = a.discount_percentage
-    const db = b.discount_percentage
-    const aNull = da == null
-    const bNull = db == null
-    if (aNull !== bNull) return aNull ? 1 : -1
-    if (!aNull && !bNull && db !== da) return Number(db) - Number(da)
-    return Number(a.current_price || 0) - Number(b.current_price || 0)
   }
 
   private async fetchFoodOffersViaRpc(
@@ -707,6 +606,7 @@ export class DatabaseService {
       }
 
       const rows = this.parseFoodOffersRpcRows(data)
+        .filter((row) => !isDisallowedUpstreamOfferSource(String(row.source ?? '')))
         .map((row) => this.applyRpcOfferFlagFallback(row, !!opts.offersOnly))
         .filter((row) => !opts.offersOnly || isRealOfferFields(row))
       if (rows.length === 0 && data != null && !Array.isArray(data)) {
@@ -716,22 +616,6 @@ export class DatabaseService {
       const normalizedRows = rows
         .map((row) => this.normalizeRpcOfferRow(row))
         .filter((row) => this.isFoodOfferRow(row))
-
-      const rpcAlreadyHasOverlay = normalizedRows.some((row) =>
-        String(row.source ?? '').toLowerCase().startsWith('tjek'),
-      )
-      if (!rpcAlreadyHasOverlay) {
-        const overlay = await this.fetchTjekOverlayOfferRows(opts, storeIds)
-        if (overlay.length > 0) {
-          const seen = new Set(normalizedRows.map((row) => String(row.id)))
-          for (const extra of overlay) {
-            if (seen.has(String(extra.id))) continue
-            seen.add(String(extra.id))
-            normalizedRows.push(extra)
-          }
-          normalizedRows.sort(this.compareOfferRows)
-        }
-      }
 
       const pageRows = normalizedRows.slice(offset, offset + opts.limit)
       const imageLookup = await this.buildEanImageLookupForOfferRows(pageRows)
@@ -795,7 +679,7 @@ export class DatabaseService {
       : null
 
     const isFoodRow = (row: Record<string, any>) => {
-      if (String(row.source ?? '').toLowerCase().startsWith('tjek')) return true
+      if (isDisallowedUpstreamOfferSource(row.source)) return false
       return isFoodCatalogProduct({
         department: row.products?.department,
         category: row.products?.category,

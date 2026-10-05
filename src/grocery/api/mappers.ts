@@ -1,4 +1,5 @@
 import type { GroceryOfferDto, GroceryProductDto } from './shapes'
+import { toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
 
 interface RawOffer {
   store_id: string
@@ -66,7 +67,7 @@ export function mapProduct(row: RawProduct): GroceryProductDto {
     description: row.description,
     amount: row.amount,
     unit: row.unit,
-    imageUrl: row.image_url,
+    imageUrl: toPublicCatalogImageUrl(row.image_url),
     category: {
       path: row.category_path,
       lvl0: row.category_lvl0,

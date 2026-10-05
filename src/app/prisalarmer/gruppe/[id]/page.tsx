@@ -6,6 +6,7 @@ import { ArrowLeft, Bell, Trash2 } from 'lucide-react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { authFetch } from '@/lib/auth-fetch'
+import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
 
 type GroupAlert = {
   id: string
@@ -119,7 +120,7 @@ export default function PrisalarmGruppePage() {
                 >
                   <div className="w-14 h-14 bg-gray-100 rounded-lg overflow-hidden shrink-0">
                     {alert.image_url ? (
-                      <img src={alert.image_url} alt="" className="w-full h-full object-contain" />
+                      <img src={resolveDagligvarerImageSrc(alert.image_url)} alt="" className="w-full h-full object-contain" />
                     ) : null}
                   </div>
                   <div className="flex-1 min-w-0">
