@@ -2,8 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 
-import { AndroidBetaLink } from '@/components/AppStoreBadges'
-import { APP_STORE_URL } from '@/lib/referral-shared'
+import { APP_STORE_URL, PLAY_STORE_URL } from '@/lib/referral-shared'
 
 /**
  * Site-wide top announcement — app launch + new recipes.
@@ -29,9 +28,9 @@ export default function AppLaunchTopBar() {
             Hent appen til iPhone
           </a>
           {' · '}
-          <AndroidBetaLink className="font-medium text-white underline decoration-white/40 underline-offset-2 hover:decoration-white">
-            Android: tilmeld beta
-          </AndroidBetaLink>
+          <a href={PLAY_STORE_URL} className="font-medium text-white underline decoration-white/40 underline-offset-2 hover:decoration-white">
+            Hent appen til Android
+          </a>
         </p>
       </div>
     </div>

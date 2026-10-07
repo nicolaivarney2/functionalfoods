@@ -25,7 +25,6 @@ import {
 } from 'lucide-react'
 import { Recipe } from '@/types/recipe'
 import HeroVideo from '@/components/home/HeroVideo'
-import HeroPlanCard from '@/components/home/HeroPlanCard'
 import AppStoreBadges from '@/components/AppStoreBadges'
 import { useAnalytics } from '@/components/AnalyticsProvider'
 
@@ -344,7 +343,14 @@ export default function Home() {
               <AppStoreBadges showCaption tone="dark" className="mt-5" />
             </div>
             <div className="order-2 min-w-0">
-              <HeroPlanCard />
+              <Image
+                src="/billeder/hero/functionalfoods-app-hero.webp"
+                alt="Functional Foods-appen med madplan, dagbog og indkøbsliste"
+                width={1600}
+                height={1537}
+                priority
+                className="mx-auto h-auto w-full"
+              />
             </div>
           </div>
 
