@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
             time: i.time,
             tips: i.tips ?? null,
           }))
-        : normalizeAiRecipeInstructions(recipe.instructions || [])
+        : normalizeAiRecipeInstructions(recipe.instructions || [], ingredientsNormalized)
 
     const supabase = createSupabaseClient()
     const slug = generateSlug(recipe.title)
@@ -133,11 +133,11 @@ export async function POST(request: NextRequest) {
       totalTime: recipe.prepTime + recipe.cookTime,
       servings: recipe.servings,
       difficulty: recipe.difficulty.toLowerCase(),
-      calories: recipe.nutritionalInfo?.calories || 0,
-      protein: recipe.nutritionalInfo?.protein || 0,
-      carbs: recipe.nutritionalInfo?.carbs || 0,
-      fat: recipe.nutritionalInfo?.fat || 0,
-      fiber: recipe.nutritionalInfo?.fiber || 0,
+      calories: category === 'manual' ? recipe.nutritionalInfo?.calories || 0 : 0,
+      protein: category === 'manual' ? recipe.nutritionalInfo?.protein || 0 : 0,
+      carbs: category === 'manual' ? recipe.nutritionalInfo?.carbs || 0 : 0,
+      fat: category === 'manual' ? recipe.nutritionalInfo?.fat || 0 : 0,
+      fiber: category === 'manual' ? recipe.nutritionalInfo?.fiber || 0 : 0,
       imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg',
       imageAlt: `${recipe.title} - Functional Foods`,
       metaTitle: `${recipe.title} - ${recipe.dietaryCategories?.[0] || 'Opskrift'} | Functional Foods`,

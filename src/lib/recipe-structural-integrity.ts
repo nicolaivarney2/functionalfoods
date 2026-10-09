@@ -66,7 +66,7 @@ export function getRecipeStructuralIntegrityIssues(recipe: RecipeStructuralInput
   // --- Pizza (undtag supper og ren "pizzaost") ---
   if (/\bpizza\b/.test(title) && !/(pizzasuppe|pizza suppe|dip|snackbolle)/.test(title)) {
     const hasBase =
-      /pizzadej|tipo.?00|hvedemel|fuldkornsmel|gaer|mel.*gaer|gaer.*mel|tortilla|pitabrod|pita|polenta|blomkal|kartoffel.*bund/.test(
+      /pizzadej|tipo.?00|hvedemel|fuldkornsmel|gaer|mel.*gaer|gaer.*mel|tortilla|wraps?|tortillawraps?|fuldkornswraps?|pitabrod|pita|polenta|blomkal|kartoffel.*bund/.test(
         ing
       )
     if (!hasBase) {

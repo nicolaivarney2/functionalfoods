@@ -1,122 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOpenAIConfig } from '@/lib/openai-config'
+import { generateRecipeTips } from '@/lib/ff-recipe-tips'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 interface GenerateTipsRequest {
   title: string
-  description: string
-  difficulty: string
-  totalTime: number
-  dietaryCategories: string[]
+  description?: string
+  difficulty?: string
+  totalTime?: number
+  dietaryCategories?: string[]
+  ingredients?: Array<{ name?: string; notes?: string } | string>
+  instructions?: Array<{ instruction?: string; text?: string } | string>
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: GenerateTipsRequest = await request.json()
-    const { title, description, difficulty, totalTime, dietaryCategories } = body
-
-    // Prompt til at generere menneskelige, personlige tips
-    const prompt = `Generer personlige tips til denne opskrift:
-
-Opskrift: ${title}
-Beskrivelse: ${description}
-Sværhedsgrad: ${difficulty}
-Total tid: ${totalTime} minutter
-Kategori: ${dietaryCategories.join(', ') || 'Generel'}
-
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.`
-
-    // Kald OpenAI standard API
-    const tips = await callOpenAIStandardAPI(prompt)
-
-    return NextResponse.json({ 
-      success: true, 
-      tips,
-      message: 'AI tips genereret succesfuldt'
-    })
-
-  } catch (error: any) {
-    console.error('Error generating AI tips:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: error?.message || 'Unknown error' 
-    }, { status: 500 })
-  }
-}
-
-async function callOpenAIStandardAPI(prompt: string): Promise<string> {
-  // Læs OpenAI config fra fil
-  const config = getOpenAIConfig()
-  
-  if (!config || !config.apiKey) {
-    throw new Error('OpenAI API key mangler. Tilføj den i /admin/settings')
-  }
-
-  try {
-    console.log('🤖 Starter OpenAI standard API kald...')
-    console.log('📝 Prompt:', prompt.substring(0, 100) + '...')
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: `Du er en erfaren kok der skal give personlige tips til opskrifter. Skriv altid på dansk.
-
-Skriv 3-4 personlige, menneskelige tips som om du har lavet denne ret mange gange.
-
-Formatér tips sådan:
-- Første tip her
-- Andet tip her  
-- Tredje tip her
-- Fjerde tip her
-
-Brug bindestreg (-) foran hvert tip.`
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        temperature: 0.8,
-        max_tokens: 1000
+    const ingredients = (body.ingredients || [])
+      .map((ing) => {
+        if (typeof ing === 'string') return ing.trim()
+        const name = String(ing?.name || '').trim()
+        if (!name) return ''
+        const notes = typeof ing.notes === 'string' && ing.notes.trim() ? ` (${ing.notes.trim()})` : ''
+        return `${name}${notes}`
       })
+      .filter(Boolean)
+    const instructions = (body.instructions || [])
+      .map((step) => {
+        if (typeof step === 'string') return step.trim()
+        return String(step?.instruction || step?.text || '').trim()
+      })
+      .filter(Boolean)
+      .slice(0, 10)
+
+    const tips = await generateRecipeTips({
+      title: body.title,
+      description: body.description,
+      nicheLabel: (body.dietaryCategories || []).join(', ') || 'Generel',
+      ingredients,
+      instructions,
     })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content
-    
-    if (!content) {
-      throw new Error('No content generated')
-    }
-
-    console.log('✅ OpenAI svar modtaget')
-    return content
-
-  } catch (error: any) {
-    console.error('OpenAI API error:', error)
-    // Fallback til template hvis API fejler
-    return generatePersonalTipsFallback()
+    return NextResponse.json({
+      success: true,
+      tips,
+      message: 'AI tips genereret succesfuldt',
+    })
+  } catch (error: unknown) {
+    console.error('Error generating AI tips:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
-}
-
-function generatePersonalTipsFallback(): string {
-  return `Denne ret har jeg lavet mange gange, og den bliver bedre hver gang!
-
-- Min bedste tip er at tage dig tid til at forberede alle ingredienserne først.
-- Jeg plejer at servere den med en frisk salat til - det giver en perfekt balance.
-- Lad retten hvile i 5 minutter efter den er færdig, så udvikler alle smagene sig perfekt.`
 }

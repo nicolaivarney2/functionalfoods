@@ -528,10 +528,11 @@ export default function CreateRecipePage() {
         ? (mergedForNormalize.ingredients as GeneratedRecipe['ingredients'])
         : []
 
+      const ingredients = normalizeAiRecipeIngredients(rawIngredients)
       const normalizedRecipe = {
         ...recipeData.recipe,
-        ingredients: normalizeAiRecipeIngredients(rawIngredients),
-        instructions: normalizeAiRecipeInstructions(recipeData.recipe?.instructions || []),
+        ingredients,
+        instructions: normalizeAiRecipeInstructions(recipeData.recipe?.instructions || [], ingredients),
       }
 
       if (!String(recipeData.midjourneyPrompt || '').trim()) {

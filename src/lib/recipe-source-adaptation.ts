@@ -30,34 +30,26 @@ export function buildSourceRecipeUserPrompt(
   const title = source.title?.trim() || 'Kildeopskrift'
   const ingredients = source.ingredientsText?.trim() || '(ikke fundet)'
   const instructions = source.instructionsText?.trim() || '(ikke fundet)'
-  const summary = source.summary?.trim()
 
-  return `OPGAVE: ADAPTÉR KILDEOPSKRIFT — IKKE OPFIND EN NY RET.
+  return `OPGAVE: TILPAS KILDEOPSKRIFTEN. OPFIND IKKE EN NY RET.
 
-Du skal lave en Functional Foods-version af opskriften fra linket nedenfor.
-Retten skal være **næsten identisk** i idé, ret-type, smag, struktur og genkendelighed.
-Behold det samme koncept og de samme hovedingredienser medmindre kostkategoriens regler kræver en lille erstatning.
+Retten skal være næsten identisk i idé, ret-type, smag og struktur.
+Behold hovedingredienserne, medmindre kosten kræver en lille erstatning.
 
-KILDE-LINK: ${source.url}
 KILDE-TITEL: ${title}
-${summary ? `KILDE-BESKRIVELSE: ${summary}\n` : ''}
 KILDE-INGREDIENSER:
 ${ingredients}
-
 KILDE-FREMGANGSMÅDE:
 ${instructions}
 
-OBLIGATORISKE REGLER:
-- Behold rettypen fra kilden (fx chaffle, burger, lasagne, suppe osv.) — lav den **ikke** om til en helt anden ret.
-- Behold hovedingredienserne fra kilden så vidt muligt.
-- Omskriv til dansk Functional Foods-format: 2 portioner, vores JSON-struktur, gram/enhedsregler og ${categoryName}-krav.
-- Du må justere mængder, formatering og små detaljer — men resultatet skal tydeligt føles som samme opskrift.
-- Kopiér ikke tekst ordret fra kilden.
-- Titlen skal stadig ligne kildens titel (samme ret, evt. let omskrevet).
-- Hvis kilden er keto og du genererer keto: behold lavkulhydrat-profilen.
-${extraRules ? `\n${extraRules}` : ''}
-
-Returnér kun valid JSON i det format, du allerede er instrueret i.`
+- Behold rettypen. Lav den ikke om til en anden ret.
+- Omskriv til dansk, 2 portioner, JSON-formatet og ${categoryName}-reglerne.
+- Kopiér ikke teksten ordret. Titlen skal stadig ligne kildens.
+- Højst 16 ingredienslinjer. 8–14 er fint.
+- Drop pynt, valgfri dip og citronskiver til servering.
+- Behold protein, stivelse, grønt, salt, peber, fedtstof og den sovs, retten er.
+- Slå identiske dubletter sammen. Opfind ikke nye ingrediensnavne.
+${extraRules ? `\n${extraRules}` : ''}`
 }
 
 export function shouldSkipVariationPrompt(sourceRecipe?: SourceRecipePayload | null): boolean {

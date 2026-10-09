@@ -725,7 +725,9 @@ export default function AdminPublishingPage() {
           description: recipe.description,
           difficulty: recipe.difficulty,
           totalTime: recipe.totalTime,
-          dietaryCategories: recipe.dietaryCategories || []
+          dietaryCategories: recipe.dietaryCategories || [],
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
         }),
       })
 

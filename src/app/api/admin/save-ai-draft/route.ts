@@ -70,7 +70,10 @@ export async function POST(request: NextRequest) {
     console.log(`💾 Saving AI-kladde as real draft: ${recipe.title}`)
 
     const ingredientsNormalized = normalizeAiRecipeIngredients(recipe.ingredients || [])
-    const instructionsNormalized = normalizeAiRecipeInstructions(recipe.instructions || [])
+    const instructionsNormalized = normalizeAiRecipeInstructions(
+      recipe.instructions || [],
+      ingredientsNormalized,
+    )
 
     let ingredientsForDb: Ingredient[] = ingredientsNormalized.map((ingredient) => ({
       id: crypto.randomUUID(),
@@ -152,11 +155,11 @@ export async function POST(request: NextRequest) {
       totalTime: recipe.prepTime + recipe.cookTime,
       servings: recipe.servings,
       difficulty: recipe.difficulty.toLowerCase(),
-      calories: recipe.nutritionalInfo.calories,
-      protein: recipe.nutritionalInfo.protein,
-      carbs: recipe.nutritionalInfo.carbs,
-      fat: recipe.nutritionalInfo.fat,
-      fiber: recipe.nutritionalInfo.fiber,
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
       imageUrl: recipe.imageUrl || '/images/recipe-placeholder.jpg',
       imageAlt: `${recipe.title} - Functional Foods`,
       metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0] || 'Opskrift'} | Functional Foods`,
