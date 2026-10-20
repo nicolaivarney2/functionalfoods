@@ -27,24 +27,7 @@ export async function completeSignupAfterAuth(
 
   await applyPendingOnboarding(accessToken)
 
-  if (tier === 'plus' || tier === 'premium' || tier === 'community') {
-    const payRes = await fetch('/api/stripe/create-subscription-checkout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ tier }),
-    })
-    const payJson = await payRes.json().catch(() => ({}))
-    if (!payRes.ok || !payJson.url) {
-      return {
-        ok: false,
-        error: (payJson.error as string) || 'Kunne ikke starte betaling. Prøv igen.',
-      }
-    }
-    return { ok: true, redirectUrl: payJson.url as string, external: true }
-  }
-
+  // Nye konti sendes ikke til Stripe. Eksisterende abonnementer kører videre, til de selv opsiges.
+  void tier
   return { ok: true, redirectUrl: '/madbudget?ny=1', external: false }
 }

@@ -8,14 +8,14 @@ const columns = [
     title: 'Funktioner',
     links: [
       { label: 'Oversigt over funktioner', href: '/funktioner' },
-      { label: 'Madbudget (AI madplaner)', href: '/funktioner/madbudget-ai-madplaner' },
+      { label: 'Madbudget', href: '/funktioner/madbudget-ai-madplaner' },
       { label: 'Madplaner ud fra tilbud', href: '/funktioner/madplaner-ud-fra-tilbud' },
       { label: 'Vægttabsrejse (50+ parametre)', href: '/funktioner/vaegttabsrejse' },
       { label: 'Community', href: '/funktioner/community' },
       { label: 'Personlig vejledning', href: '/funktioner/personlig-vejledning' },
       { label: 'Makro + mikro opskrifter', href: '/funktioner/makro-mikro-opskrifter' },
       { label: '5000 opskrifter i 8 nicher', href: '/funktioner/5000-opskrifter-i-8-nicher' },
-      { label: 'Smart-indkøbliste på sms', href: '/funktioner/smart-indkob-liste-sms' },
+      { label: 'Del madplanen', href: '/funktioner/smart-indkob-liste-sms' },
       { label: 'Vægt tracker', href: '/funktioner/vaegt-tracker' },
     ],
   },
@@ -50,7 +50,6 @@ const columns = [
       { label: 'Om os', href: '/bag-om-ff' },
       { label: 'Privatlivspolitik', href: '/cookies-og-privatliv' },
       { label: 'Betingelser', href: '/betingelser' },
-      { label: 'Henvis en ven', href: '/henvis' },
       { label: 'Opret dig', href: '/kom-i-gang' },
       { label: 'Opskrifter', href: '/opskriftsoversigt' },
       { label: 'Dagligvarer', href: '/dagligvarer' },
@@ -108,6 +107,36 @@ export default function Footer() {
           <AppStoreBadges showCaption tone="dark" />
         </div>
 
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <p className="text-sm font-semibold tracking-wide text-white/95">Følg med</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            <a
+              href="https://www.instagram.com/nicolaivarney/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/70 transition-colors hover:text-white"
+            >
+              Instagram · nicolaivarney
+            </a>
+            <a
+              href="https://www.instagram.com/functionalfoods.dk/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/70 transition-colors hover:text-white"
+            >
+              Instagram · functionalfoods.dk
+            </a>
+            <a
+              href="https://www.facebook.com/funktionelmad/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/70 transition-colors hover:text-white"
+            >
+              Facebook · funktionelmad
+            </a>
+          </div>
+        </div>
+
         <div className="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-white/50">
           <p>© {new Date().getFullYear()} FunctionalFoods</p>
           <div className="flex flex-wrap items-center gap-4">
@@ -128,9 +157,6 @@ export default function Footer() {
             </Link>
             <Link href="/betingelser" className="hover:text-white/80 transition-colors">
               Betingelser
-            </Link>
-            <Link href="/henvis" className="hover:text-white/80 transition-colors">
-              Henvis en ven
             </Link>
             <CookieSettingsFooterLink />
           </div>

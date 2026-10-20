@@ -27,7 +27,8 @@ import HealthInformationNotice from '@/components/HealthInformationNotice'
 import { Cite } from '@/components/Cite'
 import { healthMethodologyAnchor } from '@/lib/health-sources'
 import OAuthProviderButtons from '@/components/auth/OAuthProviderButtons'
-import { COMMUNITY_PRICE_KR, TIER_PRICES_KR, TRIAL_DAYS, type CheckoutPlan } from '@/lib/subscription-tiers'
+import { FREE_FOREVER_SIGNUP } from '@/lib/free-product'
+import { type CheckoutPlan } from '@/lib/subscription-tiers'
 import { completeSignupAfterAuth } from '@/lib/onboarding/complete-signup'
 import { readStoredReferralCode } from '@/lib/referral-client'
 import { normalizeReferralCode } from '@/lib/referral-shared'
@@ -76,11 +77,8 @@ const STEP = {
   SIGNUP: 15,
 } as const
 
-function signupPlanCopy(plan: CheckoutPlan): string {
-  const name = plan === 'community' ? 'Community' : plan === 'premium' ? 'Premium' : 'Madbudget'
-  const price =
-    plan === 'community' ? COMMUNITY_PRICE_KR : plan === 'premium' ? TIER_PRICES_KR.premium : TIER_PRICES_KR.plus
-  return `${name}. ${TRIAL_DAYS} dage gratis, derefter ${price} kr pr. måned. Start de ${TRIAL_DAYS} dage og se, hvad der fungerer for dig. Vi sender dig en mail dagen før, så du husker at opsige, hvis det ikke er noget for dig.`
+function signupPlanCopy(): string {
+  return FREE_FOREVER_SIGNUP
 }
 
 const TOTAL_STEPS = 16
@@ -90,7 +88,6 @@ const USP_INTRO = {
   icon: Tag,
   title: 'Din plan starter i tilbudsavisen',
   body: 'Vi bygger din vægttabsplan ud fra det, der faktisk er på tilbud hos Netto, REMA, Bilka m.fl. — ikke en fantasivareliste til fuld pris.',
-  image: '/billeder/funktioner/functionalfoods-madbudget-1.png',
 }
 
 declare global {
@@ -188,12 +185,9 @@ function VaegttabsplanOnboardingInner() {
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [captchaToken, setCaptchaToken] = useState('')
-  const [paymentCancelled, setPaymentCancelled] = useState(false)
-
   useEffect(() => {
     if (typeof window === 'undefined') return
     const cancelled = new URLSearchParams(window.location.search).get('betaling') === 'annulleret'
-    setPaymentCancelled(cancelled)
     if (!cancelled) return
     try {
       window.localStorage.removeItem(FF_AUTO_FIRST_PLAN_KEY)
@@ -204,7 +198,10 @@ function VaegttabsplanOnboardingInner() {
 
   useEffect(() => {
     const saved = loadOnboardingData()
-    if (saved) setData(saved)
+    if (saved) {
+      if (saved.currentStep === STEP.PRICING) saved.currentStep = STEP.SUMMARY
+      setData(saved)
+    }
     const plan = loadCheckoutPlan()
     if (plan) setSelectedTier(plan)
     const stored = readStoredReferralCode()
@@ -278,10 +275,18 @@ function VaegttabsplanOnboardingInner() {
   const energy = calculateOnboardingEnergy(data)
 
   const goNext = () => {
+    if (step === STEP.EXCLUDED) {
+      patch({ currentStep: STEP.SUMMARY })
+      return
+    }
     if (step < TOTAL_STEPS - 1) patch({ currentStep: step + 1 })
   }
 
   const goBack = () => {
+    if (step === STEP.SUMMARY) {
+      patch({ currentStep: STEP.EXCLUDED })
+      return
+    }
     if (step > 0) patch({ currentStep: step - 1 })
   }
 
@@ -495,10 +500,9 @@ function VaegttabsplanOnboardingInner() {
         return
       }
 
-      saveCheckoutPlan(selectedTier)
       const result = await completeSignupAfterAuth(
         accessToken,
-        selectedTier,
+        'free',
         productUpdatesConsent,
         normalizeReferralCode(referralCode)
       )
@@ -508,7 +512,7 @@ function VaegttabsplanOnboardingInner() {
         return
       }
 
-      trackEvent('sign_up', { method: 'guidet_plan', tier: selectedTier })
+      trackEvent('sign_up', { method: 'guidet_plan', tier: 'free' })
 
       if (result.external) {
         skipReset = true
@@ -532,11 +536,10 @@ function VaegttabsplanOnboardingInner() {
     }
     setSubmitting(true)
     setError('')
-    saveCheckoutPlan(selectedTier)
     try {
       const result = await completeSignupAfterAuth(
         accessToken,
-        selectedTier,
+        'free',
         productUpdatesConsent,
         normalizeReferralCode(referralCode)
       )
@@ -574,13 +577,9 @@ function VaegttabsplanOnboardingInner() {
   if (user) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-lg flex-col justify-center bg-emerald-950 px-4 py-16 text-white">
-        <h1 className="text-2xl font-bold">
-          {paymentCancelled ? 'Betalingen blev annulleret' : 'Kontoen er oprettet'}
-        </h1>
+        <h1 className="text-2xl font-bold">Kontoen er klar</h1>
         <p className="mt-3 text-sm leading-relaxed text-emerald-100/85">
-          {paymentCancelled
-            ? `Madplanen åbner først, når prøven er startet. Der trækkes først efter ${TRIAL_DAYS} dage.`
-            : `Betalingen åbnede ikke. Stripe skal tage over her, så du kan lægge kortet ind. Der trækkes først efter ${TRIAL_DAYS} dage.`}
+          Functional Foods er gratis. Vi lægger madplanen klar til dig.
         </p>
         {error ? (
           <p className="mt-4 rounded-xl bg-red-900/40 px-4 py-3 text-sm text-red-100 ring-1 ring-red-400/30">{error}</p>
@@ -591,7 +590,7 @@ function VaegttabsplanOnboardingInner() {
           disabled={submitting}
           className="mt-6 inline-flex items-center justify-center rounded-xl bg-amber-300 px-6 py-3 text-sm font-bold text-emerald-950 hover:bg-amber-200 disabled:opacity-60"
         >
-          {submitting ? 'Åbner betaling…' : `Start ${TRIAL_DAYS} dages prøve`}
+          {submitting ? 'Åbner madplanen…' : 'Gå til madplanen'}
         </button>
       </div>
     )
@@ -622,22 +621,20 @@ function VaegttabsplanOnboardingInner() {
             >
               <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-white/20">
                 <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-                14 dage gratis
+                Gratis på ubestemt tid
               </div>
               <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
                 Lav din personlige vægttabsplan på få minutter
               </h1>
-              <p className="text-emerald-100/90 leading-relaxed">
-                Vi guider dig igennem det vigtigste, så din plan er klar, når du opretter dig. Du starter med 14 dage
-                gratis. Derefter fortsætter den plan, du vælger.
-              </p>
+              <p className="text-emerald-100/90 leading-relaxed">{FREE_FOREVER_SIGNUP}</p>
               <div className="overflow-hidden rounded-2xl ring-1 ring-white/15">
                 <Image
-                  src={USP_INTRO.image}
-                  alt="Madbudget: ugeoversigt og madplan i Functional Foods"
-                  width={640}
-                  height={360}
-                  className="h-auto w-full object-cover"
+                  src="/billeder/andet/gratis-paa-ubestemt-tid.jpg"
+                  alt="Nicolai foran ambulancen. Teksten på billedet: Gratis på ubestemt tid."
+                  width={678}
+                  height={494}
+                  className="h-auto w-full"
+                  priority
                 />
               </div>
               <div className="rounded-2xl bg-white/10 p-5 ring-1 ring-white/15">
@@ -1082,7 +1079,7 @@ function VaegttabsplanOnboardingInner() {
                   { icon: TrendingDown, text: energy ? `Kalorietarget: ${energy.targetCalories} kcal/dag` : 'Kalorier beregnet' },
                   { icon: Clock, text: `Måltider: ${mealPlanScopeLabel(data.mealPlanScope)}` },
                   { icon: Tag, text: `Kostretning: ${ONBOARDING_DIETARY_OPTIONS.find((d) => d.id === data.dietaryApproach)?.name ?? '—'}` },
-                  { icon: Tag, text: `Butikker: ${data.selectedStores.map(storeName).join(', ')}` },
+                  { icon: Tag, text: `Butikker: ${data.selectedStores.map(storeName).filter(Boolean).join(', ')}` },
                   ...((data.excludedFoods ?? []).length
                     ? [
                         {
@@ -1116,7 +1113,7 @@ function VaegttabsplanOnboardingInner() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Sidste trin</p>
                 <h2 className="mt-1 text-2xl font-bold">Opret din konto</h2>
-                <p className="mt-2 text-sm text-emerald-100/85">{signupPlanCopy(selectedTier)}</p>
+                <p className="mt-2 text-sm text-emerald-100/85">{signupPlanCopy()}</p>
               </div>
 
               {info && (
@@ -1201,7 +1198,9 @@ function VaegttabsplanOnboardingInner() {
                     onChange={(e) => setProductUpdatesConsent(e.target.checked)}
                     className="mt-1 rounded border-white/30 bg-white/10 text-amber-400 focus:ring-amber-300"
                   />
-                  <span className="text-sm text-emerald-100/85">Ja tak til nyheder om nye funktioner (valgfrit)</span>
+                  <span className="text-sm leading-snug text-emerald-100/85">
+                    Sig ja tak til en sjælden og personlig e-mail fra nicolaivarney, stifter af Functional Foods. Ingen reklamer.
+                  </span>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-emerald-100/70">
@@ -1228,13 +1227,13 @@ function VaegttabsplanOnboardingInner() {
 
               <OAuthProviderButtons
                 mode="signup"
-                tier={selectedTier}
+                tier="free"
                 redirectPath="/lav-din-plan"
                 disabled={!acceptTerms || submitting}
                 variant="dark"
                 onBeforeRedirect={() => {
                   saveOAuthSignupPending({
-                    tier: selectedTier,
+                    tier: 'free',
                     productUpdatesConsent,
                     source: 'onboarding',
                     referralCode: normalizeReferralCode(referralCode),
@@ -1286,7 +1285,7 @@ function VaegttabsplanOnboardingInner() {
               disabled={submitting}
               className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-300 px-6 py-3 text-sm font-bold text-emerald-950 transition hover:bg-amber-200 disabled:opacity-60 sm:flex-none"
             >
-              {submitting ? 'Opretter…' : `Start ${TRIAL_DAYS} dages prøve`}
+              {submitting ? 'Opretter…' : 'Opret gratis konto'}
               <ArrowRight className="h-4 w-4" />
             </button>
           )}

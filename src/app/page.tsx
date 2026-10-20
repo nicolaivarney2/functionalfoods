@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Search,
   ChevronRight,
+  Gift,
   Tag,
   Clock,
   ShoppingCart,
@@ -248,7 +249,7 @@ export default function Home() {
     {
       question: 'Koster det noget?',
       answer:
-        '14 dage gratis. Madbudget er 29 kr/md og er madplan og madlog. Community er 49 kr/md og er vægttab sammen. Premium er 249 kr/md og er personlig vægttabscoaching.',
+        'Ingenting. Functional Foods er gratis på ubestemt tid: madplan, madlog, prisalarmer, community og personlig vejledning. Efter et par ugers brug kan du støtte os på MobilePay, hvis du har lyst.',
     },
     {
       question: 'Skal jeg følge keto eller én bestemt kur?',
@@ -302,16 +303,16 @@ export default function Home() {
         <div className="container relative px-4 py-10 sm:py-12 lg:py-16">
           <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-6 sm:gap-10 lg:grid-cols-2 lg:gap-14">
             <div className="order-1 min-w-0">
-              <p className="inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-950 ring-1 ring-amber-500 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-xs">
-                <Tag className="h-3 w-3 text-amber-950 sm:h-3.5 sm:w-3.5" aria-hidden />
-                Vægttabsplan ud fra tilbud
+              <p className="inline-flex max-w-full items-start gap-1.5 rounded-2xl bg-amber-400 px-3 py-1.5 text-xs font-semibold leading-snug text-amber-950 ring-1 ring-amber-500 sm:items-center sm:gap-2 sm:px-4 sm:py-2 sm:text-sm">
+                <Gift className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-950 sm:mt-0 sm:h-4 sm:w-4" aria-hidden />
+                FF er gjort 100% gratis på ubestemt tid - Nicolaivarney
               </p>
               <h1 className="mt-4 text-[1.75rem] font-extrabold leading-[1.1] tracking-tight sm:mt-5 sm:text-3xl md:text-[2.5rem]">
                 Tab dig med smarte madplaner tilpasset ugens tilbud
               </h1>
               <p className="mt-4 text-sm leading-relaxed text-emerald-50/90 sm:mt-5 sm:text-base md:text-lg">
                 Personlig ugeplan, indkøbsliste og kalorier til dit mål - inkl. mad du fravælger og{' '}
-                <strong className="font-semibold text-white">30+ andre parametre</strong>. Gratis at starte.
+                <strong className="font-semibold text-white">30+ andre parametre</strong>. 100% gratis.
               </p>
 
               <ul className="mt-6 flex flex-col gap-2.5">
@@ -654,57 +655,41 @@ export default function Home() {
 
       <section id="abonnement" className="border-y border-emerald-100 bg-white py-16 lg:py-20">
         <div className="container px-4">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">14 dage med den plan, du vælger</p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
-              Madplan, rum eller vejledning
-            </h2>
-            <p className="mt-4 text-lg text-gray-600">
-              14 dage gratis. Madbudget er madplan og madlog. Community er vægttab sammen. Premium er personlig
-              vægttabscoaching.
-            </p>
+          <div className="mx-auto grid max-w-5xl items-center gap-8 lg:grid-cols-[minmax(0,22rem)_1fr] lg:gap-12">
+            <Image
+              src="/billeder/andet/gratis-paa-ubestemt-tid.jpg"
+              alt="Nicolai foran ambulancen. Teksten på billedet: Gratis på ubestemt tid."
+              width={678}
+              height={494}
+              className="h-auto w-full rounded-2xl shadow-lg"
+            />
+            <div className="text-center lg:text-left">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Ingen prøveperiode</p>
+              <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
+                Functional Foods er bare gratis
+              </h2>
+              <p className="mt-4 text-lg text-gray-600">
+                Madplan, madlog, prisalarmer, community og personlig vejledning koster ikke noget. Efter et par uger kan
+                du støtte os på MobilePay, hvis du har lyst.
+              </p>
+              <p className="mt-4 text-base font-medium leading-relaxed text-emerald-900">
+                Jeg er paramediciner, og jeg brænder for at gøre en forskel. Derfor har jeg besluttet, at Functional
+                Foods er gratis på ubestemt tid. Slå dig løs.
+              </p>
+            </div>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                name: 'Madbudget',
-                price: '29 kr',
-                period: 'pr. måned',
-                points: ['Ubegrænset madplan og madlog', 'Prisalarmer', 'Madlogger'],
-              },
-              {
-                name: 'Community',
-                price: '49 kr',
-                period: 'pr. måned',
-                points: [
-                  'Alt i Madbudget',
-                  'Grupper à 10 i appen',
-                  'Start vægttabsforløb sammen',
-                  '66 % holdt vægttabet sammen med andre. Alene var det 24 %',
-                ],
-              },
-              {
-                name: 'Premium',
-                price: '249 kr',
-                period: 'pr. måned',
-                points: ['Alt i Community', 'Vejledning 7.30-21.30', 'Messenger med teamet'],
-              },
-            ].map((plan) => (
-              <div key={plan.name} className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-                <p className="text-sm font-semibold text-emerald-800">{plan.name}</p>
-                <p className="mt-2 text-3xl font-extrabold text-gray-900">{plan.price}</p>
-                <p className="text-sm text-gray-500">{plan.period}</p>
-                <ul className="mt-5 space-y-2 text-sm text-gray-700">
-                  {plan.points.map((point) => (
-                    <li key={point} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-gray-200 bg-gray-50 p-6">
+            <p className="text-sm font-semibold text-emerald-800">Madplan</p>
+            <p className="mt-2 text-3xl font-extrabold text-gray-900">0 kr</p>
+            <ul className="mt-5 space-y-2 text-sm text-gray-700">
+              {['Ubegrænset madplan og madlog', 'Prisalarmer og indkøbsliste ud fra tilbud', 'Community og personlig vejledning'].map((point) => (
+                <li key={point} className="flex items-start gap-2">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                  {point}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-emerald-200 bg-emerald-50 p-6 md:p-8">
@@ -743,7 +728,7 @@ export default function Home() {
               href="/lav-din-plan"
               className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-800"
             >
-              Start 14 dages prøve
+              Kom i gang gratis
               <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
           </div>

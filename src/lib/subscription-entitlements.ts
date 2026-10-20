@@ -189,9 +189,9 @@ export async function getSubscriptionStatus(
       : access.effective
   const ent = entitlementsForTier(mealTier)
   if (access.communityAccess && mealTier !== 'premium') {
-    ent.messengerGuidance = false
     ent.tier = access.effective === 'free' ? 'plus' : access.effective
   }
+  ent.messengerGuidance = true
 
   const mealPlansRemainingThisWeek =
     ent.mealPlansPerWeek == null
@@ -287,31 +287,15 @@ export async function assertDiaryWriteAllowed(
   return status
 }
 
-function throwIfUnpaidCheckout(status: SubscriptionStatus, feature: string) {
-  if (status.checkoutStarted && status.tier === 'free' && !status.communityAccess && !status.lifetimeAccess) {
-    throw new SubscriptionLimitError(
-      'payment_required',
-      status.tier,
-      status,
-      `${feature} åbner, når du har startet de ${TRIAL_DAYS} dages prøve. Der trækkes først efter ${TRIAL_DAYS} dage.`,
-    )
-  }
+function throwIfUnpaidCheckout(_status: SubscriptionStatus, _feature: string) {
+  // Produktet er gratis. En påbegyndt betaling spærrer ikke madplan, log eller prisalarmer.
 }
 
 export async function assertMessengerGuidanceAllowed(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<SubscriptionStatus> {
-  const status = await getSubscriptionStatus(supabase, userId)
-  if (!status.messengerGuidance) {
-    throw new SubscriptionLimitError(
-      'messenger_premium_only',
-      status.tier,
-      status,
-      `Personlig vejledning på Messenger er inkluderet i Premium (${TIER_PRICES_KR.premium} kr/md).`,
-    )
-  }
-  return status
+  return getSubscriptionStatus(supabase, userId)
 }
 
 export async function profileHasLifetimeAccess(

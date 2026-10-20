@@ -3,8 +3,6 @@ import { createClient, type SupabaseClient, type User } from '@supabase/supabase
 import { dietaryApproachLabel } from '@/lib/dietary-approach-options'
 import { sendLoopsEvent } from '@/lib/loops-subscribe'
 import { sendExpoPush, type ExpoPushMessage } from '@/lib/push/send-expo-push'
-import { getEffectiveSubscriptionTier } from '@/lib/subscription-entitlements'
-
 import {
   addDaysIso,
   copenhagenLocalToUtc,
@@ -143,20 +141,6 @@ export async function joinCommunityRoom(params: {
   roomId: string
 }): Promise<{ room: CommunityRoomRow; alreadyMember: boolean }> {
   const service = communityServiceClient()
-  const tier = await getEffectiveSubscriptionTier(service, params.user.id)
-  const { data: accessRow } = await service
-    .from('user_profiles')
-    .select('community_access')
-    .eq('id', params.user.id)
-    .maybeSingle()
-  const communityAccess = Boolean((accessRow as { community_access?: boolean } | null)?.community_access)
-  if (tier !== 'premium' && !communityAccess) {
-    throw Object.assign(
-      new Error('Community kræver Community-abonnementet eller Premium. Madbudget er madplan og madlog.'),
-      { status: 403 }
-    )
-  }
-
   const today = copenhagenTodayIso()
   const { data: room, error: roomErr } = await service
     .from('community_rooms')

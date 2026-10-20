@@ -4,18 +4,18 @@ import Link from 'next/link'
 export const metadata: Metadata = {
   title: 'Betingelser | Functional Foods',
   description:
-    'Vilkår for brug af Functional Foods, herunder abonnement og henvisningsprogram med Lifetime-bonus.',
+    'Vilkår for brug af Functional Foods. Tjenesten er gratis. Henvisningsprogrammet kan give et Lifetime-badge.',
   alternates: {
     canonical: 'https://www.functionalfoods.dk/betingelser',
   },
   openGraph: {
     title: 'Betingelser | Functional Foods',
-    description: 'Vilkår for Functional Foods, abonnement og henvisningsprogram.',
+    description: 'Vilkår for Functional Foods. Tjenesten er gratis.',
     url: 'https://www.functionalfoods.dk/betingelser',
   },
 }
 
-const LAST_UPDATED = '18. august 2026'
+const LAST_UPDATED = '20. oktober 2026'
 
 export default function BetingelserPage() {
   return (
@@ -25,8 +25,8 @@ export default function BetingelserPage() {
           <p className="mb-2 text-sm font-medium text-emerald-800">Vilkår</p>
           <h1 className="mb-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Betingelser</h1>
           <p className="text-lg leading-relaxed text-slate-600">
-            Disse betingelser gælder, når du bruger Functional Foods på web og i appen — herunder oprettelse,
-            abonnement og henvisningsprogrammet.
+            Disse betingelser gælder, når du bruger Functional Foods på web og i appen — herunder oprettelse
+            og henvisningsprogrammet.
           </p>
           <p className="mt-4 text-sm text-slate-500">Sidst opdateret: {LAST_UPDATED}</p>
         </div>
@@ -42,11 +42,11 @@ export default function BetingelserPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-bold text-slate-900">2. Konto og abonnement</h2>
+          <h2 className="text-xl font-bold text-slate-900">2. Konto</h2>
           <p className="mt-3">
-            Du kan bruge en gratis plan med et begrænset antal madplaner og prisalarmer pr. uge. Betalte planer
-            (Madbudget og Premium) tegnes via web (Stripe) eller via App Store / Google Play. Opsigelse følger den
-            kanal, du betalte i. Privatlivspolitik:{' '}
+            Functional Foods er gratis på ubestemt tid. En konto giver madplan, madlog, prisalarmer, community og
+            personlig vejledning. Har du et ældre abonnement, kan du opsige det i den kanal, du betalte i (web, App
+            Store eller Google Play), så der ikke trækkes mere. Privatlivspolitik:{' '}
             <Link href="/cookies-og-privatliv" className="font-medium text-emerald-800 underline underline-offset-2">
               Cookies og privatliv
             </Link>
@@ -58,9 +58,8 @@ export default function BetingelserPage() {
           <h2 className="text-xl font-bold text-slate-900">3. Henvisningsprogram og Lifetime</h2>
           <p className="mt-3">
             Du kan dele dit unikke henvisningslink eller din kode. Når 10 personer downloader appen og opretter sig
-            via din henvisning — også på gratis plan — kan du få <strong>Lifetime</strong>: ubegrænset madplaner og
-            prisalarmer uden månedlig betaling. Lifetime tildeles manuelt efter gennemgang. Du ser et Lifetime-badge i
-            appen, når det er givet.
+            via din henvisning, kan du få et <strong>Lifetime</strong>-badge. Tjenesten er allerede gratis. Lifetime
+            tildeles manuelt efter gennemgang. Du ser badget i appen, når det er givet.
           </p>
           <p className="mt-3">
             Henvisningsprogrammet med gratis Lifetime som bonus må ikke misbruges. Hvis vi vurderer, at der reelt

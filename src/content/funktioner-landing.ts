@@ -105,13 +105,13 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
   },
   'madbudget-ai-madplaner': {
     slug: 'madbudget-ai-madplaner',
-    title: 'Madbudget (AI madplaner) | Functional Foods',
-    shortTitle: 'Madbudget (AI madplaner)',
+    title: 'Madbudget | Functional Foods',
+    shortTitle: 'Madbudget',
     description:
-      'AI-drevne madplaner med ugeoversigt, daglig ernæring og indkøbslister — synk til maddagbog, skift opskrifter og byg lige så mange uger du vil.',
+      'Vores system bygger en madplan baseret på rigtige opskrifter (ikke AI slop!) med ugeoversigt, daglig ernæring og indkøbsliste. Synk til maddagbog, skift opskrifter og byg lige så mange uger du vil.',
     iconName: 'Sparkles',
     heroEyebrow: 'Funktion',
-    heroTitle: 'Madbudget: AI-madplaner der passer til din uge',
+    heroTitle: 'Madbudget: en ugeplan bygget på rigtige opskrifter',
     heroLeadParagraphs: [
       'Madbudget samler dine præferencer, energibehov og hverdag i én plan. Du får konkrete måltider og indkøb, så du slipper for at bygge ugen fra bunden selv.',
       'Lav så mange madplaner du vil, og skift opskrifter ud efter behov – uden at starte forfra hver gang.',
@@ -261,11 +261,11 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
     description:
       'Vægttabsforløb i grupper à 10 i appen. I starter samme dag, skriver i samme tråd i 30 dage, og madplan og madlog følger med.',
     iconName: 'Users',
-    heroEyebrow: 'Community, 49 kr/md',
+    heroEyebrow: 'Community er gratis',
     heroTitle: 'Et rum på 10, samme startdato',
     heroLeadParagraphs: [
       'Community er vægttabsforløb i små grupper. I er 10 personer på samme madstil, I starter samme dag, og forløbet kører 30 dage. I skriver i samme tråd. Vejledningen lægges ind undervejs.',
-      'Rummet ligger i appen. På websitet kan du lave madplan og madlog, som også er med i prisen. Personlig vejledning på Messenger hører til Premium.',
+      'Rummet ligger i appen og er gratis, ligesom madplan, madlog og personlig vejledning på Messenger.',
     ],
     bullets: [
       {
@@ -282,31 +282,31 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
       {
         title: 'Madplan og madlog er med',
-        text: '49 kr om måneden giver rummene og det, Madbudget kan: ubegrænset madplan, madlog og prisalarmer. Madbudget til 29 kr åbner ikke rummene.',
+        text: 'Rum, madplan, madlog og prisalarmer er gratis. Du opretter en konto og slår dig løs.',
       },
       {
-        title: 'Vejledning er Premium',
-        text: 'Personlig vejledning på Messenger, i dagstimerne 7.30-21.30, er med i Premium til 249 kr om måneden. Premium har også rummene.',
+        title: 'Vejledning er med',
+        text: 'Personlig vejledning på Messenger er også gratis. Jeg gør mit bedste for at hjælpe så hurtigt jeg kan.',
       },
     ],
     howItHelps:
       'Forskning viser, at vægttab med forpligtelse til andre holdt hos 66 %, mod 24 % blandt dem der kørte det alene (Wing og Jeffery, 1999).',
-    ctaLabel: 'Vælg Community',
+    ctaLabel: 'Kom i gang gratis',
     ctaHref: '/lav-din-plan',
-    secondaryCta: { label: 'Se abonnementerne', href: '/#abonnement' },
+    secondaryCta: { label: 'Læs om vejledning', href: '/funktioner/personlig-vejledning' },
   },
   'personlig-vejledning': {
     slug: 'personlig-vejledning',
     title: 'Personlig vejledning | Functional Foods',
     shortTitle: 'Personlig vejledning',
     description:
-      'Premium giver personlig vejledning på Messenger i dagstimerne 7.30-21.30. Grupper à 10 er Community-abonnementet.',
+      'Personlig vejledning på Messenger er gratis. Jeg gør mit bedste for at hjælpe så hurtigt jeg kan.',
     iconName: 'Users',
     heroEyebrow: 'Funktion',
     heroTitle: 'Personlig vejledning på Messenger',
     heroLeadParagraphs: [
-      'Premium er personlig vejledning i dagstimerne 7.30-21.30. Du skriver med teamet på Messenger, når madplanen eller ugen ikke hænger sammen.',
-      'Grupperne à 10 er et andet abonnement: Community til 49 kr om måneden. Premium har begge dele.',
+      'Personlig vejledning på Messenger er gratis. Skriv, når madplanen eller ugen ikke hænger sammen. Jeg gør mit bedste for at hjælpe så hurtigt jeg kan.',
+      'Grupperne à 10 er også gratis. Opret en konto, og slå dig løs.',
     ],
     bullets: [
       {
@@ -315,7 +315,7 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
       {
         title: 'Et sted at spørge',
-        text: 'Når ugen skrider, kan du skrive til teamet i dagstimerne i stedet for at gætte dig frem alene.',
+        text: 'Når ugen skrider, kan du skrive i stedet for at gætte dig frem alene. Jeg gør mit bedste for at svare så hurtigt jeg kan.',
       },
       {
         title: 'Koblet til din madprofil',
@@ -327,7 +327,7 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
     ],
     howItHelps:
-      'Personlig vejledning er Premium. Grupper à 10 er Community, og Premium har begge dele.',
+      'Personlig vejledning og grupper à 10 er gratis.',
     ctaLabel: 'Kom i gang',
     ctaHref: '/kom-i-gang',
     secondaryCta: { label: 'Læs om Community', href: '/funktioner/community' },
@@ -418,15 +418,15 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
   },
   'smart-indkob-liste-sms': {
     slug: 'smart-indkob-liste-sms',
-    title: 'Smart-indkøbsliste på sms | Functional Foods',
-    shortTitle: 'Smart-indkøbliste på sms',
+    title: 'Del madplanen | Functional Foods',
+    shortTitle: 'Del madplanen',
     description:
-      'Indkøbsliste på sms med mængder, priser og afkrydsning i den rækkefølge du møder varerne i butikken.',
+      'Inviter din partner, så I bruger den samme madplan og kan rette i den. Du kan også sende madplanen på sms.',
     iconName: 'MessageSquare',
     heroEyebrow: 'Funktion',
-    heroTitle: 'Smart-indkøbsliste på sms',
+    heroTitle: 'Inviter din partner til den samme madplan',
     heroLead:
-      'Listen samler det, du skal bruge til ugen – formateret så du kan bruge den i butikken fra telefonen, inkl. deling og afkrydsning når du er logget ind.',
+      'I bruger den samme madplan og kan begge rette i den. Du kan også sende madplanen på sms.',
     bullets: [
       {
         title: 'Præcis mængde og antal',

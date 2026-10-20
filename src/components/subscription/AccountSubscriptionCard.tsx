@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { CreditCard } from 'lucide-react'
 import { createSupabaseClient } from '@/lib/supabase'
-import { TRIAL_DAYS } from '@/lib/subscription-tiers'
 
 type Billing = {
   planLabel: string
@@ -114,7 +112,8 @@ export default function AccountSubscriptionCard() {
             <p className="text-sm text-gray-600">
               {trialDate && billing.subscriptionSource === 'stripe'
                 ? `Prøve til ${trialDate}. Derefter ${billing.priceKr} kr pr. måned.`
-                : `${billing.priceKr} kr pr. måned.`}
+                : `${billing.priceKr} kr pr. måned.`}{' '}
+              Functional Foods er gratis. Opsig abonnementet, så der ikke trækkes mere. Du beholder adgangen.
             </p>
           )}
           {billing.subscriptionSource === 'app_store' ? (
@@ -138,16 +137,9 @@ export default function AccountSubscriptionCard() {
       {!loading && billing && !paid ? (
         <div className="space-y-3">
           <p className="text-sm leading-relaxed text-gray-600">
-            {billing.checkoutStarted
-              ? `Du har ikke et aktivt abonnement. Madplanen åbner, når du starter de ${TRIAL_DAYS} dages prøve. Der trækkes først efter ${TRIAL_DAYS} dage.`
-              : `Du har ikke et aktivt abonnement. Uden abonnement er der et begrænset antal madplaner om ugen.`}
+            Functional Foods er gratis på ubestemt tid. Madplan, community og personlig vejledning er åbne. Efter et
+            par uger kan du støtte os på MobilePay, hvis du har lyst.
           </p>
-          <Link
-            href="/lav-din-plan"
-            className="inline-flex items-center justify-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800"
-          >
-            Start {TRIAL_DAYS} dages prøve
-          </Link>
         </div>
       ) : null}
 

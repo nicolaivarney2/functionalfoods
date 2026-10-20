@@ -114,7 +114,7 @@ const TOOLS: Tool[] = [
     messenger: true,
     title: 'Personlig vejledning',
     description:
-      'Skriv med os i Messenger om din madplan, ugens tilbud, opskrifter eller det, der driller i hverdagen. Nicolai eller en anden fra teamet svarer, og vi kan koble samtalen til din konto, så hjælpen bliver konkret.',
+      'Skriv i Messenger om din madplan, ugens tilbud, opskrifter eller det, der driller. Det er gratis, og jeg gør mit bedste for at hjælpe så hurtigt jeg kan.',
     icon: MessageCircle,
     accent: 'from-[#0084FF] to-blue-700',
     badge: 'Messenger',

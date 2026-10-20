@@ -7,12 +7,10 @@ import { ExternalLink, Loader2, MessageCircle, UserRound, X } from 'lucide-react
 import { useAuth } from '@/contexts/AuthContext'
 import { FF_OPEN_MESSENGER_GUIDANCE } from '@/lib/messenger-guidance-events'
 import { createSupabaseClient } from '@/lib/supabase'
-import type { SubscriptionTier } from '@/lib/subscription-tiers'
-
 const PAGE_ID = process.env.NEXT_PUBLIC_MESSENGER_PAGE_ID
 
 /**
- * Logget ind + Premium: widget med menneskelig vejledning + direkte til Messenger (ManyChat).
+ * Logget ind: widget med menneskelig vejledning + direkte til Messenger (ManyChat).
  */
 export default function MessengerHumanGuidanceWidget() {
   const pathname = usePathname()
@@ -20,18 +18,18 @@ export default function MessengerHumanGuidanceWidget() {
   const [messengerUrl, setMessengerUrl] = useState<string | null>(null)
   const [linkLoading, setLinkLoading] = useState(false)
   const [open, setOpen] = useState(false)
-  const [tier, setTier] = useState<SubscriptionTier | null>(null)
+  const [guidance, setGuidance] = useState(false)
 
   useEffect(() => {
     if (!user?.id) {
-      setTier(null)
+      setGuidance(false)
       return
     }
 
     let cancelled = false
     const supabase = createSupabaseClient()
 
-    const loadTier = async () => {
+    const loadAccess = async () => {
       try {
         const { data: sessionData } = await supabase.auth.getSession()
         const accessToken = sessionData.session?.access_token
@@ -40,21 +38,21 @@ export default function MessengerHumanGuidanceWidget() {
 
         const res = await fetch('/api/subscription/status', { credentials: 'include', headers })
         if (!res.ok) return
-        const data = (await res.json()) as { tier?: SubscriptionTier }
-        if (!cancelled && data.tier) setTier(data.tier)
+        const data = (await res.json()) as { messengerGuidance?: boolean }
+        if (!cancelled) setGuidance(Boolean(data.messengerGuidance))
       } catch {
-        if (!cancelled) setTier('free')
+        if (!cancelled) setGuidance(false)
       }
     }
 
-    void loadTier()
+    void loadAccess()
     return () => {
       cancelled = true
     }
   }, [user?.id])
 
   useEffect(() => {
-    if (!user?.id || !PAGE_ID?.trim() || tier !== 'premium') return
+    if (!user?.id || !PAGE_ID?.trim() || !guidance) return
 
     let cancelled = false
     setLinkLoading(true)
@@ -92,7 +90,7 @@ export default function MessengerHumanGuidanceWidget() {
     return () => {
       cancelled = true
     }
-  }, [user?.id])
+  }, [user?.id, guidance])
 
   useEffect(() => {
     const openPanel = () => setOpen(true)
@@ -100,7 +98,7 @@ export default function MessengerHumanGuidanceWidget() {
     return () => window.removeEventListener(FF_OPEN_MESSENGER_GUIDANCE, openPanel)
   }, [])
 
-  if (!PAGE_ID?.trim() || loading || !user || tier !== 'premium') {
+  if (!PAGE_ID?.trim() || loading || !user || !guidance) {
     return null
   }
 
@@ -155,7 +153,7 @@ export default function MessengerHumanGuidanceWidget() {
             </div>
 
             <p className="text-sm leading-relaxed text-gray-700">
-              Du bliver sendt videre til Messenger, hvor en person fra teamet hjælper dig videre. Der chatttes ikke på denne side.
+              Du bliver sendt videre til Messenger. Vejledningen er gratis, og jeg gør mit bedste for at hjælpe så hurtigt jeg kan. Der chattes ikke på denne side.
             </p>
             <p className="mt-2 text-xs leading-relaxed text-gray-500">
               Vi bruger et kort engangstoken for at kunne koble samtalen til din FF-konto.

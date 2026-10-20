@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BookOpen,
   CheckCircle2,
+  Gift,
   Heart,
   HeartPulse,
   Lightbulb,
@@ -59,7 +60,7 @@ export default function BagOmFFPage() {
 
               <div className="mt-8 rounded-2xl border border-amber-200/60 bg-white/95 p-5 text-slate-900 shadow-xl backdrop-blur-sm">
                 <p className="text-base sm:text-lg leading-relaxed">
-                  Hej 👋 Hvis du kommer fra <strong>Ketoliv</strong>, er du stadig det rette sted. Functionalfoods er udvidet, og kan nu tilbyde vægttabsløsninger inden for Keto, der både lige nu er gratis, og super effektive. Har du kommentar eller spørgsmål så skriv til{' '}
+                  Hej 👋 Hvis du kommer fra <strong>Ketoliv</strong>, er du stadig det rette sted. Functional Foods er udvidet og kan nu tilbyde vægttabsløsninger inden for keto, som er gratis på ubestemt tid. Har du kommentar eller spørgsmål, så skriv til{' '}
                   <a href="mailto:hej@functionalfoods.dk" className="font-semibold text-emerald-800 underline underline-offset-2 hover:text-emerald-950">
                     hej@functionalfoods.dk
                   </a>
@@ -237,6 +238,54 @@ export default function BagOmFFPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-amber-100 bg-amber-50/70">
+        <div className="container mx-auto px-4 py-14 sm:py-18 max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-amber-950">
+            <Gift className="h-3.5 w-3.5" aria-hidden />
+            Gratis på ubestemt tid
+          </div>
+          <h2 className="mt-4 text-2xl sm:text-3xl font-semibold text-slate-900">Hvorfor det er gratis</h2>
+          <div className="mt-6 space-y-4 text-lg leading-relaxed text-slate-600">
+            <p>
+              Jeg har alt, hvad jeg skal bruge i mit liv, og jeg tror på, at sundhed ikke skal koste noget.
+            </p>
+            <p>
+              Jeg er til dagligt paramediciner og elsker at gøre en forskel (og have travlt med det). Derfor forærer jeg Functional Foods og mine andre koncepter gratis på ubestemt tid.
+            </p>
+            <p>
+              Følg{' '}
+              <a
+                href="https://www.instagram.com/nicolaivarney/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+              >
+                @nicolaivarney
+              </a>{' '}
+              på Instagram, hvis du vil vide mere personligt om, hvad der foregår hos mig. Functional Foods finder du som{' '}
+              <a
+                href="https://www.instagram.com/functionalfoods.dk/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+              >
+                @functionalfoods.dk
+              </a>{' '}
+              på Instagram og{' '}
+              <a
+                href="https://www.facebook.com/funktionelmad/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-emerald-800 underline underline-offset-2 hover:text-emerald-950"
+              >
+                @funktionelmad
+              </a>{' '}
+              på Facebook.
+            </p>
           </div>
         </div>
       </section>

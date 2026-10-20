@@ -70,14 +70,13 @@ export type TierEntitlements = {
 }
 
 export function entitlementsForTier(tier: SubscriptionTier): TierEntitlements {
-  const isPaid = tier === 'plus' || tier === 'premium'
   return {
     tier,
-    mealPlansPerWeek: isPaid ? null : FREE_MEAL_PLANS_PER_WEEK_LIMIT,
-    priceAlertsMax: isPaid ? null : FREE_PRICE_ALERTS_MAX,
-    messengerGuidance: tier === 'premium',
-    unlimitedMealPlans: isPaid,
-    unlimitedPriceAlerts: isPaid,
+    mealPlansPerWeek: null,
+    priceAlertsMax: null,
+    messengerGuidance: true,
+    unlimitedMealPlans: true,
+    unlimitedPriceAlerts: true,
   }
 }
 

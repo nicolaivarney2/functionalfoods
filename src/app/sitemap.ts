@@ -50,7 +50,6 @@ const staticPages: Array<{
   { path: '/medlem', changeFrequency: 'monthly', priority: 0.68 },
   { path: '/cookies-og-privatliv', changeFrequency: 'yearly', priority: 0.3 },
   { path: '/betingelser', changeFrequency: 'yearly', priority: 0.3 },
-  { path: '/henvis', changeFrequency: 'monthly', priority: 0.55 },
 
   { path: '/sense', changeFrequency: 'weekly', priority: 0.86 },
   { path: '/sense/opskrifter', changeFrequency: 'daily', priority: 0.84 },
