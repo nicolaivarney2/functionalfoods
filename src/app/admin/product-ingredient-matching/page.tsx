@@ -702,15 +702,9 @@ export default function ProductIngredientMatchingPage() {
                 <option value="Netto">Netto</option>
                 <option value="Bilka">Bilka</option>
                 <option value="Lidl">Lidl</option>
-                <option value="365 Discount">365 Discount</option>
                 <option value="Nemlig">Nemlig</option>
                 <option value="MENY">MENY</option>
                 <option value="Spar">Spar</option>
-                <option value="Kvickly">Kvickly</option>
-                <option value="Super Brugsen">Super Brugsen</option>
-                <option value="Brugsen">Brugsen</option>
-                <option value="Løvbjerg">Løvbjerg</option>
-                <option value="ABC Lavpris">ABC Lavpris</option>
               </select>
             </div>
 

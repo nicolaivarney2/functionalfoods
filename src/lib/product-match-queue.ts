@@ -99,25 +99,29 @@ async function loadQueuedIdsForProducts(
   return queued
 }
 
+type CatalogDb = 'app' | 'fooddata'
+
+type OfferName = { store_id: string; name_store: string | null }
+
 async function loadOffersForProducts(
   supabase: SupabaseClient,
   productIds: string[],
-): Promise<Map<string, { store_id: string; name_store: string | null }>> {
-  const offerByProduct = new Map<string, { store_id: string; name_store: string | null }>()
+  catalog: CatalogDb,
+): Promise<Map<string, OfferName>> {
+  const offerByProduct = new Map<string, OfferName>()
+  const columns = catalog === 'fooddata' ? 'product_id, store_id' : 'product_id, store_id, name_store'
   for (let i = 0; i < productIds.length; i += ID_CHUNK) {
     const chunk = productIds.slice(i, i + ID_CHUNK)
-    const { data, error } = await supabase
-      .from('product_offers')
-      .select('product_id, store_id, name_store')
-      .in('product_id', chunk)
-      .eq('is_available', true)
+    let query = supabase.from('product_offers').select(columns).in('product_id', chunk)
+    query = catalog === 'app' ? query.eq('is_available', true) : query.eq('in_stock', true)
+    const { data, error } = await query
     if (error) throw error
     for (const row of data || []) {
       const pid = row.product_id ? String(row.product_id) : ''
       if (!pid || offerByProduct.has(pid)) continue
       offerByProduct.set(pid, {
         store_id: row.store_id,
-        name_store: row.name_store ?? null,
+        name_store: catalog === 'fooddata' ? null : (row.name_store ?? null),
       })
     }
   }
@@ -167,18 +171,21 @@ async function loadAllPendingQueueIds(supabase: SupabaseClient): Promise<Set<str
 
 async function loadAllAvailableOffers(
   supabase: SupabaseClient,
-): Promise<Map<string, { store_id: string; name_store: string | null }>> {
-  const offerByProduct = new Map<string, { store_id: string; name_store: string | null }>()
+  catalog: CatalogDb,
+): Promise<Map<string, OfferName>> {
+  const offerByProduct = new Map<string, OfferName>()
+  const columns = catalog === 'fooddata' ? 'product_id, store_id' : 'product_id, store_id, name_store'
 
   for (const storeId of FOODDATA_STORE_IDS) {
     const rows = await selectPaged(async (from, pageSize) => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('product_offers')
-        .select('product_id, store_id, name_store')
+        .select(columns)
         .eq('store_id', storeId)
-        .eq('is_available', true)
         .order('product_id', { ascending: true })
         .range(from, from + pageSize - 1)
+      query = catalog === 'app' ? query.eq('is_available', true) : query.eq('in_stock', true)
+      const { data, error } = await query
       return { data, error }
     })
     for (const row of rows as {
@@ -200,26 +207,27 @@ async function loadAllAvailableOffers(
 
 export async function enqueueUnmatchedFooddataProducts(
   supabase: SupabaseClient,
-  options: { productIds?: string[]; dryRun?: boolean } = {}
+  options: { productIds?: string[]; dryRun?: boolean; catalog?: CatalogDb } = {}
 ): Promise<EnqueueFooddataQueueResult> {
   const dryRun = options.dryRun ?? false
+  const catalog = options.catalog ?? 'app'
   const targetIds = options.productIds?.length ? Array.from(new Set(options.productIds)) : null
 
   let matchedIds: Set<string>
   let pendingIds: Set<string>
-  let offerByProduct: Map<string, { store_id: string; name_store: string | null }>
+  let offerByProduct: Map<string, OfferName>
 
   if (targetIds) {
     // Daily import path: only touch the new product ids — never full-table scans.
     ;[matchedIds, pendingIds, offerByProduct] = await Promise.all([
       loadMatchedIdsForProducts(supabase, targetIds),
       loadQueuedIdsForProducts(supabase, targetIds),
-      loadOffersForProducts(supabase, targetIds),
+      loadOffersForProducts(supabase, targetIds, catalog),
     ])
   } else {
     matchedIds = await loadAllMatchedIds(supabase)
     pendingIds = await loadAllPendingQueueIds(supabase)
-    offerByProduct = await loadAllAvailableOffers(supabase)
+    offerByProduct = await loadAllAvailableOffers(supabase, catalog)
   }
 
   const productIds = targetIds
@@ -306,18 +314,48 @@ export async function enqueueUnmatchedFooddataProducts(
   >()
   for (let i = 0; i < candidateIds.length; i += ID_CHUNK) {
     const chunk = candidateIds.slice(i, i + ID_CHUNK)
+    const productColumns =
+      catalog === 'fooddata'
+        ? 'id, name, brand, category_lvl0, category_lvl1, category_lvl2'
+        : 'id, name_generic, brand, department, category, subcategory'
     const { data: products, error: prodErr } = await supabase
       .from('products')
-      .select('id, name_generic, brand, department, category, subcategory')
+      .select(productColumns)
       .in('id', chunk)
     if (prodErr) throw prodErr
     for (const p of products || []) {
-      const label = [p.name_generic, p.brand].filter(Boolean).join(' · ') || p.id
-      catalogById.set(p.id, {
+      if (catalog === 'fooddata') {
+        const row = p as {
+          id: string
+          name?: string | null
+          brand?: string | null
+          category_lvl0?: string | null
+          category_lvl1?: string | null
+          category_lvl2?: string | null
+        }
+        const label = [row.name, row.brand].filter(Boolean).join(' · ') || row.id
+        catalogById.set(row.id, {
+          name: label,
+          department: row.category_lvl0 ?? null,
+          category: row.category_lvl1 ?? null,
+          subcategory: row.category_lvl2 ?? null,
+        })
+        continue
+      }
+      const row = p as {
+        id: string
+        name_generic?: string | null
+        brand?: string | null
+        department?: string | null
+        category?: string | null
+        subcategory?: string | null
+      }
+      const label = [row.name_generic, row.brand].filter(Boolean).join(' · ') || row.id
+      catalogById.set(row.id, {
         name: label,
-        department: p.department ?? null,
-        category: p.category ?? null,
-        subcategory: p.subcategory ?? null,
+        department: row.department ?? null,
+        category: row.category ?? null,
+        subcategory: row.subcategory ?? null,
       })
     }
   }

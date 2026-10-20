@@ -305,14 +305,8 @@ export function matchBelongsToStore(
     nemlig: ['nemlig-'],
     meny: ['meny-'],
     spar: ['spar-'],
-    løvbjerg: ['loevbjerg-', 'løvbjerg-', 'lovbjerg-'],
     'min-koebmand': ['min-koebmand-'],
     lidl: ['lidl-'],
-    '365discount': ['365discount-', '365-discount-'],
-    kvickly: ['kvickly-'],
-    superbrugsen: ['superbrugsen-', 'super-brugsen-'],
-    brugsen: ['brugsen-'],
-    'abc-lavpris': ['abc-lavpris-'],
   }
 
   const prefixes = storePrefixes[storeKey] || [`${storeKey}-`]
@@ -334,14 +328,8 @@ export function matchBelongsToStore(
     nemlig: ['nemlig'],
     meny: ['meny'],
     spar: ['spar'],
-    løvbjerg: ['loevbjerg', 'lovbjerg', 'løvbjerg'],
     'min-koebmand': ['min-koebmand', 'min købmand'],
     lidl: ['lidl'],
-    '365discount': ['365discount', '365 discount', '365-discount'],
-    kvickly: ['kvickly'],
-    superbrugsen: ['superbrugsen', 'super brugsen', 'super-brugsen'],
-    brugsen: ['brugsen'],
-    'abc-lavpris': ['abc-lavpris', 'abc lavpris'],
   }
 
   const aliases = storeAliases[storeKey] || [storeKey]

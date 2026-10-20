@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Share2, Utensils, ShoppingCart, ChevronRight, Users, Store, Calendar, PieChart, FlaskConical } from 'lucide-react'
+import { selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 
 type SharedMealSlot = {
   title?: string
@@ -104,7 +105,6 @@ const STORE_NAMES: Record<number, string> = {
   5: 'Nemlig.com',
   6: 'MENY',
   7: 'Spar',
-  8: 'Løvbjerg',
   9: 'Min Købmand'
 }
 
@@ -116,7 +116,6 @@ const STORE_COLORS: Record<number, string> = {
   5: 'bg-orange-500',
   6: 'bg-red-600',
   7: 'bg-red-500',
-  8: 'bg-green-600',
   9: 'bg-orange-500'
 }
 
@@ -128,7 +127,6 @@ const STORE_ID_TO_KEY: Record<number, string> = {
   5: 'nemlig',
   6: 'meny',
   7: 'spar',
-  8: 'løvbjerg',
   9: 'min-koebmand'
 }
 
@@ -367,8 +365,8 @@ export default function SharedMealPlanPage() {
   const family = plan.family_profile_snapshot || {}
   const adults = family.adults ?? 0
   const children = family.children ?? 0
-  const storeIds = family.selectedStores || []
-  const storeNames = storeIds.map((id: number) => STORE_NAMES[id] || `Butik ${id}`).filter(Boolean)
+  const storeIds = selectableMadbudgetStoreIds(family.selectedStores || [])
+  const storeNames = storeIds.map((id: number) => STORE_NAMES[id]).filter(Boolean)
   const primaryDiet = family.adultsProfiles?.[0]?.dietaryApproach || 'sense'
   const dietLabel = DIETARY_LABELS[primaryDiet] || primaryDiet
   const sharedByName = plan.shared_by_name || null

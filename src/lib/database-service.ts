@@ -8,6 +8,7 @@ import {
   applyDagligvarerSourceFilter,
   dagligvarerOfferScanOrFilter,
   isDisallowedUpstreamOfferSource,
+  isUncoveredStoreId,
 } from '@/lib/dagligvarer-source-filter'
 import { isOwnChainAvisSource } from '@/grocery/types'
 import { isGomaImportEnabled } from '@/lib/goma-sunset'
@@ -565,6 +566,7 @@ export class DatabaseService {
 
   private isFoodOfferRow(row: Record<string, any>): boolean {
     if (isDisallowedUpstreamOfferSource(row.source)) return false
+    if (isUncoveredStoreId(row.store_id)) return false
     return isFoodCatalogProduct({
       department: row.products?.department,
       category: row.products?.category,
@@ -680,6 +682,7 @@ export class DatabaseService {
 
     const isFoodRow = (row: Record<string, any>) => {
       if (isDisallowedUpstreamOfferSource(row.source)) return false
+      if (isUncoveredStoreId(row.store_id)) return false
       return isFoodCatalogProduct({
         department: row.products?.department,
         category: row.products?.category,

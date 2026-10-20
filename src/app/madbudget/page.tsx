@@ -69,7 +69,7 @@ import {
 import { MEAL_PLAN_SCOPE_OPTIONS, mealPlanScopeLabel } from '@/lib/onboarding/vaegttabsplan-onboarding'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
-import { selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
+import { isUncoveredStoreLabel, selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 import {
   GUIDE_PRICES_STORAGE_KEY,
   productDisplayTotal,
@@ -172,14 +172,13 @@ const STORE_KEY_BY_ID: Record<number, string> = {
   5: 'nemlig',
   6: 'meny',
   7: 'spar',
-  8: 'løvbjerg',
   9: 'min-koebmand',
   10: 'lidl',
-  11: '365discount',
-  12: 'kvickly',
-  13: 'superbrugsen',
-  14: 'brugsen',
-  15: 'abc-lavpris',
+}
+
+function mealStoreLabel(store?: string | null): string {
+  if (!store || isUncoveredStoreLabel(store)) return ''
+  return store
 }
 
 function storeIdFromTabKey(tab: string): number | null {
@@ -289,9 +288,9 @@ function findProductInfoForStoreTab(
 }
 
 /**
- * Madbudget tab-keys bruger danske bogstaver ('føtex', 'løvbjerg') hvorimod
- * grocery-service'ens SourceChain er ASCII ('foetex', 'loevbjerg'). Denne
- * mapping er nødvendig for at slå CHAIN_COVERAGE op pr. valgt butiks-tab.
+ * Madbudget tab-keys bruger danske bogstaver ('føtex') hvorimod
+ * grocery-service'ens SourceChain er ASCII ('foetex'). Denne
+ * mapping slår CHAIN_COVERAGE op pr. valgt butiks-tab.
  */
 const TAB_KEY_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   'rema-1000': 'rema-1000',
@@ -301,14 +300,8 @@ const TAB_KEY_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   nemlig: 'nemlig',
   meny: 'meny',
   spar: 'spar',
-  løvbjerg: 'loevbjerg',
   'min-koebmand': 'min-koebmand',
   lidl: 'lidl',
-  '365discount': '365discount',
-  kvickly: 'kvickly',
-  superbrugsen: 'superbrugsen',
-  brugsen: 'brugsen',
-  'abc-lavpris': 'abc-lavpris',
 }
 
 function sourceChainFromTabKey(tab: string): SourceChain | null {
@@ -918,7 +911,7 @@ export default function MadbudgetPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shoppingListItems: items,
-          selectedStoreIds: familyProfile.selectedStores,
+          selectedStoreIds: selectableMadbudgetStoreIds(familyProfile.selectedStores),
           organicPreferences: {
             prioritizeOrganic: familyProfile.prioritizeOrganic,
             prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
@@ -2081,7 +2074,9 @@ export default function MadbudgetPage() {
         const res = await fetch(`/api/supermarket/products?${params.toString()}`)
         const data = await res.json()
         if (data.success && Array.isArray(data.products)) {
-          setProductSearchResults(data.products)
+          setProductSearchResults(
+            data.products.filter((product: Product) => !isUncoveredStoreLabel(product.store)),
+          )
         } else {
           setProductSearchResults([])
         }
@@ -3529,7 +3524,7 @@ export default function MadbudgetPage() {
                                   const mealKey = mealType.key as MealType
                                   handleMealCellClick(dayKey, mealKey)
                                 }}
-                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
+                                title={currentMeal ? `${currentMeal.title}${mealStoreLabel(currentMeal.store) ? ` - ${mealStoreLabel(currentMeal.store)}` : ''}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
                                 {isLocked && (
                                   <span className="absolute bottom-1.5 right-1.5 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-amber-600 text-white shadow" title="Låst ved næste generering">
@@ -3583,7 +3578,9 @@ export default function MadbudgetPage() {
                                       <div className="text-[11px] sm:text-xs font-medium text-gray-900 line-clamp-3 leading-tight">
                                         {currentMeal.title}
                                       </div>
-                                      <div className="text-[10px] text-gray-500 truncate">{currentMeal.store}</div>
+                                      {mealStoreLabel(currentMeal.store) ? (
+                                        <div className="text-[10px] text-gray-500 truncate">{mealStoreLabel(currentMeal.store)}</div>
+                                      ) : null}
                                       {(typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number' || typeof mealCardNut?.carbs === 'number' || typeof mealCardNut?.fat === 'number') && (
                                         <div className="grid grid-cols-4 gap-px rounded-md overflow-hidden bg-gray-200 mt-1">
                                           <div className="bg-gray-50 py-1 px-0.5 text-center">
@@ -3695,7 +3692,7 @@ export default function MadbudgetPage() {
                                   const mealKey = mealType.key as MealType
                                   handleMealCellClick(dayKey, mealKey)
                                 }}
-                                title={currentMeal ? `${currentMeal.title} - ${currentMeal.store}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
+                                title={currentMeal ? `${currentMeal.title}${mealStoreLabel(currentMeal.store) ? ` - ${mealStoreLabel(currentMeal.store)}` : ''}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
                                 {isLocked && (
                                   <span className="absolute bottom-1 right-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-amber-600 text-white shadow sm:bottom-1.5 sm:right-1.5 sm:h-6 sm:w-6" title="Låst ved næste generering">
@@ -3749,7 +3746,9 @@ export default function MadbudgetPage() {
                                       <div className="text-[10px] sm:text-xs font-medium text-gray-900 line-clamp-3 leading-tight">
                                         {currentMeal.title}
                                       </div>
-                                      <div className="text-[9px] sm:text-[10px] text-gray-500 truncate">{currentMeal.store}</div>
+                                      {mealStoreLabel(currentMeal.store) ? (
+                                        <div className="text-[9px] sm:text-[10px] text-gray-500 truncate">{mealStoreLabel(currentMeal.store)}</div>
+                                      ) : null}
                                       {(typeof mealCardNut?.calories === 'number' || typeof mealCardNut?.protein === 'number' || typeof mealCardNut?.carbs === 'number' || typeof mealCardNut?.fat === 'number') && (
                                         <div className="grid grid-cols-4 gap-px rounded overflow-hidden bg-gray-200 mt-0.5 sm:mt-1">
                                           <div className="bg-gray-50 py-0.5 sm:py-1 px-0.5 text-center">

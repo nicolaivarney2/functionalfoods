@@ -81,17 +81,11 @@ const STATUS_COLORS: Record<SyncHealthStore['status'], string> = {
 type GomaStoreId =
   | 'Netto'
   | 'REMA 1000'
-  | '365discount'
   | 'Lidl'
   | 'Bilka'
   | 'Nemlig'
   | 'MENY'
   | 'Spar'
-  | 'Kvickly'
-  | 'superbrugsen'
-  | 'Brugsen'
-  | 'Løvbjerg'
-  | 'ABC Lavpris'
 
 const GOMA_STORES: {
   id: GomaStoreId
@@ -101,17 +95,11 @@ const GOMA_STORES: {
 }[] = [
   { id: 'Netto', label: 'Netto', offerDay: 'Fredag' },
   { id: 'REMA 1000', label: 'REMA 1000', offerDay: 'Lørdag' },
-  { id: '365discount', label: '365 Discount', offerDay: 'Onsdag', note: 'Goma-id: 365discount' },
   { id: 'Lidl', label: 'Lidl', offerDay: 'Lørdag' },
   { id: 'Bilka', label: 'Bilka', offerDay: 'Fredag' },
   { id: 'Nemlig', label: 'Nemlig', offerDay: 'Hver dag' },
   { id: 'MENY', label: 'MENY', offerDay: 'Torsdag' },
   { id: 'Spar', label: 'Spar', offerDay: 'Torsdag' },
-  { id: 'Kvickly', label: 'Kvickly', offerDay: 'Torsdag' },
-  { id: 'superbrugsen', label: 'SuperBrugsen', offerDay: 'Torsdag', note: 'Goma-id: superbrugsen' },
-  { id: 'Brugsen', label: 'Brugsen', offerDay: 'Fredag' },
-  { id: 'Løvbjerg', label: 'Løvbjerg', offerDay: 'Torsdag' },
-  { id: 'ABC Lavpris', label: 'ABC Lavpris', offerDay: 'Tirsdag' }
 ]
 
 export default function AdminGomaDagligvarerPage() {

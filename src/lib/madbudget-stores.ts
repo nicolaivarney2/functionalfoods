@@ -63,11 +63,31 @@ const MADBUDGET_NAME_TO_SLUG: Record<string, string> = {
   'ABC Lavpris': 'abc-lavpris',
 }
 
-/** Map numeric madbudget store ids → fooddata store_id slugs. */
+const UNCOVERED_STORE_LABELS = new Set([
+  'løvbjerg',
+  'lovbjerg',
+  'loevbjerg',
+  'kvickly',
+  'super brugsen',
+  'superbrugsen',
+  'brugsen',
+  '365 discount',
+  '365discount',
+  'abc lavpris',
+  'abc-lavpris',
+])
+
+/** Visningsnavn på en kæde vi ikke længere dækker (Coop, Løvbjerg, ABC Lavpris). */
+export function isUncoveredStoreLabel(name: string | null | undefined): boolean {
+  if (!name) return false
+  return UNCOVERED_STORE_LABELS.has(name.trim().toLowerCase())
+}
+
+/** Map numeric madbudget store ids → fooddata store_id slugs. Uden kæder vi ikke dækker. */
 export function madbudgetStoreIdsToSlugs(ids: number[]): string[] {
   return [
     ...new Set(
-      ids
+      selectableMadbudgetStoreIds(ids)
         .map((id) => MADBUDGET_STORE_CATALOG.find((s) => s.id === id)?.name)
         .filter(Boolean)
         .map((name) => MADBUDGET_NAME_TO_SLUG[name!] || name!.toLowerCase().replace(/\s+/g, '-')),

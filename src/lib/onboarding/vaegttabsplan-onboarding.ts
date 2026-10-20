@@ -1,6 +1,6 @@
 import { ActivityLevel, DietaryCalculator, UserProfile, WeightGoal } from '@/lib/dietary-system'
 import { DIETARY_APPROACH_OPTIONS } from '@/lib/dietary-approach-options'
-import { MADBUDGET_STORE_CATALOG } from '@/lib/madbudget-stores'
+import { MADBUDGET_SELECTABLE_STORES, selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 import { mealsPerDayFromScope } from '@/lib/adult-plan-profile'
 
 export const ONBOARDING_STORAGE_KEY = 'ff_vaegttabsplan_onboarding_v1'
@@ -259,6 +259,7 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
   const adults = Math.max(1, Math.min(10, data.adults ?? 1))
   const children = Math.max(0, Math.min(10, data.children ?? 0))
   const childrenAges = Array.from({ length: children }, () => '4-9')
+  const selectedStores = selectableMadbudgetStoreIds(data.selectedStores)
 
   const res = await fetch('/api/madbudget/family-profile', {
     method: 'POST',
@@ -274,7 +275,7 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
         prioritizeOrganic: false,
         prioritizeAnimalOrganic: false,
         excludedIngredients: data.excludedFoods ?? [],
-        selectedStores: data.selectedStores.length ? data.selectedStores : [1, 2],
+        selectedStores: selectedStores.length ? selectedStores : [1, 2],
         variationLevel: 2,
       },
       adultProfiles: Array.from({ length: adults }, (_, i) => ({
@@ -297,5 +298,5 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
 }
 
 export function storeName(id: number): string {
-  return MADBUDGET_STORE_CATALOG.find((s) => s.id === id)?.name ?? `Butik ${id}`
+  return MADBUDGET_SELECTABLE_STORES.find((s) => s.id === id)?.name ?? ''
 }

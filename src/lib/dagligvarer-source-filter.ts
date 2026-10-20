@@ -10,11 +10,11 @@ import { GOMA_FULL_CATALOG_CHAINS, isDisallowedUpstreamOfferSource } from '@/lib
 
 export { isDisallowedUpstreamOfferSource }
 
-/** store_id hvor Goma erstatter Tjek som primær tilbudskilde. */
+/** store_id for kæder med egen tilbudsavis. Coop, Løvbjerg og ABC Lavpris er ikke med. */
 export const GOMA_PRIMARY_STORE_IDS: SourceChain[] = (
   Object.entries(CHAIN_COVERAGE) as [SourceChain, (typeof CHAIN_COVERAGE)[SourceChain]][]
 )
-  .filter(([, coverage]) => coverage === 'offers-only' || coverage === 'none')
+  .filter(([, coverage]) => coverage === 'offers-only')
   .map(([chain]) => chain)
 
 export const GOMA_FULL_CATALOG_STORE_IDS: SourceChain[] = [...GOMA_FULL_CATALOG_CHAINS]
@@ -76,6 +76,21 @@ export function applyDagligvarerSourceFilter<T>(query: T): T {
 export function isGomaOffersOnlyStoreId(storeId?: string | null): boolean {
   if (!storeId) return false
   return (GOMA_OFFERS_ONLY_STORE_IDS as readonly string[]).includes(storeId)
+}
+
+const UNCOVERED_STORE_ALIASES: Record<string, SourceChain> = {
+  lovbjerg: 'loevbjerg',
+  'løvbjerg': 'loevbjerg',
+  '365-discount': '365discount',
+  'super-brugsen': 'superbrugsen',
+}
+
+/** Coop, Løvbjerg og ABC Lavpris har ingen kilde og må ikke vises som butikker. */
+export function isUncoveredStoreId(storeId: string | null | undefined): boolean {
+  if (!storeId) return false
+  const raw = storeId.trim().toLowerCase()
+  const chain = UNCOVERED_STORE_ALIASES[raw] ?? raw
+  return CHAIN_COVERAGE[chain as SourceChain] === 'none'
 }
 
 /** PostgREST .or() til tilbuds-scan. Kun rækker kilden selv har markeret som tilbud. */

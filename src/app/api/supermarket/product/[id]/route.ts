@@ -3,6 +3,7 @@ import { createSupabaseClient } from '@/lib/supabase'
 import { databaseService } from '@/lib/database-service'
 import { resolveProductImageUrlWithLookup } from '@/lib/product-image-fallback'
 import { publicStoreUrl, toPublicCatalogImageUrl } from '@/lib/catalog-image-url'
+import { applyDagligvarerSourceFilter, isUncoveredStoreId } from '@/lib/dagligvarer-source-filter'
 
 const PRODUCT_DETAILS_CACHE_CONTROL = 'public, s-maxage=1800, stale-while-revalidate=86400'
 const PRODUCT_DETAILS_MEMORY_TTL_MS = 5 * 60 * 1000
@@ -57,7 +58,8 @@ export async function GET(
     }
 
     // Hent primær offer + tilhørende produkt
-    const { data: offer, error } = await supabase
+    const { data: offer, error } = await applyDagligvarerSourceFilter(
+      supabase
       .from('product_offers')
       .select(
         `
@@ -94,8 +96,15 @@ export async function GET(
         )
       `
       )
-      .eq('id', offerId)
-      .single()
+      .eq('id', offerId),
+    ).single()
+
+    if (offer && isUncoveredStoreId(offer.store_id)) {
+      return NextResponse.json(
+        { success: false, message: 'Produkt ikke fundet' },
+        { status: 404 },
+      )
+    }
 
     if (error || !offer) {
       console.error('Error fetching product offer:', error)
@@ -179,7 +188,8 @@ export async function GET(
     }
 
     // Hent andre butikker med samme product_id
-    const { data: otherOffersRaw, error: otherError } = await supabase
+    const { data: otherOffersRaw, error: otherError } = await applyDagligvarerSourceFilter(
+      supabase
       .from('product_offers')
       .select(
         `
@@ -207,7 +217,8 @@ export async function GET(
       .eq('product_id', offer.product_id)
       .neq('id', offer.id)
       .eq('is_available', true)
-      .order('current_price', { ascending: true })
+      .order('current_price', { ascending: true }),
+    )
 
     if (otherError) {
       console.error('Error fetching other offers:', otherError)
@@ -222,6 +233,7 @@ export async function GET(
     const mainName = normalizeName(mainProduct.name)
 
     for (const o of otherOffersRaw || []) {
+      if (isUncoveredStoreId(o.store_id)) continue
       const key = o.store_id || 'unknown'
       const isSameSize =
         (o.unit || null) === (p.unit || null) &&

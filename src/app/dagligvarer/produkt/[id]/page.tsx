@@ -11,6 +11,7 @@ import {
   createPriceAlert,
 } from '@/lib/dagligvarer-actions'
 import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
+import { isUncoveredStoreLabel } from '@/lib/madbudget-stores'
 
 interface Product {
   id: string
@@ -44,7 +45,6 @@ interface Product {
 const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'Netto': 'Fredag',
   'REMA 1000': 'Lørdag',
-  '365 Discount': 'Onsdag',
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
   'Føtex': 'Torsdag',
@@ -52,11 +52,6 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
   'Min Købmand': 'Torsdag',
-  'Kvickly': 'Torsdag',
-  'Super Brugsen': 'Torsdag',
-  'Brugsen': 'Fredag',
-  'Løvbjerg': 'Torsdag',
-  'ABC Lavpris': 'Tirsdag'
 }
 
 // Map Danish weekday names to day indices (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
@@ -462,10 +457,18 @@ export default function ProductPage() {
         setLoading(true)
         const response = await fetch(`/api/supermarket/product/${params.id}`)
         const data = await response.json()
-        if (data.success && data.product) {
+        if (data.success && data.product && !isUncoveredStoreLabel(data.product.store)) {
           setProduct(data.product)
-          if (data.similarProducts) setSimilarProducts(data.similarProducts)
-          if (data.otherSizeProducts) setOtherSizeProducts(data.otherSizeProducts)
+          if (data.similarProducts) {
+            setSimilarProducts(
+              data.similarProducts.filter((item: Product) => !isUncoveredStoreLabel(item.store)),
+            )
+          }
+          if (data.otherSizeProducts) {
+            setOtherSizeProducts(
+              data.otherSizeProducts.filter((item: Product) => !isUncoveredStoreLabel(item.store)),
+            )
+          }
 
           const histRes = await fetch(`/api/supermarket/product/${params.id}/price-history`)
           if (histRes.ok) {

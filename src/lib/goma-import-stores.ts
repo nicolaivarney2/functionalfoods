@@ -113,8 +113,7 @@ export function getGomaSyncMode(chain: SourceChain): GomaSyncMode {
 
 /** Chains where Goma is the intended tilbud source (not Salling/REMA fooddata). */
 export function isGomaImportChain(chain: SourceChain): boolean {
-  const coverage = CHAIN_COVERAGE[chain]
-  return coverage === 'offers-only' || coverage === 'none'
+  return CHAIN_COVERAGE[chain] === 'offers-only'
 }
 
 export function isGomaImportStoreName(storeName: string): boolean {
@@ -161,16 +160,16 @@ export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[]
       stores = []
       break
     case 2:
-      stores = ['ABC Lavpris']
+      stores = []
       break
     case 3:
-      stores = ['ABC Lavpris', '365discount']
+      stores = []
       break
     case 4:
-      stores = ['365discount', 'MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg']
+      stores = ['MENY', 'Spar', 'Min Købmand']
       break
     case 5:
-      stores = ['MENY', 'Spar', 'Min Købmand', 'Kvickly', 'SuperBrugsen', 'Løvbjerg', 'Brugsen']
+      stores = ['MENY', 'Spar', 'Min Købmand']
       break
     case 6:
       stores = ['Lidl']
@@ -186,7 +185,7 @@ export function getGomaStoresForDanishWeekday(dayIndex: number): GomaStoreName[]
 
 /** Skip fooddata→FF copy for chains owned by Goma while import is enabled. */
 export function shouldSkipFooddataChainForGoma(chain: SourceChain): boolean {
-  return isGomaImportChain(chain)
+  return CHAIN_COVERAGE[chain] === 'none' || isGomaImportChain(chain)
 }
 
 /** Goma og Tjek (også de omdøbte navne catalog/leaflet) er ikke tilladte kilder. */
@@ -208,6 +207,7 @@ export function shouldImportFooddataOfferSource(
   offerSource: string,
   _gomaImportEnabled: boolean,
 ): boolean {
+  if (CHAIN_COVERAGE[chain] === 'none') return false
   if (isDisallowedUpstreamOfferSource(offerSource)) return false
   if (!isGomaImportChain(chain)) return true
   return isOwnChainAvisSource(offerSource)
@@ -222,6 +222,7 @@ export function shouldImportFooddataProduct(
   _matchedFfProductIds: Set<string>,
   ffProductId: string,
 ): boolean {
+  if (CHAIN_COVERAGE[chain] === 'none') return false
   if (!isGomaImportChain(chain)) return true
   return isOwnAvisProductId(ffProductId)
 }

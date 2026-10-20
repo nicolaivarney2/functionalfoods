@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { MADBUDGET_UNAVAILABLE_STORE_IDS } from '@/lib/madbudget-stores'
 import { createSupabaseClient } from '@/lib/supabase'
 import { getGomaSunsetStatus, isGomaLegacyDataEnabled } from '@/lib/goma-sunset'
 import { isFooddataProductExternalId } from '@/lib/product-match-snapshots'
@@ -78,12 +79,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const coveredStoreIds = selectedStoreIds.filter(
+      (id: number) => !MADBUDGET_UNAVAILABLE_STORE_IDS.has(Number(id)),
+    )
+    if (coveredStoreIds.length === 0) {
+      return NextResponse.json({ success: true, data: {}, guideCount: 0 })
+    }
+
     const supabase = createSupabaseClient()
 
     // Map frontend store IDs to a canonical UI key + possible DB slug aliases.
-    // We support both legacy slugs (føtex/løvbjerg) and ASCII slugs (fotex/lovbjerg).
-    // Id 1–9 er de oprindelige madbudget-kæder; id 10–15 er Tjek-tilbuds-kæder
-    // tilføjet for at synkronisere madbudget med /dagligvarer (14 butikker total).
+    // Id 8 og 11–15 (Løvbjerg, Coop, ABC Lavpris) har ingen kilde og er filtreret fra.
     const storeIdMap: Record<number, { key: string; candidates: string[] }> = {
       1: { key: 'rema-1000', candidates: ['rema-1000'] },
       2: { key: 'netto', candidates: ['netto'] },
@@ -92,17 +98,11 @@ export async function POST(request: NextRequest) {
       5: { key: 'nemlig', candidates: ['nemlig'] },
       6: { key: 'meny', candidates: ['meny'] },
       7: { key: 'spar', candidates: ['spar'] },
-      8: { key: 'løvbjerg', candidates: ['loevbjerg', 'løvbjerg', 'lovbjerg'] },
       9: { key: 'min-koebmand', candidates: ['min-koebmand'] },
       10: { key: 'lidl', candidates: ['lidl'] },
-      11: { key: '365discount', candidates: ['365discount', '365-discount'] },
-      12: { key: 'kvickly', candidates: ['kvickly'] },
-      13: { key: 'superbrugsen', candidates: ['superbrugsen', 'super-brugsen'] },
-      14: { key: 'brugsen', candidates: ['brugsen'] },
-      15: { key: 'abc-lavpris', candidates: ['abc-lavpris'] },
     }
 
-    const requestedStores = selectedStoreIds
+    const requestedStores = coveredStoreIds
       .map((id: number) => storeIdMap[id])
       .filter((s): s is { key: string; candidates: string[] } => Boolean(s))
     const requestedStoreKeys = Array.from(new Set(requestedStores.map((s) => s.key)))
@@ -136,7 +136,6 @@ export async function POST(request: NextRequest) {
     const canonicalStoreKey = (raw: string): string => {
       const n = normalizeStoreKey(raw)
       if (n === 'fotex' || n === 'foetex' || n === 'føtex') return 'føtex'
-      if (n === 'loevbjerg' || n === 'lovbjerg' || n === 'løvbjerg') return 'løvbjerg'
       return raw
     }
 
@@ -147,7 +146,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const cacheKey = buildShoppingPricesCacheKey(shoppingListItems, selectedStoreIds, organicPrefs)
+    const cacheKey = buildShoppingPricesCacheKey(shoppingListItems, coveredStoreIds, organicPrefs)
     const cachedResponse = priceResponseCache.get(cacheKey)
     if (cachedResponse && cachedResponse.expiresAt > Date.now()) {
       return NextResponse.json(cachedResponse.body)

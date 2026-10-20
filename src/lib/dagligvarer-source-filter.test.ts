@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { dagligvarerOfferScanOrFilter } from './dagligvarer-source-filter'
+import { dagligvarerOfferScanOrFilter, isUncoveredStoreId } from './dagligvarer-source-filter'
 import { shouldImportFooddataOfferSource } from './goma-import-stores'
 
 describe('tilladte dagligvarekilder', () => {
@@ -23,5 +23,20 @@ describe('tilladte dagligvarekilder', () => {
     assert.equal(shouldImportFooddataOfferSource('foetex', 'tjek:offers', true), false)
     assert.equal(shouldImportFooddataOfferSource('bilka', 'catalog', false), false)
     assert.equal(shouldImportFooddataOfferSource('kvickly', 'leaflet:offers', false), false)
+    assert.equal(shouldImportFooddataOfferSource('kvickly', 'kvickly-api', false), false)
+    assert.equal(shouldImportFooddataOfferSource('loevbjerg', 'goma', true), false)
+    assert.equal(shouldImportFooddataOfferSource('365discount', 'catalog', false), false)
+  })
+
+  it('Coop, Løvbjerg og ABC Lavpris er ikke butikker vi dækker', () => {
+    assert.equal(isUncoveredStoreId('kvickly'), true)
+    assert.equal(isUncoveredStoreId('loevbjerg'), true)
+    assert.equal(isUncoveredStoreId('lovbjerg'), true)
+    assert.equal(isUncoveredStoreId('365discount'), true)
+    assert.equal(isUncoveredStoreId('superbrugsen'), true)
+    assert.equal(isUncoveredStoreId('brugsen'), true)
+    assert.equal(isUncoveredStoreId('abc-lavpris'), true)
+    assert.equal(isUncoveredStoreId('netto'), false)
+    assert.equal(isUncoveredStoreId('lidl'), false)
   })
 })

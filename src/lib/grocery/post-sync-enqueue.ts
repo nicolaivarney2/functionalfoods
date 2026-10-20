@@ -122,5 +122,6 @@ export async function enqueueAfterGrocerySync(options: {
 
   return enqueueUnmatchedFooddataProducts(options.supabase, {
     productIds: newProductIds,
+    catalog: 'fooddata',
   })
 }

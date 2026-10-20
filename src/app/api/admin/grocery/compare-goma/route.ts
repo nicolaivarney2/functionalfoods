@@ -14,23 +14,19 @@ import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const CHAINS: SourceChain[] = [
-  'netto',
-  'foetex',
-  'bilka',
-  'rema-1000',
-  'nemlig',
-  'lidl',
-  '365discount',
-  'kvickly',
-  'superbrugsen',
-  'brugsen',
-  'meny',
-  'spar',
-  'loevbjerg',
-  'abc-lavpris',
-  'min-koebmand',
-]
+const CHAINS: SourceChain[] = (
+  [
+    'netto',
+    'foetex',
+    'bilka',
+    'rema-1000',
+    'nemlig',
+    'lidl',
+    'meny',
+    'spar',
+    'min-koebmand',
+  ] as SourceChain[]
+).filter((chain) => CHAIN_COVERAGE[chain] !== 'none')
 
 /**
  * Goma sometimes uses ASCII variants for store_ids that lack æ/ø/å normalization.

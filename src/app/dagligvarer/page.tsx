@@ -14,6 +14,7 @@ import {
   previewPriceAlertGroup,
 } from '@/lib/dagligvarer-actions'
 import { resolveDagligvarerImageSrc } from '@/lib/product-image-fallback'
+import { isUncoveredStoreLabel } from '@/lib/madbudget-stores'
 
 
 // Types
@@ -128,13 +129,7 @@ const ProductCard = ({ product, onOpenModal, onBasisliste, onShopping, onPriceAl
         product.store === 'MENY' ? 'border-red-800' :
         product.store === 'Spar' ? 'border-red-600' :
         product.store === 'Min Købmand' ? 'border-orange-500' :
-        product.store === '365 Discount' ? 'border-green-400' :
         product.store === 'Lidl' ? 'border-yellow-500' :
-        product.store === 'Kvickly' ? 'border-red-500' :
-        product.store === 'Super Brugsen' ? 'border-red-700' :
-        product.store === 'Brugsen' ? 'border-red-400' :
-        product.store === 'Løvbjerg' ? 'border-emerald-500' :
-        product.store === 'ABC Lavpris' ? 'border-purple-500' :
         'border-gray-300'
       }`}>
         {product.store}
@@ -303,7 +298,6 @@ const SORT_OPTIONS = [
 const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'Netto': 'Fredag',
   'REMA 1000': 'Lørdag',
-  '365 Discount': 'Onsdag',
   'Lidl': 'Lørdag',
   'Bilka': 'Fredag',
   'Føtex': 'Torsdag',
@@ -311,11 +305,6 @@ const STORE_UPDATE_SCHEDULE: { [key: string]: string } = {
   'MENY': 'Torsdag',
   'Spar': 'Torsdag',
   'Min Købmand': 'Torsdag',
-  'Kvickly': 'Torsdag',
-  'Super Brugsen': 'Torsdag',
-  'Brugsen': 'Fredag',
-  'Løvbjerg': 'Torsdag',
-  'ABC Lavpris': 'Tirsdag'
 }
 
 // Map Danish weekday names to day indices (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
@@ -421,7 +410,6 @@ const CATEGORIES = [
 const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   Netto: 'netto',
   'REMA 1000': 'rema-1000',
-  '365discount': '365discount',
   Lidl: 'lidl',
   Bilka: 'bilka',
   'Føtex': 'foetex',
@@ -429,11 +417,6 @@ const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   MENY: 'meny',
   Spar: 'spar',
   'min-koebmand': 'min-koebmand',
-  Kvickly: 'kvickly',
-  superbrugsen: 'superbrugsen',
-  Brugsen: 'brugsen',
-  Løvbjerg: 'loevbjerg',
-  'ABC Lavpris': 'abc-lavpris',
 }
 
 // Available stores - using Goma's exact store names for API calls
@@ -642,7 +625,9 @@ export default function DagligvarerPage() {
       if (requestId !== latestRequestIdRef.current) return
 
       if (data.success && data.products) {
-        let newProducts = data.products
+        let newProducts = data.products.filter(
+          (product: Product) => !isUncoveredStoreLabel(product.store),
+        )
 
         // Apply sorting
         newProducts = sortProducts(newProducts, sortBy)
@@ -1532,13 +1517,7 @@ export default function DagligvarerPage() {
                   selectedProduct.store === 'MENY' ? 'border-red-800' :
                   selectedProduct.store === 'Spar' ? 'border-red-600' :
                   selectedProduct.store === 'Min Købmand' ? 'border-orange-500' :
-                  selectedProduct.store === '365 Discount' ? 'border-green-400' :
                   selectedProduct.store === 'Lidl' ? 'border-yellow-500' :
-                  selectedProduct.store === 'Kvickly' ? 'border-red-500' :
-                  selectedProduct.store === 'Super Brugsen' ? 'border-red-700' :
-                  selectedProduct.store === 'Brugsen' ? 'border-red-400' :
-                  selectedProduct.store === 'Løvbjerg' ? 'border-emerald-500' :
-                  selectedProduct.store === 'ABC Lavpris' ? 'border-purple-500' :
                   'border-gray-300'
                 }`}>
                   {selectedProduct.store}
