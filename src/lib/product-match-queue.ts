@@ -102,6 +102,7 @@ async function loadQueuedIdsForProducts(
 type CatalogDb = 'app' | 'fooddata'
 
 type OfferName = { store_id: string; name_store: string | null }
+type OfferNameRow = { product_id?: string | null; store_id: string; name_store?: string | null }
 
 async function loadOffersForProducts(
   supabase: SupabaseClient,
@@ -116,7 +117,7 @@ async function loadOffersForProducts(
     query = catalog === 'app' ? query.eq('is_available', true) : query.eq('in_stock', true)
     const { data, error } = await query
     if (error) throw error
-    for (const row of data || []) {
+    for (const row of (data ?? []) as unknown as OfferNameRow[]) {
       const pid = row.product_id ? String(row.product_id) : ''
       if (!pid || offerByProduct.has(pid)) continue
       offerByProduct.set(pid, {
@@ -323,9 +324,9 @@ export async function enqueueUnmatchedFooddataProducts(
       .select(productColumns)
       .in('id', chunk)
     if (prodErr) throw prodErr
-    for (const p of products || []) {
+    for (const p of (products ?? []) as Array<Record<string, unknown>>) {
       if (catalog === 'fooddata') {
-        const row = p as {
+        const row = p as unknown as {
           id: string
           name?: string | null
           brand?: string | null
@@ -342,7 +343,7 @@ export async function enqueueUnmatchedFooddataProducts(
         })
         continue
       }
-      const row = p as {
+      const row = p as unknown as {
         id: string
         name_generic?: string | null
         brand?: string | null
