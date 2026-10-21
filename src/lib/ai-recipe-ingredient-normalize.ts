@@ -140,6 +140,17 @@ const NAME_CANONICAL_FIXES: [RegExp, string][] = [
   [/^hakket\s+okse$/i, 'hakket oksekød'],
   [/^okse(?:kød)?\s+hakket$/i, 'hakket oksekød'],
   [/^jalapeno(?:er|s|es)?$/i, 'jalapeno'],
+  [/^(?:frossen|frosne|frost)\s+blomkåls\s*ris$/i, 'blomkålsris'],
+  [/^blomkåls\s*ris$/i, 'blomkålsris'],
+  [/^blomkaals\s*ris$/i, 'blomkålsris'],
+  [/^cauliflower\s*rice$/i, 'blomkålsris'],
+  [/^piskefl(?:øde|ode)(?:\s*38\s*%)?$/i, 'piskefløde'],
+  [/^fl(?:øde|ode)\s*38\s*%$/i, 'piskefløde'],
+  [/^whipping\s*cream$/i, 'piskefløde'],
+  [/^madlavningsfl(?:øde|ode)(?:\s*18\s*%)?$/i, 'madlavningsfløde 18%'],
+  [/^fl(?:øde|ode)\s*18\s*%$/i, 'madlavningsfløde 18%'],
+  [/^cooking\s*cream$/i, 'madlavningsfløde 18%'],
+  [/^fl(?:øde|ode)$/i, 'madlavningsfløde 18%'],
   [/^laks$/i, 'laksefilet'],
   [/^laksefileter$/i, 'laksefilet'],
   [/^laksestykker?$/i, 'laksefilet'],
@@ -350,11 +361,32 @@ function splitNameAndPrep(name: string, existingNotes?: string | null): { name: 
 
   const canonical = applyCanonicalNameFixes(cleaned)
   const folded = foldMincedMeatProduct(canonical, mergeNotes(...extra))
+  const asCauliflowerRice = canonicalizeBlomkaalsris(folded.name, folded.notes)
 
-  return {
-    name: folded.name,
-    notes: folded.notes,
-  }
+  return asCauliflowerRice ?? { name: folded.name, notes: folded.notes }
+}
+
+/** Broccoliris er ikke en pose. Det er et halvt hoved broccoli, mærket så det ikke er broccoli i sovsen. */
+function canonicalizeBroccoliRice(name: string, notes: string | null): { name: string; notes: string | null } | null {
+  const blob = `${name} ${notes || ''}`
+  const isRice = /broccoli/i.test(blob) && /ris/i.test(blob)
+  if (!isRice) return null
+  const kept = (notes || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part && !/ris/i.test(part))
+  return { name: 'broccoli', notes: mergeNotes(...kept, 'til ris-tilbehør') }
+}
+
+/** Frostposen hedder blomkålsris. Revet blomkål er den samme vare, ikke et hoved man river selv. */
+function canonicalizeBlomkaalsris(name: string, notes: string | null): { name: string; notes: string | null } | null {
+  const gratedHead = /^blomkål$/i.test(name) && /revet|rivet|\bris\b/i.test(notes || '')
+  if (name !== 'blomkålsris' && !gratedHead) return null
+  const kept = (notes || '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part && !/^(?:revet|rivet|ris|frosne|frossen|frost)$/i.test(part))
+  return { name: 'blomkålsris', notes: mergeNotes(...kept, 'frosne') }
 }
 
 function normalizeUnit(u: string): string {
@@ -703,11 +735,30 @@ function normalizeOneAiIngredient(raw: AiIngredientInput): AiIngredientOutput {
     String(raw.unit || 'stk'),
     { peppercornSource: isPeppercornSourceName(rawName), driedHerb, explicitFresh },
   )
+  if (adj.name === 'blomkålsris' && (adj.unit === 'stk' || adj.unit === 'pose' || adj.unit === 'pk')) {
+    adj.amount = Math.round((adj.amount || 1) * 400)
+    adj.unit = 'g'
+  }
+
+  if (adj.name === 'madlavningsfløde 18%' && (adj.unit === 'ml' || adj.unit === 'g') && adj.amount > 150) {
+    adj.amount = 150
+  }
+  if (adj.name === 'piskefløde' && (adj.unit === 'ml' || adj.unit === 'g') && adj.amount > 100) {
+    adj.amount = 100
+  }
+
+  const broccoliRice = canonicalizeBroccoliRice(adj.name, split.notes)
+  if (broccoliRice) {
+    adj.name = broccoliRice.name
+    adj.amount = 0.5
+    adj.unit = 'stk'
+  }
+
   return {
     name: adj.name,
     amount: adj.amount,
     unit: adj.unit,
-    notes: split.notes,
+    notes: broccoliRice?.notes ?? split.notes,
   }
 }
 
@@ -1104,6 +1155,32 @@ function weavePrepNotesIntoInstructions(
   return [prep, ...rest]
 }
 
+function rewriteCreamTags(text: string): string {
+  return text.replace(/\[\[ing:\s*([^\]#]+?)\s*(#\d+)?\]\]/gi, (full, raw: string, hash?: string) => {
+    const mapped = canonicalCreamName(raw)
+    if (!mapped) return full
+    return `[[ing:${mapped}${hash || ''}]]`
+  })
+}
+
+function canonicalCreamName(name: string): string | null {
+  const n = name.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (/kokos|ost|bolle|kaffe|fraiche|syrnet/.test(n)) return null
+  if (/^piskefl(?:øde|ode)(?:\s*38\s*%)?$/.test(n) || /^fl(?:øde|ode)\s*38\s*%$/.test(n) || n === 'whipping cream') {
+    return 'piskefløde'
+  }
+  if (
+    n === 'fløde' ||
+    n === 'flode' ||
+    /^madlavningsfl(?:øde|ode)(?:\s*18\s*%)?$/.test(n) ||
+    /^fl(?:øde|ode)\s*18\s*%$/.test(n) ||
+    n === 'cooking cream'
+  ) {
+    return 'madlavningsfløde 18%'
+  }
+  return null
+}
+
 export function normalizeAiRecipeInstructions(
   instructions: AiInstructionInput[],
   ingredients?: Array<{ name: string; notes?: string | null }>,
@@ -1112,7 +1189,7 @@ export function normalizeAiRecipeInstructions(
 
   const cleaned = instructions.map((raw) => ({
     ...raw,
-    instruction: stripCelsiusMentions(String(raw.instruction || '')),
+    instruction: rewriteCreamTags(stripCelsiusMentions(String(raw.instruction || ''))),
     tips: raw.tips ? stripCelsiusMentions(String(raw.tips)) : raw.tips ?? null,
   }))
 

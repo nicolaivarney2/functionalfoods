@@ -78,6 +78,70 @@ describe('normalizeAiRecipeInstructions', () => {
     assert.equal(ingredients[0].notes, null)
   })
 
+  it('kalder revet blomkål for frostposen blomkålsris', () => {
+    const [rice] = normalizeAiRecipeIngredients([{ name: 'revet blomkål', amount: 1, unit: 'stk' }])
+    assert.equal(rice.name, 'blomkålsris')
+    assert.equal(rice.notes, 'frosne')
+    assert.equal(rice.amount, 400)
+    assert.equal(rice.unit, 'g')
+
+    const named = normalizeAiRecipeIngredients([{ name: 'blomkålsris', amount: 400, unit: 'g' }])[0]
+    assert.equal(named.name, 'blomkålsris')
+    assert.equal(named.notes, 'frosne')
+    assert.equal(named.amount, 400)
+
+    const head = normalizeAiRecipeIngredients([{ name: 'blomkål', amount: 1, unit: 'stk' }])[0]
+    assert.equal(head.name, 'blomkål')
+  })
+
+  it('lander fløde som madlavningsfløde 18% og lader piskefløde være piskefløde', () => {
+    const cooking = normalizeAiRecipeIngredients([{ name: 'fløde', amount: 2.5, unit: 'dl' }])[0]
+    assert.equal(cooking.name, 'madlavningsfløde 18%')
+    assert.equal(cooking.amount, 150)
+    assert.equal(cooking.unit, 'ml')
+
+    const named = normalizeAiRecipeIngredients([{ name: 'madlavningsfløde', amount: 100, unit: 'ml' }])[0]
+    assert.equal(named.name, 'madlavningsfløde 18%')
+    assert.equal(named.amount, 100)
+
+    const whip = normalizeAiRecipeIngredients([{ name: 'piskefløde', amount: 200, unit: 'ml' }])[0]
+    assert.equal(whip.name, 'piskefløde')
+    assert.equal(whip.amount, 100)
+
+    const heavy = normalizeAiRecipeIngredients([{ name: 'fløde 38%', amount: 50, unit: 'ml' }])[0]
+    assert.equal(heavy.name, 'piskefløde')
+    assert.equal(heavy.amount, 50)
+
+    const cheese = normalizeAiRecipeIngredients([{ name: 'flødeost', amount: 100, unit: 'g' }])[0]
+    assert.equal(cheese.name, 'flødeost')
+
+    const steps = normalizeAiRecipeInstructions(
+      [{ stepNumber: 1, instruction: 'Hæld [[ing:fløde]] i gryden.' }],
+      [cooking],
+    )
+    assert.match(steps[0].instruction, /\[\[ing:madlavningsfløde 18%\]\]/)
+  })
+
+  it('skiller broccoliris fra broccoli i sovsen og sætter et halvt hoved', () => {
+    const rice = normalizeAiRecipeIngredients([{ name: 'broccoliris', amount: 200, unit: 'g' }])[0]
+    assert.equal(rice.name, 'broccoli')
+    assert.equal(rice.notes, 'til ris-tilbehør')
+    assert.equal(rice.amount, 0.5)
+    assert.equal(rice.unit, 'stk')
+
+    const named = normalizeAiRecipeIngredients([
+      { name: 'broccoli til ris tilbehør', amount: 1, unit: 'stk' },
+    ])[0]
+    assert.equal(named.name, 'broccoli')
+    assert.equal(named.amount, 0.5)
+    assert.equal(named.notes, 'til ris-tilbehør')
+
+    const vegetable = normalizeAiRecipeIngredients([{ name: 'broccoli', amount: 1, unit: 'stk' }])[0]
+    assert.equal(vegetable.name, 'broccoli')
+    assert.equal(vegetable.amount, 1)
+    assert.equal(vegetable.notes, null)
+  })
+
   it('beholder frosne som note, fordi det er sådan varen købes', () => {
     const ingredients = [{ name: 'ærter', amount: 200, unit: 'g', notes: 'frosne' }]
     const steps = normalizeAiRecipeInstructions(

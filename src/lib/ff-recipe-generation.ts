@@ -11,8 +11,7 @@ import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
 import { inferSenseIngredientGroupsFromFlat } from '@/lib/sense-spisekasse'
 import { getRecipeStructuralIntegrityIssues } from '@/lib/recipe-structural-integrity'
 import { normalizeDanishRecipeTitle } from '@/lib/recipe-title-format'
-import type { FfRecipeNiche } from '@/lib/recipe-dish-family'
-import { NICHE_PROMPT_NAME } from '@/lib/recipe-dish-family'
+import { ketoDinnerSideIssue, ketoMealKey, NICHE_PROMPT_NAME, type FfRecipeNiche } from '@/lib/recipe-dish-family'
 import { getOpenAIConfig } from '@/lib/openai-config'
 import type { SourceRecipePayload } from '@/lib/recipe-source-adaptation'
 
@@ -149,7 +148,11 @@ function readRecipeJson(content: string): {
   }
 }
 
-function finishRecipe(niche: FfRecipeNiche, parsed: ReturnType<typeof readRecipeJson>): GeneratedNicheRecipe {
+function finishRecipe(
+  niche: FfRecipeNiche,
+  parsed: ReturnType<typeof readRecipeJson>,
+  requireDinnerSide = false,
+): GeneratedNicheRecipe {
   const ingredients = normalizeAiRecipeIngredients(parsed.ingredients)
   const instructions = normalizeAiRecipeInstructions(parsed.instructions, ingredients)
   const title = normalizeDanishRecipeTitle(parsed.title)
@@ -161,6 +164,10 @@ function finishRecipe(niche: FfRecipeNiche, parsed: ReturnType<typeof readRecipe
   if (niche === 'keto') {
     const proteinIssue = ketoProteinIssue(ingredients)
     if (proteinIssue) throw new Error(proteinIssue)
+    if (requireDinnerSide) {
+      const sideIssue = ketoDinnerSideIssue(title, ingredients)
+      if (sideIssue) throw new Error(sideIssue)
+    }
   }
 
   const recipe: GeneratedNicheRecipe = {
@@ -265,9 +272,15 @@ export async function generateFfNicheRecipe(input: GenerateFfNicheInput): Promis
   }
 
   const call = resolveRecipeCall(input)
+  const mealKey = ketoMealKey(input.mealType || '')
+  const requireDinnerSide =
+    input.niche === 'keto' &&
+    (mealKey === 'aftensmad' ||
+      (!(input.mealType || '').trim() && !input.wish?.trim() && !input.sourceRecipe))
   let lastError = ''
+  const maxAttempts = requireDinnerSide ? 3 : 2
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const correction =
       attempt === 0 || !lastError
         ? ''
@@ -309,7 +322,7 @@ export async function generateFfNicheRecipe(input: GenerateFfNicheInput): Promis
     }
 
     try {
-      const recipe = finishRecipe(input.niche, readRecipeJson(String(content)))
+      const recipe = finishRecipe(input.niche, readRecipeJson(String(content)), requireDinnerSide)
       await attachIngredientNutrition(recipe)
       const aiTips = await generateRecipeTips({
         title: recipe.title,

@@ -2,7 +2,49 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { resolveRecipeCall, recipeGenerationTemperature } from './ff-recipe-prompt'
-import { familiesForNiche, pickLeastUsedFamily } from './recipe-dish-family'
+import { familiesForNiche, ketoDinnerSideIssue, pickLeastUsedFamily } from './recipe-dish-family'
+
+describe('ketoDinnerSideIssue', () => {
+  it('afviser flødesovs hvor grønkål og champignon ligger i sovsen', () => {
+    const issue = ketoDinnerSideIssue('Hakket svinekød i fløde med grønkål', [
+      { name: 'hakket svinekød', amount: 350, unit: 'g' },
+      { name: 'grønkål', amount: 150, unit: 'g' },
+      { name: 'champignon', amount: 150, unit: 'g' },
+      { name: 'fløde', amount: 200, unit: 'ml' },
+    ])
+    assert.match(issue || '', /mangler tilbehør/)
+  })
+
+  it('godkender blomkålsris, spidskål og en salat som hele retten', () => {
+    assert.equal(
+      ketoDinnerSideIssue('Svinekød i fløde', [{ name: 'blomkålsris', amount: 400, unit: 'g' }]),
+      null,
+    )
+    assert.match(
+      ketoDinnerSideIssue('Svinekød i fløde', [{ name: 'blomkål', amount: 400, unit: 'g' }]) || '',
+      /blomkålsris/,
+    )
+    assert.equal(
+      ketoDinnerSideIssue('Koteletter', [{ name: 'spidskål', amount: 1, unit: 'stk' }]),
+      null,
+    )
+    assert.equal(
+      ketoDinnerSideIssue('Koteletter', [
+        { name: 'broccoli', amount: 0.5, unit: 'stk', notes: 'til ris-tilbehør' },
+      ]),
+      null,
+    )
+    assert.match(
+      ketoDinnerSideIssue('Koteletter', [{ name: 'broccoli', amount: 1, unit: 'stk' }]) || '',
+      /til ris-tilbehør/,
+    )
+    assert.equal(ketoDinnerSideIssue('Cæsarsalat med kylling', [{ name: 'kylling', amount: 300, unit: 'g' }]), null)
+    assert.equal(
+      ketoDinnerSideIssue('Oksekød', [{ name: 'blomkål', amount: 150, unit: 'g' }]),
+      ketoDinnerSideIssue('Oksekød', []),
+    )
+  })
+})
 
 describe('pickLeastUsedFamily', () => {
   it('vælger familien der er brugt mindst', () => {
@@ -27,7 +69,58 @@ describe('resolveRecipeCall', () => {
     assert.match(call.systemPrompt, /Nævn ikke Planomo/)
     assert.match(call.systemPrompt, new RegExp(`DENNE GANG: ${call.familyLabel}`))
     assert.match(call.userPrompt, /Generer én keto-opskrift til 2/)
+    assert.match(call.systemPrompt, /AFTENSMAD/)
+    assert.match(call.systemPrompt, /færdigt måltid/)
+    assert.match(call.systemPrompt, /Grønt i sovsen er ikke tilbehør/)
+    assert.match(call.systemPrompt, /400 g blomkålsris/)
+    assert.match(call.systemPrompt, /0,5 stk broccoli/)
+    assert.match(call.systemPrompt, /100 g pr\. person/)
+    assert.match(call.systemPrompt, /Hold dig til det spor/)
+    assert.doesNotMatch(call.systemPrompt, /UNDTAGELSE FRA OLIVENOLIE/)
     assert.doesNotMatch(call.systemPrompt, /madpakke|børnene/)
+  })
+
+  it('gør keto-frokost nem og skifter mellem salat, wrap og tærte', () => {
+    const call = resolveRecipeCall({ niche: 'keto', mealType: 'frokost' })
+    assert.equal(call.mode, 'free')
+    assert.match(call.systemPrompt, /FROKOST/)
+    assert.match(call.systemPrompt, /Nemt, men lækkert/)
+    assert.match(call.systemPrompt, /croutoner/)
+    assert.match(call.systemPrompt, /æggecrepe|ostewrap/i)
+    assert.match(call.userPrompt, /^Generer én keto-opskrift til 2\. Det skal være frokost:/)
+    assert.ok(call.familyLabel)
+  })
+
+  it('skiller keto-morgenmad på tid uden at låse én ret', () => {
+    const call = resolveRecipeCall({ niche: 'keto', mealType: 'morgenmad' })
+    assert.match(call.systemPrompt, /MORGENMAD/)
+    assert.match(call.systemPrompt, /5–10 minutter/)
+    assert.match(call.systemPrompt, /ikke skabelonen/)
+    assert.match(call.systemPrompt, /chiapudding/i)
+    assert.match(call.systemPrompt, /mandelmel/)
+    assert.match(call.userPrompt, /morgenmad:/)
+  })
+
+  it('kan lave fedtkaffe som en keto-snack blandt andre', () => {
+    const call = resolveRecipeCall({ niche: 'keto', mealType: 'snacks' })
+    assert.match(call.systemPrompt, /SNACKS/)
+    assert.match(call.systemPrompt, /fedtkaffe/)
+    assert.match(call.systemPrompt, /MCT-olie/)
+    assert.match(call.systemPrompt, /ikke den eneste/)
+    assert.match(call.systemPrompt, /UNDTAGELSE FRA OLIVENOLIE/)
+  })
+
+  it('beholder keto-måltidet når brugeren har et ønske', () => {
+    const call = resolveRecipeCall({
+      niche: 'keto',
+      mealType: 'morgenmad',
+      wish: 'røræg',
+    })
+    assert.equal(call.mode, 'wish')
+    assert.equal(call.familyLabel, null)
+    assert.match(call.systemPrompt, /MORGENMAD/)
+    assert.match(call.userPrompt, /røræg/)
+    assert.doesNotMatch(call.systemPrompt, /DENNE GANG:/)
   })
 
   it('springer familien over ved fritekst og ved kildeopskrift', () => {

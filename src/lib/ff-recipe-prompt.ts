@@ -1,9 +1,12 @@
 import {
+  familiesForKetoMeal,
   familiesForNiche,
   focusLine,
+  ketoMealGuidance,
   lockedBlock,
   NICHE_PROMPT_NAME,
   pickLeastUsedFamily,
+  pickRandomFamily,
   type FfRecipeNiche,
 } from '@/lib/recipe-dish-family'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
@@ -35,7 +38,8 @@ const AMOUNT_RULES = `MÆNGDER TIL 2 PERSONER:
 - Ris eller pasta, tør: 150–200 g
 - Broccoli: 0,5–1 stk. Aldrig gram
 - Løg: 1 stk. Gulerødder: 2–3 stk. Tomater: 2–3 stk. Æg: 2–3 stk
-- Fløde eller mælk: 200–300 ml. Smør eller olie: 1–2 spsk
+- Mælk: 200–300 ml. Fløde i sovs er madlavningsfløde 18%, 100–150 ml til 2. Ikke i hver ret.
+- Piskefløde kun når den skal piskes. Navnet er piskefløde, højst 100 ml til 2. Smør eller olie: 1–2 spsk
 - I tvivl: den mindre mængde`
 
 export const FF_JSON_RECIPE_FORMAT = `OPPSKRIFT FORMAT (returner kun JSON):
@@ -123,7 +127,17 @@ export function buildFfRecipeSystemPrompt(input: {
   niche: FfRecipeNiche
   titles: string[]
   familyLabel: string | null
+  mealGuidance?: string | null
 }): string {
+  const denneGang = input.familyLabel
+    ? input.mealGuidance?.trim()
+      ? `DENNE GANG: ${input.familyLabel}. Hold dig til det spor, men skift protein, grønt og smag, så det ikke bliver den samme ret.`
+      : denneGangLine(input.familyLabel)
+    : ''
+  const mealAndFocus = [input.mealGuidance?.trim(), denneGang].filter(Boolean).join('\n\n')
+  const fatCoffeeException = input.mealGuidance?.includes('fedtkaffe')
+    ? '\n\nUNDTAGELSE FRA OLIVENOLIE: Fedtkaffe laves med smør og/eller MCT-olie. Ikke olivenolie.'
+    : ''
   return `Du er FunctionalFoods' opskriftsassistent. Skriv altid på dansk. Brug almindelige danske butiksvarer. Tone og fokus følger den aktive kost. Nævn ikke Planomo.
 
 ${focusLine(input.niche)}
@@ -132,14 +146,14 @@ ${DESCRIPTION_RULES}
 
 ${lockedBlock(input.niche)}
 
-${denneGangLine(input.familyLabel)}
+${mealAndFocus}
 
 EKSISTERENDE OPSKRIFTER (lav en anden slags ret):
 ${formatExistingTitles(input.titles)}
 
 ${AMOUNT_RULES}
 
-${FF_JSON_RECIPE_FORMAT}`.replace(/\n{3,}/g, '\n\n')
+${FF_JSON_RECIPE_FORMAT}${fatCoffeeException}`.replace(/\n{3,}/g, '\n\n')
 }
 
 export function buildFreeTextWishBlock(wish: string, niche: FfRecipeNiche): string {
@@ -164,10 +178,12 @@ export function buildFreeRecipeUserPrompt(input: {
 export function buildMealUserPrompt(input: {
   niche: FfRecipeNiche
   mealLabel: string
+  familyLabel?: string | null
   constraints?: string[]
 }): string {
   const nicheName = NICHE_PROMPT_NAME[input.niche]
-  const base = `Generer én ${nicheName}-opskrift til 2. Det skal være ${input.mealLabel}. Fremgangsmåden skal gøre den færdig.`
+  const focus = input.familyLabel?.trim() ? `${input.mealLabel}: ${input.familyLabel.trim()}` : input.mealLabel
+  const base = `Generer én ${nicheName}-opskrift til 2. Det skal være ${focus}. Fremgangsmåden skal gøre den færdig.`
   const extra = (input.constraints || []).map((line) => line.trim()).filter(Boolean)
   return extra.length ? `${base}\n\n${extra.join('\n')}` : base
 }
@@ -204,13 +220,16 @@ export function resolveRecipeCall(input: {
   const wish = input.wish?.trim() || ''
   const meal = (input.mealType || '').trim().toLowerCase()
   const constraints = input.constraints || []
+  const named = Boolean(wish) || isSourceRecipe(input.sourceRecipe)
+  const guidanceMeal = input.niche === 'keto' ? meal || (named ? '' : 'aftensmad') : ''
+  const mealGuidance = guidanceMeal ? ketoMealGuidance(guidanceMeal) : null
 
   if (isSourceRecipe(input.sourceRecipe)) {
     return {
       mode: 'source',
       temperature: recipeGenerationTemperature('source'),
       familyLabel: null,
-      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null }),
+      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null, mealGuidance }),
       userPrompt: buildSourceRecipeUserPrompt(input.sourceRecipe, NICHE_PROMPT_NAME[input.niche]),
     }
   }
@@ -220,18 +239,20 @@ export function resolveRecipeCall(input: {
       mode: 'wish',
       temperature: recipeGenerationTemperature('wish'),
       familyLabel: null,
-      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null }),
+      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null, mealGuidance }),
       userPrompt: buildWishUserPrompt({ niche: input.niche, wish, constraints }),
     }
   }
 
   if (meal && !DINNER_MEALS.has(meal)) {
+    const mealFamilies = input.niche === 'keto' ? familiesForKetoMeal(meal) : []
+    const familyLabel = mealFamilies.length ? pickRandomFamily(mealFamilies) : null
     return {
       mode: 'free',
       temperature: recipeGenerationTemperature('free'),
-      familyLabel: null,
-      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null }),
-      userPrompt: buildMealUserPrompt({ niche: input.niche, mealLabel: meal, constraints }),
+      familyLabel,
+      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel, mealGuidance }),
+      userPrompt: buildMealUserPrompt({ niche: input.niche, mealLabel: meal, familyLabel, constraints }),
     }
   }
 
@@ -240,7 +261,7 @@ export function resolveRecipeCall(input: {
     mode: 'free',
     temperature: recipeGenerationTemperature('free'),
     familyLabel,
-    systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel }),
+    systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel, mealGuidance }),
     userPrompt: buildFreeRecipeUserPrompt({ niche: input.niche, familyLabel, constraints }),
   }
 }
