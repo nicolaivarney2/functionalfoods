@@ -194,6 +194,8 @@ export type AddEntryInput = {
   carbs?: number
   fat?: number
   fiber?: number
+  vitamins?: Record<string, number>
+  minerals?: Record<string, number>
 }
 
 export async function addDiaryEntry(input: AddEntryInput): Promise<DiaryEntry> {
@@ -245,6 +247,22 @@ export async function logMealToDiary(input: LogMealInput): Promise<DiaryEntry> {
   })
   const data = await readJson<{ data: Record<string, unknown> }>(res)
   return mapEntry(data.data)
+}
+
+export async function loadDiaryWeek(
+  start: string,
+  days = 7
+): Promise<Array<{ date: string; entries: DiaryEntry[] }>> {
+  const res = await authFetch(
+    `/api/diary/week?start=${encodeURIComponent(start)}&days=${days}`
+  )
+  const data = await readJson<{
+    items?: Array<{ date?: string; entries?: Record<string, unknown>[] }>
+  }>(res)
+  return (data.items ?? []).map((item) => ({
+    date: String(item.date ?? ''),
+    entries: (item.entries ?? []).map(mapEntry),
+  }))
 }
 
 export async function syncMealPlanToDiary(opts?: {

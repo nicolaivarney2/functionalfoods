@@ -21,21 +21,31 @@ export function extractRecipeIdsFromMealPlanData(raw: unknown): string[] {
   return Array.from(ids)
 }
 
-/** Seneste madplaners retter — undgås ved ny generering (typisk forrige uge). */
+/**
+ * Seneste madplaners retter — undgås ved ny generering (typisk forrige uge).
+ * `currentWeekStarts` er alle mandage i det indkøb, der laves om. Den anden
+ * mandag i samme indkøb må ikke tælle som en ældre plan.
+ */
 export function collectRecentlyUsedRecipeIds(
   plans: Array<{ week_start_date?: string; meal_plan_data?: unknown; updated_at?: string }>,
-  currentWeekStart: string,
+  currentWeekStarts: string | string[],
 ): string[] {
+  const current = new Set(
+    (Array.isArray(currentWeekStarts) ? currentWeekStarts : [currentWeekStarts]).map((d) =>
+      String(d).slice(0, 10)
+    )
+  )
   const ids = new Set<string>()
   const now = Date.now()
   const rapidRetryWindowMs = 30 * 60 * 1000
 
   for (const plan of plans) {
-    const isCurrentWeek = plan.week_start_date === currentWeekStart
+    const start = String(plan.week_start_date || '').slice(0, 10)
+    const isCurrentWeek = current.has(start)
     const updatedAt = plan.updated_at ? new Date(plan.updated_at).getTime() : 0
     const isRecentRetry = isCurrentWeek && now - updatedAt < rapidRetryWindowMs
 
-    // Forrige uger: altid undgå. Samme uge inden for 30 min: også undgå (shake-up).
+    // Forrige uger: altid undgå. Samme indkøb inden for 30 min: også undgå (shake-up).
     if (!isCurrentWeek || isRecentRetry) {
       for (const id of extractRecipeIdsFromMealPlanData(plan.meal_plan_data)) {
         ids.add(id)

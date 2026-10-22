@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import { getSupabaseRouteUser } from '@/lib/supabase-api-user'
 import { assertDiaryWriteAllowed, SubscriptionLimitError } from '@/lib/subscription-entitlements'
 import { prepareStoredMicros } from '@/lib/diary-food-log-micro'
+import { parseShop, sameShop } from '@/lib/madbudget/meal-plan-span'
+import { addIsoDays } from '@/lib/madbudget/week-dates'
 
 export const dynamic = 'force-dynamic'
 
@@ -166,16 +168,32 @@ export async function POST(request: NextRequest) {
 
     const weekStart = plan.week_start_date as string
     if (!weekStart) return NextResponse.json({ error: 'Madplan mangler startdato' }, { status: 400 })
-    const weekEnd = (plan.week_end_date as string) || addDays(weekStart, 6)
+    const shop = parseShop(plan.meal_plan_data)
+    let sources: PlanRow[] = [plan]
+    if (shop) {
+      const { data: siblingRows } = await supabase
+        .from('user_meal_plans')
+        .select('id, week_start_date, week_end_date, meal_plan_data, is_active')
+        .eq('user_id', ownerId)
+        .order('week_start_date', { ascending: true })
+        .limit(12)
+      const matched = ((siblingRows ?? []) as PlanRow[]).filter((row) =>
+        sameShop(parseShop(row.meal_plan_data), shop)
+      )
+      if (matched.length) sources = matched
+    }
+    const weekEnd = shop ? addIsoDays(shop.date, shop.dayCount - 1) : (plan.week_end_date as string) || addDays(weekStart, 6)
+    const spanStart = shop ? shop.date : weekStart
 
-    const grid = extractGrid(plan.meal_plan_data)
-
-    // Byg entries for alle dage/måltider planen dækker.
     const rows: Record<string, unknown>[] = []
-    PLAN_DAYS.forEach((day, dayIdx) => {
+    for (const source of sources) {
+      const sourceStart = source.week_start_date as string
+      const grid = extractGrid(source.meal_plan_data)
+      PLAN_DAYS.forEach((day, dayIdx) => {
       const dayObj = grid[day]
       if (!dayObj || typeof dayObj !== 'object') return
-      const loggedDate = addDays(weekStart, dayIdx)
+      const loggedDate = addDays(sourceStart, dayIdx)
+      if (shop && (loggedDate < shop.date || loggedDate > weekEnd)) return
       if (fromDate && loggedDate < fromDate) return
       for (const meal of PLAN_MEALS) {
         const cell = dayObj[meal] as Cell | null
@@ -187,7 +205,7 @@ export async function POST(request: NextRequest) {
           logged_date: loggedDate,
           meal_type: meal,
           source: 'meal-plan',
-          meal_plan_id: plan.id,
+          meal_plan_id: source.id,
           recipe_id: cell.id != null ? String(cell.id) : null,
           recipe_slug: cell.slug != null ? String(cell.slug) : null,
           title: String(cell.title).slice(0, 200),
@@ -204,8 +222,9 @@ export async function POST(request: NextRequest) {
         })
       }
     })
+    }
 
-    const rangeStart = fromDate && fromDate > weekStart ? fromDate : weekStart
+    const rangeStart = fromDate && fromDate > spanStart ? fromDate : spanStart
 
     const { data: existingSlots, error: existErr } = await supabase
       .from('food_log_entries')
@@ -229,14 +248,15 @@ export async function POST(request: NextRequest) {
 
     let delErr
     if (replaceAll) {
-      const sources = ['meal-plan', 'meal-plan-dismissed']
+      const entrySources = ['meal-plan', 'meal-plan-dismissed']
+      const planIds = sources.map((source) => source.id)
       if (fromDate) {
         ({ error: delErr } = await supabase
           .from('food_log_entries')
           .delete()
           .eq('user_id', user.id)
-          .in('source', sources)
-          .eq('meal_plan_id', plan.id)
+          .in('source', entrySources)
+          .in('meal_plan_id', planIds)
           .gte('logged_date', rangeStart)
           .lte('logged_date', weekEnd))
       } else {
@@ -244,14 +264,14 @@ export async function POST(request: NextRequest) {
           .from('food_log_entries')
           .delete()
           .eq('user_id', user.id)
-          .in('source', sources)
-          .eq('meal_plan_id', plan.id)
+          .in('source', entrySources)
+          .in('meal_plan_id', planIds)
         ;({ error: delErr } = await supabase
           .from('food_log_entries')
           .delete()
           .eq('user_id', user.id)
-          .in('source', sources)
-          .gte('logged_date', weekStart)
+          .in('source', entrySources)
+          .gte('logged_date', spanStart)
           .lte('logged_date', weekEnd))
       }
       if (delErr) {

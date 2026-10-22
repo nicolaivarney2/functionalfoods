@@ -1,3 +1,5 @@
+import { isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
+
 const DAY_KEYS = [
   'monday',
   'tuesday',
@@ -54,7 +56,7 @@ export function countCellsMissingIngredients(raw: unknown): number {
   for (const day of DAY_KEYS) {
     for (const meal of MEALS) {
       const cell = grid[day]?.[meal]
-      if (cell && !cellHasIngredients(cell)) n++
+      if (cell && !isLeftoverMealCell(cell) && !cellHasIngredients(cell)) n++
     }
   }
   return n
@@ -78,7 +80,7 @@ export function mergeMealPlanDataPreservingIngredients(incoming: unknown, existi
     for (const meal of MEALS) {
       const inCell = inDay[meal]
       const exCell = exDay?.[meal]
-      if (!inCell || !exCell) continue
+      if (!inCell || !exCell || isLeftoverMealCell(inCell)) continue
       if (!cellHasIngredients(inCell) && cellHasIngredients(exCell)) {
         mergedDay[meal] = { ...inCell, ingredients: exCell.ingredients }
       }
@@ -101,7 +103,7 @@ export async function hydrateGridIngredientsFromRecipes(
   for (const day of DAY_KEYS) {
     for (const meal of MEALS) {
       const cell = grid[day]?.[meal]
-      if (!cell || cellHasIngredients(cell)) continue
+      if (!cell || isLeftoverMealCell(cell) || cellHasIngredients(cell)) continue
       const slug = typeof cell.slug === 'string' ? cell.slug.trim() : ''
       if (slug) slugs.add(slug)
     }
@@ -134,7 +136,7 @@ export async function hydrateGridIngredientsFromRecipes(
     let changed = false
     for (const meal of MEALS) {
       const cell = row[meal]
-      if (!cell || cellHasIngredients(cell)) continue
+      if (!cell || isLeftoverMealCell(cell) || cellHasIngredients(cell)) continue
       const slug = typeof cell.slug === 'string' ? cell.slug.trim() : ''
       const ingredients = slug ? bySlug.get(slug) : undefined
       if (!ingredients) continue

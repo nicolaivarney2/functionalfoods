@@ -22,6 +22,8 @@ import {
 
 import { getPeoplePerMealFromAdultsProfiles } from './people-per-meal';
 import { computeChildPersonEquivalent } from '../madbudget/person-equivalent';
+import { shoppingPeopleEating } from '../madbudget/next-lunch-leftover';
+import { recipeFitsSlotStyle } from '../madbudget/meal-slot-style';
 
 import { RecipeCategory } from '../ingredient-system';
 
@@ -633,6 +635,8 @@ export class MealPlanGenerator {
       includedRecipeCategories?: string[]
       /** Recipe IDs fra seneste madplaner — undgås ved ny generering. */
       recentlyUsedRecipeIds?: string[]
+      breakfastStyle?: 'skip' | 'fast' | 'home' | 'repeat'
+      lunchStyle?: 'skip' | 'leftovers' | 'packed' | 'home'
       /** Rester / køleskab — scores + trækkes fra indkøbslisten. */
       availableIngredients?: Array<{
         ingredientId?: string
@@ -640,6 +644,8 @@ export class MealPlanGenerator {
         amount: number
         unit: string
       }>
+      /** Antal dage i spise-rækkefølge. Generatoren kender ikke ugedage. */
+      planDayCount?: number
     },
     variationLevel: number = 2 // 0-3 scale for variation preference
   ): Promise<WeekPlan> {
@@ -750,19 +756,25 @@ export class MealPlanGenerator {
       },
       difficultyLevel: DifficultyLevel.Medium,
       timeConstraints: {
-        maxPrepTime: 30,
+        maxPrepTime: familyProfile.breakfastStyle === 'fast' ? 15 : 30,
         maxCookTime: 60,
         preferredCookingDays: ['monday', 'wednesday', 'friday'],
         batchCookingAllowed: true
       },
+      breakfastStyle:
+        familyProfile.breakfastStyle ??
+        (planOwner as { breakfastStyle?: 'skip' | 'fast' | 'home' | 'repeat' } | undefined)?.breakfastStyle,
+      lunchStyle:
+        familyProfile.lunchStyle ??
+        (planOwner as { lunchStyle?: 'skip' | 'leftovers' | 'packed' | 'home' } | undefined)?.lunchStyle,
     };
 
     const storeIds = familyProfile.selectedStores ?? []
     console.log(`🛒 Loading offers from stores: ${storeIds.length ? storeIds.join(', ') : '(ingen butikker valgt)'}`)
     await this.loadCurrentOffers(storeIds)
 
-    // Generate 1 week of meal plans
-    const weekPlan = await this.generateWeekPlan(1, config);
+    const planDayCount = Math.min(14, Math.max(1, Math.round(familyProfile.planDayCount ?? 7)))
+    const weekPlan = await this.generateWeekPlan(1, config, planDayCount);
 
     console.log(`1-week meal plan generated in ${Date.now() - startTime}ms`);
     return weekPlan;
@@ -880,7 +892,9 @@ export class MealPlanGenerator {
       planDietaryApproach?: string
       }
     },
-    availableIngredients?: AvailableIngredient[]
+    availableIngredients?: AvailableIngredient[],
+    /** Spise-rækkefølge på tværs af kalenderuger. Samme ugedag kan findes to gange. */
+    spanDays?: Array<{ date: string; breakfast?: unknown; lunch?: unknown; dinner?: unknown }>
   ): Promise<ShoppingList> {
     const dayKeys = [
       'monday',
@@ -899,10 +913,18 @@ export class MealPlanGenerator {
     anchor.setDate(anchor.getDate() + mondayOffset);
     anchor.setHours(0, 0, 0, 0);
 
-    const days: DayPlan[] = dayKeys.map((dayKey, dayIndex) => {
-      const date = new Date(anchor);
-      date.setDate(anchor.getDate() + dayIndex);
-      const row = grid[dayKey] || {};
+    const dayRows = spanDays?.length
+      ? spanDays.map((day) => ({
+          date: new Date(`${day.date.slice(0, 10)}T12:00:00`),
+          row: { breakfast: day.breakfast, lunch: day.lunch, dinner: day.dinner },
+        }))
+      : dayKeys.map((dayKey, dayIndex) => {
+          const date = new Date(anchor);
+          date.setDate(anchor.getDate() + dayIndex);
+          return { date, row: grid[dayKey] || {} };
+        });
+
+    const days: DayPlan[] = dayRows.map(({ date, row }) => {
       const meals: MealAssignment[] = [];
 
       for (const mt of mealTypes) {
@@ -911,7 +933,7 @@ export class MealPlanGenerator {
         const c = cell as Record<string, unknown>;
         if (c.leftoverFromDay || c.isLeftover === true) continue;
         const cookDays = Number(c.cookAheadDays);
-        const peopleEating =
+        const basePeopleEating =
           Number.isFinite(cookDays) && cookDays > 1 && Number(c.servings) > 0
             ? Number(c.servings)
             : family
@@ -919,6 +941,9 @@ export class MealPlanGenerator {
               : Number(c.householdServings) > 0
                 ? Number(c.householdServings)
                 : Math.max(1, Number(c.servings) || 1);
+        // extraShoppingPortions er den bevidste rester-portion. Den ændrer mængden,
+        // så indkøbslistens pris-cache kan se forskellen.
+        const peopleEating = shoppingPeopleEating(basePeopleEating, c);
         meals.push({
           mealType: mt as MealType,
           recipe: this.normalizePlannerCellToRecipe(c),
@@ -1015,7 +1040,8 @@ export class MealPlanGenerator {
    */
   private async generateWeekPlan(
     weekNumber: number,
-    config: MealPlanConfig
+    config: MealPlanConfig,
+    dayCount = 7
   ): Promise<WeekPlan> {
     // Per-uge overlap mellem måltider — ikke kryds-generering.
     this.selectedIngredientIds.clear();
@@ -1037,7 +1063,8 @@ export class MealPlanGenerator {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() + (weekNumber - 1) * 7);
 
-    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const daysToPlan = Math.min(14, Math.max(1, Math.round(dayCount)))
+    for (let dayIndex = 0; dayIndex < daysToPlan; dayIndex++) {
       const date = new Date(startDate);
       date.setDate(startDate.getDate() + dayIndex);
       
@@ -1247,8 +1274,33 @@ export class MealPlanGenerator {
       return true;
     });
     
-    console.log(`🔍 Filtered ${this.recipes.length} recipes → ${filteredRecipes.length} suitable (excluded: ${excludedByMealType} meal type, ${excludedByDietaryApproach} dietary, ${excludedByCarbs} carbs)`);
-    return filteredRecipes;
+    const slot =
+      mealType === 'breakfast' || mealType === 'lunch' || mealType === MealType.Breakfast || mealType === MealType.Lunch
+        ? (String(mealType) as 'breakfast' | 'lunch')
+        : null
+    const styled = slot
+      ? filteredRecipes.filter((recipe) =>
+          recipeFitsSlotStyle(
+            {
+              title: recipe.title,
+              category: recipe.categories?.[0],
+              subCategories: recipe.categories,
+              dietaryTags: recipe.dietaryApproaches,
+              preparationTime: recipe.prepTime,
+            },
+            slot,
+            {
+              dietaryApproach: config.dietaryApproach?.id,
+              breakfastStyle: config.breakfastStyle,
+              lunchStyle: config.lunchStyle,
+            }
+          )
+        )
+      : filteredRecipes
+    const pool = styled.length >= 4 ? styled : filteredRecipes
+
+    console.log(`🔍 Filtered ${this.recipes.length} recipes → ${pool.length} suitable (excluded: ${excludedByMealType} meal type, ${excludedByDietaryApproach} dietary, ${excludedByCarbs} carbs)`);
+    return pool;
   }
 
   /**
@@ -2174,13 +2226,14 @@ export class MealPlanGenerator {
       });
     });
 
-    const averageDailyCalories = totalCalories / 7;
-    const averageDailyProtein = totalProtein / 7;
-    const averageDailyCarbs = totalCarbs / 7;
-    const averageDailyFat = totalFat / 7;
-    const averageDailyFiber = totalFiber / 7;
-    const averageDailySugar = totalSugar / 7;
-    const averageDailySodium = totalSodium / 7;
+    const plannedDays = Math.max(1, days.length);
+    const averageDailyCalories = totalCalories / plannedDays;
+    const averageDailyProtein = totalProtein / plannedDays;
+    const averageDailyCarbs = totalCarbs / plannedDays;
+    const averageDailyFat = totalFat / plannedDays;
+    const averageDailyFiber = totalFiber / plannedDays;
+    const averageDailySugar = totalSugar / plannedDays;
+    const averageDailySodium = totalSodium / plannedDays;
 
     const nutritionGoals: NutritionGoals = {
       targetCalories: config.targetCalories,
@@ -2256,7 +2309,7 @@ export class MealPlanGenerator {
 
     // Vitamin and mineral deficiencies
     Object.entries(vitaminTotals).forEach(([vitamin, totalAmount]) => {
-      const dailyAverage = totalAmount / 7;
+      const dailyAverage = totalAmount / plannedDays;
       const targetAmount = this.getVitaminTarget(vitamin);
       if (dailyAverage < targetAmount * 0.8) {
         deficiencies.push({
@@ -2271,7 +2324,7 @@ export class MealPlanGenerator {
     });
 
     Object.entries(mineralTotals).forEach(([mineral, totalAmount]) => {
-      const dailyAverage = totalAmount / 7;
+      const dailyAverage = totalAmount / plannedDays;
       const targetAmount = this.getMineralTarget(mineral);
       if (dailyAverage < targetAmount * 0.8) {
         deficiencies.push({
@@ -2288,7 +2341,7 @@ export class MealPlanGenerator {
     // Identify strengths: top 3 nutrients where coverage >= 1.0 (meeting or exceeding targets)
     const strengths: { nutrient: string; coverage: number; unit: string; dailyAverage: number; targetAmount: number }[] = [];
     Object.entries(vitaminTotals).forEach(([vitamin, totalAmount]) => {
-      const dailyAverage = totalAmount / 7;
+      const dailyAverage = totalAmount / plannedDays;
       const target = this.getVitaminTarget(vitamin);
       if (target > 0) {
         const coverage = dailyAverage / target;
@@ -2298,7 +2351,7 @@ export class MealPlanGenerator {
       }
     });
     Object.entries(mineralTotals).forEach(([mineral, totalAmount]) => {
-      const dailyAverage = totalAmount / 7;
+      const dailyAverage = totalAmount / plannedDays;
       const target = this.getMineralTarget(mineral);
       if (target > 0) {
         const coverage = dailyAverage / target;

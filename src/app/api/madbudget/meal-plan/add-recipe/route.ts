@@ -5,6 +5,9 @@ import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopp
 import { getWeekInfo } from '@/lib/madbudget/week-dates'
 import { loadHouseholdForUser } from '@/lib/household-access'
 import { resolveHouseholdMealPlan } from '@/lib/madbudget/resolve-meal-plan'
+import { mealPlanDataKeepingMeta, parseShop } from '@/lib/madbudget/meal-plan-span'
+import type { CookAheadGrid } from '@/lib/madbudget/cook-ahead'
+import { replaceMealKeepingLeftovers } from '@/lib/madbudget/next-lunch-leftover'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -168,16 +171,25 @@ export async function POST(request: NextRequest) {
       weekStartDate: weekStartDateArg,
     })
 
-    const { grid, slotLocks } = parseMealPlanData(existingPlan?.meal_plan_data)
+    const parsed = parseMealPlanData(existingPlan?.meal_plan_data)
     const dayKey = day as DayKey
     const mealKey = meal as MealType
-    grid[dayKey][mealKey] = mealSlotFromRecipe(recipe, mealKey)
+    const grid = replaceMealKeepingLeftovers(
+      parsed.grid as CookAheadGrid,
+      dayKey,
+      mealKey,
+      mealSlotFromRecipe(recipe, mealKey) as Record<string, unknown>
+    ) as typeof parsed.grid
+    const slotLocks = parsed.slotLocks
     slotLocks[`${dayKey}_${mealKey}`] = true
 
-    const mealPlanData = { v: 2, grid, slotLocks }
+    const mealPlanData = mealPlanDataKeepingMeta(existingPlan?.meal_plan_data, grid, slotLocks)
 
     // Genopbyg indkøbslisten så priserne følger den ændrede madplan.
-    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any)
+    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any, {
+      shop: parseShop(existingPlan?.meal_plan_data),
+      weekStartDate: existingPlan?.week_start_date,
+    })
 
     if (existingPlan) {
       const { error: updateError } = await supabase

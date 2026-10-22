@@ -74,6 +74,8 @@ export async function PATCH(request: NextRequest) {
     }
     if (typeof body.dietaryApproach === 'string') row.dietary_approach = body.dietaryApproach
     if (Array.isArray(body.mealsPerDay)) row.meals_per_day = body.mealsPerDay
+    if (typeof body.breakfastStyle === 'string') row.breakfast_style = body.breakfastStyle
+    if (typeof body.lunchStyle === 'string') row.lunch_style = body.lunchStyle
     if (typeof body.weightGoal === 'string') row.weight_goal = body.weightGoal
     if (typeof body.isComplete === 'boolean') row.is_complete = body.isComplete
 

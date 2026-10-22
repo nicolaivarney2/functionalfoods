@@ -252,6 +252,8 @@ export async function POST(request: NextRequest) {
               dietary_approach: p.dietaryApproach,
               excluded_foods: [],
               meals_per_day: (p.mealsPerDay as string[]) || ['dinner'],
+              breakfast_style: p.breakfastStyle ?? null,
+              lunch_style: p.lunchStyle ?? null,
               weight_goal: p.weightGoal,
               is_complete: derivedComplete || Boolean(p.isComplete),
               updated_at: new Date().toISOString(),

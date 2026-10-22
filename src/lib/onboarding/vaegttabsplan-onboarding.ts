@@ -2,6 +2,18 @@ import { ActivityLevel, DietaryCalculator, UserProfile, WeightGoal } from '@/lib
 import { DIETARY_APPROACH_OPTIONS } from '@/lib/dietary-approach-options'
 import { MADBUDGET_SELECTABLE_STORES, selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 import { mealsPerDayFromScope } from '@/lib/adult-plan-profile'
+import {
+  inferBreakfastStyle,
+  inferLunchStyle,
+  mealsPerDayFromStyles,
+  mealSlotStylesSummary,
+  parseBreakfastStyle,
+  parseLunchStyle,
+  type BreakfastStyle,
+  type LunchStyle,
+} from '@/lib/madbudget/meal-slot-style'
+
+export type { BreakfastStyle, LunchStyle }
 
 export const ONBOARDING_STORAGE_KEY = 'ff_vaegttabsplan_onboarding_v1'
 export const CHECKOUT_PLAN_KEY = 'ff_checkout_plan'
@@ -61,8 +73,30 @@ export function mealPlanScopeLabel(scope?: MealPlanScope): string {
   return '—'
 }
 
+export function onboardingMealSummary(data: {
+  mealPlanScope?: MealPlanScope
+  breakfastStyle?: BreakfastStyle
+  lunchStyle?: LunchStyle
+  dietaryApproach?: string
+}): string {
+  if (data.breakfastStyle || data.lunchStyle) {
+    return mealSlotStylesSummary({
+      dietaryApproach: data.dietaryApproach,
+      breakfastStyle: data.breakfastStyle ?? inferBreakfastStyle(
+        data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner'],
+        data.breakfastStyle
+      ),
+      lunchStyle: data.lunchStyle ?? inferLunchStyle(
+        data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner'],
+        data.lunchStyle
+      ),
+    })
+  }
+  return mealPlanScopeLabel(data.mealPlanScope)
+}
+
 export type VaegttabsplanOnboardingData = {
-  version: 2
+  version: 3
   currentStep: number
   /** Antal voksne i husstanden (inkl. brugeren selv). */
   adults?: number
@@ -76,6 +110,8 @@ export type VaegttabsplanOnboardingData = {
   activityLevel?: ActivityLevel
   dietaryApproach?: string
   mealPlanScope?: MealPlanScope
+  breakfastStyle?: BreakfastStyle
+  lunchStyle?: LunchStyle
   selectedStores: number[]
   excludedFoods: string[]
   name?: string
@@ -84,7 +120,7 @@ export type VaegttabsplanOnboardingData = {
 
 export function defaultOnboardingData(): VaegttabsplanOnboardingData {
   return {
-    version: 2,
+    version: 3,
     currentStep: 0,
     adults: 1,
     children: 0,
@@ -126,11 +162,13 @@ export function loadOnboardingData(): VaegttabsplanOnboardingData | null {
     const merged: VaegttabsplanOnboardingData = {
       ...defaultOnboardingData(),
       ...parsed,
-      version: 2,
+      version: 3,
       adults: parsed.adults ?? 1,
       children: parsed.children ?? 0,
       selectedStores: parsed.selectedStores ?? [1, 2],
       excludedFoods: parsed.excludedFoods ?? [],
+      breakfastStyle: parseBreakfastStyle(parsed.breakfastStyle) ?? undefined,
+      lunchStyle: parseLunchStyle(parsed.lunchStyle) ?? undefined,
     }
     if (savedVersion === 1) {
       merged.currentStep = migrateOnboardingStep(parsed.currentStep ?? 0, merged)
@@ -225,7 +263,8 @@ export function onboardingProfileComplete(data: VaegttabsplanOnboardingData): bo
       data.weight &&
       data.activityLevel != null &&
       data.dietaryApproach &&
-      data.mealPlanScope &&
+      data.breakfastStyle &&
+      data.lunchStyle &&
       data.selectedStores.length > 0
   )
 }
@@ -285,7 +324,20 @@ export async function applyPendingOnboarding(accessToken: string): Promise<boole
         weight: data.weight,
         activityLevel: data.activityLevel,
         dietaryApproach: data.dietaryApproach,
-        mealsPerDay: data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner'],
+        mealsPerDay: mealsPerDayFromStyles(
+          data.breakfastStyle ?? inferBreakfastStyle(
+            data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner']
+          ),
+          data.lunchStyle ?? inferLunchStyle(
+            data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner']
+          )
+        ),
+        breakfastStyle: data.breakfastStyle ?? inferBreakfastStyle(
+          data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner']
+        ),
+        lunchStyle: data.lunchStyle ?? inferLunchStyle(
+          data.mealPlanScope ? mealsPerDayFromScope(data.mealPlanScope) : ['dinner']
+        ),
         weightGoal: data.weightGoal,
         isComplete: i === 0,
       })),

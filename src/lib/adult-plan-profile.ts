@@ -3,6 +3,17 @@
  * Andre voksne har kun biometri og vægtmål — planindstillinger arves for at undgå modstrid.
  */
 
+import {
+  inferBreakfastStyle,
+  inferLunchStyle,
+  mealsPerDayFromStyles,
+  parseBreakfastStyle,
+  parseLunchStyle,
+  type BreakfastStyle,
+  type LunchStyle,
+} from '@/lib/madbudget/meal-slot-style'
+
+export type { BreakfastStyle, LunchStyle }
 export type MealPlanScope = 'full' | 'dinner-only'
 
 export const FULL_PLAN_MEALS = ['breakfast', 'lunch', 'dinner'] as const
@@ -30,22 +41,48 @@ export interface PlanOwnerSettings {
   dietaryApproach?: string
   mealsPerDay: string[]
   mealPlanScope: MealPlanScope
+  breakfastStyle: BreakfastStyle
+  lunchStyle: LunchStyle
 }
 
 export interface AdultPlanFields {
   dietaryApproach?: string
   mealsPerDay?: string[]
+  breakfastStyle?: BreakfastStyle | null
+  lunchStyle?: LunchStyle | null
 }
 
 /** Læser planindstillinger fra voksen 0. */
+function mealsFrom(profile?: AdultPlanFields | null): string[] | undefined {
+  if (!profile) return undefined
+  const raw = profile as AdultPlanFields & { meals_per_day?: string[] }
+  return raw.mealsPerDay ?? raw.meals_per_day
+}
+
+function breakfastFrom(profile?: AdultPlanFields | null): unknown {
+  if (!profile) return undefined
+  const raw = profile as AdultPlanFields & { breakfast_style?: unknown }
+  return raw.breakfastStyle ?? raw.breakfast_style
+}
+
+function lunchFrom(profile?: AdultPlanFields | null): unknown {
+  if (!profile) return undefined
+  const raw = profile as AdultPlanFields & { lunch_style?: unknown }
+  return raw.lunchStyle ?? raw.lunch_style
+}
+
 export function getPlanOwnerSettings(adultsProfiles: AdultPlanFields[]): PlanOwnerSettings {
   const owner = adultsProfiles[0]
-  const mealsPerDay = normalizeMealsPerDay(owner?.mealsPerDay)
+  const breakfastStyle = inferBreakfastStyle(mealsFrom(owner), breakfastFrom(owner))
+  const lunchStyle = inferLunchStyle(mealsFrom(owner), lunchFrom(owner))
+  const mealsPerDay = normalizeMealsPerDay(mealsPerDayFromStyles(breakfastStyle, lunchStyle))
   const dietaryApproach = String(owner?.dietaryApproach || '').trim() || undefined
   return {
     dietaryApproach,
     mealsPerDay,
     mealPlanScope: mealPlanScopeFromMeals(mealsPerDay),
+    breakfastStyle,
+    lunchStyle,
   }
 }
 
@@ -57,7 +94,9 @@ export function syncPlanSettingsAcrossAdults<T extends AdultPlanFields>(profiles
   if (!profiles.length) return profiles
 
   const owner = profiles[0]
-  const mealsPerDay = normalizeMealsPerDay(owner?.mealsPerDay)
+  const breakfastStyle = inferBreakfastStyle(mealsFrom(owner), breakfastFrom(owner))
+  const lunchStyle = inferLunchStyle(mealsFrom(owner), lunchFrom(owner))
+  const mealsPerDay = normalizeMealsPerDay(mealsPerDayFromStyles(breakfastStyle, lunchStyle))
   const dietaryApproach = String(owner?.dietaryApproach || '').trim() || undefined
 
   return profiles.map((p, i) => {
@@ -65,12 +104,16 @@ export function syncPlanSettingsAcrossAdults<T extends AdultPlanFields>(profiles
       return {
         ...p,
         mealsPerDay,
+        breakfastStyle,
+        lunchStyle,
         ...(dietaryApproach ? { dietaryApproach } : {}),
       }
     }
     return {
       ...p,
       mealsPerDay: [...mealsPerDay],
+      breakfastStyle,
+      lunchStyle,
       ...(dietaryApproach ? { dietaryApproach } : {}),
     }
   })
@@ -83,8 +126,40 @@ export function setMealPlanScopeOnProfiles<T extends AdultPlanFields>(
 ): T[] {
   const mealsPerDay = mealsPerDayFromScope(scope)
   if (!profiles.length) return profiles
+  const breakfastStyle: BreakfastStyle = scope === 'full' ? 'fast' : 'skip'
+  const lunchStyle: LunchStyle = scope === 'full' ? 'home' : 'skip'
   const updated = profiles.map((p, i) =>
-    i === 0 ? { ...p, mealsPerDay: [...mealsPerDay] } : p
+    i === 0 ? { ...p, mealsPerDay: [...mealsPerDay], breakfastStyle, lunchStyle } : p
+  )
+  return syncPlanSettingsAcrossAdults(updated)
+}
+
+export function setBreakfastStyleOnProfiles<T extends AdultPlanFields>(
+  profiles: T[],
+  style: BreakfastStyle
+): T[] {
+  if (!profiles.length) return profiles
+  const parsed = parseBreakfastStyle(style) ?? 'skip'
+  const owner = profiles[0]
+  const lunchStyle = inferLunchStyle(owner?.mealsPerDay, owner?.lunchStyle)
+  const mealsPerDay = mealsPerDayFromStyles(parsed, lunchStyle)
+  const updated = profiles.map((p, i) =>
+    i === 0 ? { ...p, breakfastStyle: parsed, lunchStyle, mealsPerDay } : p
+  )
+  return syncPlanSettingsAcrossAdults(updated)
+}
+
+export function setLunchStyleOnProfiles<T extends AdultPlanFields>(
+  profiles: T[],
+  style: LunchStyle
+): T[] {
+  if (!profiles.length) return profiles
+  const parsed = parseLunchStyle(style) ?? 'skip'
+  const owner = profiles[0]
+  const breakfastStyle = inferBreakfastStyle(owner?.mealsPerDay, owner?.breakfastStyle)
+  const mealsPerDay = mealsPerDayFromStyles(breakfastStyle, parsed)
+  const updated = profiles.map((p, i) =>
+    i === 0 ? { ...p, breakfastStyle, lunchStyle: parsed, mealsPerDay } : p
   )
   return syncPlanSettingsAcrossAdults(updated)
 }
@@ -111,12 +186,8 @@ export function setPlannerMealIncludedOnProfiles<T extends AdultPlanFields>(
   checked: boolean
 ): T[] {
   if (!profiles.length) return profiles
-  const ownerMeals = new Set(normalizeMealsPerDay(profiles[0]?.mealsPerDay))
-  if (checked) ownerMeals.add(meal)
-  else ownerMeals.delete(meal)
-  ownerMeals.add('dinner')
-  const updated = profiles.map((p, i) =>
-    i === 0 ? { ...p, mealsPerDay: Array.from(ownerMeals) } : p
-  )
-  return syncPlanSettingsAcrossAdults(updated)
+  if (meal === 'breakfast') {
+    return setBreakfastStyleOnProfiles(profiles, checked ? 'fast' : 'skip')
+  }
+  return setLunchStyleOnProfiles(profiles, checked ? 'home' : 'skip')
 }

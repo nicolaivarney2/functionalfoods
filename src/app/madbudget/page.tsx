@@ -12,7 +12,16 @@ import { mealPlanGenerator, applyKetoShoppingListRules, isKetoDietaryApproach } 
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
 import { shoppingListHasItems } from '@/lib/madbudget/shopping-list-presence'
 import { cheapestStoreKeyFromPrices } from '@/lib/madbudget/shopping-list-display'
-import { applyCookAhead, clearLeftoversFromSource, isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
+import { applyCookAhead, isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
+import {
+  applyNextDayLunchLeftover,
+  gridHasPlannedExtraPortions,
+  isNextLunchLeftover,
+  leftoverSlotAction,
+  removeNextDayLunchLeftover,
+  replaceMealKeepingLeftovers,
+  stripOrphanExtraPortions,
+} from '@/lib/madbudget/next-lunch-leftover'
 import { getPeoplePerMealFromAdultsProfiles } from '@/lib/meal-plan-system/people-per-meal'
 import { computeChildPersonEquivalent } from '@/lib/madbudget/person-equivalent'
 import { mergeVitaminsAgainstRda } from '@/lib/nutrition-reference-values'
@@ -24,12 +33,17 @@ import GuestDemoBanner from '@/components/madbudget/GuestDemoBanner'
 import GuestPageTour, { type GuestPageTourStep } from '@/components/madbudget/GuestPageTour'
 import GuestGuidedTour, { type GuestTourFamilyState } from '@/components/madbudget/GuestGuidedTour'
 import GuestSignupPromptModal from '@/components/madbudget/GuestSignupPromptModal'
-import WeekTargetPickerModal from '@/components/madbudget/WeekTargetPickerModal'
+import ShopSpanModal from '@/components/madbudget/ShopSpanModal'
+import { parseShop, type ShopMeta } from '@/lib/madbudget/meal-plan-span'
 import {
+  buildPlannerDays,
+  formatSpanRange,
   getWeekInfo,
+  groupSpanByCalendarWeek,
   isWeekendShoppingWindow,
+  localIsoDate,
+  parsePlanDate,
   weekInfoFromStartDate,
-  type MealPlanWeekTarget,
 } from '@/lib/madbudget/week-dates'
 import {
   GUEST_DEMO_ADULT_PROFILES,
@@ -59,14 +73,25 @@ import FeedbackCta from '@/components/FeedbackCta'
 import { healthMethodologyAnchor } from '@/lib/health-sources'
 import {
   getPlanOwnerSettings,
-  mealPlanScopeFromMeals,
   setDietaryApproachOnProfiles,
-  setMealPlanScopeOnProfiles,
+  setBreakfastStyleOnProfiles,
+  setLunchStyleOnProfiles,
   setPlannerMealIncludedOnProfiles,
   syncPlanSettingsAcrossAdults,
-  type MealPlanScope,
 } from '@/lib/adult-plan-profile'
-import { MEAL_PLAN_SCOPE_OPTIONS, mealPlanScopeLabel } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import {
+  mealSlotStylesSummary,
+  applyMealSlotStylesToGrid,
+  breakfastStyleHint,
+  breakfastStyleLabel,
+  inferBreakfastStyle,
+  inferLunchStyle,
+  lunchStyleHint,
+  lunchStyleLabel,
+  recipeFitsSlotStyle,
+  type BreakfastStyle,
+  type LunchStyle,
+} from '@/lib/madbudget/meal-slot-style'
 import { useApplyPendingOnboarding } from '@/hooks/useApplyPendingOnboarding'
 import { CHAIN_COVERAGE, type SourceChain } from '@/grocery/types'
 import { isUncoveredStoreLabel, selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
@@ -153,6 +178,7 @@ interface PlannerRecipe {
   /** Ernærings-servings fra generatoren (kalorier) – må ikke bruges til indkøb. */
   nutritionServings?: number
   category: string
+  subCategories?: string[]
   dietaryTags: string[]
   mealTypeMatch?: boolean
   calories?: number
@@ -327,29 +353,32 @@ function emptyMealPlanGrid(): Record<DayKeyPlanner, Record<MealTypePlanner, any 
 function parseMealPlanData(raw: unknown): {
   grid: Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>
   slotLocks: Record<string, boolean>
+  shop: ShopMeta | null
 } {
+  const shop = parseShop(raw)
   if (!raw || typeof raw !== 'object') {
-    return { grid: emptyMealPlanGrid(), slotLocks: {} }
+    return { grid: emptyMealPlanGrid(), slotLocks: {}, shop }
   }
   const o = raw as Record<string, unknown>
   if ('grid' in o && o.grid && typeof o.grid === 'object') {
     const g = o.grid as Record<string, unknown>
     if (g.monday) {
       const locks = (o.slotLocks as Record<string, boolean>) || {}
-      return { grid: o.grid as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: locks }
+      return { grid: o.grid as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: locks, shop }
     }
   }
   if ('monday' in o) {
-    return { grid: raw as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: {} }
+    return { grid: raw as Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>, slotLocks: {}, shop }
   }
-  return { grid: emptyMealPlanGrid(), slotLocks: {} }
+  return { grid: emptyMealPlanGrid(), slotLocks: {}, shop }
 }
 
 function wrapMealPlanForSave(
   grid: Record<DayKeyPlanner, Record<MealTypePlanner, any | null>>,
-  slotLocks: Record<string, boolean>
+  slotLocks: Record<string, boolean>,
+  shop?: ShopMeta | null
 ) {
-  return { v: 2 as const, grid, slotLocks }
+  return { v: 2 as const, grid, slotLocks, ...(shop ? { shop } : {}) }
 }
 
 const mockStores = [
@@ -373,6 +402,8 @@ interface AdultProfile {
   activityLevel?: ActivityLevel
   dietaryApproach?: string // 'keto', 'sense', 'glp-1', etc.
   mealsPerDay: string[] // ['dinner', 'breakfast', 'lunch']
+  breakfastStyle?: BreakfastStyle
+  lunchStyle?: LunchStyle
   weightGoal?: WeightGoal // 'weight-loss', 'maintenance', 'muscle-gain'
   isComplete: boolean
 }
@@ -416,6 +447,14 @@ function adultProfileFromApiRow(p: any): AdultProfile {
         : undefined,
     dietaryApproach: p.dietary_approach ?? undefined,
     mealsPerDay: Array.isArray(p.meals_per_day) ? p.meals_per_day : ['dinner'],
+    breakfastStyle: inferBreakfastStyle(
+      Array.isArray(p.meals_per_day) ? p.meals_per_day : p.mealsPerDay,
+      p.breakfast_style ?? p.breakfastStyle
+    ),
+    lunchStyle: inferLunchStyle(
+      Array.isArray(p.meals_per_day) ? p.meals_per_day : p.mealsPerDay,
+      p.lunch_style ?? p.lunchStyle
+    ),
     weightGoal: p.weight_goal ?? undefined,
     isComplete: Boolean(p.is_complete),
   }
@@ -442,6 +481,8 @@ function buildAdultsProfilesForFamily(adultsCount: number, rows: any[] | undefin
       return {
         id: `adult-${Date.now()}-${i}`,
         mealsPerDay: ['dinner'],
+        breakfastStyle: 'skip' as const,
+        lunchStyle: 'skip' as const,
         isComplete: false,
       } as AdultProfile
     }
@@ -459,7 +500,7 @@ export default function MadbudgetPage() {
   const [showUserTour, setShowUserTour] = useState(false)
   const [showGuidedFamilyTour, setShowGuidedFamilyTour] = useState(false)
   const [showRecalculatePrompt, setShowRecalculatePrompt] = useState(false)
-  const [showWeekTargetPicker, setShowWeekTargetPicker] = useState(false)
+  const [showShopSpanPicker, setShowShopSpanPicker] = useState(false)
   const [guestSignupPrompt, setGuestSignupPrompt] = useState<string | null>(null)
   const [guestSignupTitle, setGuestSignupTitle] = useState<string | undefined>(undefined)
   const [guestSignupCta, setGuestSignupCta] = useState<string | undefined>(undefined)
@@ -523,21 +564,41 @@ export default function MadbudgetPage() {
   const nextWeekInfo = useMemo(() => getWeekInfo('next'), [])
 
   const weekSelectorOptions = useMemo(() => {
-    const options = savedMealPlans.map((p: any) => {
-      const weekNum =
-        p.week_number ||
-        weekInfoFromStartDate(p.week_start_date).weekNumber
-      return { weekNum, plan: p as any }
-    })
-    const weekNums = new Set(options.map((o) => o.weekNum))
-    if (isWeekendShoppingWindow() && !weekNums.has(nextWeekInfo.weekNumber)) {
-      options.push({ weekNum: nextWeekInfo.weekNumber, plan: null })
+    const groups = new Map<string, any[]>()
+    for (const plan of savedMealPlans) {
+      const shop = parseShop(plan.meal_plan_data)
+      const id = shop ? `${shop.date}:${shop.dayCount}` : `plan:${plan.id}`
+      const list = groups.get(id) ?? []
+      list.push(plan)
+      groups.set(id, list)
     }
-    return options.sort((a, b) => b.weekNum - a.weekNum)
-  }, [savedMealPlans, nextWeekInfo.weekNumber])
+    const options: { key: string; weekNum: number; weekStart: string; label: string; plan: any }[] = []
+    for (const [id, list] of groups) {
+      const plan =
+        list.find((p) => p.is_active) ??
+        [...list].sort((a, b) => String(a.week_start_date).localeCompare(String(b.week_start_date)))[0]
+      const shop = parseShop(plan.meal_plan_data)
+      const weekNum = plan.week_number || weekInfoFromStartDate(plan.week_start_date).weekNumber
+      const weekStart = String(plan.week_start_date || '').slice(0, 10)
+      const label = shop ? formatSpanRange(parsePlanDate(shop.date), shop.dayCount) : `Uge ${weekNum}`
+      options.push({ key: id, weekNum, weekStart, label, plan })
+    }
+    const coveredStarts = new Set(savedMealPlans.map((p: any) => String(p.week_start_date || '').slice(0, 10)))
+    if (isWeekendShoppingWindow() && !coveredStarts.has(nextWeekInfo.weekStartDate)) {
+      options.push({
+        key: `empty-${nextWeekInfo.weekStartDate}`,
+        weekNum: nextWeekInfo.weekNumber,
+        weekStart: nextWeekInfo.weekStartDate,
+        label: `Uge ${nextWeekInfo.weekNumber} (Næste — tom)`,
+        plan: null,
+      })
+    }
+    return options.sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+  }, [savedMealPlans, nextWeekInfo.weekNumber, nextWeekInfo.weekStartDate])
   
   const [showRecipeSelector, setShowRecipeSelector] = useState(false)
   const [selectedMealSlot, setSelectedMealSlot] = useState('')
+  const [selectedSlotWeek, setSelectedSlotWeek] = useState<string | null>(null)
   const [showFamilySettings, setShowFamilySettings] = useState(false)
   const [savingFamilySettings, setSavingFamilySettings] = useState(false)
   const [currentDayOffset, setCurrentDayOffset] = useState(0)
@@ -596,12 +657,13 @@ export default function MadbudgetPage() {
   const [loadingAvailableRecipes, setLoadingAvailableRecipes] = useState(false)
   const [availableRecipesError, setAvailableRecipesError] = useState<string | null>(null)
   const [recipeViewSlugOrId, setRecipeViewSlugOrId] = useState<string | null>(null)
-  const [recipeViewSlot, setRecipeViewSlot] = useState<{ dayKey: DayKey; mealKey: MealType } | null>(null)
+  const [recipeViewSlot, setRecipeViewSlot] = useState<{ dayKey: DayKey; mealKey: MealType; weekStartDate?: string } | null>(null)
   const [recipeViewData, setRecipeViewData] = useState<any>(null)
   const [recipeViewLoading, setRecipeViewLoading] = useState(false)
   const [recipeSearchQuery, setRecipeSearchQuery] = useState('')
   const [recipeCategoryFilter, setRecipeCategoryFilter] = useState('all')
   const [recipeMealTypeFilter, setRecipeMealTypeFilter] = useState<MealType | 'all'>('all')
+  const [recipeRecommendOnly, setRecipeRecommendOnly] = useState(true)
   const [showNutritionDetails, setShowNutritionDetails] = useState(false)
   const [selectedNutritionAdultIndex, setSelectedNutritionAdultIndex] = useState(0)
   const [shareLoading, setShareLoading] = useState(false)
@@ -678,6 +740,7 @@ export default function MadbudgetPage() {
           effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges)
         ),
       category: recipe?.mainCategory || recipe?.categories?.[0] || 'Andet',
+      subCategories: Array.isArray(recipe?.subCategories) ? recipe.subCategories : [],
       dietaryTags: Array.isArray(recipe?.dietaryCategories)
         ? recipe.dietaryCategories
         : (Array.isArray(recipe?.dietaryApproaches) ? recipe.dietaryApproaches : []),
@@ -1693,8 +1756,8 @@ export default function MadbudgetPage() {
   }, [])
   
   // Function to load a specific week's meal plan
-  const loadWeekMealPlan = async (weekNumber: number) => {
-    const plan = savedMealPlans.find((p: any) => p.week_number === weekNumber)
+  const loadWeekMealPlan = async (weekStart: string) => {
+    const plan = savedMealPlans.find((p: any) => String(p.week_start_date || '').slice(0, 10) === weekStart.slice(0, 10))
     if (plan && plan.meal_plan_data) {
       const parsed = parseMealPlanData(plan.meal_plan_data)
       setMealPlan(parsed.grid)
@@ -1702,12 +1765,12 @@ export default function MadbudgetPage() {
       const list = shoppingListHasItems(plan.shopping_list) ? plan.shopping_list : null
       setShoppingList(list)
       setShoppingListStale(!list)
-      setSelectedWeekNumber(weekNumber)
+      setSelectedWeekNumber(plan.week_number || weekInfoFromStartDate(weekStart).weekNumber)
       setActivePlanRef(plan)
     } else if (isGuest) {
-      setSelectedWeekNumber(weekNumber)
+      setSelectedWeekNumber(weekInfoFromStartDate(weekStart).weekNumber)
     } else {
-      setSelectedWeekNumber(weekNumber)
+      setSelectedWeekNumber(weekInfoFromStartDate(weekStart).weekNumber)
       setActivePlanRef(null)
       setMealPlan({
         monday: { breakfast: null, lunch: null, dinner: null },
@@ -1751,7 +1814,14 @@ export default function MadbudgetPage() {
 
   const saveMealPlanToDb = async (
     mealPlanData: Record<DayKey, Record<MealType, any | null>>,
-    options?: { shoppingList?: any; familyProfileSnapshot?: Record<string, unknown> }
+    options?: {
+      shoppingList?: any
+      familyProfileSnapshot?: Record<string, unknown>
+      weekStartDate?: string
+      activate?: boolean
+      slotLocks?: Record<string, boolean>
+      shop?: ShopMeta | null
+    }
   ) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -1765,13 +1835,19 @@ export default function MadbudgetPage() {
             ? shoppingList
             : null
 
-      const weekInfo = activePlanRef
+      const targetStart = options?.weekStartDate?.slice(0, 10)
+      const targetPlan = targetStart
+        ? savedMealPlans.find((p: any) => String(p.week_start_date || '').slice(0, 10) === targetStart) ?? activePlanRef
+        : activePlanRef
+      const weekInfo = targetPlan?.week_start_date
         ? {
-            weekStartDate: activePlanRef.week_start_date,
-            weekEndDate: activePlanRef.week_end_date,
-            weekNumber: activePlanRef.week_number || getWeekDatesForSave().weekNumber
+            weekStartDate: targetPlan.week_start_date,
+            weekEndDate: targetPlan.week_end_date,
+            weekNumber: targetPlan.week_number || weekInfoFromStartDate(targetPlan.week_start_date).weekNumber
           }
         : getWeekDatesForSave()
+      const shopForSave = options?.shop !== undefined ? options.shop : parseShop(targetPlan?.meal_plan_data)
+      const locksForSave = options?.slotLocks ?? slotLocks
 
       const response = await fetch('/api/madbudget/meal-plan', {
         method: 'POST',
@@ -1789,7 +1865,8 @@ export default function MadbudgetPage() {
             options?.familyProfileSnapshot ??
             activePlanRef?.family_profile_snapshot ??
             buildFamilyProfileSnapshot(),
-          mealPlanData: wrapMealPlanForSave(mealPlanData, slotLocks),
+          mealPlanData: wrapMealPlanForSave(mealPlanData, locksForSave, shopForSave),
+          activate: options?.activate,
           shoppingList: shoppingListToPersist,
           totalCost: activePlanRef?.total_cost ?? null,
           totalSavings: activePlanRef?.total_savings ?? null,
@@ -1800,11 +1877,12 @@ export default function MadbudgetPage() {
       if (response.ok) {
         const result = await response.json()
         if (result.success && result.data) {
-          setActivePlanRef(result.data)
+          if (options?.activate !== false) setActivePlanRef(result.data)
           setSavedMealPlans(prev => {
-            const existing = prev.find((p: any) => p.week_number === result.data.week_number)
+            const start = String(result.data.week_start_date || '').slice(0, 10)
+            const existing = prev.find((p: any) => String(p.week_start_date || '').slice(0, 10) === start)
             if (existing) {
-              return prev.map((p: any) => p.week_number === result.data.week_number ? result.data : p)
+              return prev.map((p: any) => (String(p.week_start_date || '').slice(0, 10) === start ? result.data : p))
             }
             return [result.data, ...prev]
           })
@@ -2238,14 +2316,34 @@ export default function MadbudgetPage() {
     return recipeMatchesDiet({ dietaryCategories: categories }, canonical)
   }
 
+  const slotStyleProfile = useMemo(() => {
+    const owner = getPlanOwnerSettings(familyProfile.adultsProfiles)
+    return {
+      dietaryApproach: owner.dietaryApproach || primaryDietForRecipePicker,
+      breakfastStyle: owner.breakfastStyle,
+      lunchStyle: owner.lunchStyle,
+    }
+  }, [familyProfile.adultsProfiles, primaryDietForRecipePicker])
+
   // Get filtered recipes based on search, category, måltidsslots og valgt kostprofil
   const getFilteredRecipes = () => {
     let filtered: PlannerRecipe[] = [...availableRecipes]
+    const slot =
+      recipeMealTypeFilter !== 'all'
+        ? recipeMealTypeFilter
+        : selectedMealSlot
+          ? (selectedMealSlot.split('-')[1] as MealType)
+          : null
 
-    if (primaryDietForRecipePicker) {
-      filtered = filtered.filter((recipe) =>
-        recipeMatchesProfileDiet(recipe, primaryDietForRecipePicker)
-      )
+    if (recipeRecommendOnly) {
+      if (primaryDietForRecipePicker) {
+        filtered = filtered.filter((recipe) =>
+          recipeMatchesProfileDiet(recipe, primaryDietForRecipePicker)
+        )
+      }
+      if (slot === 'breakfast' || slot === 'lunch') {
+        filtered = filtered.filter((recipe) => recipeFitsSlotStyle(recipe, slot, slotStyleProfile))
+      }
     }
 
     if (recipeMealTypeFilter !== 'all') {
@@ -2286,41 +2384,121 @@ export default function MadbudgetPage() {
         recipeServings,
         householdServings: resolvePeopleEatingForMealType(meal),
       }
-      const updatedPlan = {
-        ...mealPlan,
-        [day]: {
-          ...mealPlan[day],
-          [meal]: cell
-        }
-      }
-      setMealPlan(updatedPlan)
+      const week = selectedSlotWeek || String(activePlanRef?.week_start_date || '').slice(0, 10)
+      const activeStart = String(activePlanRef?.week_start_date || '').slice(0, 10)
+      const base = week && week !== activeStart ? gridForWeek(week) : mealPlan
+      const updatedPlan = replaceMealKeepingLeftovers(base, day, meal, cell) as typeof mealPlan
+      if (!week || week === activeStart) setMealPlan(updatedPlan)
       setShoppingListStale(true)
       setShowRecipeSelector(false)
       setSelectedMealSlot('')
-      saveMealPlanToDb(updatedPlan)
+      saveMealPlanToDb(updatedPlan, week && week !== activeStart ? { weekStartDate: week, activate: false } : undefined)
     }
   }
 
   const slotKey = (d: DayKey, m: MealType) => `${d}_${m}`
 
-  const handleCookAhead = (dayKey: DayKey, mealKey: MealType, days: 2 | 3) => {
-    const next = applyCookAhead(mealPlan, dayKey, mealKey, days, (d, m) =>
+  const handleCookAhead = (dayKey: DayKey, mealKey: MealType, days: 2 | 3, weekStartDate?: string) => {
+    const week = weekStartDate || String(activePlanRef?.week_start_date || '').slice(0, 10)
+    const shop = parseShop(activePlanRef?.meal_plan_data) ?? (week ? parseShop(savedMealPlans.find((p: any) => String(p.week_start_date || '').slice(0, 10) === week)?.meal_plan_data) : null)
+    const crossesSunday = shop && (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as DayKey[]).indexOf(dayKey) + days - 1 > 6
+    if (shop && crossesSunday) {
+      void (async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
+        const res = await fetch('/api/madbudget/meal-plan/cook-ahead', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ day: dayKey, meal: mealKey, days, weekStartDate: week }),
+        })
+        if (!res.ok) return
+        const list = await fetch('/api/madbudget/meal-plan', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        })
+        if (!list.ok) return
+        const result = await list.json()
+        const plans = Array.isArray(result.data) ? result.data : result.data ? [result.data] : []
+        setSavedMealPlans(plans)
+        const active = plans.find((p: any) => String(p.week_start_date || '').slice(0, 10) === String(activePlanRef?.week_start_date || '').slice(0, 10)) ?? plans.find((p: any) => p.is_active)
+        if (active?.meal_plan_data) {
+          const parsed = parseMealPlanData(active.meal_plan_data)
+          setMealPlan(parsed.grid)
+          setSlotLocks(parsed.slotLocks)
+          setActivePlanRef(active)
+          if (shoppingListHasItems(active.shopping_list)) setShoppingList(active.shopping_list)
+        }
+        setShoppingListStale(false)
+      })()
+      return
+    }
+    const base = week && week !== String(activePlanRef?.week_start_date || '').slice(0, 10) ? gridForWeek(week) : mealPlan
+    const next = applyCookAhead(base, dayKey, mealKey, days, (d, m) =>
       Boolean(slotLocks[`${d}_${m}`])
     ) as typeof mealPlan
+    if (!week || week === String(activePlanRef?.week_start_date || '').slice(0, 10)) setMealPlan(next)
+    setShoppingListStale(true)
+    void saveMealPlanToDb(next, week && week !== String(activePlanRef?.week_start_date || '').slice(0, 10) ? { weekStartDate: week, activate: false } : undefined)
+  }
+
+  const commitMealPlan = (next: typeof mealPlan) => {
     setMealPlan(next)
     setShoppingListStale(true)
     void saveMealPlanToDb(next)
   }
 
-  const clearMealSlot = (dayKey: DayKey, mealKey: MealType) => {
-    const lk = slotKey(dayKey, mealKey)
-    setMealPlan((prev) => {
-      const cleared = clearLeftoversFromSource(prev, dayKey, mealKey) as typeof prev
-      const next = { ...cleared }
-      next[dayKey] = { ...cleared[dayKey], [mealKey]: null }
-      void saveMealPlanToDb(next)
-      return next
+  const planLeftoverFromDinner = (dinnerDay: DayKey, overwrite = false) => {
+    const result = applyNextDayLunchLeftover(mealPlan, dinnerDay, {
+      overwrite,
+      isLocked: (d, m) => Boolean(slotLocks[`${d}_${m}`]),
     })
+    if (result.ok) {
+      commitMealPlan(result.grid as typeof mealPlan)
+      return
+    }
+    if (result.reason === 'occupied') {
+      const ok = window.confirm(
+        `Frokost ${result.nextDayLabel} er allerede «${result.occupiedTitle}». Vil du erstatte den med rester?`
+      )
+      if (!ok) return
+      planLeftoverFromDinner(dinnerDay, true)
+      return
+    }
+    if (result.reason === 'locked') {
+      window.alert(`Frokost ${result.nextDayLabel} er låst og kan ikke overskrives.`)
+    }
+  }
+
+  const removePlannedLeftover = (dinnerDay: DayKey) => {
+    commitMealPlan(removeNextDayLunchLeftover(mealPlan, dinnerDay) as typeof mealPlan)
+  }
+
+  const renderLeftoverAction = (dayKey: DayKey, mealKey: MealType) => {
+    const action = leftoverSlotAction(mealPlan, dayKey, mealKey)
+    if (!action) return null
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          if (action.type === 'remove') removePlannedLeftover(action.dinnerDay)
+          else planLeftoverFromDinner(action.dinnerDay)
+        }}
+        className="mx-2 mb-2 mt-1 block text-left text-[10px] font-semibold leading-tight text-emerald-800 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-950"
+      >
+        {action.label}
+      </button>
+    )
+  }
+
+  const clearMealSlot = (dayKey: DayKey, mealKey: MealType, weekStartDate?: string) => {
+    const lk = slotKey(dayKey, mealKey)
+    const week = weekStartDate || String(activePlanRef?.week_start_date || '').slice(0, 10)
+    const activeStart = String(activePlanRef?.week_start_date || '').slice(0, 10)
+    const onActive = !week || week === activeStart
+    const base = onActive ? mealPlan : gridForWeek(week)
+    const next = replaceMealKeepingLeftovers(base, dayKey, mealKey, null) as typeof mealPlan
+    if (onActive) setMealPlan(next)
+    void saveMealPlanToDb(next, onActive ? undefined : { weekStartDate: week, activate: false })
     setShoppingListStale(true)
     setSlotLocks((prev) => {
       const n = { ...prev }
@@ -2339,14 +2517,17 @@ export default function MadbudgetPage() {
     setRecipeSearchQuery('')
     setRecipeCategoryFilter('all')
     setRecipeMealTypeFilter(meal)
+    setRecipeRecommendOnly(true)
   }
 
-  const handleMealCellClick = (dayKey: DayKey, mealKey: MealType) => {
+  const handleMealCellClick = (dayKey: DayKey, mealKey: MealType, weekStartDate?: string) => {
+    const week = weekStartDate || String(activePlanRef?.week_start_date || '').slice(0, 10)
     if (lockDishesMode) {
       const k = slotKey(dayKey, mealKey)
       setSlotLocks((prev) => ({ ...prev, [k]: !prev[k] }))
       return
     }
+    setSelectedSlotWeek(week)
     openRecipeSelector(dayKey, mealKey)
   }
 
@@ -2359,11 +2540,6 @@ export default function MadbudgetPage() {
       dinner: true,
     }
   }, [familyProfile.adultsProfiles])
-
-  const selectedMealPlanScope = useMemo(
-    (): MealPlanScope => mealPlanScopeFromMeals(getPlanOwnerSettings(familyProfile.adultsProfiles).mealsPerDay),
-    [familyProfile.adultsProfiles]
-  )
 
   const setPlannerMealIncluded = (meal: 'breakfast' | 'lunch', checked: boolean) => {
     if (isGuest) {
@@ -2378,6 +2554,28 @@ export default function MadbudgetPage() {
     }))
   }
 
+  const setPlannerBreakfastStyle = (style: BreakfastStyle) => {
+    if (isGuest) {
+      setGuestSignupPrompt('For at tilpasse morgenmad skal du oprette en gratis bruger.')
+      return
+    }
+    setFamilyProfile((prev) => ({
+      ...prev,
+      adultsProfiles: setBreakfastStyleOnProfiles(prev.adultsProfiles, style),
+    }))
+  }
+
+  const setPlannerLunchStyle = (style: LunchStyle) => {
+    if (isGuest) {
+      setGuestSignupPrompt('For at tilpasse frokost skal du oprette en gratis bruger.')
+      return
+    }
+    setFamilyProfile((prev) => ({
+      ...prev,
+      adultsProfiles: setLunchStyleOnProfiles(prev.adultsProfiles, style),
+    }))
+  }
+
   const selectedPlanDietaryApproach = useMemo(
     () => getPlanOwnerSettings(familyProfile.adultsProfiles).dietaryApproach || '',
     [familyProfile.adultsProfiles]
@@ -2388,13 +2586,6 @@ export default function MadbudgetPage() {
     setFamilyProfile((prev) => ({
       ...prev,
       adultsProfiles: setDietaryApproachOnProfiles(prev.adultsProfiles, dietaryApproach),
-    }))
-  }
-
-  const syncMealPlanScopeAcrossAdults = (scope: MealPlanScope) => {
-    setFamilyProfile((prev) => ({
-      ...prev,
-      adultsProfiles: setMealPlanScopeOnProfiles(prev.adultsProfiles, scope),
     }))
   }
 
@@ -2607,7 +2798,7 @@ export default function MadbudgetPage() {
     return true
   }
 
-  const generateMealPlan = async (targetWeek: MealPlanWeekTarget = 'current') => {
+  const generateMealPlan = async (shop?: { date: string; dayCount: number }) => {
     if (isGuest) {
       setGuestSignupPrompt(
         'For at generere din egen madplan med ugens tilbud skal du oprette en gratis bruger.',
@@ -2670,10 +2861,12 @@ export default function MadbudgetPage() {
       // Step 4: Check family factors
       setGenerationProgress(generationSteps[3])
 
-      const weekInfoForGen = getWeekInfo(targetWeek)
+      const shopDate = shop?.date ?? localIsoDate(new Date())
+      const dayCount = Math.min(14, Math.max(1, shop?.dayCount ?? 7))
+      const spanGroups = groupSpanByCalendarWeek(parsePlanDate(shopDate), dayCount)
       const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(
         savedMealPlans,
-        weekInfoForGen.weekStartDate,
+        spanGroups.map((group) => group.weekStartDate),
       )
       
       // Actually generate the meal plan
@@ -2694,14 +2887,19 @@ export default function MadbudgetPage() {
             activityLevel: p.activityLevel,
             dietaryApproach: p.dietaryApproach,
             mealsPerDay: p.mealsPerDay || ['dinner'],
+            breakfastStyle: p.breakfastStyle,
+            lunchStyle: p.lunchStyle,
             weightGoal: p.weightGoal,
             excludedFoods: []
           })) as any,
+          breakfastStyle: slotStyleProfile.breakfastStyle,
+          lunchStyle: slotStyleProfile.lunchStyle,
           excludedIngredients: familyProfile.excludedIngredients,
           selectedStores: familyProfile.selectedStores,
           prioritizeOrganic: familyProfile.prioritizeOrganic,
           prioritizeAnimalOrganic: familyProfile.prioritizeAnimalOrganic,
           recentlyUsedRecipeIds,
+          planDayCount: dayCount,
         },
         variationLevel
       )
@@ -2714,24 +2912,14 @@ export default function MadbudgetPage() {
       setGenerationProgress(generationSteps[5])
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Convert weekPlan to UI format
-      const newMealPlan: Record<DayKey, Record<MealType, any | null>> = {
-        monday: { breakfast: null, lunch: null, dinner: null },
-        tuesday: { breakfast: null, lunch: null, dinner: null },
-        wednesday: { breakfast: null, lunch: null, dinner: null },
-        thursday: { breakfast: null, lunch: null, dinner: null },
-        friday: { breakfast: null, lunch: null, dinner: null },
-        saturday: { breakfast: null, lunch: null, dinner: null },
-        sunday: { breakfast: null, lunch: null, dinner: null }
-      }
+      // Generatoren kender ikke ugedage. days[i] hører til indkøbsdag + i.
+      const orderedDays: Array<Record<MealType, any | null>> = []
       
-      const dayNames: DayKey[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-      
-      weekPlan.days.forEach((dayPlan, dayIndex) => {
-        const dayKey = dayNames[dayIndex]
+      weekPlan.days.forEach((dayPlan) => {
+        const daySlots: Record<MealType, any | null> = { breakfast: null, lunch: null, dinner: null }
         dayPlan.meals.forEach(meal => {
           const mealType = meal.mealType as MealType
-          if (mealType && dayKey) {
+          if (mealType) {
             // Generator: adjusted* er husstands-total = (per-person måltidsmål) ×
             // (antal personer der spiser). Madplanen viser ernæring PR. PERSON, så vi
             // deler med peopleEating (ikke meal.servings, der giver opskriftens rå
@@ -2749,7 +2937,7 @@ export default function MadbudgetPage() {
             )
             const nutritionServings = Math.max(1, meal.servings || 1)
             const perPersonDivisor = peopleEating
-            newMealPlan[dayKey][mealType] = {
+            daySlots[mealType] = {
               id: meal.recipe.id,
               slug: meal.recipe.slug || '',
               title: meal.recipe.title,
@@ -2782,24 +2970,35 @@ export default function MadbudgetPage() {
             }
           }
         })
+        orderedDays.push(daySlots)
       })
 
-      // Bevar låste retter fra nuværende plan
-      const mergedMealPlan: Record<DayKey, Record<MealType, any | null>> = { ...newMealPlan }
-      for (const dayKey of dayNames) {
-        for (const mt of ['breakfast', 'lunch', 'dinner'] as MealType[]) {
-          const lockKey = `${dayKey}_${mt}`
-          if (slotLocks[lockKey] && mealPlan[dayKey]?.[mt]) {
-            mergedMealPlan[dayKey] = { ...mergedMealPlan[dayKey], [mt]: mealPlan[dayKey][mt] }
-          }
+      const todayIso = localIsoDate(new Date())
+      const activeGroup =
+        spanGroups.find((group) => group.days.some((day) => day.date === todayIso)) ?? spanGroups[0]
+      const shopMeta = { date: shopDate, dayCount }
+      const weekPayloads = spanGroups.map((group) => {
+        const grid = emptyMealPlanGrid()
+        for (const day of group.days) {
+          const slots = orderedDays[day.offset]
+          if (slots) grid[day.weekday] = slots
         }
-      }
+        const styled = applyMealSlotStylesToGrid(grid, slotStyleProfile)
+        return {
+          group,
+          grid: stripOrphanExtraPortions(styled) as typeof grid,
+          isActive: group.weekStartDate === activeGroup.weekStartDate,
+        }
+      })
+      const activePayload = weekPayloads.find((week) => week.isActive) ?? weekPayloads[0]
+      const plannedExtraPortions = weekPayloads.some((week) => gridHasPlannedExtraPortions(week.grid))
 
-      setMealPlan(mergedMealPlan)
+      setMealPlan(activePayload.grid)
+      setSlotLocks({})
       
       // Generate shopping list
       setShoppingList(weekPlan.shoppingList)
-      setShoppingListStale(false)
+      setShoppingListStale(plannedExtraPortions)
 
       // Intro-rundvisning efter første madplan (loggede-in brugere)
       if (!isGuest) {
@@ -2818,8 +3017,14 @@ export default function MadbudgetPage() {
         if (!session) {
           console.error('No session found, cannot save meal plan')
         } else {
-          const weekInfo = getWeekInfo(targetWeek)
-
+          const familyProfileSnapshot = {
+            adults: familyProfile.adults,
+            children: familyProfile.children,
+            childrenAges: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
+            children_ages: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
+            adultsProfiles: familyProfile.adultsProfiles,
+            selectedStores: familyProfile.selectedStores,
+          }
           const response = await fetch('/api/madbudget/meal-plan', {
             method: 'POST',
             headers: { 
@@ -2827,45 +3032,45 @@ export default function MadbudgetPage() {
               'Authorization': `Bearer ${session.access_token}`
             },
             body: JSON.stringify({
-              name: `Madplan Uge ${weekInfo.weekNumber} (${weekInfo.weekStartDate})`,
-              weekStartDate: weekInfo.weekStartDate,
-              weekEndDate: weekInfo.weekEndDate,
-              weekNumber: weekInfo.weekNumber,
               variationLevel,
-              familyProfileSnapshot: {
-                adults: familyProfile.adults,
-                children: familyProfile.children,
-                childrenAges: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
-                children_ages: effectiveChildrenAges(familyProfile.children, familyProfile.childrenAges),
-                adultsProfiles: familyProfile.adultsProfiles,
-                selectedStores: familyProfile.selectedStores,
-              },
-              mealPlanData: wrapMealPlanForSave(mergedMealPlan, slotLocks), // grid + låse
+              familyProfileSnapshot,
               shoppingList: weekPlan.shoppingList,
-              totalCost: null, // Will be calculated later with prices
-              totalSavings: null, // Will be calculated later
-              estimatedCaloriesPerDay: null // Will be calculated later
+              weeks: weekPayloads.map(({ group, grid, isActive }) => ({
+                name: `Madplan Uge ${group.weekNumber} (${group.weekStartDate})`,
+                weekStartDate: group.weekStartDate,
+                weekEndDate: group.weekEndDate,
+                weekNumber: group.weekNumber,
+                variationLevel,
+                familyProfileSnapshot,
+                mealPlanData: wrapMealPlanForSave(grid, {}, shopMeta),
+                shoppingList: weekPlan.shoppingList,
+                isActive,
+              })),
             })
           })
           
           if (response.ok) {
             const result = await response.json()
             if (result.success && result.data) {
+              const savedWeeks = Array.isArray(result.weeks) ? result.weeks : [result.data]
               setActivePlanRef(result.data)
-              setSelectedWeekNumber(result.data.week_number ?? weekInfo.weekNumber)
+              setSelectedWeekNumber(result.data.week_number ?? activePayload.group.weekNumber)
               setSavedMealPlans(prev => {
-                const existing = prev.find((p: any) => p.week_number === result.data.week_number)
-                if (existing) {
-                  return prev.map((p: any) => p.week_number === result.data.week_number ? result.data : p)
+                const next = [...prev]
+                for (const row of savedWeeks) {
+                  const start = String(row.week_start_date || '').slice(0, 10)
+                  const index = next.findIndex((p: any) => String(p.week_start_date || '').slice(0, 10) === start)
+                  if (index >= 0) next[index] = row
+                  else next.unshift(row)
                 }
-                return [result.data, ...prev]
+                return next
               })
 
               // Auto-synk ny madplan til dagbogen (best-effort — må ikke fejle generering)
               try {
                 await syncMealPlanToDiary({
                   mealPlanId: result.data.id,
-                  preferDate: weekInfo.weekStartDate,
+                  preferDate: shopDate,
                   mode: 'replace',
                 })
               } catch (syncErr) {
@@ -2894,19 +3099,7 @@ export default function MadbudgetPage() {
 
   const requestGenerateMealPlan = () => {
     setLockDishesMode(false)
-    if (!isWeekendShoppingWindow()) {
-      void generateMealPlan('current')
-      return
-    }
-    if (selectedWeekNumber === nextWeekInfo.weekNumber) {
-      void generateMealPlan('next')
-      return
-    }
-    if (selectedWeekNumber === currentWeekInfo.weekNumber) {
-      void generateMealPlan('current')
-      return
-    }
-    setShowWeekTargetPicker(true)
+    setShowShopSpanPicker(true)
   }
 
   // Efter onboarding (?ny=1 / localStorage-flag): generér første madplan automatisk → eksisterende user tour.
@@ -2979,7 +3172,7 @@ export default function MadbudgetPage() {
         return
       }
 
-      void generateMealPlan('current')
+      void generateMealPlan()
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- én auto-start efter betaling når data er klar
   }, [
@@ -3001,7 +3194,7 @@ export default function MadbudgetPage() {
   void _calculateSavings
 
   const nextDays = () => {
-    setCurrentDayOffset(prev => Math.min(prev + 3, 4)) // Max 4 (so we can show days 5-7)
+    setCurrentDayOffset(prev => Math.min(prev + 3, Math.max(0, plannerDays.length - 3)))
   }
 
   const prevDays = () => {
@@ -3009,7 +3202,7 @@ export default function MadbudgetPage() {
   }
 
   const getVisibleDays = () => {
-    return days.slice(currentDayOffset, currentDayOffset + 3)
+    return plannerDays.slice(currentDayOffset, currentDayOffset + 3)
   }
 
   const mealTypes = [
@@ -3019,15 +3212,40 @@ export default function MadbudgetPage() {
   ]
 
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-  const dayLabels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
+  const activeShop = parseShop(activePlanRef?.meal_plan_data)
+  const plannerDays = useMemo(() => {
+    const start = activePlanRef?.week_start_date
+      ? String(activePlanRef.week_start_date).slice(0, 10)
+      : selectedWeekNumber === nextWeekInfo.weekNumber
+        ? nextWeekInfo.weekStartDate
+        : currentWeekInfo.weekStartDate
+    return buildPlannerDays(start, activeShop)
+  }, [activePlanRef, activeShop, selectedWeekNumber, nextWeekInfo.weekNumber, nextWeekInfo.weekStartDate, currentWeekInfo.weekStartDate])
+  const gridForWeek = (weekStart: string) => {
+    const activeStart = String(activePlanRef?.week_start_date || '').slice(0, 10)
+    if (!weekStart || weekStart === activeStart) return mealPlan
+    const row = savedMealPlans.find((p: any) => String(p.week_start_date || '').slice(0, 10) === weekStart)
+    return row ? parseMealPlanData(row.meal_plan_data).grid : emptyMealPlanGrid()
+  }
+  const mealAt = (day: { dayKey: DayKey; weekStartDate: string }, meal: MealType) =>
+    gridForWeek(day.weekStartDate)[day.dayKey]?.[meal] ?? null
+  const todayIso = localIsoDate(new Date())
+  const plannerSpanKey = activeShop
+    ? `${activeShop.date}:${activeShop.dayCount}`
+    : String(activePlanRef?.week_start_date || '')
+  useEffect(() => {
+    const todayIndex = plannerDays.findIndex((day) => localIsoDate(day.date) === todayIso)
+    setSelectedDayIndex(todayIndex >= 0 ? todayIndex : 0)
+    setCurrentDayOffset(0)
+  }, [plannerSpanKey])
 
   /** Summér ernæring for én dag. Værdier i mealPlan er pr. person/portion (Frida + generator). */
-  const getDayNutrition = (dayKey: DayKey, mealsFilter?: MealType[]) => {
+  const getDayNutrition = (dayKey: DayKey, mealsFilter?: MealType[], weekStartDate?: string) => {
     let calories = 0, protein = 0, carbs = 0, fat = 0, fiber = 0
     const vitamins: Record<string, number> = {}
     const mealKeys = (mealsFilter && mealsFilter.length > 0) ? mealsFilter : (['breakfast', 'lunch', 'dinner'] as MealType[])
     ;(mealKeys as MealType[]).forEach(mealKey => {
-      const m = mealPlan[dayKey][mealKey]
+      const m = weekStartDate ? mealAt({ dayKey, weekStartDate }, mealKey) : mealPlan[dayKey][mealKey]
       if (m) {
         if (typeof m.calories === 'number') calories += m.calories
         if (typeof m.protein === 'number') protein += m.protein
@@ -3086,8 +3304,8 @@ export default function MadbudgetPage() {
     let totalCal = 0, totalP = 0, totalK = 0, totalF = 0, totalFiber = 0
     const totalVitamins: Record<string, number> = {}
     let daysWithData = 0
-    ;(days as DayKey[]).forEach(dayKey => {
-      const nut = getDayNutrition(dayKey, mealsFilter)
+    plannerDays.forEach(day => {
+      const nut = getDayNutrition(day.dayKey, mealsFilter, day.weekStartDate)
       if (nut.calories > 0 || nut.protein > 0 || nut.carbs > 0 || nut.fat > 0) {
         daysWithData++
         totalCal += nut.calories
@@ -3119,10 +3337,10 @@ export default function MadbudgetPage() {
   const getMealsIncludedStatus = (mealsFilter?: MealType[]) => {
     let hasBreakfast = false, hasLunch = false, hasDinner = false
     const checkMeals = (mealsFilter && mealsFilter.length > 0) ? mealsFilter : (['breakfast', 'lunch', 'dinner'] as MealType[])
-    ;(days as DayKey[]).forEach(dayKey => {
-      if (checkMeals.includes('breakfast') && mealPlan[dayKey].breakfast) hasBreakfast = true
-      if (checkMeals.includes('lunch') && mealPlan[dayKey].lunch) hasLunch = true
-      if (checkMeals.includes('dinner') && mealPlan[dayKey].dinner) hasDinner = true
+    plannerDays.forEach(day => {
+      if (checkMeals.includes('breakfast') && mealAt(day, 'breakfast')) hasBreakfast = true
+      if (checkMeals.includes('lunch') && mealAt(day, 'lunch')) hasLunch = true
+      if (checkMeals.includes('dinner') && mealAt(day, 'dinner')) hasDinner = true
     })
     const count = [hasBreakfast, hasLunch, hasDinner].filter(Boolean).length
     const onlyDinner = hasDinner && !hasBreakfast && !hasLunch
@@ -3210,22 +3428,6 @@ export default function MadbudgetPage() {
 
     return { intro, bullets }
   }
-
-  // Week dates (Mon–Sun) for day view calendar — følger valgt/gemt uge
-  const getWeekDates = () => {
-    const weekStartDate =
-      activePlanRef?.week_start_date ??
-      (selectedWeekNumber === nextWeekInfo.weekNumber
-        ? nextWeekInfo.weekStartDate
-        : currentWeekInfo.weekStartDate)
-    const monday = new Date(`${weekStartDate}T12:00:00`)
-    return (days as DayKey[]).map((dayKey, i) => {
-      const d = new Date(monday)
-      d.setDate(monday.getDate() + i)
-      return { dayKey, date: d }
-    })
-  }
-  const weekDates = getWeekDates()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -3377,20 +3579,19 @@ export default function MadbudgetPage() {
                   >
                     {(weekSelectorOptions.length > 0 || isWeekendShoppingWindow()) && (
                       <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700">Uge:</label>
+                        <label className="text-sm font-medium text-gray-700">Plan:</label>
                         <select
-                          value={selectedWeekNumber || currentWeekNumber}
+                          value={activePlanRef?.week_start_date?.slice(0, 10) || weekSelectorOptions[0]?.weekStart || ''}
                           onChange={(e) => {
-                            const weekNum = parseInt(e.target.value)
-                            loadWeekMealPlan(weekNum)
+                            void loadWeekMealPlan(e.target.value)
                           }}
                           className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          {weekSelectorOptions.map(({ weekNum, plan }) => (
-                            <option key={plan?.id ?? `week-${weekNum}`} value={weekNum}>
-                              Uge {weekNum}
-                              {weekNum === currentWeekNumber ? ' (Denne)' : ''}
-                              {weekNum === nextWeekInfo.weekNumber && !plan ? ' (Næste — tom)' : ''}
+                          {weekSelectorOptions.map(({ key, weekStart, label, weekNum, plan }) => (
+                            <option key={key} value={weekStart}>
+                              {label}
+                              {weekNum === currentWeekNumber && !parseShop(plan?.meal_plan_data) ? ' (Denne)' : ''}
+                              {!plan ? '' : ''}
                             </option>
                           ))}
                         </select>
@@ -3443,6 +3644,34 @@ export default function MadbudgetPage() {
                         <span>Aftensmad</span>
                         <span className="text-xs">(altid)</span>
                       </label>
+                      {plannerMealToggles.breakfast ? (
+                        <select
+                          value={slotStyleProfile.breakfastStyle}
+                          onChange={(e) => setPlannerBreakfastStyle(e.target.value as BreakfastStyle)}
+                          className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800"
+                          aria-label="Morgenmadsstil"
+                        >
+                          {(['fast', 'home', 'repeat'] as const).map((id) => (
+                            <option key={id} value={id}>
+                              {breakfastStyleLabel(id, slotStyleProfile.dietaryApproach)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
+                      {plannerMealToggles.lunch ? (
+                        <select
+                          value={slotStyleProfile.lunchStyle}
+                          onChange={(e) => setPlannerLunchStyle(e.target.value as LunchStyle)}
+                          className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-800"
+                          aria-label="Frokoststil"
+                        >
+                          {(['leftovers', 'packed', 'home'] as const).map((id) => (
+                            <option key={id} value={id}>
+                              {lunchStyleLabel(id)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {activePlanRef?.id && !isGeneratingMealPlan && (
@@ -3481,8 +3710,7 @@ export default function MadbudgetPage() {
                   </div>
                   {lockDishesMode && (
                     <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                      Klik på en ret eller et tomt felt for at låse eller låse op. Låste felter beholdes, når du
-                      genererer en ny madplan — der kommer kun nye retter på de pladser, der ikke er låst.
+                      Klik på en ret eller et tomt felt for at låse eller låse op. En ny madplan starter forfra på de dage, den dækker.
                     </p>
                   )}
                 </div>
@@ -3491,26 +3719,33 @@ export default function MadbudgetPage() {
               {viewMode === 'week' && (
               <>
               {/* Desktop: 7 Days Grid */}
-              <div data-tour="meal-plan-grid" className="hidden lg:grid lg:grid-cols-7 gap-4">
-                {days.map((day, index) => {
-                  const dayKey = day as DayKey
-                  const dayNut = getDayNutrition(dayKey)
+              <div
+                data-tour="meal-plan-grid"
+                className="hidden lg:grid gap-4"
+                style={{ gridTemplateColumns: `repeat(${Math.min(plannerDays.length, 7)}, minmax(0, 1fr))` }}
+              >
+                {plannerDays.map((plannerDay) => {
+                  const dayKey = plannerDay.dayKey
+                  const dayNut = getDayNutrition(dayKey, undefined, plannerDay.weekStartDate)
                   const hasDayNut = dayNut.calories > 0 || dayNut.protein > 0 || dayNut.carbs > 0 || dayNut.fat > 0
                   return (
-                  <div key={day} className="text-center">
-                    <div className="font-medium text-gray-900 mb-3">{dayLabels[index]}</div>
+                  <div key={plannerDay.id} className={`text-center rounded-lg ${localIsoDate(plannerDay.date) === todayIso ? 'ring-2 ring-green-500' : ''}`}>
+                    <div className="font-medium text-gray-900 mb-3">
+                      {plannerDay.label}
+                      {localIsoDate(plannerDay.date) === todayIso ? ' · i dag' : ''}
+                    </div>
                     <div className="space-y-2">
                       {mealTypes.map(mealType => {
-                        const dayKey = day as DayKey
+                        const dayKey = plannerDay.dayKey
                         const mealKey = mealType.key as MealType
-                        const currentMeal = mealPlan[dayKey][mealKey]
+                        const currentMeal = mealAt(plannerDay, mealKey)
                         const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal) : null
                         const sk = slotKey(dayKey, mealKey)
                         const isLocked = Boolean(slotLocks[sk])
 
                         return (
                               <div
-                                key={`${day}-${mealType.key}`}
+                                key={`${plannerDay.id}-${mealType.key}`}
                                 data-tour={dayKey === 'wednesday' && mealKey === 'dinner' ? 'swap-meal-example' : undefined}
                                 className={`relative p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
                                   lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
@@ -3520,9 +3755,7 @@ export default function MadbudgetPage() {
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
                                 } ${isLocked ? 'border-amber-500/90' : ''}`}
                                 onClick={() => {
-                                  const dayKey = day as DayKey
-                                  const mealKey = mealType.key as MealType
-                                  handleMealCellClick(dayKey, mealKey)
+                                  handleMealCellClick(plannerDay.dayKey, mealType.key as MealType, plannerDay.weekStartDate)
                                 }}
                                 title={currentMeal ? `${currentMeal.title}${mealStoreLabel(currentMeal.store) ? ` - ${mealStoreLabel(currentMeal.store)}` : ''}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
@@ -3553,7 +3786,7 @@ export default function MadbudgetPage() {
                                             const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
                                             if (slugOrId) {
                                               setRecipeViewSlugOrId(String(slugOrId))
-                                              setRecipeViewSlot({ dayKey, mealKey })
+                                              setRecipeViewSlot({ dayKey, mealKey, weekStartDate: plannerDay.weekStartDate })
                                             }
                                           }}
                                           className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
@@ -3565,7 +3798,7 @@ export default function MadbudgetPage() {
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation()
-                                            clearMealSlot(dayKey, mealKey)
+                                            clearMealSlot(dayKey, mealKey, plannerDay.weekStartDate)
                                           }}
                                           className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
                                           aria-label="Fjern ret"
@@ -3605,6 +3838,7 @@ export default function MadbudgetPage() {
                                         <div className="text-[10px] text-green-600 font-medium">Sparer {currentMeal.savings.toFixed(0)} kr</div>
                                       )}
                                     </div>
+                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 ) : (
                                   <div className="text-center py-1">
@@ -3612,6 +3846,7 @@ export default function MadbudgetPage() {
                                       <mealType.icon size={12} />
                                       {mealType.label}
                                     </span>
+                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 )}
                               </div>
@@ -3646,9 +3881,9 @@ export default function MadbudgetPage() {
                 </button>
                 <button
                   onClick={nextDays}
-                  disabled={currentDayOffset >= 4}
+                  disabled={currentDayOffset >= Math.max(0, plannerDays.length - 3)}
                   className={`absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full shadow-md border transition-colors ${
-                    currentDayOffset >= 4
+                    currentDayOffset >= Math.max(0, plannerDays.length - 3)
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200'
                       : 'bg-white/95 hover:bg-white text-gray-700 border-gray-200 hover:border-yellow-300'
                   }`}
@@ -3659,26 +3894,27 @@ export default function MadbudgetPage() {
 
                 {/* Days Grid: full width, only small horizontal padding */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 px-1">
-                  {getVisibleDays().map((day, index) => {
-                    const actualIndex = currentDayOffset + index
-                    const dayKey = day as DayKey
-                    const dayNut = getDayNutrition(dayKey)
+                  {getVisibleDays().map((plannerDay) => {
+                    const dayKey = plannerDay.dayKey
+                    const dayNut = getDayNutrition(dayKey, undefined, plannerDay.weekStartDate)
                     const hasDayNut = dayNut.calories > 0 || dayNut.protein > 0 || dayNut.carbs > 0 || dayNut.fat > 0
                     return (
-                      <div key={day} className="text-center">
-                        <div className="font-medium text-gray-900 mb-3">{dayLabels[actualIndex]}</div>
+                      <div key={plannerDay.id} className={`text-center rounded-lg ${localIsoDate(plannerDay.date) === todayIso ? 'ring-2 ring-green-500' : ''}`}>
+                        <div className="font-medium text-gray-900 mb-3">
+                          {plannerDay.shortLabel}
+                          {localIsoDate(plannerDay.date) === todayIso ? ' · i dag' : ''}
+                        </div>
                         <div className="space-y-2">
                           {mealTypes.map(mealType => {
-                            const dayKey = day as DayKey
                             const mealKey = mealType.key as MealType
-                            const currentMeal = mealPlan[dayKey][mealKey]
+                            const currentMeal = mealAt(plannerDay, mealKey)
                             const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal) : null
                             const sk = slotKey(dayKey, mealKey)
                             const isLocked = Boolean(slotLocks[sk])
 
                             return (
                               <div
-                                key={`${day}-${mealType.key}`}
+                                key={`${plannerDay.id}-${mealType.key}`}
                                 data-tour={dayKey === 'wednesday' && mealKey === 'dinner' ? 'swap-meal-example' : undefined}
                                 className={`relative p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
                                   lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
@@ -3688,9 +3924,7 @@ export default function MadbudgetPage() {
                                     : 'border-gray-200 hover:border-green-300 hover:bg-green-25'
                                 } ${isLocked ? 'border-amber-500/90' : ''}`}
                                 onClick={() => {
-                                  const dayKey = day as DayKey
-                                  const mealKey = mealType.key as MealType
-                                  handleMealCellClick(dayKey, mealKey)
+                                  handleMealCellClick(plannerDay.dayKey, mealType.key as MealType, plannerDay.weekStartDate)
                                 }}
                                 title={currentMeal ? `${currentMeal.title}${mealStoreLabel(currentMeal.store) ? ` - ${mealStoreLabel(currentMeal.store)}` : ''}${currentMeal.savings !== undefined && currentMeal.savings > 0 ? ` (Sparer ${currentMeal.savings.toFixed(0)} kr)` : ''}` : `Vælg ${mealType.label.toLowerCase()}`}
                               >
@@ -3721,7 +3955,7 @@ export default function MadbudgetPage() {
                                             const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
                                             if (slugOrId) {
                                               setRecipeViewSlugOrId(String(slugOrId))
-                                              setRecipeViewSlot({ dayKey, mealKey })
+                                              setRecipeViewSlot({ dayKey, mealKey, weekStartDate: plannerDay.weekStartDate })
                                             }
                                           }}
                                           className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
@@ -3733,7 +3967,7 @@ export default function MadbudgetPage() {
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation()
-                                            clearMealSlot(dayKey, mealKey)
+                                            clearMealSlot(dayKey, mealKey, plannerDay.weekStartDate)
                                           }}
                                           className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
                                           aria-label="Fjern ret"
@@ -3773,6 +4007,7 @@ export default function MadbudgetPage() {
                                         <div className="text-[9px] sm:text-[10px] text-green-600 font-medium">Sparer {currentMeal.savings.toFixed(0)} kr</div>
                                       )}
                                     </div>
+                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 ) : (
                                   <div className="text-center py-1">
@@ -3780,6 +4015,7 @@ export default function MadbudgetPage() {
                                       <mealType.icon size={12} />
                                       {mealType.label}
                                     </span>
+                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 )}
                               </div>
@@ -3800,7 +4036,7 @@ export default function MadbudgetPage() {
 
               {/* Mobile Day Indicator */}
               <div className="lg:hidden flex justify-center mt-4 space-x-2">
-                {Array.from({ length: 3 }).map((_, index) => (
+                {Array.from({ length: Math.max(1, Math.ceil(plannerDays.length / 3)) }).map((_, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentDayOffset(index * 3)}
@@ -3816,15 +4052,18 @@ export default function MadbudgetPage() {
               {viewMode === 'day' && (
               <div data-tour="meal-plan-grid" className="space-y-6">
                 {/* Kalender: ugens dage med dato — fylder hele bredden; på mobil kan man slide */}
-                <div className="w-full grid grid-cols-7 gap-2 max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:snap-x max-sm:snap-mandatory max-sm:pb-2 max-sm:-mx-1 max-sm:px-1">
-                  {weekDates.map(({ dayKey, date }, i) => {
+                <div
+                  className="w-full grid gap-2 max-sm:flex max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:snap-x max-sm:snap-mandatory max-sm:pb-2 max-sm:-mx-1 max-sm:px-1"
+                  style={{ gridTemplateColumns: `repeat(${Math.min(plannerDays.length, 7)}, minmax(0, 1fr))` }}
+                >
+                  {plannerDays.map((plannerDay, i) => {
                     const isSelected = i === selectedDayIndex
-                    const dayShort = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'][i]
-                    const dateNum = date.getDate()
-                    const monthShort = date.toLocaleDateString('da-DK', { month: 'short' })
+                    const isToday = localIsoDate(plannerDay.date) === todayIso
+                    const dateNum = plannerDay.date.getDate()
+                    const monthShort = plannerDay.date.toLocaleDateString('da-DK', { month: 'short' })
                     return (
                       <button
-                        key={dayKey}
+                        key={plannerDay.id}
                         type="button"
                         onClick={() => setSelectedDayIndex(i)}
                         className={`min-w-0 px-2 py-2.5 rounded-lg text-sm font-medium transition-colors max-sm:flex-shrink-0 max-sm:min-w-[4.25rem] max-sm:snap-center ${
@@ -3833,7 +4072,7 @@ export default function MadbudgetPage() {
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
                       >
-                        <span className="block truncate">{dayShort}</span>
+                        <span className="block truncate">{plannerDay.shortLabel}{isToday ? ' · i dag' : ''}</span>
                         <span className="block text-xs opacity-90 truncate">{dateNum}. {monthShort}</span>
                       </button>
                     )
@@ -3842,8 +4081,9 @@ export default function MadbudgetPage() {
 
                 {/* Dagens ernæring — præcis kasse (vægttab) */}
                 {(() => {
-                  const dayKey = days[selectedDayIndex] as DayKey
-                  const nut = getDayNutrition(dayKey)
+                  const selectedPlannerDay = plannerDays[selectedDayIndex] ?? plannerDays[0]
+                  const dayKey = selectedPlannerDay?.dayKey
+                  const nut = dayKey ? getDayNutrition(dayKey, undefined, selectedPlannerDay.weekStartDate) : { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, vitamins: {} }
                   const completeAdults = familyProfile.adultsProfiles.filter((p) =>
                     adultProfileHasRequiredFieldsForMealPlan(p)
                   )
@@ -3987,13 +4227,14 @@ export default function MadbudgetPage() {
                 {/* Måltider for valgt dag: Morgenmad, Frokost, Aftensmad */}
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 mb-3">
-                    {dayLabels[selectedDayIndex]} · {weekDates[selectedDayIndex].date.getDate()}. {weekDates[selectedDayIndex].date.toLocaleDateString('da-DK', { month: 'short' })}
+                    {(plannerDays[selectedDayIndex] ?? plannerDays[0])?.label} · {(plannerDays[selectedDayIndex] ?? plannerDays[0])?.date.getDate()}. {(plannerDays[selectedDayIndex] ?? plannerDays[0])?.date.toLocaleDateString('da-DK', { month: 'short' })}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {mealTypes.map(mealType => {
-                      const dayKey = days[selectedDayIndex] as DayKey
+                      const selectedPlannerDay = plannerDays[selectedDayIndex] ?? plannerDays[0]
+                      const dayKey = selectedPlannerDay.dayKey
                       const mealKey = mealType.key as MealType
-                      const currentMeal = mealPlan[dayKey][mealKey]
+                      const currentMeal = mealAt(selectedPlannerDay, mealKey)
                             const mealCardNut = currentMeal ? getMealCardNutrition(currentMeal) : null
                       const sk = slotKey(dayKey, mealKey)
                       const isLocked = Boolean(slotLocks[sk])
@@ -4001,7 +4242,7 @@ export default function MadbudgetPage() {
                         <div
                           key={mealType.key}
                           data-tour={dayKey === 'wednesday' && mealKey === 'dinner' ? 'swap-meal-example' : undefined}
-                          onClick={() => handleMealCellClick(dayKey, mealKey)}
+                          onClick={() => handleMealCellClick(dayKey, mealKey, selectedPlannerDay.weekStartDate)}
                           className={`relative rounded-xl border-2 cursor-pointer transition-colors overflow-hidden flex flex-row sm:flex-col ${
                             lockDishesMode ? 'ring-2 ring-amber-300 ring-offset-1' : ''
                           } ${
@@ -4035,7 +4276,7 @@ export default function MadbudgetPage() {
                                     const slugOrId = (currentMeal as { slug?: string }).slug || currentMeal.id
                                     if (slugOrId) {
                                       setRecipeViewSlugOrId(String(slugOrId))
-                                      setRecipeViewSlot({ dayKey, mealKey })
+                                      setRecipeViewSlot({ dayKey, mealKey, weekStartDate: selectedPlannerDay.weekStartDate })
                                     }
                                   }}
                                   className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 border border-white/20 shadow"
@@ -4047,7 +4288,7 @@ export default function MadbudgetPage() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    clearMealSlot(dayKey, mealKey)
+                                    clearMealSlot(dayKey, mealKey, selectedPlannerDay.weekStartDate)
                                   }}
                                   className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-white hover:bg-red-700 shadow"
                                   aria-label="Fjern ret"
@@ -4073,6 +4314,7 @@ export default function MadbudgetPage() {
                                 <span>{Math.round(mealCardNut?.fat ?? 0)}g F</span>
                               </div>
                             )}
+                            {renderLeftoverAction(dayKey, mealKey)}
                           </div>
                         </div>
                       )
@@ -4139,10 +4381,13 @@ export default function MadbudgetPage() {
                     ? (selectedAdult.mealsPerDay as MealType[])
                     : undefined
                   const isDayView = viewMode === 'day'
-                  const dayKey = days[selectedDayIndex] as DayKey
+                  const selectedPlannerDay = plannerDays[selectedDayIndex] ?? plannerDays[0]
+                  const dayKey = selectedPlannerDay?.dayKey
                   const avg = isDayView
                     ? (() => {
-                        const d = getDayNutrition(dayKey, mealsFilter)
+                        const d = dayKey
+                          ? getDayNutrition(dayKey, mealsFilter, selectedPlannerDay.weekStartDate)
+                          : { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, vitamins: {} }
                         return { ...d, daysWithData: (d.calories > 0 || d.protein > 0 || d.carbs > 0 || d.fat > 0) ? 1 : 0 }
                       })()
                     : getWeekAverageNutrition(mealsFilter)
@@ -4237,7 +4482,7 @@ export default function MadbudgetPage() {
                     )
                     if (isDayView) {
                       weekHighlights.push(
-                        `Viser ${dayLabels[selectedDayIndex].toLowerCase()}s tre måltider — vælg anden dag for at sammenligne`
+                        `Viser ${(plannerDays[selectedDayIndex] ?? plannerDays[0])?.label?.toLowerCase() ?? 'dagen'}s tre måltider — vælg anden dag for at sammenligne`
                       )
                     } else {
                       weekHighlights.push('Gennemsnit for hele demo-ugen (morgenmad, frokost og aftensmad)')
@@ -4287,7 +4532,7 @@ export default function MadbudgetPage() {
                             <PieChart size={16} className="text-gray-500" />
                             <h4 className="text-sm font-medium text-gray-900">
                               {isDayView
-                                ? `Daglig ernæring (${dayLabels[selectedDayIndex]})`
+                                ? `Daglig ernæring (${(plannerDays[selectedDayIndex] ?? plannerDays[0])?.label ?? ''})`
                                 : 'Gennemsnitlig daglig ernæring (uge)'}
                             </h4>
                           </div>
@@ -5045,17 +5290,16 @@ export default function MadbudgetPage() {
             <p className="text-sm text-gray-600 leading-relaxed">
               {mealInfoKind === 'breakfast' ? (
                 <>
-                  Når morgenmad er afkrydset, indgår morgenmad i dine beregninger og i den automatiske madplan - men
-                  morgenmad er ofte meget individuelt. Klik på et frit morgenmadsfelt for at vælge ret manuelt.
+                  Når morgenmad er afkrydset, indgår den i madplanen. Vælg om den skal være hurtig, laves i ro og mag
+                  eller gentages. I opskriftsvælgeren er «Anbefalet til mig» slået til som udgangspunkt.
                   <span className="mt-3 block text-gray-700">
                     <strong>Tip:</strong> Markér ofte brugte morgenmadsopskrifter som favoritter for hurtig adgang.
                   </span>
                 </>
               ) : (
                 <>
-                  Når frokost er afkrydset, indgår frokost i dine beregninger og i den automatiske madplan - men
-                  frokost er ofte meget individuelt. Klik på et frit frokostfelt for at vælge ret manuelt, præcis som ved
-                  morgenmad.
+                  Når frokost er afkrydset, indgår den i madplanen. Vælg rester, madpakke eller hjemmelavet. I
+                  opskriftsvælgeren er «Anbefalet til mig» slået til som udgangspunkt.
                   <span className="mt-3 block text-gray-700">
                     <strong>Tip:</strong> Markér ofte brugte frokostopskrifter som favoritter for hurtig adgang.
                   </span>
@@ -5089,6 +5333,32 @@ export default function MadbudgetPage() {
 
             {/* Search and Filters */}
             <div className="mb-6 space-y-4">
+              {(recipeMealTypeFilter === 'breakfast' || recipeMealTypeFilter === 'lunch') && (
+                <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecipeRecommendOnly(true)}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      recipeRecommendOnly
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Anbefalet til mig
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipeRecommendOnly(false)}
+                    className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      !recipeRecommendOnly
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Alle opskrifter
+                  </button>
+                </div>
+              )}
               <div>
                 <p className="mb-2 text-sm font-medium text-gray-700">Måltidstype</p>
                 <div className="flex flex-wrap gap-2">
@@ -5452,13 +5722,40 @@ export default function MadbudgetPage() {
             </div>
             {recipeViewSlot && (
               <div className="p-4 border-t border-gray-100 flex-shrink-0 space-y-2">
+                {isNextLunchLeftover(mealPlan[recipeViewSlot.dayKey]?.[recipeViewSlot.mealKey]) ? (
+                  <p className="text-xs text-gray-500">
+                    Rester fra aftensmaden dagen før. Næringen er en hel portion, og den ekstra portion ligger på aftensmaden og indkøbslisten.
+                  </p>
+                ) : null}
+                {(() => {
+                  const action = leftoverSlotAction(
+                    mealPlan,
+                    recipeViewSlot.dayKey,
+                    recipeViewSlot.mealKey
+                  )
+                  if (!action) return null
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (action.type === 'remove') removePlannedLeftover(action.dinnerDay)
+                        else planLeftoverFromDinner(action.dinnerDay)
+                        setRecipeViewSlugOrId(null)
+                        setRecipeViewSlot(null)
+                      }}
+                      className="w-full py-2.5 px-4 text-sm font-medium text-emerald-800 border border-emerald-200 rounded-lg hover:bg-emerald-50"
+                    >
+                      {action.label}
+                    </button>
+                  )
+                })()}
                 {!isLeftoverMealCell(mealPlan[recipeViewSlot.dayKey]?.[recipeViewSlot.mealKey]) ? (
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         const { dayKey, mealKey } = recipeViewSlot
-                        handleCookAhead(dayKey, mealKey, 2)
+                        handleCookAhead(dayKey, mealKey, 2, recipeViewSlot.weekStartDate)
                         setRecipeViewSlugOrId(null)
                         setRecipeViewSlot(null)
                       }}
@@ -5470,7 +5767,7 @@ export default function MadbudgetPage() {
                       type="button"
                       onClick={() => {
                         const { dayKey, mealKey } = recipeViewSlot
-                        handleCookAhead(dayKey, mealKey, 3)
+                        handleCookAhead(dayKey, mealKey, 3, recipeViewSlot.weekStartDate)
                         setRecipeViewSlugOrId(null)
                         setRecipeViewSlot(null)
                       }}
@@ -5480,14 +5777,19 @@ export default function MadbudgetPage() {
                     </button>
                   </div>
                 ) : null}
-                <p className="text-xs text-gray-500">
-                  Lav maden dag 1. De næste dage bliver rester, og indkøbet skaleres til husstanden.
-                </p>
+                {!isLeftoverMealCell(mealPlan[recipeViewSlot.dayKey]?.[recipeViewSlot.mealKey]) ? (
+                  <p className="text-xs text-gray-500">
+                    Lav maden dag 1. De næste dage bliver rester, og indkøbet skaleres til husstanden.
+                    {recipeViewSlot.mealKey === 'dinner'
+                      ? ' «Tilføj til frokost dagen efter» lægger én portion ekstra på aftensmaden og indkøbslisten.'
+                      : ''}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => {
-                    const { dayKey, mealKey } = recipeViewSlot
-                    clearMealSlot(dayKey, mealKey)
+                    const { dayKey, mealKey, weekStartDate } = recipeViewSlot
+                    clearMealSlot(dayKey, mealKey, weekStartDate)
                   }}
                   className="w-full py-2.5 px-4 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                 >
@@ -5760,40 +6062,69 @@ export default function MadbudgetPage() {
                         ))}
                       </div>
                       <label className="mb-2 mt-6 block text-sm font-medium text-gray-700">
-                        Måltider i madplanen
+                        Morgenmad og frokost
                       </label>
                       <p className="mb-3 text-xs text-gray-500">
-                        Voksen 1 (primær profil) styrer om du får fuld plan eller kun aftensmad. Gælder hele
-                        familien.
+                        Gælder hele familien. Aftensmad er altid med.
                       </p>
-                      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        {MEAL_PLAN_SCOPE_OPTIONS.map((opt) => (
+                      <div className="mb-3 space-y-2">
+                        {(['skip', 'fast', 'home', 'repeat'] as const).map((id) => (
                           <label
-                            key={opt.id}
+                            key={`breakfast-${id}`}
                             className={`flex cursor-pointer items-start rounded-lg border p-3 transition-all ${
-                              selectedMealPlanScope === opt.id
+                              slotStyleProfile.breakfastStyle === id
                                 ? 'border-blue-500 bg-blue-50'
                                 : 'border-gray-200 bg-white hover:border-gray-300'
                             }`}
                           >
                             <input
                               type="radio"
-                              name="familyPlanMealScope"
+                              name="familyBreakfastStyle"
                               className="mr-3 mt-1"
-                              checked={selectedMealPlanScope === opt.id}
-                              onChange={() => syncMealPlanScopeAcrossAdults(opt.id)}
+                              checked={slotStyleProfile.breakfastStyle === id}
+                              onChange={() => setPlannerBreakfastStyle(id)}
                             />
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {opt.icon} {opt.label}
+                                Morgenmad: {breakfastStyleLabel(id, slotStyleProfile.dietaryApproach)}
                               </div>
-                              <div className="text-xs text-gray-600">{opt.desc}</div>
+                              <div className="text-xs text-gray-600">
+                                {breakfastStyleHint(id, slotStyleProfile.dietaryApproach)}
+                              </div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="mb-4 space-y-2">
+                        {(['skip', 'leftovers', 'packed', 'home'] as const).map((id) => (
+                          <label
+                            key={`lunch-${id}`}
+                            className={`flex cursor-pointer items-start rounded-lg border p-3 transition-all ${
+                              slotStyleProfile.lunchStyle === id
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 bg-white hover:border-gray-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="familyLunchStyle"
+                              className="mr-3 mt-1"
+                              checked={slotStyleProfile.lunchStyle === id}
+                              onChange={() => setPlannerLunchStyle(id)}
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                Frokost: {lunchStyleLabel(id)}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                {lunchStyleHint(id, slotStyleProfile.dietaryApproach)}
+                              </div>
                             </div>
                           </label>
                         ))}
                       </div>
                       <p className="mb-4 text-xs text-gray-500">
-                        Aktuelt: {mealPlanScopeLabel(selectedMealPlanScope)}
+                        Aktuelt: {mealSlotStylesSummary(slotStyleProfile)}
                       </p>
                       <label className="mb-3 block text-sm font-medium text-gray-700">
                         Vægttabsprofiler for voksne
@@ -6577,14 +6908,12 @@ export default function MadbudgetPage() {
       )}
 
       {/* Ugevalg ved generering fredag–søndag */}
-      <WeekTargetPickerModal
-        open={showWeekTargetPicker}
-        currentWeek={currentWeekInfo}
-        nextWeek={nextWeekInfo}
-        onClose={() => setShowWeekTargetPicker(false)}
-        onSelect={(target) => {
-          setShowWeekTargetPicker(false)
-          void generateMealPlan(target)
+      <ShopSpanModal
+        open={showShopSpanPicker}
+        onClose={() => setShowShopSpanPicker(false)}
+        onConfirm={(shopDate, count) => {
+          setShowShopSpanPicker(false)
+          void generateMealPlan({ date: shopDate, dayCount: count })
         }}
       />
 

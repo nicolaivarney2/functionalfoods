@@ -1,5 +1,6 @@
 import { hydrateGridIngredientsFromRecipes } from '@/lib/madbudget/meal-plan-ingredients'
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
+import { parseShop, sameShop, spanMealDays, type ShopMeta, type SpanGrid } from '@/lib/madbudget/meal-plan-span'
 
 type DayKey = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 type MealType = 'breakfast' | 'lunch' | 'dinner'
@@ -58,7 +59,8 @@ export function extractLeftoversFromShoppingList(
 export async function rebuildShoppingListForUser(
   supabase: SupabaseLike,
   userId: string,
-  grid: Grid
+  grid: Grid,
+  options?: { shop?: ShopMeta | null; weekStartDate?: string | null }
 ): Promise<unknown | null> {
   try {
     const { data: profile } = await supabase
@@ -94,29 +96,74 @@ export async function rebuildShoppingListForUser(
       adultsProfiles,
     }
 
-    const hydratedGrid = await hydrateGridIngredientsFromRecipes(supabase, grid)
-    const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(hydratedGrid as any, family)
-
     const planDietaryApproach =
       adultsProfiles.find((p: { dietaryApproach?: string }) => p.dietaryApproach)?.dietaryApproach
 
-    const { data: activePlan } = await supabase
+    const { data: recentPlans } = await supabase
       .from('user_meal_plans')
-      .select('shopping_list')
+      .select('id, week_start_date, meal_plan_data, shopping_list, is_active')
       .eq('user_id', userId)
-      .eq('is_active', true)
       .order('week_start_date', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .limit(12)
 
-    const availableIngredients = extractLeftoversFromShoppingList(activePlan?.shopping_list)
+    const plans = (recentPlans ?? []) as Array<{
+      id: string
+      week_start_date: string
+      meal_plan_data: unknown
+      shopping_list: unknown
+      is_active: boolean
+    }>
+    const shop =
+      options?.shop ??
+      parseShop(plans.find((p) => p.week_start_date?.slice(0, 10) === options?.weekStartDate?.slice(0, 10))?.meal_plan_data) ??
+      parseShop(plans.find((p) => p.is_active)?.meal_plan_data)
+    const listSource = plans.find((p) => p.is_active) ?? plans[0]
+    const availableIngredients = extractLeftoversFromShoppingList(listSource?.shopping_list)
 
-    const shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
-      syncedGrid,
-      1,
-      { ...family, planDietaryApproach },
-      availableIngredients.length ? availableIngredients : undefined
-    )
+    const familyForList = { ...family, planDietaryApproach }
+    let shoppingList: unknown
+    if (shop) {
+      const siblings = plans.filter((p) => sameShop(parseShop(p.meal_plan_data), shop))
+      const editedStart = options?.weekStartDate?.slice(0, 10)
+      const gridsByWeek: Record<string, SpanGrid> = {}
+      const weeks = new Set<string>(siblings.map((p) => p.week_start_date.slice(0, 10)))
+      if (editedStart) weeks.add(editedStart)
+      for (const start of weeks) {
+        const stored = siblings.find((p) => p.week_start_date.slice(0, 10) === start)?.meal_plan_data
+        const storedGrid =
+          stored && typeof stored === 'object' && stored !== null && 'grid' in (stored as object)
+            ? ((stored as { grid?: Grid }).grid ?? {})
+            : ((stored ?? {}) as Grid)
+        const source = start === editedStart ? grid : storedGrid
+        const hydrated = await hydrateGridIngredientsFromRecipes(supabase, (source ?? {}) as Grid)
+        gridsByWeek[start] = mealPlanGenerator.applyHouseholdServingsToGrid(hydrated as any, family) as SpanGrid
+      }
+      const spanDays = spanMealDays(shop, siblings, gridsByWeek)
+      shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
+        gridsByWeek[editedStart || siblings[0]?.week_start_date] ?? {},
+        1,
+        familyForList,
+        availableIngredients.length ? availableIngredients : undefined,
+        spanDays
+      )
+      if (shoppingList != null) {
+        for (const sibling of siblings) {
+          await supabase
+            .from('user_meal_plans')
+            .update({ shopping_list: shoppingList, updated_at: new Date().toISOString() })
+            .eq('id', sibling.id)
+        }
+      }
+    } else {
+      const hydratedGrid = await hydrateGridIngredientsFromRecipes(supabase, grid)
+      const syncedGrid = mealPlanGenerator.applyHouseholdServingsToGrid(hydratedGrid as any, family)
+      shoppingList = await mealPlanGenerator.buildShoppingListFromMadbudgetGrid(
+        syncedGrid,
+        1,
+        familyForList,
+        availableIngredients.length ? availableIngredients : undefined
+      )
+    }
 
     return shoppingList ?? null
   } catch (err) {

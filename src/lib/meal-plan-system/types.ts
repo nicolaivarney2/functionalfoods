@@ -182,6 +182,8 @@ export interface MealPlanConfig {
   peoplePerMeal?: Record<string, number>;
   /** Samlet PE for børn (aldersbånd) – lægges oven i voksne pr. måltid ved portionsberegning. */
   childPersonEquivalent?: number;
+  breakfastStyle?: 'skip' | 'fast' | 'home' | 'repeat'
+  lunchStyle?: 'skip' | 'leftovers' | 'packed' | 'home'
   /** Rester / køleskab — trækkes fra indkøbslisten med enhedskonvertering. */
   availableIngredients?: Array<{
     ingredientId?: string

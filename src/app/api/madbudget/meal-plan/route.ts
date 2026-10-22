@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
         .select(PLAN_LIST_COLUMNS)
         .eq('user_id', ownerId)
         .order('week_start_date', { ascending: false })
-        .limit(10))
+        .limit(24))
     }
 
     if (error) {
@@ -203,6 +203,70 @@ export async function POST(request: NextRequest) {
     const supabase = createClient(supabaseUrl, serviceKey)
 
     const body = await request.json()
+
+    if (Array.isArray(body.weeks) && body.weeks.length > 0) {
+      if (body.weeks.length > 3) {
+        return NextResponse.json({ error: 'Et indkøb kan højst ramme tre uger.' }, { status: 400 })
+      }
+      await supabase
+        .from('user_meal_plans')
+        .update({ is_active: false })
+        .eq('user_id', ownerId)
+        .eq('is_active', true)
+
+      const savedWeeks: Record<string, unknown>[] = []
+      let activeRow: Record<string, unknown> | null = null
+      for (const week of body.weeks as Array<Record<string, unknown>>) {
+        const weekStartDate = typeof week.weekStartDate === 'string' ? week.weekStartDate.slice(0, 10) : ''
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStartDate)) {
+          return NextResponse.json({ error: 'Invalid weekStartDate' }, { status: 400 })
+        }
+        const { data: existingPlan } = await supabase
+          .from('user_meal_plans')
+          .select('id, meal_plan_data, shopping_list')
+          .eq('user_id', ownerId)
+          .eq('week_start_date', weekStartDate)
+          .maybeSingle()
+
+        const mealPlanDataToSave = existingPlan
+          ? mergeMealPlanDataPreservingIngredients(week.mealPlanData, existingPlan.meal_plan_data)
+          : week.mealPlanData
+        const isActive = week.isActive === true
+        const rowValues = {
+          name: week.name || `Madplan ${weekStartDate}`,
+          week_end_date: week.weekEndDate,
+          week_number: week.weekNumber || null,
+          variation_level: week.variationLevel || body.variationLevel || 2,
+          family_profile_snapshot: week.familyProfileSnapshot || body.familyProfileSnapshot,
+          meal_plan_data: mealPlanDataToSave,
+          shopping_list: week.shoppingList ?? body.shoppingList,
+          total_cost: null,
+          total_savings: null,
+          estimated_calories_per_day: null,
+          is_active: isActive,
+          updated_at: new Date().toISOString(),
+        }
+        const write = existingPlan
+          ? await supabase.from('user_meal_plans').update(rowValues).eq('id', existingPlan.id).select().single()
+          : await supabase
+              .from('user_meal_plans')
+              .insert({ user_id: ownerId, week_start_date: weekStartDate, ...rowValues })
+              .select()
+              .single()
+        if (write.error || !write.data) {
+          console.error('Error saving meal plan span:', write.error)
+          return NextResponse.json({ error: 'Failed to save meal plan' }, { status: 500 })
+        }
+        savedWeeks.push(write.data)
+        if (isActive) activeRow = write.data
+      }
+      return NextResponse.json({
+        success: true,
+        data: activeRow ?? savedWeeks[0],
+        weeks: savedWeeks,
+      })
+    }
+
     const {
       name,
       weekStartDate,
@@ -216,18 +280,20 @@ export async function POST(request: NextRequest) {
       totalSavings,
       estimatedCaloriesPerDay
     } = body
+    const activate = body.activate !== false
 
-    // Deactivate previous active plans
-    await supabase
-      .from('user_meal_plans')
-      .update({ is_active: false })
-      .eq('user_id', ownerId)
-      .eq('is_active', true)
+    if (activate) {
+      await supabase
+        .from('user_meal_plans')
+        .update({ is_active: false })
+        .eq('user_id', ownerId)
+        .eq('is_active', true)
+    }
 
     // Check if meal plan for this week already exists
     const { data: existingPlan } = await supabase
       .from('user_meal_plans')
-      .select('id, meal_plan_data, shopping_list')
+      .select('id, meal_plan_data, shopping_list, is_active')
       .eq('user_id', ownerId)
       .eq('week_start_date', weekStartDate)
       .single()
@@ -259,7 +325,7 @@ export async function POST(request: NextRequest) {
           total_cost: totalCost,
           total_savings: totalSavings,
           estimated_calories_per_day: estimatedCaloriesPerDay,
-          is_active: true,
+          is_active: activate ? true : Boolean(existingPlan?.is_active),
           updated_at: new Date().toISOString()
         })
         .eq('id', existingPlan.id)
@@ -284,7 +350,7 @@ export async function POST(request: NextRequest) {
           total_cost: totalCost,
           total_savings: totalSavings,
           estimated_calories_per_day: estimatedCaloriesPerDay,
-          is_active: true
+          is_active: activate
         })
         .select()
         .single()

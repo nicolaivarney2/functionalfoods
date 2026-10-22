@@ -3,8 +3,10 @@ import { getAuthenticatedUser } from '@/lib/auth-from-request'
 import { createSupabaseServiceClient } from '@/lib/supabase'
 import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 import { loadHouseholdForUser } from '@/lib/household-access'
-import { clearLeftoversFromSource, type CookAheadGrid } from '@/lib/madbudget/cook-ahead'
+import { type CookAheadGrid } from '@/lib/madbudget/cook-ahead'
+import { replaceMealKeepingLeftovers } from '@/lib/madbudget/next-lunch-leftover'
 import { resolveHouseholdMealPlan } from '@/lib/madbudget/resolve-meal-plan'
+import { mealPlanDataKeepingMeta, parseShop } from '@/lib/madbudget/meal-plan-span'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -116,19 +118,26 @@ export async function POST(request: NextRequest) {
     const parsed = parseMealPlanData(plan.meal_plan_data)
     const dayKey = day as DayKey
     const mealKey = meal as MealType
-    const grid = clearLeftoversFromSource(parsed.grid as CookAheadGrid, dayKey, mealKey) as typeof parsed.grid
+    const grid = replaceMealKeepingLeftovers(
+      parsed.grid as CookAheadGrid,
+      dayKey,
+      mealKey,
+      null
+    ) as typeof parsed.grid
     const slotLocks = parsed.slotLocks
-    grid[dayKey][mealKey] = null
     delete slotLocks[`${dayKey}_${mealKey}`]
 
     // Genopbyg indkøbslisten så priserne følger den ændrede madplan. Slår fejl ikke
     // ud over hele kaldet — grid-ændringen gemmes uanset (listen markeres stale i app'en).
-    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any)
+    const shoppingList = await rebuildShoppingListForUser(supabase, ownerId, grid as any, {
+      shop: parseShop(plan.meal_plan_data),
+      weekStartDate: plan.week_start_date,
+    })
 
     const { error: updateError } = await supabase
       .from('user_meal_plans')
       .update({
-        meal_plan_data: { v: 2, grid, slotLocks },
+        meal_plan_data: mealPlanDataKeepingMeta(plan.meal_plan_data, grid, slotLocks),
         ...(shoppingList != null ? { shopping_list: shoppingList } : {}),
         updated_at: new Date().toISOString(),
       })

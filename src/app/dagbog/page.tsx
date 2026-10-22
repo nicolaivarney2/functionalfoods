@@ -22,6 +22,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
 import AddMealSheet from '@/components/diary/AddMealSheet'
+import LeftoverFromLogSheet from '@/components/diary/LeftoverFromLogSheet'
 import FeedbackCta from '@/components/FeedbackCta'
 import {
   addDiaryActivity,
@@ -132,6 +133,7 @@ export default function DagbogPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sheetMeal, setSheetMeal] = useState<MealType | null>(null)
+  const [leftoverOpen, setLeftoverOpen] = useState(false)
   const [moveEntry, setMoveEntry] = useState<DiaryEntry | null>(null)
   const [moveBusy, setMoveBusy] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
@@ -620,6 +622,15 @@ export default function DagbogPage() {
                         <Plus size={18} />
                       </span>
                     </button>
+                    {mealKey === 'lunch' ? (
+                      <button
+                        type="button"
+                        onClick={() => setLeftoverOpen(true)}
+                        className="border-t border-gray-100 px-4 py-2 text-left text-sm font-medium text-emerald-800 hover:bg-emerald-50 lg:px-5"
+                      >
+                        Tilføj rester fra de sidste dage
+                      </button>
+                    ) : null}
                     {entries.length ? (
                       <ul className="flex-1 border-t border-gray-100 divide-y divide-gray-50">
                         {entries.map((entry) => (
@@ -639,6 +650,9 @@ export default function DagbogPage() {
                               <p className="truncate text-sm font-medium text-gray-900">{entry.title}</p>
                               <p className="text-xs text-gray-500">
                                 {Math.round(entry.calories).toLocaleString('da-DK')} kcal
+                                {entry.title.startsWith('Rester:') && Math.abs(entry.servings - 0.75) < 0.01
+                                  ? ' · rester (−25%)'
+                                  : ''}
                                 {entry.source === 'meal-plan' ? ' · madplan' : ''}
                                 {entry.source === 'manual' ? ' · manuel' : ''}
                               </p>
@@ -768,6 +782,13 @@ export default function DagbogPage() {
         meal={sheetMeal ?? 'breakfast'}
         date={dateKey}
         onClose={() => setSheetMeal(null)}
+        onLogged={() => void load()}
+      />
+
+      <LeftoverFromLogSheet
+        open={leftoverOpen}
+        date={dateKey}
+        onClose={() => setLeftoverOpen(false)}
         onLogged={() => void load()}
       />
 

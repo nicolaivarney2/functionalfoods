@@ -42,13 +42,12 @@ import {
   ACTIVITY_OPTIONS,
   EXCLUDED_FOOD_OPTIONS,
   ONBOARDING_DIETARY_OPTIONS,
-  MEAL_PLAN_SCOPE_OPTIONS,
   WEIGHT_GOAL_OPTIONS,
   calculateOnboardingEnergy,
   defaultOnboardingData,
   hasPendingOnboardingData,
   loadOnboardingData,
-  mealPlanScopeLabel,
+  onboardingMealSummary,
   onboardingProfileComplete,
   saveCheckoutPlan,
   loadCheckoutPlan,
@@ -57,6 +56,15 @@ import {
   FF_AUTO_FIRST_PLAN_KEY,
   type VaegttabsplanOnboardingData,
 } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import {
+  breakfastStyleHint,
+  breakfastStyleLabel,
+  isKetoLikeDiet,
+  lunchStyleHint,
+  lunchStyleLabel,
+  type BreakfastStyle,
+  type LunchStyle,
+} from '@/lib/madbudget/meal-slot-style'
 
 const STEP = {
   INTRO: 0,
@@ -71,17 +79,19 @@ const STEP = {
   STORES: 9,
   DIETARY: 10,
   MEAL_SCOPE: 11,
-  EXCLUDED: 12,
-  PRICING: 13,
-  SUMMARY: 14,
-  SIGNUP: 15,
+  BREAKFAST_STYLE: 12,
+  LUNCH_STYLE: 13,
+  EXCLUDED: 14,
+  PRICING: 15,
+  SUMMARY: 16,
+  SIGNUP: 17,
 } as const
 
 function signupPlanCopy(): string {
   return FREE_FOREVER_SIGNUP
 }
 
-const TOTAL_STEPS = 16
+const TOTAL_STEPS = 18
 const ALMOST_DONE_FROM_STEP = STEP.AGE
 
 const USP_INTRO = {
@@ -274,8 +284,25 @@ function VaegttabsplanOnboardingInner() {
   const step = data.currentStep
   const energy = calculateOnboardingEnergy(data)
 
+  const nextAfterMealScope = (breakfast?: BreakfastStyle, lunch?: LunchStyle) => {
+    if (breakfast && breakfast !== 'skip') return STEP.BREAKFAST_STYLE
+    if (lunch && lunch !== 'skip') return STEP.LUNCH_STYLE
+    return STEP.EXCLUDED
+  }
+
   const goNext = () => {
-    if (step === STEP.EXCLUDED) {
+    if (step === STEP.MEAL_SCOPE) {
+      patch({ currentStep: nextAfterMealScope(data.breakfastStyle, data.lunchStyle) })
+      return
+    }
+    if (step === STEP.BREAKFAST_STYLE) {
+      patch({
+        currentStep:
+          data.lunchStyle && data.lunchStyle !== 'skip' ? STEP.LUNCH_STYLE : STEP.EXCLUDED,
+      })
+      return
+    }
+    if (step === STEP.LUNCH_STYLE || step === STEP.EXCLUDED) {
       patch({ currentStep: STEP.SUMMARY })
       return
     }
@@ -287,12 +314,49 @@ function VaegttabsplanOnboardingInner() {
       patch({ currentStep: STEP.EXCLUDED })
       return
     }
+    if (step === STEP.EXCLUDED) {
+      if (data.lunchStyle && data.lunchStyle !== 'skip') {
+        patch({ currentStep: STEP.LUNCH_STYLE })
+        return
+      }
+      if (data.breakfastStyle && data.breakfastStyle !== 'skip') {
+        patch({ currentStep: STEP.BREAKFAST_STYLE })
+        return
+      }
+      patch({ currentStep: STEP.MEAL_SCOPE })
+      return
+    }
+    if (step === STEP.LUNCH_STYLE) {
+      patch({
+        currentStep:
+          data.breakfastStyle && data.breakfastStyle !== 'skip'
+            ? STEP.BREAKFAST_STYLE
+            : STEP.MEAL_SCOPE,
+      })
+      return
+    }
+    if (step === STEP.BREAKFAST_STYLE) {
+      patch({ currentStep: STEP.MEAL_SCOPE })
+      return
+    }
     if (step > 0) patch({ currentStep: step - 1 })
   }
 
   const pickAndAdvance = (updates: Partial<VaegttabsplanOnboardingData>) => {
     if (step >= TOTAL_STEPS - 1) {
       patch(updates)
+      return
+    }
+    if (step === STEP.BREAKFAST_STYLE) {
+      const lunch = updates.lunchStyle ?? data.lunchStyle
+      patch({
+        ...updates,
+        currentStep: lunch && lunch !== 'skip' ? STEP.LUNCH_STYLE : STEP.EXCLUDED,
+      })
+      return
+    }
+    if (step === STEP.LUNCH_STYLE) {
+      patch({ ...updates, currentStep: STEP.EXCLUDED })
       return
     }
     patch({ ...updates, currentStep: step + 1 })
@@ -338,7 +402,11 @@ function VaegttabsplanOnboardingInner() {
       case STEP.DIETARY:
         return Boolean(data.dietaryApproach)
       case STEP.MEAL_SCOPE:
-        return Boolean(data.mealPlanScope)
+        return Boolean(data.breakfastStyle && data.lunchStyle)
+      case STEP.BREAKFAST_STYLE:
+        return Boolean(data.breakfastStyle && data.breakfastStyle !== 'skip')
+      case STEP.LUNCH_STYLE:
+        return Boolean(data.lunchStyle && data.lunchStyle !== 'skip')
       case STEP.EXCLUDED:
         return true
       case STEP.PRICING:
@@ -980,35 +1048,164 @@ function VaegttabsplanOnboardingInner() {
             <motion.div key="meal-scope" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Din plan</p>
-                <h2 className="mt-1 text-2xl font-bold">Hvilke måltider vil du have planlagt?</h2>
+                <h2 className="mt-1 text-2xl font-bold">Hvordan vil du have morgenmad og frokost?</h2>
                 <p className="mt-2 text-sm text-emerald-100/85">
-                  Vælg om du vil have hele dagen med, eller start med aftensmaden.
+                  Aftensmad er altid med. Periodisk faste er bare at springe et af de andre over.
+                </p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Morgenmad</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {([
+                      { id: 'skip' as const, label: 'Jeg faster morgenmad', desc: 'Ingen morgenmad i planen.' },
+                      {
+                        id: 'fast' as const,
+                        label: 'Jeg vil have morgenmad planlagt',
+                        desc: 'Vi spørger lige hvordan den skal laves.',
+                      },
+                    ] as const).map((opt) => {
+                      const selected =
+                        opt.id === 'skip'
+                          ? data.breakfastStyle === 'skip'
+                          : Boolean(data.breakfastStyle && data.breakfastStyle !== 'skip')
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            patch({
+                              breakfastStyle: opt.id,
+                              mealPlanScope:
+                                opt.id !== 'skip' || (data.lunchStyle && data.lunchStyle !== 'skip')
+                                  ? 'full'
+                                  : 'dinner-only',
+                            })
+                          }
+                          className={`rounded-xl border-2 p-4 text-left transition ${
+                            selected
+                              ? 'border-amber-300 bg-white/15'
+                              : 'border-white/15 bg-white/5 hover:border-white/30'
+                          }`}
+                        >
+                          <div className="font-semibold">{opt.label}</div>
+                          <div className="mt-1 text-sm text-emerald-100/80">{opt.desc}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Frokost</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {([
+                      { id: 'skip' as const, label: 'Jeg faster frokost', desc: 'Ingen frokost i planen.' },
+                      {
+                        id: 'home' as const,
+                        label: 'Jeg vil have frokost planlagt',
+                        desc: 'Vi spørger lige om rester, madpakke eller hjemme.',
+                      },
+                    ] as const).map((opt) => {
+                      const selected =
+                        opt.id === 'skip'
+                          ? data.lunchStyle === 'skip'
+                          : Boolean(data.lunchStyle && data.lunchStyle !== 'skip')
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() =>
+                            patch({
+                              lunchStyle: opt.id,
+                              mealPlanScope:
+                                opt.id !== 'skip' || (data.breakfastStyle && data.breakfastStyle !== 'skip')
+                                  ? 'full'
+                                  : 'dinner-only',
+                            })
+                          }
+                          className={`rounded-xl border-2 p-4 text-left transition ${
+                            selected
+                              ? 'border-amber-300 bg-white/15'
+                              : 'border-white/15 bg-white/5 hover:border-white/30'
+                          }`}
+                        >
+                          <div className="font-semibold">{opt.label}</div>
+                          <div className="mt-1 text-sm text-emerald-100/80">{opt.desc}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <p className="rounded-xl bg-white/10 px-4 py-3 text-sm text-emerald-50/95 ring-1 ring-white/15 leading-relaxed">
+                Du kan altid ændre det senere under familieindstillinger.
+              </p>
+            </motion.div>
+          )}
+
+          {step === STEP.BREAKFAST_STYLE && (
+            <motion.div key="breakfast-style" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Morgenmad</p>
+                <h2 className="mt-1 text-2xl font-bold">Hvad er vigtigst om morgenen?</h2>
+                <p className="mt-2 text-sm text-emerald-100/85">
+                  {isKetoLikeDiet(data.dietaryApproach)
+                    ? 'Keto-morgenmad er oftest æg, ost eller keto-rugbrød med pålæg.'
+                    : 'Nogle har tid derhjemme. Andre skal bare ud af døren.'}
                 </p>
               </div>
               <div className="space-y-3">
-                {MEAL_PLAN_SCOPE_OPTIONS.map((opt) => (
+                {(['fast', 'home', 'repeat'] as const).map((id) => (
                   <button
-                    key={opt.id}
+                    key={id}
                     type="button"
-                    onClick={() => pickAndAdvance({ mealPlanScope: opt.id })}
-                    className={`flex w-full items-center gap-4 rounded-xl border-2 p-4 text-left transition ${
-                      data.mealPlanScope === opt.id
+                    onClick={() => pickAndAdvance({ breakfastStyle: id, mealPlanScope: 'full' })}
+                    className={`flex w-full flex-col rounded-xl border-2 p-4 text-left transition ${
+                      data.breakfastStyle === id
                         ? 'border-amber-300 bg-white/15'
                         : 'border-white/15 bg-white/5 hover:border-white/30'
                     }`}
                   >
-                    <span className="text-2xl">{opt.icon}</span>
-                    <div>
-                      <div className="font-semibold">{opt.label}</div>
-                      <div className="text-sm text-emerald-100/80">{opt.desc}</div>
-                    </div>
+                    <span className="font-semibold">{breakfastStyleLabel(id, data.dietaryApproach)}</span>
+                    <span className="mt-1 text-sm text-emerald-100/80">
+                      {breakfastStyleHint(id, data.dietaryApproach)}
+                    </span>
                   </button>
                 ))}
               </div>
-              <p className="rounded-xl bg-white/10 px-4 py-3 text-sm text-emerald-50/95 ring-1 ring-white/15 leading-relaxed">
-                <strong className="text-white">Bemærk:</strong> Hvis du er i tvivl, så start med aftensmad kun - du kan
-                altid ændre det senere.
-              </p>
+            </motion.div>
+          )}
+
+          {step === STEP.LUNCH_STYLE && (
+            <motion.div key="lunch-style" initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300/90">Frokost</p>
+                <h2 className="mt-1 text-2xl font-bold">Hvordan skal frokosten fungere?</h2>
+                <p className="mt-2 text-sm text-emerald-100/85">
+                  {isKetoLikeDiet(data.dietaryApproach)
+                    ? 'Keto-frokost er svær ude i byen. De fleste bruger keto-rugbrød, en preppet salat eller rester.'
+                    : 'Rester, madpakke eller noget du laver derhjemme.'}
+                </p>
+              </div>
+              <div className="space-y-3">
+                {(['leftovers', 'packed', 'home'] as const).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => pickAndAdvance({ lunchStyle: id, mealPlanScope: 'full' })}
+                    className={`flex w-full flex-col rounded-xl border-2 p-4 text-left transition ${
+                      data.lunchStyle === id
+                        ? 'border-amber-300 bg-white/15'
+                        : 'border-white/15 bg-white/5 hover:border-white/30'
+                    }`}
+                  >
+                    <span className="font-semibold">{lunchStyleLabel(id)}</span>
+                    <span className="mt-1 text-sm text-emerald-100/80">
+                      {lunchStyleHint(id, data.dietaryApproach)}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </motion.div>
           )}
 
@@ -1077,7 +1274,7 @@ function VaegttabsplanOnboardingInner() {
                   { icon: Users, text: `Husstand: ${data.adults ?? 1} voksen(e)${(data.children ?? 0) > 0 ? `, ${data.children} barn` : ''}` },
                   { icon: Target, text: `Mål: ${WEIGHT_GOAL_OPTIONS.find((g) => g.value === data.weightGoal)?.label ?? '—'}` },
                   { icon: TrendingDown, text: energy ? `Kalorietarget: ${energy.targetCalories} kcal/dag` : 'Kalorier beregnet' },
-                  { icon: Clock, text: `Måltider: ${mealPlanScopeLabel(data.mealPlanScope)}` },
+                  { icon: Clock, text: `Måltider: ${onboardingMealSummary(data)}` },
                   { icon: Tag, text: `Kostretning: ${ONBOARDING_DIETARY_OPTIONS.find((d) => d.id === data.dietaryApproach)?.name ?? '—'}` },
                   { icon: Tag, text: `Butikker: ${data.selectedStores.map(storeName).filter(Boolean).join(', ')}` },
                   ...((data.excludedFoods ?? []).length

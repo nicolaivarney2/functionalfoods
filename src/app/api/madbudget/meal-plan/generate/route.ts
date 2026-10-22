@@ -6,6 +6,10 @@ import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-paylo
 import {
   getWeekInfo,
   getWeekInfoByOffset,
+  groupSpanByCalendarWeek,
+  localIsoDate,
+  parseAnchoredShopDate,
+  parseDayCount,
   type MealPlanWeekTarget,
 } from '@/lib/madbudget/week-dates'
 
@@ -110,6 +114,40 @@ function appendKidCarbToDinners(
   }
 }
 
+/** Samme børne-kulhydrat, men kun én gang på den delte indkøbsliste når spændet rammer flere uger. */
+function appendKidCarbToSpan(
+  grids: Array<Record<DayKey, Record<MealType, unknown | null>>>,
+  childCount: number,
+  shoppingList?: { categories?: { name: string; items: { name: string; amount: number; unit: string; notes?: string }[] }[] } | null
+) {
+  if (childCount <= 0) return
+  const perCarb = new Map<string, number>()
+  for (const grid of grids) {
+    DAY_KEYS.forEach((dayKey, dayIndex) => {
+      const cell = grid[dayKey]?.dinner
+      if (!cell || typeof cell !== 'object') return
+      const c = cell as Record<string, unknown>
+      const carbName = KID_CARBS[dayIndex % KID_CARBS.length]
+      const amount = 100 * childCount
+      const ingredients = Array.isArray(c.ingredients) ? (c.ingredients as unknown[]) : []
+      ingredients.push({ name: carbName, amount, unit: 'g', isKidCarb: true })
+      c.ingredients = ingredients
+      perCarb.set(carbName, (perCarb.get(carbName) ?? 0) + amount)
+    })
+  }
+  if (shoppingList && perCarb.size > 0) {
+    const items = Array.from(perCarb.entries()).map(([name, amount]) => ({
+      name,
+      amount,
+      unit: 'g',
+      notes: 'Mættende tilbehør til børnene',
+    }))
+    const categories = Array.isArray(shoppingList.categories) ? shoppingList.categories : []
+    categories.push({ name: 'Til børnene', items })
+    shoppingList.categories = categories
+  }
+}
+
 /**
  * Genererer en uges madplan server-side ud fra brugerens gemte familieprofil
  * (family_profiles) + voksen-profiler (adult_weight_loss_profiles, der bærer
@@ -119,7 +157,8 @@ function appendKidCarbToDinners(
  * vi genbruger samme generator (mealPlanGenerator) her med samme input-form, så
  * app og web deler præcis samme logik og output-format.
  *
- * Body (valgfrit): { variationLevel?: number; targetWeek?: 'current' | 'next'; weekOffset?: number; availableIngredients?: [...] }
+ * Body (valgfrit): { variationLevel?: number; targetWeek?: 'current' | 'next'; weekOffset?: number; shopDate?: string; dayCount?: number; availableIngredients?: [...] }
+ * `shopDate` + `dayCount`: maden lægges fra indkøbsdagen og N dage frem, fordelt på de mandage dagene falder i.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -193,7 +232,7 @@ export async function POST(request: NextRequest) {
         .select('week_start_date, meal_plan_data, updated_at')
         .eq('user_id', ownerId)
         .order('week_start_date', { ascending: false })
-        .limit(4),
+        .limit(8),
     ])
 
     const { data: profile, error: profileError } = profileResult
@@ -229,16 +268,40 @@ export async function POST(request: NextRequest) {
       typeof body?.variationLevel === 'number' ? body.variationLevel : profile.variation_level ?? 2
     const availableIngredients = parseAvailableIngredients(body?.availableIngredients)
     const targetWeek = parseWeekTarget(body?.targetWeek)
+    const shopDate = body?.shopDate != null ? parseAnchoredShopDate(body.shopDate) : null
+    if (body?.shopDate != null && !shopDate) {
+      return NextResponse.json(
+        { error: 'Invalid shopDate', message: 'Indkøbsdagen skal være i går eller de næste tre uger.' },
+        { status: 400 }
+      )
+    }
+    let dayCount = 7
+    if (shopDate) {
+      if (body?.dayCount == null) {
+        dayCount = 7
+      } else {
+        const parsedCount = parseDayCount(body.dayCount)
+        if (parsedCount == null) {
+          return NextResponse.json(
+            { error: 'Invalid dayCount', message: 'Antal dage skal være mellem 1 og 14.' },
+            { status: 400 }
+          )
+        }
+        dayCount = parsedCount
+      }
+    }
     const weekInfo =
       typeof body?.weekOffset === 'number' && Number.isFinite(body.weekOffset)
         ? getWeekInfoByOffset(Math.max(0, Math.floor(body.weekOffset)))
         : getWeekInfo(targetWeek)
+    const shopGroups = shopDate ? groupSpanByCalendarWeek(shopDate, dayCount) : null
+    const currentWeekStarts = shopGroups?.map((group) => group.weekStartDate) ?? [weekInfo.weekStartDate]
 
     const childrenAges = effectiveChildrenAges(profile.children ?? 0, profile.children_ages)
 
     const { data: recentPlans } = recentResult
 
-    const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(recentPlans ?? [], weekInfo.weekStartDate)
+    const recentlyUsedRecipeIds = collectRecentlyUsedRecipeIds(recentPlans ?? [], currentWeekStarts)
 
     // Kør generatoren (samme input-form som web's klient-flow).
     const weekPlan = await mealPlanGenerator.generateOneWeekMealPlan(
@@ -256,15 +319,15 @@ export async function POST(request: NextRequest) {
           : [],
         recentlyUsedRecipeIds,
         availableIngredients,
+        planDayCount: shopGroups ? dayCount : 7,
       },
       variationLevel
     )
 
-    // WeekPlan → v2 grid (samme cell-form som planomo-app'ens meal-plan.ts forventer).
+    // WeekPlan → v2 grid. Uden indkøbsdag: mandag–søndag. Med indkøbsdag fordeles
+    // days[i] på kalenderdatoen indkøbsdag + i, og den dato bestemmer både ugedag og mandag-række.
     const grid = emptyGrid()
-    weekPlan.days.forEach((dayPlan, dayIndex) => {
-      const dayKey = DAY_KEYS[dayIndex]
-      if (!dayKey) return
+    const placeDay = (target: typeof grid, dayKey: DayKey, dayPlan: (typeof weekPlan.days)[number]) => {
       dayPlan.meals.forEach((meal) => {
         const mealType = meal.mealType as MealType
         if (!mealType || !grid[dayKey]) return
@@ -286,7 +349,7 @@ export async function POST(request: NextRequest) {
                 Object.entries(obj).map(([k, v]) => [k, typeof v === 'number' ? v / peopleEating : v])
               )
             : obj
-        grid[dayKey][mealType] = {
+        target[dayKey][mealType] = {
           id: recipe.id,
           slug: recipe.slug || '',
           title: recipe.title,
@@ -311,14 +374,39 @@ export async function POST(request: NextRequest) {
           minerals: perPortionMap(meal.adjustedMinerals),
         }
       })
-    })
-
-    // Børne-kulhydrat til aftensmaden (100 g pasta/ris/bulgur pr. barn) — også til indkøbslisten.
-    appendKidCarbToDinners(grid, profile.children ?? 0, weekPlan.shoppingList as any)
+    }
+    if (!shopGroups) {
+      weekPlan.days.forEach((dayPlan, dayIndex) => {
+        const dayKey = DAY_KEYS[dayIndex]
+        if (!dayKey) return
+        placeDay(grid, dayKey, dayPlan)
+      })
+      appendKidCarbToDinners(grid, profile.children ?? 0, weekPlan.shoppingList as any)
+    }
 
     const { weekStartDate, weekEndDate, weekNumber } = weekInfo
+    const shopMeta = shopDate ? { date: localIsoDate(shopDate), dayCount } : null
 
-    const mealPlanData = { v: 2 as const, grid, slotLocks: {} }
+    const weeksToSave = shopGroups
+      ? shopGroups.map((group) => {
+          const weekGrid = emptyGrid()
+          for (const day of group.days) {
+            const dayPlan = weekPlan.days[day.offset]
+            if (!dayPlan) continue
+            placeDay(weekGrid, day.weekday, dayPlan)
+          }
+          return { ...group, grid: weekGrid }
+        })
+      : [{ weekStartDate, weekEndDate, weekNumber, days: [] as { date: string }[], grid }]
+
+    if (shopGroups) {
+      appendKidCarbToSpan(
+        weeksToSave.map((week) => week.grid),
+        profile.children ?? 0,
+        weekPlan.shoppingList as any
+      )
+    }
+
     const familyProfileSnapshot = {
       adults: profile.adults,
       children: profile.children,
@@ -335,56 +423,74 @@ export async function POST(request: NextRequest) {
       .eq('user_id', ownerId)
       .eq('is_active', true)
 
-    const { data: existing } = await supabase
-      .from('user_meal_plans')
-      .select('id')
-      .eq('user_id', ownerId)
-      .eq('week_start_date', weekStartDate)
-      .single()
+    const todayIso = localIsoDate(new Date())
+    const activeWeekStart =
+      shopGroups?.find((group) => group.days.some((day) => day.date === todayIso))?.weekStartDate ??
+      weeksToSave[0].weekStartDate
 
-    const rowValues = {
-      name: `Madplan Uge ${weekNumber} (${weekStartDate})`,
-      week_end_date: weekEndDate,
-      week_number: weekNumber,
-      variation_level: variationLevel,
-      family_profile_snapshot: familyProfileSnapshot,
-      meal_plan_data: mealPlanData,
-      shopping_list: weekPlan.shoppingList,
-      total_cost: null,
-      total_savings: null,
-      estimated_calories_per_day: null,
-      is_active: true,
+    let saved: Record<string, unknown> | null = null
+    const savedWeeks: Record<string, unknown>[] = []
+    for (const group of weeksToSave) {
+      const { data: existing } = await supabase
+        .from('user_meal_plans')
+        .select('id')
+        .eq('user_id', ownerId)
+        .eq('week_start_date', group.weekStartDate)
+        .maybeSingle()
+
+      const mealPlanData = {
+        v: 2 as const,
+        grid: group.grid,
+        slotLocks: {},
+        ...(shopMeta ? { shop: shopMeta } : {}),
+      }
+      const isActive = group.weekStartDate === activeWeekStart
+      const rowValues = {
+        name: `Madplan Uge ${group.weekNumber} (${group.weekStartDate})`,
+        week_end_date: group.weekEndDate,
+        week_number: group.weekNumber,
+        variation_level: variationLevel,
+        family_profile_snapshot: familyProfileSnapshot,
+        meal_plan_data: mealPlanData,
+        shopping_list: weekPlan.shoppingList,
+        total_cost: null,
+        total_savings: null,
+        estimated_calories_per_day: null,
+        is_active: isActive,
+      }
+
+      const write = existing
+        ? await supabase
+            .from('user_meal_plans')
+            .update({ ...rowValues, updated_at: new Date().toISOString() })
+            .eq('id', existing.id)
+            .select()
+            .single()
+        : await supabase
+            .from('user_meal_plans')
+            .insert({ user_id: ownerId, week_start_date: group.weekStartDate, ...rowValues })
+            .select()
+            .single()
+
+      if (write.error) {
+        console.error('generate: kunne ikke gemme madplan:', write.error)
+        return NextResponse.json({ error: 'Failed to save meal plan' }, { status: 500 })
+      }
+      if (write.data) savedWeeks.push(write.data)
+      if (isActive) saved = write.data
     }
 
-    let saved
-    let saveError
-    if (existing) {
-      const { data, error } = await supabase
-        .from('user_meal_plans')
-        .update({ ...rowValues, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-        .select()
-        .single()
-      saved = data
-      saveError = error
-    } else {
-      const { data, error } = await supabase
-        .from('user_meal_plans')
-        .insert({ user_id: ownerId, week_start_date: weekStartDate, ...rowValues })
-        .select()
-        .single()
-      saved = data
-      saveError = error
-    }
-
-    if (saveError) {
-      console.error('generate: kunne ikke gemme madplan:', saveError)
+    if (!saved) {
       return NextResponse.json({ error: 'Failed to save meal plan' }, { status: 500 })
     }
 
     await logMealPlanGeneration(supabase, user.id)
 
-    return NextResponse.json({ success: true, data: saved ? slimMealPlanRowForClient(saved) : saved })
+    return NextResponse.json({
+      success: true,
+      data: slimMealPlanRowForClient(saved),
+      weeks: savedWeeks.map((row) => slimMealPlanRowForClient(row)),
+    })
   } catch (error) {
     console.error('Error in POST /api/madbudget/meal-plan/generate:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
