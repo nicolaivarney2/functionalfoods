@@ -69,12 +69,22 @@ export async function POST() {
     
     // Opdater status til 'published' for alle planlagte opskrifter
     const recipeIds = scheduledRecipes.map(recipe => recipe.id)
+    const publishedNow = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('recipes')
       .update({ 
-        status: 'published'
+        status: 'published',
+        updatedAt: publishedNow,
       })
       .in('id', recipeIds)
+
+    if (!updateError) {
+      await supabase
+        .from('recipes')
+        .update({ publishedAt: publishedNow })
+        .in('id', recipeIds)
+        .is('publishedAt', null)
+    }
     
     if (updateError) {
       console.error('❌ Error updating recipe status:', updateError)

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Recipe } from '@/types/recipe'
 import { useAdminAuth } from '@/hooks/useAdminAuth'
+import AdminImagePreview from '@/components/admin/AdminImagePreview'
 import RecipeNutritionRecalculator from '@/components/RecipeNutritionRecalculator'
 import { 
   Target,
@@ -40,6 +41,7 @@ export default function AdminRecipesPage() {
   const { isAdmin, checking } = useAdminAuth()
   const [recipes, setRecipes] = useState<RecipeWithStatus[]>([])
   const [loading, setLoading] = useState(true)
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
   
   // Batch import states
   const [batchImportProgress, setBatchImportProgress] = useState<BatchImportProgress>({
@@ -427,11 +429,23 @@ export default function AdminRecipesPage() {
                                 <div className="flex items-center">
                                   <div className="flex-shrink-0 h-10 w-10">
                                     {recipe.imageUrl ? (
-                                      <img 
-                                        className="h-10 w-10 rounded-lg object-cover" 
-                                        src={recipe.imageUrl} 
-                                        alt={recipe.title}
-                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPreviewImage({
+                                            src: recipe.imageUrl,
+                                            alt: recipe.title,
+                                          })
+                                        }
+                                        className="rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        title="Vis billedet stort"
+                                      >
+                                        <img 
+                                          className="h-10 w-10 rounded-lg object-cover" 
+                                          src={recipe.imageUrl} 
+                                          alt={recipe.title}
+                                        />
+                                      </button>
                                     ) : (
                                       <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
                                         <Image className="h-5 w-5 text-gray-400" />
@@ -518,6 +532,13 @@ export default function AdminRecipesPage() {
             </div>
           </div>
         </div>
+        {previewImage && (
+          <AdminImagePreview
+            src={previewImage.src}
+            alt={previewImage.alt}
+            onClose={() => setPreviewImage(null)}
+          />
+        )}
     </div>
   )
 }

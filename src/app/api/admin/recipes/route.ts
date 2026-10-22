@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = parseBoundedInt(searchParams.get('limit'), MAX_ADMIN_PAGE_SIZE, 1, MAX_ADMIN_PAGE_SIZE)
     const offset = page * limit
     const lite = searchParams.get('lite') === '1' || searchParams.get('lite') === 'true'
+    const sortByPublished = searchParams.get('sort') === 'publishedAt'
     
     // Create Supabase client with service role key for admin access
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -61,11 +62,12 @@ export async function GET(request: NextRequest) {
       ? 'id, title, description, dietaryCategories, ingredients'
       : '*'
 
-    const { data: recipes, error } = await supabase
-      .from('recipes')
-      .select(selectCols)
-      .order('updatedAt', { ascending: false })
-      .range(offset, offset + limit - 1)
+    let recipesQuery = supabase.from('recipes').select(selectCols)
+    recipesQuery = sortByPublished
+      ? recipesQuery.order('publishedAt', { ascending: false, nullsFirst: false })
+      : recipesQuery.order('updatedAt', { ascending: false })
+
+    const { data: recipes, error } = await recipesQuery.range(offset, offset + limit - 1)
     
     if (error) {
       console.error('❌ Error fetching recipes:', error)

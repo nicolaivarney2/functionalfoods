@@ -63,7 +63,7 @@ export async function POST(
 
     const { data: updated, error: updateError } = await supabase
       .from('recipes')
-      .update({ pageViews: next, updatedAt: new Date().toISOString() })
+      .update({ pageViews: next })
       .eq('id', row.id)
       .select('pageViews')
       .single()

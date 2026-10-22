@@ -20,8 +20,23 @@ export async function PUT(
     // Create Supabase client dynamically
     const supabase = createSupabaseServerClient()
 
+    const { data: existing } = await supabase
+      .from('recipes')
+      .select('publishedAt')
+      .eq('slug', slug)
+      .maybeSingle()
+
     // Build update data object
-    const updateData: any = { status }
+    const updateData: any = {
+      status,
+      updatedAt: new Date().toISOString(),
+    }
+
+    // AI-opskrifter gemmes med publishedAt = null. Stempel ved første udgivelse,
+    // så admin kan sortere på senest udgivet uden at overskrive ældre datoer.
+    if (status === 'published' && !existing?.publishedAt) {
+      updateData.publishedAt = new Date().toISOString()
+    }
     
     if (scheduledDate !== undefined) {
       updateData.scheduledDate = scheduledDate

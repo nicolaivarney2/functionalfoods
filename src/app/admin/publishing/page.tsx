@@ -24,6 +24,14 @@ import {
   linkIngredientTagsInText,
 } from '@/lib/recipe-ingredient-tags'
 import { Pencil, Plus, X } from 'lucide-react'
+import AdminImagePreview from '@/components/admin/AdminImagePreview'
+import {
+  comparePublishingRecipes,
+  formatAdminListDate,
+  publishedSortKey,
+  recipeTimestamp,
+  type PublishingListSort,
+} from '@/lib/admin-publishing-sort'
 
 interface RecipeWithTips extends Recipe {
   personalTips?: string
@@ -76,6 +84,9 @@ export default function AdminPublishingPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [tipsFilter, setTipsFilter] = useState<'all' | 'with' | 'without'>('all')
   const [qualityFilter, setQualityFilter] = useState<'all' | 'missing-image' | 'missing-description' | 'missing-categories'>('all')
+  /** Senest udgivet er default. Sidst ændret følger updatedAt, som før også rykkede sig ved sidevisning. */
+  const [listSort, setListSort] = useState<PublishingListSort>('publishedAt')
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
   const [selectedDate, setSelectedDate] = useState('')
   const [saving, setSaving] = useState(false)
   const [nutritionBatchSize, setNutritionBatchSize] = useState<25 | 50>(25)
@@ -190,11 +201,14 @@ export default function AdminPublishingPage() {
     }
   }
 
-  const loadRecipes = async () => {
+  const loadRecipes = async (
+    sort: PublishingListSort = listSort,
+    options?: { silent?: boolean }
+  ) => {
     try {
-      setLoading(true)
+      if (!options?.silent) setLoading(true)
       // Tilføj cache-busting for at sikre frisk data
-      const response = await fetch(`/api/admin/recipes?t=${Date.now()}`, {
+      const response = await fetch(`/api/admin/recipes?sort=${sort}&t=${Date.now()}`, {
         cache: 'no-store'
       })
       if (!response.ok) {
@@ -832,6 +846,7 @@ export default function AdminPublishingPage() {
         r.id === recipeId ? { 
           ...r, 
           status: 'published' as const,
+          publishedAt: r.publishedAt || new Date(),
           scheduledDate: undefined,
           scheduledTime: undefined
         } : r
@@ -850,6 +865,7 @@ export default function AdminPublishingPage() {
         setSelectedRecipe({
           ...selectedRecipe,
           status: 'published' as const,
+          publishedAt: selectedRecipe.publishedAt || new Date(),
           scheduledDate: undefined,
           scheduledTime: undefined
         })
@@ -922,7 +938,7 @@ export default function AdminPublishingPage() {
     }
 
     return true
-  })
+  }).sort((a, b) => comparePublishingRecipes(listSort, a, b))
 
   const handleBulkNutritionRecalculation = async (offset = nutritionBatchOffset) => {
     try {
@@ -1112,6 +1128,27 @@ export default function AdminPublishingPage() {
             </button>
           </div>
 
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Sortering</label>
+              <select
+                value={listSort}
+                onChange={(e) => {
+                  const next = e.target.value === 'updatedAt' ? 'updatedAt' : 'publishedAt'
+                  setListSort(next)
+                  void loadRecipes(next, { silent: true })
+                }}
+                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="publishedAt">Senest udgivet</option>
+                <option value="updatedAt">Sidst ændret</option>
+              </select>
+            </div>
+            <p className="pb-2 text-xs text-gray-500">
+              Senest udgivet følger udgivelsestidspunktet. Sidst ændret følger seneste redigering, ikke sidevisninger.
+            </p>
+          </div>
+
           {/* Advanced filters */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
             <div className="xl:col-span-2">
@@ -1180,6 +1217,8 @@ export default function AdminPublishingPage() {
                 setTipsFilter('all')
                 setQualityFilter('all')
                 setStatusFilter('all')
+                setListSort('publishedAt')
+                void loadRecipes('publishedAt', { silent: true })
               }}
               className="px-3 py-1.5 rounded-md border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
@@ -1296,6 +1335,14 @@ export default function AdminPublishingPage() {
                           <p className="text-xs text-gray-500">
                             Status: {recipe.status === 'published' ? 'Udgivet' :
                                      recipe.status === 'scheduled' ? 'Planlagt' : 'Kladde'}
+                            {(() => {
+                              const stamp = listSort === 'publishedAt'
+                                ? publishedSortKey(recipe)
+                                : recipeTimestamp(recipe.updatedAt)
+                              const label = formatAdminListDate(stamp)
+                              if (!label) return null
+                              return ` · ${listSort === 'publishedAt' ? 'Udgivet' : 'Ændret'} ${label}`
+                            })()}
                           </p>
                         </div>
                         <div className="ml-2 flex items-center gap-2">
@@ -1392,11 +1439,23 @@ export default function AdminPublishingPage() {
                       </div>
                       
                       <div className="flex items-center gap-4">
-                        <img
-                          src={selectedRecipe.imageUrl || '/images/recipe-placeholder.jpg'}
-                          alt={selectedRecipe.imageAlt || selectedRecipe.title}
-                          className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewImage({
+                              src: selectedRecipe.imageUrl || '/images/recipe-placeholder.jpg',
+                              alt: selectedRecipe.imageAlt || selectedRecipe.title,
+                            })
+                          }
+                          className="shrink-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          title="Vis billedet stort"
+                        >
+                          <img
+                            src={selectedRecipe.imageUrl || '/images/recipe-placeholder.jpg'}
+                            alt={selectedRecipe.imageAlt || selectedRecipe.title}
+                            className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+                          />
+                        </button>
                         <div className="flex-1">
                           <p className="text-sm text-gray-600">
                             <strong>URL:</strong> {selectedRecipe.imageUrl || 'Ingen billede'}
@@ -2365,6 +2424,13 @@ export default function AdminPublishingPage() {
               </div>
             </div>
           </div>
+        )}
+        {previewImage && (
+          <AdminImagePreview
+            src={previewImage.src}
+            alt={previewImage.alt}
+            onClose={() => setPreviewImage(null)}
+          />
         )}
     </div>
   )
