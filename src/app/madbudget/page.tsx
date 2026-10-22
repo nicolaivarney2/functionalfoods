@@ -385,6 +385,11 @@ const mockStores = [
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
   { id: 3, name: 'Føtex', color: 'bg-blue-500', isSelected: false },
   { id: 4, name: 'Bilka', color: 'bg-blue-700', isSelected: false },
+  { id: 5, name: 'Nemlig.com', color: 'bg-orange-500', isSelected: false },
+  { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
+  { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
+  { id: 9, name: 'Min Købmand', color: 'bg-orange-400', isSelected: false },
+  { id: 10, name: 'Lidl', color: 'bg-yellow-400', isSelected: false },
 ]
 
 interface AdultProfile {
@@ -509,7 +514,7 @@ export default function MadbudgetPage() {
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
-    selectedStores: [1, 2], // REMA 1000, Netto
+    selectedStores: [1, 2, 10], // REMA 1000, Netto, Lidl
     adultsProfiles: [] as AdultProfile[], // New: profiles for each adult
   })
   

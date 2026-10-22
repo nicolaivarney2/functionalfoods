@@ -410,16 +410,26 @@ const CATEGORIES = [
 const GOMA_STORE_TO_SOURCE_CHAIN: Record<string, SourceChain> = {
   Netto: 'netto',
   'REMA 1000': 'rema-1000',
+  Lidl: 'lidl',
   Bilka: 'bilka',
   'Føtex': 'foetex',
+  Nemlig: 'nemlig',
+  MENY: 'meny',
+  Spar: 'spar',
+  'min-koebmand': 'min-koebmand',
 }
 
-// Available stores — only chains with aktiv Fooddata-sync.
+// Available stores — fuldt katalog + tilbuds-only. Coop/Løvbjerg/ABC er ude.
 const STORES = [
   { id: 'Netto', name: 'Netto', icon: '🟨' },
   { id: 'REMA 1000', name: 'REMA 1000', icon: '🟦' },
+  { id: 'Lidl', name: 'Lidl', icon: '🟡' },
   { id: 'Bilka', name: 'Bilka', icon: '🔷' },
   { id: 'Føtex', name: 'Føtex', icon: '🔵' },
+  { id: 'Nemlig', name: 'Nemlig.com', icon: '🟠' },
+  { id: 'MENY', name: 'MENY', icon: '🔴' },
+  { id: 'Spar', name: 'Spar', icon: '🔺' },
+  { id: 'min-koebmand', name: 'Min Købmand', icon: '🛒' },
 ]
 
 const ALL_STORE_IDS = STORES.map((store) => store.id)
