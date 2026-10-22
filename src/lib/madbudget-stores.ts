@@ -8,11 +8,9 @@ export const MADBUDGET_OFFER_ONLY_STORE_KEYS = new Set([
 
 /**
  * Butikker brugt i madbudget / indkøbsundersøgelse (id matcher family_profiles.selected_stores).
- * Id 5 (Nemlig.com) er fuldt katalog via nemlig.com.
  *
- * Id 8 og 11–15 (Løvbjerg, 365 Discount, Kvickly, Super Brugsen, Brugsen, ABC Lavpris)
- * bliver i kataloget, så gamle profiler stadig kan slå navnet op, men de kan ikke vælges.
- * De har ingen kilde, efter Goma og Tjek er lukket.
+ * Kun kæder i FOODDATA_ACTIVE_SYNC_STORE_IDS kan vælges: REMA, Netto, Føtex, Bilka.
+ * Øvrige id'er bliver i kataloget, så gamle profiler stadig kan slå navnet op.
  */
 export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 1, name: 'REMA 1000' },
@@ -32,8 +30,8 @@ export const MADBUDGET_STORE_CATALOG: { id: number; name: string }[] = [
   { id: 15, name: 'ABC Lavpris' },
 ]
 
-/** Gemte id'er uden tilbudskilde. Må ikke vises som butikker, vi dækker. */
-export const MADBUDGET_UNAVAILABLE_STORE_IDS = new Set([8, 11, 12, 13, 14, 15])
+/** Gemte id'er uden aktiv Fooddata-sync. Må ikke vises som butikker, vi dækker. */
+export const MADBUDGET_UNAVAILABLE_STORE_IDS = new Set([5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
 
 /** Butikker brugeren kan vælge i madbudget/indkøbsundersøgelse. */
 export const MADBUDGET_SELECTABLE_STORES = MADBUDGET_STORE_CATALOG.filter(

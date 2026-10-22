@@ -15,7 +15,6 @@ import { cheapestStoreKeyFromPrices } from '@/lib/madbudget/shopping-list-displa
 import { applyCookAhead, isLeftoverMealCell } from '@/lib/madbudget/cook-ahead'
 import {
   applyNextDayLunchLeftover,
-  gridHasPlannedExtraPortions,
   isNextLunchLeftover,
   leftoverSlotAction,
   removeNextDayLunchLeftover,
@@ -81,7 +80,7 @@ import {
 } from '@/lib/adult-plan-profile'
 import {
   mealSlotStylesSummary,
-  applyMealSlotStylesToGrid,
+  applyMealSlotStylesToGrids,
   breakfastStyleHint,
   breakfastStyleLabel,
   inferBreakfastStyle,
@@ -386,11 +385,6 @@ const mockStores = [
   { id: 2, name: 'Netto', color: 'bg-yellow-500', isSelected: true },
   { id: 3, name: 'Føtex', color: 'bg-blue-500', isSelected: false },
   { id: 4, name: 'Bilka', color: 'bg-blue-700', isSelected: false },
-  { id: 5, name: 'Nemlig.com', color: 'bg-orange-500', isSelected: false },
-  { id: 6, name: 'MENY', color: 'bg-red-600', isSelected: false },
-  { id: 7, name: 'Spar', color: 'bg-red-500', isSelected: false },
-  { id: 9, name: 'Min Købmand', color: 'bg-orange-400', isSelected: false },
-  { id: 10, name: 'Lidl', color: 'bg-yellow-400', isSelected: false },
 ]
 
 interface AdultProfile {
@@ -515,7 +509,7 @@ export default function MadbudgetPage() {
     prioritizeOrganic: true,
     prioritizeAnimalOrganic: false,
     excludedIngredients: [] as string[], // Changed from dislikedIngredients
-    selectedStores: [1, 2, 10], // REMA 1000, Netto, Lidl
+    selectedStores: [1, 2], // REMA 1000, Netto
     adultsProfiles: [] as AdultProfile[], // New: profiles for each adult
   })
   
@@ -2472,24 +2466,6 @@ export default function MadbudgetPage() {
     commitMealPlan(removeNextDayLunchLeftover(mealPlan, dinnerDay) as typeof mealPlan)
   }
 
-  const renderLeftoverAction = (dayKey: DayKey, mealKey: MealType) => {
-    const action = leftoverSlotAction(mealPlan, dayKey, mealKey)
-    if (!action) return null
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          if (action.type === 'remove') removePlannedLeftover(action.dinnerDay)
-          else planLeftoverFromDinner(action.dinnerDay)
-        }}
-        className="mx-2 mb-2 mt-1 block text-left text-[10px] font-semibold leading-tight text-emerald-800 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-950"
-      >
-        {action.label}
-      </button>
-    )
-  }
-
   const clearMealSlot = (dayKey: DayKey, mealKey: MealType, weekStartDate?: string) => {
     const lk = slotKey(dayKey, mealKey)
     const week = weekStartDate || String(activePlanRef?.week_start_date || '').slice(0, 10)
@@ -2977,28 +2953,34 @@ export default function MadbudgetPage() {
       const activeGroup =
         spanGroups.find((group) => group.days.some((day) => day.date === todayIso)) ?? spanGroups[0]
       const shopMeta = { date: shopDate, dayCount }
-      const weekPayloads = spanGroups.map((group) => {
+      const draftPayloads = spanGroups.map((group) => {
         const grid = emptyMealPlanGrid()
         for (const day of group.days) {
           const slots = orderedDays[day.offset]
           if (slots) grid[day.weekday] = slots
         }
-        const styled = applyMealSlotStylesToGrid(grid, slotStyleProfile)
         return {
           group,
-          grid: stripOrphanExtraPortions(styled) as typeof grid,
+          grid,
           isActive: group.weekStartDate === activeGroup.weekStartDate,
         }
       })
+      const styledGrids = applyMealSlotStylesToGrids(
+        draftPayloads.map((week) => week.grid),
+        slotStyleProfile
+      )
+      const weekPayloads = draftPayloads.map((week, index) => ({
+        ...week,
+        grid: stripOrphanExtraPortions(styledGrids[index] ?? week.grid) as typeof week.grid,
+      }))
       const activePayload = weekPayloads.find((week) => week.isActive) ?? weekPayloads[0]
-      const plannedExtraPortions = weekPayloads.some((week) => gridHasPlannedExtraPortions(week.grid))
 
       setMealPlan(activePayload.grid)
       setSlotLocks({})
       
       // Generate shopping list
       setShoppingList(weekPlan.shoppingList)
-      setShoppingListStale(plannedExtraPortions)
+      setShoppingListStale(true)
 
       // Intro-rundvisning efter første madplan (loggede-in brugere)
       if (!isGuest) {
@@ -3838,7 +3820,6 @@ export default function MadbudgetPage() {
                                         <div className="text-[10px] text-green-600 font-medium">Sparer {currentMeal.savings.toFixed(0)} kr</div>
                                       )}
                                     </div>
-                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 ) : (
                                   <div className="text-center py-1">
@@ -3846,7 +3827,6 @@ export default function MadbudgetPage() {
                                       <mealType.icon size={12} />
                                       {mealType.label}
                                     </span>
-                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 )}
                               </div>
@@ -4007,7 +3987,6 @@ export default function MadbudgetPage() {
                                         <div className="text-[9px] sm:text-[10px] text-green-600 font-medium">Sparer {currentMeal.savings.toFixed(0)} kr</div>
                                       )}
                                     </div>
-                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 ) : (
                                   <div className="text-center py-1">
@@ -4015,7 +3994,6 @@ export default function MadbudgetPage() {
                                       <mealType.icon size={12} />
                                       {mealType.label}
                                     </span>
-                                    {renderLeftoverAction(dayKey, mealKey)}
                                   </div>
                                 )}
                               </div>
@@ -4314,7 +4292,6 @@ export default function MadbudgetPage() {
                                 <span>{Math.round(mealCardNut?.fat ?? 0)}g F</span>
                               </div>
                             )}
-                            {renderLeftoverAction(dayKey, mealKey)}
                           </div>
                         </div>
                       )
@@ -5322,7 +5299,11 @@ export default function MadbudgetPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-semibold text-gray-900">Vælg opskrift</h3>
+              <h3 className="text-2xl font-semibold text-gray-900">
+                {selectedMealSlot?.endsWith('-lunch') && !mealPlan[selectedMealSlot.split('-')[0] as DayKey]?.lunch
+                  ? 'Tilføj frokost'
+                  : 'Vælg opskrift'}
+              </h3>
               <button
                 onClick={() => setShowRecipeSelector(false)}
                 className="text-gray-400 hover:text-gray-600 p-2"
@@ -5330,6 +5311,35 @@ export default function MadbudgetPage() {
                 <X size={24} />
               </button>
             </div>
+
+            {(() => {
+              const [day, meal] = (selectedMealSlot || '').split('-') as [DayKey, MealType]
+              if (meal !== 'lunch') return null
+              const action = leftoverSlotAction(mealPlan, day, 'lunch')
+              if (!action) return null
+              const dinnerTitle = String(mealPlan[action.dinnerDay]?.dinner?.title || '').trim()
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (action.type === 'remove') removePlannedLeftover(action.dinnerDay)
+                    else planLeftoverFromDinner(action.dinnerDay)
+                    setShowRecipeSelector(false)
+                  }}
+                  className="mb-6 flex w-full items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left hover:bg-emerald-100"
+                >
+                  <span className="mt-0.5 text-lg" aria-hidden>🍽️</span>
+                  <span>
+                    <span className="block text-sm font-semibold text-emerald-950">Tilføj rester fra dagen før</span>
+                    <span className="mt-0.5 block text-xs text-emerald-900/80">
+                      {dinnerTitle
+                        ? `Brug «${dinnerTitle}» som frokost. Én extra portion lægges på aftensmaden.`
+                        : 'Brug aftensmaden fra i går som frokost. Én extra portion lægges på aftensmaden.'}
+                    </span>
+                  </span>
+                </button>
+              )
+            })()}
 
             {/* Search and Filters */}
             <div className="mb-6 space-y-4">
@@ -5728,6 +5738,7 @@ export default function MadbudgetPage() {
                   </p>
                 ) : null}
                 {(() => {
+                  if (recipeViewSlot.mealKey !== 'dinner') return null
                   const action = leftoverSlotAction(
                     mealPlan,
                     recipeViewSlot.dayKey,

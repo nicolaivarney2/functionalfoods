@@ -65,6 +65,40 @@ describe('meal-slot-style', () => {
     assert.equal(recipeFitsSlotStyle({ title: 'Lasagne' }, 'dinner', profile), true)
   })
 
+  it('gentager højst tre morgenmads- og frokostretter', () => {
+    const grid = {
+      monday: { breakfast: { id: 'b1', title: 'Yoghurt' }, lunch: { id: 'l1', title: 'Salat' }, dinner: null },
+      tuesday: { breakfast: { id: 'b2', title: 'Æg' }, lunch: { id: 'l2', title: 'Wrap' }, dinner: null },
+      wednesday: { breakfast: { id: 'b3', title: 'Grød' }, lunch: { id: 'l3', title: 'Tærte' }, dinner: null },
+      thursday: { breakfast: { id: 'b4', title: 'Smoothie' }, lunch: { id: 'l4', title: 'Bowl' }, dinner: null },
+      friday: { breakfast: { id: 'b5', title: 'Pandekager' }, lunch: { id: 'l5', title: 'Rugbrød' }, dinner: null },
+      saturday: { breakfast: { id: 'b6', title: 'Omelet' }, lunch: { id: 'l6', title: 'Pita' }, dinner: null },
+      sunday: { breakfast: { id: 'b7', title: 'Chia' }, lunch: { id: 'l7', title: 'Frittata' }, dinner: null },
+    }
+    const next = applyMealSlotStylesToGrid(grid, { breakfastStyle: 'fast', lunchStyle: 'packed' })
+    const breakfastIds = Object.values(next).map((day) => (day.breakfast as { id?: string })?.id)
+    const lunchIds = Object.values(next).map((day) => (day.lunch as { id?: string })?.id)
+    assert.deepEqual([...new Set(breakfastIds)].sort(), ['b1', 'b2', 'b3'])
+    assert.deepEqual([...new Set(lunchIds)].sort(), ['l1', 'l2', 'l3'])
+    assert.equal(breakfastIds[3], 'b1')
+    assert.equal(lunchIds[3], 'l1')
+  })
+
+  it('holder kun to morgenmadsretter når stilen er repeat', () => {
+    const grid = {
+      monday: { breakfast: { id: 'b1', title: 'Yoghurt' }, lunch: null, dinner: null },
+      tuesday: { breakfast: { id: 'b2', title: 'Æg' }, lunch: null, dinner: null },
+      wednesday: { breakfast: { id: 'b3', title: 'Grød' }, lunch: null, dinner: null },
+      thursday: { breakfast: { id: 'b4', title: 'Smoothie' }, lunch: null, dinner: null },
+      friday: { breakfast: { id: 'b5', title: 'Pandekager' }, lunch: null, dinner: null },
+      saturday: { breakfast: { id: 'b6', title: 'Omelet' }, lunch: null, dinner: null },
+      sunday: { breakfast: { id: 'b7', title: 'Chia' }, lunch: null, dinner: null },
+    }
+    const next = applyMealSlotStylesToGrid(grid, { breakfastStyle: 'repeat', lunchStyle: 'skip' })
+    const breakfastIds = Object.values(next).map((day) => (day.breakfast as { id?: string })?.id)
+    assert.deepEqual([...new Set(breakfastIds)].sort(), ['b1', 'b2'])
+  })
+
   it('lægger rester på frokost når stilen er leftovers', () => {
     const grid = {
       monday: { breakfast: null, lunch: { title: 'Salat' }, dinner: { id: '1', title: 'Karry', calories: 500 } },

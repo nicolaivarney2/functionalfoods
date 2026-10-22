@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
+import {
+  applyMealSlotStylesToGrids,
+  inferBreakfastStyle,
+  inferLunchStyle,
+} from '@/lib/madbudget/meal-slot-style'
+import { rebuildShoppingListForUser } from '@/lib/meal-plan-system/rebuild-shopping-list'
 import { slimMealPlanRowForClient } from '@/lib/madbudget/meal-plan-client-payload'
 import {
   getWeekInfo,
@@ -260,6 +266,8 @@ export async function POST(request: NextRequest) {
       activityLevel: p.activity_level,
       dietaryApproach: p.dietary_approach,
       mealsPerDay: Array.isArray(p.meals_per_day) ? p.meals_per_day : ['dinner'],
+      breakfastStyle: p.breakfast_style,
+      lunchStyle: p.lunch_style,
       weightGoal: p.weight_goal,
       excludedFoods: Array.isArray(p.excluded_foods) ? p.excluded_foods : [],
     }))
@@ -406,6 +414,27 @@ export async function POST(request: NextRequest) {
         weekPlan.shoppingList as any
       )
     }
+
+    const owner = adultsProfiles[0] as
+      | { mealsPerDay?: string[]; breakfastStyle?: unknown; lunchStyle?: unknown; dietaryApproach?: string }
+      | undefined
+    const styleProfile = {
+      dietaryApproach: owner?.dietaryApproach,
+      breakfastStyle: inferBreakfastStyle(owner?.mealsPerDay, owner?.breakfastStyle),
+      lunchStyle: inferLunchStyle(owner?.mealsPerDay, owner?.lunchStyle),
+    }
+    const styledGrids = applyMealSlotStylesToGrids(
+      weeksToSave.map((week) => week.grid),
+      styleProfile
+    )
+    for (let i = 0; i < weeksToSave.length; i += 1) {
+      weeksToSave[i] = { ...weeksToSave[i], grid: styledGrids[i] ?? weeksToSave[i].grid }
+    }
+    const rebuiltList = await rebuildShoppingListForUser(supabase, ownerId, weeksToSave[0].grid as any, {
+      shop: shopMeta,
+      weekStartDate: weeksToSave[0].weekStartDate,
+    })
+    if (rebuiltList) weekPlan.shoppingList = rebuiltList
 
     const familyProfileSnapshot = {
       adults: profile.adults,

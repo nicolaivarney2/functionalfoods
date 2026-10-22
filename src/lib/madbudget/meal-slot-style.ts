@@ -90,15 +90,15 @@ export function lunchStyleLabel(style: LunchStyle): string {
 export function breakfastStyleHint(style: BreakfastStyle, diet?: string | null): string {
   const keto = isKetoLikeDiet(diet)
   if (style === 'skip') return 'Kalorierne fordeles på de andre måltider.'
-  if (style === 'repeat') return 'To faste morgenmadsvalg på skift — mindre beslutningstræthed.'
+  if (style === 'repeat') return 'To faste morgenmadsvalg på skift i løbet af ugen.'
   if (style === 'home') {
     return keto
-      ? 'Frittata, æggekage eller noget i ovnen.'
-      : 'Grød, æggekage eller noget der må tage 20–30 minutter.'
+      ? 'Frittata, æggekage eller noget i ovnen. 2–3 retter på skift i ugen.'
+      : 'Grød, æggekage eller noget der må tage 20–30 minutter. 2–3 retter på skift i ugen.'
   }
   return keto
-    ? 'Æg, ost eller keto-rugbrød med pålæg. 5–10 minutter.'
-    : 'Yoghurt, æg eller rugbrød. 5–10 minutter.'
+    ? 'Æg, ost eller keto-rugbrød med pålæg. 2–3 retter på skift i ugen.'
+    : 'Yoghurt, æg eller rugbrød. 2–3 retter på skift i ugen.'
 }
 
 export function lunchStyleHint(style: LunchStyle, diet?: string | null): string {
@@ -109,12 +109,12 @@ export function lunchStyleHint(style: LunchStyle, diet?: string | null): string 
   }
   if (style === 'packed') {
     return keto
-      ? 'Salat, wrap eller tærte der kan tåle en nat i køleskabet. Keto-frokost er svær ude.'
-      : 'Salat, wrap, rugbrød eller en tærte der kan tåle en nat i køleskabet.'
+      ? 'Salat, wrap eller tærte. 2–3 frokoster på skift, så prep er overskuelig.'
+      : 'Salat, wrap, rugbrød eller tærte. 2–3 frokoster på skift, så prep er overskuelig.'
   }
   return keto
-    ? 'Almindelig keto-frokost derhjemme — salat, æg eller en lille panderet.'
-    : 'Almindelig frokost derhjemme.'
+    ? 'Almindelig keto-frokost derhjemme. 2–3 retter på skift i ugen.'
+    : 'Almindelig frokost derhjemme. 2–3 retter på skift i ugen.'
 }
 
 function textBlob(recipe: StyleRecipe): string {
@@ -195,48 +195,78 @@ export function recipeFitsSlotStyle(
   return true
 }
 
-function repeatBreakfastsInGrid(grid: CookAheadGrid): CookAheadGrid {
-  const cells = COOK_AHEAD_DAY_KEYS.map((day) => grid[day]?.breakfast).filter(
-    (cell): cell is Record<string, unknown> => Boolean(cell) && !isLeftoverMealCell(cell)
-  )
+function recipeKey(cell: Record<string, unknown>): string {
+  return String(cell.id || cell.slug || cell.title || '')
+}
+
+/** Hold 2–3 retter og læg dem på skift. Rester-celler røres ikke. */
+export function repeatMealSlotsAcrossGrids(
+  grids: CookAheadGrid[],
+  meal: 'breakfast' | 'lunch',
+  maxUnique = 3
+): CookAheadGrid[] {
   const unique: Record<string, unknown>[] = []
-  for (const cell of cells) {
-    const id = String(cell.id || cell.title || '')
-    if (!unique.some((u) => String(u.id || u.title || '') === id)) unique.push(cell)
-  }
-  const keep = unique.slice(0, 2)
-  if (keep.length === 0) return grid
-  let next = grid
-  let i = 0
-  for (const day of COOK_AHEAD_DAY_KEYS) {
-    const cell = next[day]?.breakfast
-    if (!cell || isLeftoverMealCell(cell)) continue
-    next = {
-      ...next,
-      [day]: { ...(next[day] || {}), breakfast: keep[i % keep.length] },
+  for (const grid of grids) {
+    for (const day of COOK_AHEAD_DAY_KEYS) {
+      const cell = grid[day]?.[meal]
+      if (!cell || isLeftoverMealCell(cell)) continue
+      const id = recipeKey(cell)
+      if (!id || unique.some((item) => recipeKey(item) === id)) continue
+      unique.push(cell)
     }
-    i += 1
+  }
+  const keep = unique.slice(0, Math.max(1, maxUnique))
+  if (keep.length === 0) return grids
+
+  let i = 0
+  return grids.map((grid) => {
+    let next = grid
+    for (const day of COOK_AHEAD_DAY_KEYS) {
+      const cell = next[day]?.[meal]
+      if (!cell || isLeftoverMealCell(cell)) continue
+      next = {
+        ...next,
+        [day]: { ...(next[day] || {}), [meal]: keep[i % keep.length] },
+      }
+      i += 1
+    }
+    return next
+  })
+}
+
+function applyLeftoversToGrid(
+  grid: CookAheadGrid,
+  isLocked?: (day: string, meal: 'breakfast' | 'lunch' | 'dinner') => boolean
+): CookAheadGrid {
+  let next = grid
+  for (const day of COOK_AHEAD_DAY_KEYS.slice(0, -1)) {
+    const result = applyNextDayLunchLeftover(next, day, { overwrite: true, isLocked })
+    if (result.ok) next = result.grid
   }
   return next
 }
 
-/** Efter generering: rester-frokost og gentaget morgenmad. */
+/** Efter generering: rester-frokost plus 2–3 gentagne morgenmad/frokost-retter. */
+export function applyMealSlotStylesToGrids(
+  grids: CookAheadGrid[],
+  profile: MealSlotStyleProfile,
+  isLocked?: (day: string, meal: 'breakfast' | 'lunch' | 'dinner') => boolean
+): CookAheadGrid[] {
+  let next = profile.lunchStyle === 'leftovers' ? grids.map((grid) => applyLeftoversToGrid(grid, isLocked)) : grids
+  const breakfastCount = profile.breakfastStyle === 'repeat' ? 2 : 3
+  next = repeatMealSlotsAcrossGrids(next, 'breakfast', breakfastCount)
+  if (profile.lunchStyle !== 'leftovers') {
+    next = repeatMealSlotsAcrossGrids(next, 'lunch', 3)
+  }
+  return next
+}
+
 export function applyMealSlotStylesToGrid(
   grid: CookAheadGrid,
   profile: MealSlotStyleProfile,
   isLocked?: (day: string, meal: 'breakfast' | 'lunch' | 'dinner') => boolean
 ): CookAheadGrid {
-  let next = grid
-  if (profile.lunchStyle === 'leftovers') {
-    for (const day of COOK_AHEAD_DAY_KEYS.slice(0, -1)) {
-      const result = applyNextDayLunchLeftover(next, day, { overwrite: true, isLocked })
-      if (result.ok) next = result.grid
-    }
-  }
-  if (profile.breakfastStyle === 'repeat') {
-    next = repeatBreakfastsInGrid(next)
-  }
-  return next
+  return applyMealSlotStylesToGrids([grid], profile, isLocked)[0]
 }
 
 export function mealSlotStylesSummary(profile: MealSlotStyleProfile): string {
