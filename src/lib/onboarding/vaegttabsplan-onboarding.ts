@@ -170,6 +170,12 @@ export function loadOnboardingData(): VaegttabsplanOnboardingData | null {
       breakfastStyle: parseBreakfastStyle(parsed.breakfastStyle) ?? undefined,
       lunchStyle: parseLunchStyle(parsed.lunchStyle) ?? undefined,
     }
+    if (!merged.breakfastStyle && !merged.lunchStyle && merged.mealPlanScope) {
+      if (merged.mealPlanScope === 'dinner-only') {
+        merged.breakfastStyle = 'skip'
+        merged.lunchStyle = 'skip'
+      }
+    }
     if (savedVersion === 1) {
       merged.currentStep = migrateOnboardingStep(parsed.currentStep ?? 0, merged)
     }
@@ -250,23 +256,28 @@ export function hasPendingOnboardingData(): boolean {
   return Boolean(data && onboardingProfileComplete(data))
 }
 
+export function onboardingMissingFields(data: VaegttabsplanOnboardingData): string[] {
+  const missing: string[] = []
+  if (!(data.adults && data.adults >= 1)) missing.push('antal voksne')
+  if (data.children == null || data.children < 0) missing.push('antal børn')
+  if (!data.weightGoal) missing.push('vægtmål')
+  if (!data.gender) missing.push('køn')
+  if (!data.age) missing.push('alder')
+  if (!data.height) missing.push('højde')
+  if (!data.weight) missing.push('vægt')
+  if (data.activityLevel == null) missing.push('aktivitetsniveau')
+  if (!data.dietaryApproach) missing.push('kostretning')
+  if (!data.mealPlanScope) missing.push('kun aftensmad eller fuld plan')
+  else if (data.mealPlanScope === 'full') {
+    if (!data.breakfastStyle || data.breakfastStyle === 'skip') missing.push('morgenmadsstil')
+    if (!data.lunchStyle || data.lunchStyle === 'skip') missing.push('frokoststil')
+  }
+  if (!data.selectedStores.length) missing.push('butikker')
+  return missing
+}
+
 export function onboardingProfileComplete(data: VaegttabsplanOnboardingData): boolean {
-  return Boolean(
-    data.adults &&
-      data.adults >= 1 &&
-      data.children != null &&
-      data.children >= 0 &&
-      data.weightGoal &&
-      data.gender &&
-      data.age &&
-      data.height &&
-      data.weight &&
-      data.activityLevel != null &&
-      data.dietaryApproach &&
-      data.breakfastStyle &&
-      data.lunchStyle &&
-      data.selectedStores.length > 0
-  )
+  return onboardingMissingFields(data).length === 0
 }
 
 export function calculateOnboardingEnergy(data: VaegttabsplanOnboardingData) {
