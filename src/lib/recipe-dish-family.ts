@@ -85,18 +85,43 @@ const KETO_BREAKFAST_FAMILIES: DishFamily[] = [
 const KETO_LUNCH_FAMILIES: DishFamily[] = [
   {
     id: 'salat',
-    label: 'en fyldig keto-salat med protein og sundt fedt, uden brød',
-    needles: ['salat', 'cæsar'],
+    label: 'en fyldig salat med protein og sundt fedt, uden brød',
+    needles: ['salat', 'cæsar', 'caesar'],
   },
   {
     id: 'wrap',
-    label: 'en wrap eller bowl uden brød, med kød, fed ost og grønt',
-    needles: ['wrap', 'crepe', 'bowl', 'romaine'],
+    label: 'en wrap i store blade, en æggecrepe eller en osteskive, med kød og grønt',
+    needles: ['wrap', 'crepe'],
   },
   {
     id: 'taerte',
     label: 'en tærte uden mel eller en frittata, nem nok til frokost',
     needles: ['tærte', 'frittata'],
+  },
+  {
+    id: 'suppe',
+    label: 'en cremet suppe der mætter alene, med protein og fedt',
+    needles: ['suppe'],
+  },
+  {
+    id: 'pande',
+    label: 'en varm panderet med kød, fisk eller rejer og grønt, færdig på panden',
+    needles: ['pande', 'bøf', 'kotelet', 'rejer', 'wok'],
+  },
+  {
+    id: 'omelet',
+    label: 'en omelet eller æggekage med ost og grønt, som hele frokosten',
+    needles: ['omelet', 'æggekage'],
+  },
+  {
+    id: 'tallerken',
+    label: 'en kold frokosttallerken med æg, ost eller røget fisk og grønt, uden brød',
+    needles: ['tallerken', 'røget', 'pålæg'],
+  },
+  {
+    id: 'fyld',
+    label: 'fyldte grøntsager eller en lille ovnret, som hele frokosten',
+    needles: ['fyldt', 'squash', 'aubergine', 'ovn'],
   },
 ]
 
@@ -271,12 +296,11 @@ Vælg ét tilbehør, og skift fra gang til gang. Ikke blomkålsris hver aften. G
 
 Undtagelse: er selve retten en mættende salat eller fyldte grøntsager, bærer den tallerkenen. Så skal der ikke også ris.`,
   frokost: `FROKOST
-Nemt, men lækkert. Aktiv tid typisk under 25 minutter. Ikke kedelig meal prep, og ikke en omstændelig restaurantret.
+Nemt, men et rigtigt måltid. Aktiv tid typisk under 25 minutter. Ikke kedelig meal prep, og ikke en omstændelig restaurantret.
 
-Skift spor. Eksemplerne er retning, ikke opskrifter der skal kopieres:
-- Fyldig salat med sundt fedt og protein, så den mætter. Cæsarsalat med kylling eller bacon uden brød og uden croutoner. Tun med hjemmelavet mayo, avocado og æg i spidskålsblade eller salatbåde. Andre salater i samme ånd.
-- Wrap eller bowl uden brød. Æggecrepe, omelet, ostewrap eller store romaine-blade med kød, fed ost og grønt. Samme fyld kan stå i en skål.
-- Tærte uden mel. Bund af revet blomkål og ost, eller ingen bund som en frittata. Fyld som laks, spinat, feta eller bacon, eller andet i samme familie.
+Salat er ét spor. Det er ikke standarden. Suppe, varm panderet, omelet, kold tallerken, tærte, wrap og fyldte grøntsager er lige så fine.
+
+Når DENNE GANG nævner et spor, er det formen, ikke en opskrift der skal kopieres. Uden et spor vælger du selv formen og skifter fra gang til gang. Skift protein, grønt og smag. Kylling, bacon og avocado er ikke standarden. Titlen skal beskrive retten. Skriv ikke «keto-salat» som navn.
 
 Ingen brød, croutoner, tortilla eller pita.`,
   morgenmad: `MORGENMAD
@@ -374,11 +398,6 @@ export function lockedBlock(niche: FfRecipeNiche): string {
 
 export function focusLine(niche: FfRecipeNiche): string {
   return LOCKED[niche].split('\n').find((line) => line.trim().length > 0)?.trim() ?? ''
-}
-
-export function pickRandomFamily(families: DishFamily[]): string {
-  const pool = families.length ? families : FAMILIES_BY_NICHE.proteinrig
-  return pool[Math.floor(Math.random() * pool.length)].label
 }
 
 export function pickLeastUsedFamily(titles: string[], families: DishFamily[]): string {

@@ -6,7 +6,6 @@ import {
   lockedBlock,
   NICHE_PROMPT_NAME,
   pickLeastUsedFamily,
-  pickRandomFamily,
   type FfRecipeNiche,
 } from '@/lib/recipe-dish-family'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
@@ -228,6 +227,10 @@ export type ResolvedRecipeCall = {
 
 const DINNER_MEALS = new Set(['', 'aftensmad', 'aften', 'middag'])
 
+function isQuickRecipe(constraints: string[]): boolean {
+  return constraints.some((line) => line.includes('QUICK RECIPE:'))
+}
+
 export function resolveRecipeCall(input: {
   niche: FfRecipeNiche
   existingRecipes?: ExistingTitleRecipe[]
@@ -267,9 +270,24 @@ export function resolveRecipeCall(input: {
     }
   }
 
+  if (isQuickRecipe(constraints)) {
+    return {
+      mode: 'free',
+      temperature: recipeGenerationTemperature('free'),
+      familyLabel: null,
+      systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null, mealGuidance }),
+      userPrompt: buildMealUserPrompt({
+        niche: input.niche,
+        mealLabel: meal || 'aftensmad',
+        familyLabel: null,
+        constraints,
+      }),
+    }
+  }
+
   if (meal && !DINNER_MEALS.has(meal)) {
     const mealFamilies = input.niche === 'keto' ? familiesForKetoMeal(meal) : []
-    const familyLabel = mealFamilies.length ? pickRandomFamily(mealFamilies) : null
+    const familyLabel = mealFamilies.length ? pickLeastUsedFamily(titles, mealFamilies) : null
     return {
       mode: 'free',
       temperature: recipeGenerationTemperature('free'),

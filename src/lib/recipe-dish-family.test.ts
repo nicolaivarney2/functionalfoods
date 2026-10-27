@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { resolveRecipeCall, recipeGenerationTemperature } from './ff-recipe-prompt'
+import { quickRecipeRangeInstruction } from './quick-recipe-ranges'
 import { familiesForNiche, ketoDinnerSideIssue, pickLeastUsedFamily } from './recipe-dish-family'
 
 describe('ketoDinnerSideIssue', () => {
@@ -80,15 +81,53 @@ describe('resolveRecipeCall', () => {
     assert.doesNotMatch(call.systemPrompt, /madpakke|børnene/)
   })
 
-  it('gør keto-frokost nem og skifter mellem salat, wrap og tærte', () => {
+  it('gør keto-frokost åben og undgår endnu en salat når salater allerede findes', () => {
     const call = resolveRecipeCall({ niche: 'keto', mealType: 'frokost' })
     assert.equal(call.mode, 'free')
     assert.match(call.systemPrompt, /FROKOST/)
-    assert.match(call.systemPrompt, /Nemt, men lækkert/)
+    assert.match(call.systemPrompt, /Salat er ét spor/)
     assert.match(call.systemPrompt, /croutoner/)
-    assert.match(call.systemPrompt, /æggecrepe|ostewrap/i)
+    assert.match(call.systemPrompt, /Suppe, varm panderet/)
+    assert.doesNotMatch(call.systemPrompt, /Cæsarsalat/)
     assert.match(call.userPrompt, /^Generer én keto-opskrift til 2\. Det skal være frokost:/)
     assert.ok(call.familyLabel)
+
+    const varied = resolveRecipeCall({
+      niche: 'keto',
+      mealType: 'frokost',
+      existingRecipes: Array.from({ length: 8 }, (_, index) => ({
+        title: `Keto-salat ${index}`,
+        dietaryCategories: ['Keto'],
+      })),
+    })
+    assert.ok(varied.familyLabel)
+    assert.doesNotMatch(varied.familyLabel || '', /salat/i)
+  })
+
+  it('lader quick-recipe vælge retten selv inden for måltidet', () => {
+    const lunch = resolveRecipeCall({
+      niche: 'keto',
+      mealType: 'frokost',
+      constraints: [quickRecipeRangeInstruction('keto')],
+    })
+    assert.equal(lunch.mode, 'free')
+    assert.equal(lunch.familyLabel, null)
+    assert.equal(lunch.temperature, 0.85)
+    assert.match(lunch.systemPrompt, /FROKOST/)
+    assert.match(lunch.systemPrompt, /Uden et spor vælger du selv formen/)
+    assert.doesNotMatch(lunch.systemPrompt, /DENNE GANG:/)
+    assert.match(lunch.userPrompt, /Det skal være frokost\./)
+    assert.match(lunch.userPrompt, /Ingen fast hovedingrediens, ret-type eller tidsloft/)
+
+    const dinner = resolveRecipeCall({
+      niche: 'keto',
+      mealType: 'aftensmad',
+      constraints: [quickRecipeRangeInstruction('keto')],
+    })
+    assert.equal(dinner.familyLabel, null)
+    assert.doesNotMatch(dinner.systemPrompt, /DENNE GANG:/)
+    assert.match(dinner.systemPrompt, /AFTENSMAD/)
+    assert.match(dinner.userPrompt, /Det skal være aftensmad\./)
   })
 
   it('skiller keto-morgenmad på tid uden at låse én ret', () => {
