@@ -172,7 +172,8 @@ export async function POST(request: NextRequest) {
         if (!plan) {
           return NextResponse.json({ success: true, inserted: 0 })
         }
-      } else if (!plan || countMealsInPlan(plan.meal_plan_data) === 0) {
+      } else {
+        // plan er stadig tom her: den sættes kun når mealPlanId er med.
         const active = withEnd.find((p) => p.is_active && countMealsInPlan(p.meal_plan_data) > 0)
         const recentWithMeals = withEnd.find((p) => countMealsInPlan(p.meal_plan_data) > 0)
         plan = active ?? recentWithMeals ?? withEnd.find((p) => p.is_active) ?? withEnd[0] ?? null
