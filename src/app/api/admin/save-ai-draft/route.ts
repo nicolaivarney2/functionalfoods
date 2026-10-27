@@ -14,6 +14,7 @@ import {
   ensureIngredientRowIds,
   linkIngredientTagsInInstructions,
 } from '@/lib/recipe-ingredient-tags'
+import { categoriesForGeneratedRecipe } from '@/lib/recipe-category-tags'
 
 interface GeneratedRecipe {
   title: string
@@ -54,11 +55,13 @@ interface SaveRecipeRequest {
   recipe: GeneratedRecipe
   category: string
   aiTips?: string
+  /** Måltid valgt ved generering, fx «frokost». Bliver til kategorien Frokost. */
+  maaltid?: string | null
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { recipe, category, aiTips }: SaveRecipeRequest = await request.json()
+    const { recipe, category, aiTips, maaltid }: SaveRecipeRequest = await request.json()
     
     if (!recipe || !recipe.title) {
       return NextResponse.json(
@@ -143,6 +146,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const categoryTags = categoriesForGeneratedRecipe(getMainCategory(category), maaltid)
+
     // Prepare recipe data for database
     const recipeData = {
       id: crypto.randomUUID(),
@@ -165,8 +170,8 @@ export async function POST(request: NextRequest) {
       metaTitle: `${recipe.title} - ${recipe.dietaryCategories[0] || 'Opskrift'} | Functional Foods`,
       metaDescription: recipe.description.substring(0, 160),
       keywords: recipe.dietaryCategories.join(', '),
-      mainCategory: getMainCategory(category),
-      subCategories: null,
+      mainCategory: categoryTags.mainCategory,
+      subCategories: categoryTags.subCategories.length > 0 ? categoryTags.subCategories : null,
       dietaryCategories: recipe.dietaryCategories,
       ingredients: ingredientsForDb,
       ...(ingredientGroupsForDb && ingredientGroupsForDb.length > 0

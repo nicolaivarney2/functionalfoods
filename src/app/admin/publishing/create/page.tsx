@@ -256,6 +256,8 @@ export default function CreateRecipePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null)
+  /** Måltid brugt til den opskrift der ligger klar til gem, fx «frokost». */
+  const [generatedMaaltid, setGeneratedMaaltid] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<string>('')
   const [isEditing, setIsEditing] = useState(false)
@@ -354,6 +356,7 @@ export default function CreateRecipePage() {
   const handleCategorySelect = (categoryId: string) => {
     setSelectedCategory(categoryId)
     setGeneratedRecipe(null)
+    setGeneratedMaaltid(null)
     setError(null)
     
     // Show parameter modal for familiemad
@@ -417,6 +420,7 @@ export default function CreateRecipePage() {
     setPendingCategoryId(categoryId)
     setSelectedCategory(categoryId)
     setGeneratedRecipe(null)
+    setGeneratedMaaltid(null)
     setError(null)
     setShowRecipeSourceModal(true)
   }
@@ -534,7 +538,9 @@ export default function CreateRecipePage() {
         requestBody.sourceRecipe = sourceRecipe
       }
       
+      let usedMeal: string | null = null
       if (quick?.quickRecipe) {
+        usedMeal = quick.maaltid
         requestBody.parameters = {
           quickRecipe: true,
           maaltid: quick.maaltid,
@@ -552,6 +558,10 @@ export default function CreateRecipePage() {
         requestBody.parameters = glp1Params
       } else if (activeCategory === 'sense') {
         requestBody.parameters = senseParams
+      }
+
+      if (!usedMeal && typeof requestBody.parameters?.maaltid === 'string') {
+        usedMeal = requestBody.parameters.maaltid
       }
       
       // Generate new recipe using category-specific ChatGPT assistant
@@ -664,6 +674,7 @@ export default function CreateRecipePage() {
       }
 
       // Set as AI-kladde for editing
+      setGeneratedMaaltid(usedMeal)
       setGeneratedRecipe(finalRecipe)
       setEditableRecipe({ ...finalRecipe })
       setIngredientAmountDrafts({})
@@ -770,7 +781,8 @@ export default function CreateRecipePage() {
         body: JSON.stringify({
           recipe: editableRecipe,
           category: selectedCategory,
-          aiTips: aiTips
+          aiTips: aiTips,
+          maaltid: generatedMaaltid
         })
       })
 
@@ -786,6 +798,7 @@ export default function CreateRecipePage() {
           'På Publishing-siden: vælg fanen «Planlagte» eller «Alle» — standardfilter er «Udgivne», så nye opskrifter skjules dér.'
       )
       setGeneratedRecipe(null)
+      setGeneratedMaaltid(null)
       setEditableRecipe(null)
       setIsEditing(false)
       setSelectedCategory(null)
@@ -2827,6 +2840,7 @@ export default function CreateRecipePage() {
                       <button
                         onClick={() => {
                           setGeneratedRecipe(null)
+                          setGeneratedMaaltid(null)
                           setEditableRecipe(null)
                           setIsEditing(false)
                         }}

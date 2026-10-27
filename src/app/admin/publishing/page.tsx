@@ -32,6 +32,13 @@ import {
   recipeTimestamp,
   type PublishingListSort,
 } from '@/lib/admin-publishing-sort'
+import {
+  QUICK_MEAL_CATEGORIES,
+  partitionRecipeCategories,
+  recipeCategoryNames,
+  recipeHasCategory,
+  sameCategoryList,
+} from '@/lib/recipe-category-tags'
 
 interface RecipeWithTips extends Recipe {
   personalTips?: string
@@ -44,6 +51,43 @@ interface Schedule {
   scheduledDate: Date
   status: 'scheduled' | 'published'
   scheduledTime?: string
+}
+
+type QualityFilter =
+  | 'all'
+  | 'missing-image'
+  | 'missing-description'
+  | 'missing-categories'
+  | 'ai-missing-lunch'
+
+function CategoryChip({
+  label,
+  active,
+  tone,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  tone: 'meal' | 'topic' | 'diet'
+  onClick: () => void
+}) {
+  const activeClass =
+    tone === 'meal'
+      ? 'bg-green-600 text-white border-green-600'
+      : tone === 'diet'
+        ? 'bg-purple-600 text-white border-purple-600'
+        : 'bg-blue-600 text-white border-blue-600'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${
+        active ? activeClass : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+      }`}
+    >
+      {label}
+    </button>
+  )
 }
 
 function formatPublishingIngredientLine(ing: {
@@ -71,10 +115,10 @@ export default function AdminPublishingPage() {
   const [personalTips, setPersonalTips] = useState('')
   const [editingTips, setEditingTips] = useState(false)
   const [editingDescription, setEditingDescription] = useState(false)
-  const [editingCategories, setEditingCategories] = useState(false)
   const [description, setDescription] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [newCategory, setNewCategory] = useState('')
+  const [categorySaveError, setCategorySaveError] = useState('')
+  const [savingCategoryIds, setSavingCategoryIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [selectedTime, setSelectedTime] = useState('09:00')
@@ -83,7 +127,7 @@ export default function AdminPublishingPage() {
   const [searchFilter, setSearchFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [tipsFilter, setTipsFilter] = useState<'all' | 'with' | 'without'>('all')
-  const [qualityFilter, setQualityFilter] = useState<'all' | 'missing-image' | 'missing-description' | 'missing-categories'>('all')
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('all')
   /** Senest udgivet er default. Sidst ændret følger updatedAt, som før også rykkede sig ved sidevisning. */
   const [listSort, setListSort] = useState<PublishingListSort>('publishedAt')
   const [previewImage, setPreviewImage] = useState<{ src: string; alt: string } | null>(null)
@@ -125,6 +169,10 @@ export default function AdminPublishingPage() {
   /** Sense: parallel med `editedIngredients` — spisekasse-rubrik pr. linje. */
   const [ingredientSenseGroups, setIngredientSenseGroups] = useState<string[]>([])
   const instructionCaretRef = useRef({ index: 0, start: 0, end: 0 })
+  const categoryListsRef = useRef<Map<string, string[]>>(new Map())
+  const categorySaveChain = useRef<Promise<void>>(Promise.resolve())
+  const categorySavePending = useRef<Map<string, number>>(new Map())
+  const selectedRecipeIdRef = useRef<string | null>(null)
   const instructionTextareaRefs = useRef<Array<HTMLTextAreaElement | null>>([])
 
   const rememberInstructionCaret = (index: number, el: HTMLTextAreaElement) => {
@@ -226,6 +274,9 @@ export default function AdminPublishingPage() {
       }))
       
       setRecipes(recipesWithTips)
+      categoryListsRef.current = new Map(
+        recipesWithTips.map((recipe: RecipeWithTips) => [recipe.id, recipeCategoryNames(recipe)])
+      )
       
       // Initialiser schedules baseret på database status
       const initialSchedules: Schedule[] = recipesWithTips
@@ -248,25 +299,17 @@ export default function AdminPublishingPage() {
 
   const handleRecipeSelect = async (recipe: RecipeWithTips) => {
     setSelectedRecipe(recipe)
+    selectedRecipeIdRef.current = recipe.id
     setEditingTips(false)
     setEditingDescription(false)
-    setEditingCategories(false)
     setEditingIngredients(false)
     setEditingInstructions(false)
     setEditingServings(false)
     
     // Sæt de oprindelige værdier fra opskriften
     setDescription(recipe.description || '')
-    // Kombiner mainCategory, subCategories og dietaryCategories til én liste
-    const allCategories: string[] = []
-    if (recipe.mainCategory) allCategories.push(recipe.mainCategory)
-    if (recipe.subCategories && recipe.subCategories.length > 0) {
-      allCategories.push(...recipe.subCategories)
-    }
-    if (recipe.dietaryCategories && recipe.dietaryCategories.length > 0) {
-      allCategories.push(...recipe.dietaryCategories)
-    }
-    setCategories(allCategories)
+    setCategories(categoryListsRef.current.get(recipe.id) ?? recipeCategoryNames(recipe))
+    setCategorySaveError('')
     
     // Sæt ingredienser og instruktioner til redigering
     setEditedIngredients(recipe.ingredients || [])
@@ -375,101 +418,98 @@ export default function AdminPublishingPage() {
     }
   }
 
-  const saveCategories = async () => {
-    if (!selectedRecipe) return
+  const applyCategorySplit = (
+    recipeId: string,
+    split: { mainCategory: string; subCategories: string[]; dietaryCategories: string[] }
+  ) => {
+    const names = recipeCategoryNames(split)
+    setRecipes((prev) => prev.map((recipe) => (recipe.id === recipeId ? { ...recipe, ...split } : recipe)))
+    setSelectedRecipe((prev) => (prev && prev.id === recipeId ? { ...prev, ...split } : prev))
+    if (selectedRecipeIdRef.current === recipeId) setCategories(names)
+  }
 
-    try {
-      // Separer kategorier i mainCategory, subCategories og dietaryCategories
-      // mainCategory skal være en af de tilladte kategorier (Aftensmad, Frokost, osv.)
-      // dietaryCategories skal være fra dietary categories listen (Keto, Proteinrig kost, osv.)
-      
-      // Først: Find dietary categories - disse skal ALDRIG være mainCategory
-      const selectedDietaryCategories = categories.filter(cat => 
-        dietaryCategories.includes(cat)
-      )
-      
-      // Find mainCategory - skal være en af de tilladte kategorier (IKKE dietary)
-      const mainCategory = categories.find(cat => 
-        allowedCategories.includes(cat) && 
-        !dietaryCategories.includes(cat) // Sikrer at dietary categories ikke bliver mainCategory
-      ) || selectedRecipe.mainCategory || 'Aftensmad'
-      
-      // subCategories er alle andre kategorier der ikke er dietary og ikke er mainCategory
-      const subCategories = categories.filter(cat => 
-        cat !== mainCategory && 
-        !dietaryCategories.includes(cat) && // Ikke dietary
-        allowedCategories.includes(cat) // Kun tilladte kategorier
-      )
+  const markCategorySaving = (recipeId: string, delta: number) => {
+    const next = (categorySavePending.current.get(recipeId) || 0) + delta
+    if (next <= 0) categorySavePending.current.delete(recipeId)
+    else categorySavePending.current.set(recipeId, next)
+    setSavingCategoryIds(new Set(categorySavePending.current.keys()))
+  }
 
-      // Gem til database via API
-      const response = await fetch(`/api/admin/recipes`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          recipeId: selectedRecipe.id,
-          mainCategory,
-          subCategories,
-          dietaryCategories: selectedDietaryCategories
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error('❌ API error response:', errorData)
-        throw new Error(errorData.error || 'Kunne ikke gemme kategorier')
-      }
-
-      const result = await response.json()
-
-      // Opdater local state med data fra serveren
-      const serverRecipe = result.data || result
-      const finalDietaryCategories = Array.isArray(serverRecipe.dietaryCategories) 
-        ? serverRecipe.dietaryCategories 
-        : selectedDietaryCategories
-      const finalSubCategories = Array.isArray(serverRecipe.subCategories) 
-        ? serverRecipe.subCategories 
-        : subCategories
-      const finalMainCategory = serverRecipe.mainCategory || mainCategory
-      
-      const updatedRecipes = recipes.map(recipe => 
-        recipe.id === selectedRecipe.id 
-          ? { 
-              ...recipe, 
-              mainCategory: finalMainCategory,
-              subCategories: finalSubCategories,
-              dietaryCategories: finalDietaryCategories
+  const enqueueCategorySave = (
+    recipeId: string,
+    split: { mainCategory: string; subCategories: string[]; dietaryCategories: string[] },
+    snapshot: string[],
+    previous: string[]
+  ) => {
+    const job = categorySaveChain.current
+      .catch(() => undefined)
+      .then(async () => {
+        markCategorySaving(recipeId, 1)
+        try {
+          const response = await fetch('/api/admin/recipes', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recipeId,
+              mainCategory: split.mainCategory,
+              subCategories: split.subCategories,
+              dietaryCategories: split.dietaryCategories,
+            }),
+          })
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || 'Kunne ikke gemme kategorier')
+          }
+          const result = await response.json()
+          const server = result.data || {}
+          if (!sameCategoryList(categoryListsRef.current.get(recipeId), snapshot)) return
+          if (typeof server.mainCategory === 'string' && server.mainCategory.trim()) {
+            const confirmedSplit = {
+              mainCategory: server.mainCategory,
+              subCategories: Array.isArray(server.subCategories) ? server.subCategories : split.subCategories,
+              dietaryCategories: Array.isArray(server.dietaryCategories)
+                ? server.dietaryCategories
+                : split.dietaryCategories,
             }
-          : recipe
-      )
-      setRecipes(updatedRecipes)
-      
-      const updatedRecipe = { 
-        ...selectedRecipe, 
-        mainCategory: finalMainCategory,
-        subCategories: finalSubCategories,
-        dietaryCategories: finalDietaryCategories
-      }
-      setSelectedRecipe(updatedRecipe)
-      setEditingCategories(false)
-      
-      // Genindlæs opskrifter fra databasen for at sikre konsistens
-      await loadRecipes()
-      
-      // Find den opdaterede opskrift igen efter reload
-      const { data: reloadData } = await fetch(`/api/admin/recipes?t=${Date.now()}`, {
-        cache: 'no-store'
-      }).then(r => r.json())
-      const reloadedRecipe = reloadData?.recipes?.find((r: any) => r.id === selectedRecipe.id)
-      if (reloadedRecipe) {
-        setSelectedRecipe(reloadedRecipe as RecipeWithTips)
-      }
-      
-    } catch (error) {
-      console.error('❌ Error saving categories:', error)
-      alert('Kunne ikke gemme kategorier. Prøv igen.')
-    }
+            const confirmed = recipeCategoryNames(confirmedSplit)
+            categoryListsRef.current.set(recipeId, confirmed)
+            applyCategorySplit(recipeId, confirmedSplit)
+          }
+          setCategorySaveError('')
+        } catch (error) {
+          console.error('❌ Error saving categories:', error)
+          if (sameCategoryList(categoryListsRef.current.get(recipeId), snapshot)) {
+            categoryListsRef.current.set(recipeId, previous)
+            applyCategorySplit(
+              recipeId,
+              partitionRecipeCategories(previous, allowedCategories, dietaryCategories, previous[0])
+            )
+          }
+          setCategorySaveError('Kunne ikke gemme kategorien. Prøv igen.')
+        } finally {
+          markCategorySaving(recipeId, -1)
+        }
+      })
+    categorySaveChain.current = job
+  }
+
+  const toggleRecipeCategory = (recipe: RecipeWithTips, category: string) => {
+    const name = category.trim()
+    if (!name) return
+    const previous = categoryListsRef.current.get(recipe.id) ?? recipeCategoryNames(recipe)
+    const next = previous.includes(name)
+      ? previous.filter((item) => item !== name)
+      : [...previous, name]
+    categoryListsRef.current.set(recipe.id, next)
+    const split = partitionRecipeCategories(
+      next,
+      allowedCategories,
+      dietaryCategories,
+      recipe.mainCategory
+    )
+    applyCategorySplit(recipe.id, split)
+    setCategorySaveError('')
+    enqueueCategorySave(recipe.id, split, next, previous)
   }
 
   const saveIngredients = async () => {
@@ -654,17 +694,6 @@ export default function AdminPublishingPage() {
     }
   }
 
-  const addCategory = () => {
-    if (newCategory.trim() && !categories.includes(newCategory.trim())) {
-      setCategories([...categories, newCategory.trim()])
-      setNewCategory('')
-    }
-  }
-
-  const removeCategory = (categoryToRemove: string) => {
-    setCategories(categories.filter(cat => cat !== categoryToRemove))
-  }
-
   const rebuildSenseSpisekasse = async () => {
     if (!selectedRecipe?.id) return
     setRebuildingSenseGroups(true)
@@ -717,6 +746,7 @@ export default function AdminPublishingPage() {
         alert(`✅ ${data.message}`)
         // Reload recipes and go back to list
         await loadRecipes()
+        selectedRecipeIdRef.current = null
         setSelectedRecipe(null)
       } else {
         alert(`❌ Error: ${data.error}`)
@@ -936,9 +966,25 @@ export default function AdminPublishingPage() {
       )
       if (hasAnyCategory) return false
     }
+    if (qualityFilter === 'ai-missing-lunch') {
+      const author = (recipe.author || '').toLowerCase()
+      if (!author.includes('ai')) return false
+      if (recipeHasCategory(recipe, 'Frokost')) return false
+    }
 
     return true
   }).sort((a, b) => comparePublishingRecipes(listSort, a, b))
+
+  const quickMealSet = new Set<string>(QUICK_MEAL_CATEGORIES)
+  const topicCategories = allowedCategories.filter(
+    (category) => !quickMealSet.has(category) && !dietaryCategories.includes(category)
+  )
+  const knownCategoryNames = new Set<string>([
+    ...QUICK_MEAL_CATEGORIES,
+    ...allowedCategories,
+    ...dietaryCategories,
+  ])
+  const extraCategories = categories.filter((category) => !knownCategoryNames.has(category))
 
   const handleBulkNutritionRecalculation = async (offset = nutritionBatchOffset) => {
     try {
@@ -1195,13 +1241,14 @@ export default function AdminPublishingPage() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Kvalitet</label>
               <select
                 value={qualityFilter}
-                onChange={(e) => setQualityFilter(e.target.value as 'all' | 'missing-image' | 'missing-description' | 'missing-categories')}
+                onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="all">Alle</option>
                 <option value="missing-image">Mangler billede</option>
                 <option value="missing-description">Mangler beskrivelse</option>
                 <option value="missing-categories">Mangler kategori</option>
+                <option value="ai-missing-lunch">AI uden frokost</option>
               </select>
             </div>
           </div>
@@ -1316,7 +1363,7 @@ export default function AdminPublishingPage() {
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
                   Opskrifter ({filteredRecipes.length})
                 </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-[70vh] overflow-y-auto">
                   {filteredRecipes.map((recipe) => (
                     <div
                       key={recipe.id}
@@ -1361,6 +1408,20 @@ export default function AdminPublishingPage() {
                             </div>
                           )}
                         </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                        {QUICK_MEAL_CATEGORIES.map((meal) => (
+                          <CategoryChip
+                            key={meal}
+                            label={meal}
+                            tone="meal"
+                            active={recipeHasCategory(recipe, meal)}
+                            onClick={() => toggleRecipeCategory(recipe, meal)}
+                          />
+                        ))}
+                        {savingCategoryIds.has(recipe.id) && (
+                          <span className="self-center text-xs text-gray-500">Gemmer…</span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1479,119 +1540,79 @@ export default function AdminPublishingPage() {
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-md font-medium text-gray-900">Kategorier/Tags</h4>
-                        {!editingCategories && (
-                          <button
-                            onClick={() => setEditingCategories(true)}
-                            className="text-blue-600 hover:text-blue-700 text-sm"
-                          >
-                            Rediger
-                          </button>
+                        {savingCategoryIds.has(selectedRecipe.id) ? (
+                          <span className="text-xs text-gray-500">Gemmer…</span>
+                        ) : (
+                          <span className="text-xs text-gray-500">Klik sætter på. Klik igen fjerner. Gemmes med det samme.</span>
                         )}
                       </div>
-                      
-                      {editingCategories ? (
+                      {categorySaveError && (
+                        <p className="mb-2 text-sm text-red-700">{categorySaveError}</p>
+                      )}
+                      <div className="space-y-3">
                         <div>
-                          <div className="flex flex-wrap gap-2 mb-3">
-                            {categories.map((category, index) => (
-                              <span
-                                key={index}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
-                              >
-                                {category}
-                                <button
-                                  onClick={() => removeCategory(category)}
-                                  className="ml-1 text-blue-600 hover:text-blue-800"
-                                >
-                                  ×
-                                </button>
-                              </span>
+                          <p className="mb-1 text-xs font-medium text-gray-500">Måltid</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {QUICK_MEAL_CATEGORIES.map((meal) => (
+                              <CategoryChip
+                                key={meal}
+                                label={meal}
+                                tone="meal"
+                                active={categories.includes(meal)}
+                                onClick={() => toggleRecipeCategory(selectedRecipe, meal)}
+                              />
                             ))}
                           </div>
-                          <div className="flex gap-2 mb-3">
-                            <div className="flex-1 relative">
-                              <input
-                                type="text"
-                                value={newCategory}
-                                onChange={(e) => setNewCategory(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && addCategory()}
-                                placeholder="Søg eller tilføj kategori..."
-                                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                list="allowed-categories"
-                              />
-                              <datalist id="allowed-categories">
-                                {allowedCategories.map((cat) => (
-                                  <option key={cat} value={cat} />
-                                ))}
-                                {dietaryCategories.map((cat) => (
-                                  <option key={cat} value={cat} />
-                                ))}
-                              </datalist>
+                        </div>
+                        {topicCategories.length > 0 && (
+                          <div>
+                            <p className="mb-1 text-xs font-medium text-gray-500">Kategorier</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {topicCategories.map((category) => (
+                                <CategoryChip
+                                  key={category}
+                                  label={category}
+                                  tone="topic"
+                                  active={categories.includes(category)}
+                                  onClick={() => toggleRecipeCategory(selectedRecipe, category)}
+                                />
+                              ))}
                             </div>
-                            <button
-                              onClick={addCategory}
-                              className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700"
-                            >
-                              Tilføj
-                            </button>
                           </div>
-                          <p className="text-xs text-gray-500 mb-3">
-                            Tilladte kategorier: {allowedCategories.join(', ')}
-                            <br />
-                            Dietary kategorier: {dietaryCategories.join(', ')}
-                          </p>
-                          <div className="flex gap-3">
-                            <button
-                              onClick={saveCategories}
-                              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-                            >
-                              Gem kategorier
-                            </button>
-                            <button
-                              onClick={() => {
-                                setEditingCategories(false)
-                                // Reset til original state
-                                const allCategories = [
-                                  selectedRecipe.mainCategory,
-                                  ...(selectedRecipe.subCategories || []),
-                                  ...(selectedRecipe.dietaryCategories || [])
-                                ].filter(Boolean) as string[]
-                                setCategories(allCategories)
-                                setNewCategory('')
-                              }}
-                              className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                            >
-                              Annuller
-                            </button>
+                        )}
+                        {dietaryCategories.length > 0 && (
+                          <div>
+                            <p className="mb-1 text-xs font-medium text-gray-500">Kost</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {dietaryCategories.map((category) => (
+                                <CategoryChip
+                                  key={category}
+                                  label={category}
+                                  tone="diet"
+                                  active={categories.includes(category)}
+                                  onClick={() => toggleRecipeCategory(selectedRecipe, category)}
+                                />
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {categories.length > 0 ? (
-                            categories.map((category, index) => {
-                              // Bestem farve baseret på kategori type
-                              const mealCategories = ['Morgenmad', 'Frokost', 'Aftensmad', 'Snack']
-                              
-                              let bgColor = 'bg-blue-100 text-blue-800'
-                              if (mealCategories.includes(category)) {
-                                bgColor = 'bg-green-100 text-green-800'
-                              } else if (dietaryCategories.includes(category)) {
-                                bgColor = 'bg-purple-100 text-purple-800'
-                              }
-                              
-                              return (
-                                <span
-                                  key={index}
-                                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor}`}
-                                >
-                                  {category}
-                                </span>
-                              )
-                            })
-                          ) : (
-                            <p className="text-sm text-gray-500 italic">Ingen kategorier endnu. Klik "Rediger" for at tilføje.</p>
-                          )}
-                        </div>
-                      )}
+                        )}
+                        {extraCategories.length > 0 && (
+                          <div>
+                            <p className="mb-1 text-xs font-medium text-gray-500">Andre på opskriften</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {extraCategories.map((category) => (
+                                <CategoryChip
+                                  key={category}
+                                  label={category}
+                                  tone="topic"
+                                  active
+                                  onClick={() => toggleRecipeCategory(selectedRecipe, category)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Ingredienser og Fremgangsmåde */}
