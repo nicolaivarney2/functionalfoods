@@ -9,6 +9,7 @@ import {
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
 import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
+import { quickRecipeRangeInstruction } from '@/lib/quick-recipe-ranges'
 
 interface ExistingRecipe {
   id: string
@@ -21,6 +22,8 @@ interface ExistingRecipe {
 interface FiveTwoParameters {
   dayType: '5' | '2'
   inspiration?: string
+  maaltid?: string
+  quickRecipe?: boolean
 }
 
 interface GenerateRecipeRequest {
@@ -58,9 +61,13 @@ export async function POST(request: NextRequest) {
 
     const existingTitles = existingRecipes.map((r) => r.title.toLowerCase())
     const systemPrompt = create5_2SystemPrompt(existingTitles, dayType)
+    const mealLine = parameters?.maaltid?.trim()
+      ? `\n\nMÅLTID: ${parameters.maaltid.trim()}. Retten skal passe som ${parameters.maaltid.trim()}.`
+      : ''
+    const quickLine = parameters?.quickRecipe ? `\n\n${quickRecipeRangeInstruction('5-2')}` : ''
     const userMessage = isSourceRecipe(sourceRecipe)
-      ? buildSourceRecipeUserPrompt(sourceRecipe, '5:2 Faste')
-      : create5_2UserMessage(dayType, parameters?.inspiration)
+      ? `${buildSourceRecipeUserPrompt(sourceRecipe, '5:2 Faste')}${mealLine}${quickLine}`
+      : `${create5_2UserMessage(dayType, parameters?.quickRecipe ? undefined : parameters?.inspiration)}${mealLine}${quickLine}`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',

@@ -10,6 +10,7 @@ import {
 } from '@/lib/recipe-source-adaptation'
 import { PLANOMA_INSTRUCTION_AMOUNT_RULE } from '@/lib/recipe-ingredient-tags'
 import { SAUCE_PACKET_INGREDIENT_RULE, TZATZIKI_INGREDIENT_RULE } from '@/lib/recipe-generation-diversity'
+import { quickRecipeRangeInstruction } from '@/lib/quick-recipe-ranges'
 
 interface ExistingRecipe {
   id: string
@@ -26,6 +27,8 @@ interface FamiliemadParameters {
   maxTid: 15 | 30 | 45 | null
   recipeType?: string // Predefined recipe type (burger, pizza, etc.)
   inspiration?: string // Free text inspiration (e.g., "børneversion af burger")
+  quickRecipe?: boolean
+  maaltid?: string
 }
 
 interface GenerateRecipeRequest {
@@ -502,6 +505,13 @@ JSON-struktur (obligatorisk):
 // Removed local generateMidjourneyPrompt and translateTitleForMidjourney functions - now using centralized version
 
 function buildParameterInstructions(params: FamiliemadParameters, fromSourceRecipe = false): string {
+  if (params.quickRecipe) {
+    const meal = params.maaltid?.trim()
+      ? `MÅLTID: ${params.maaltid.trim()}. Retten skal være ${params.maaltid.trim()}.\n`
+      : ''
+    return `PARAMETRE-SPECIFIKKE INSTRUKTIONER:\n${meal}${quickRecipeRangeInstruction('familiemad')}\n\n`
+  }
+
   const instructions: string[] = []
   
   // One-pot instructions (NB: Pasta-retter er ofte one-pot retter!)

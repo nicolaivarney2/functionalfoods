@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { generateFfNicheRecipe, nicheGenerationResponse } from '@/lib/ff-recipe-generation'
+import { quickRecipeRangeInstruction } from '@/lib/quick-recipe-ranges'
 import type { SourceRecipePayload } from '@/lib/recipe-source-adaptation'
 
 interface Glp1Parameters {
@@ -7,6 +8,7 @@ interface Glp1Parameters {
   proteinKilde?: string
   recipeType?: string
   inspiration?: string
+  quickRecipe?: boolean
 }
 
 function namedWish(recipeType?: string, inspiration?: string): string {
@@ -20,8 +22,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const params: Glp1Parameters = body.parameters || {}
     const constraints: string[] = []
-    const protein = (params.proteinKilde || '').trim()
-    if (protein && protein !== 'frit-valg') constraints.push(`Proteinet skal primært være ${protein}.`)
+    if (params.quickRecipe) {
+      constraints.push(quickRecipeRangeInstruction('glp1'))
+    } else {
+      const protein = (params.proteinKilde || '').trim()
+      if (protein && protein !== 'frit-valg') constraints.push(`Proteinet skal primært være ${protein}.`)
+    }
 
     const result = await generateFfNicheRecipe({
       niche: 'glp1',

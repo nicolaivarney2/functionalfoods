@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { generateFfNicheRecipe, nicheGenerationResponse } from '@/lib/ff-recipe-generation'
+import { quickRecipeRangeInstruction } from '@/lib/quick-recipe-ranges'
 import type { SourceRecipePayload } from '@/lib/recipe-source-adaptation'
 
 interface KetoParameters {
@@ -8,6 +9,7 @@ interface KetoParameters {
   inspiration?: string
   maxTid?: 15 | 30 | 45 | null
   maaltid?: string
+  quickRecipe?: boolean
 }
 
 const PROTEIN: Record<string, string> = {
@@ -29,9 +31,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const params: KetoParameters = body.parameters || {}
     const constraints: string[] = []
-    const protein = PROTEIN[(params.hovedingrediens || '').toLowerCase()]
-    if (protein) constraints.push(protein)
-    if (params.maxTid) constraints.push(`Samlet tid højst ${params.maxTid} minutter.`)
+    if (params.quickRecipe) {
+      constraints.push(quickRecipeRangeInstruction('keto'))
+    } else {
+      const protein = PROTEIN[(params.hovedingrediens || '').toLowerCase()]
+      if (protein) constraints.push(protein)
+      if (params.maxTid) constraints.push(`Samlet tid højst ${params.maxTid} minutter.`)
+    }
 
     const result = await generateFfNicheRecipe({
       niche: 'keto',

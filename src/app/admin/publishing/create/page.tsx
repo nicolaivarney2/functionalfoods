@@ -171,6 +171,30 @@ interface FiveTwoParameters {
   dayType: '5' | '2'
 }
 
+const CATEGORIES_WITH_CRITERIA = new Set([
+  'familiemad',
+  'keto',
+  '5-2',
+  'proteinrig-kost',
+  'glp1',
+  'sense',
+])
+
+type QuickGenerateOptions = {
+  quickRecipe: true
+  maaltid: string
+  dayType?: '5' | '2'
+}
+
+function quickMealsFor(categoryId: string): string[] {
+  if (categoryId === 'keto') return ['morgenmad', 'frokost', 'aftensmad', 'dessert', 'snacks']
+  return ['morgenmad', 'frokost', 'aftensmad', 'snacks']
+}
+
+function mealLabel(meal: string): string {
+  return meal.charAt(0).toUpperCase() + meal.slice(1)
+}
+
 function slimExistingRecipeForGenerate(r: any) {
   const ingredients = Array.isArray(r?.ingredients)
     ? r.ingredients.slice(0, 8).map((ing: any) =>
@@ -300,6 +324,9 @@ export default function CreateRecipePage() {
     recipeType: '',
     inspiration: '',
   })
+  const [showQuickMealModal, setShowQuickMealModal] = useState(false)
+  const [quickMeal, setQuickMeal] = useState<string | null>(null)
+  const [quickDayType, setQuickDayType] = useState<'5' | '2' | null>(null)
 
   // Redirect if not admin
   if (checking) {
@@ -394,11 +421,59 @@ export default function CreateRecipePage() {
     setShowRecipeSourceModal(true)
   }
 
+  const closeCriteriaModals = () => {
+    setShowFamiliemadModal(false)
+    setShowKetoModal(false)
+    setShow52Modal(false)
+    setShowProteinrigModal(false)
+    setShowGlp1Modal(false)
+    setShowSenseModal(false)
+  }
+
+  const openQuickMeal = () => {
+    const categoryId = pendingCategoryId || selectedCategory
+    if (!categoryId) return
+    setSelectedCategory(categoryId)
+    setPendingCategoryId(categoryId)
+    setQuickMeal(null)
+    setQuickDayType(null)
+    setShowRecipeSourceModal(false)
+    closeCriteriaModals()
+    setShowQuickMealModal(true)
+  }
+
+  const closeQuickMeal = () => {
+    setShowQuickMealModal(false)
+    setPendingCategoryId(null)
+    setSelectedCategory(null)
+    setQuickMeal(null)
+    setQuickDayType(null)
+  }
+
   const continueFromRecipeSourceModal = () => {
     if (!pendingCategoryId) return
     setShowRecipeSourceModal(false)
+    if (!CATEGORIES_WITH_CRITERIA.has(pendingCategoryId)) {
+      setQuickMeal(null)
+      setQuickDayType(null)
+      setShowQuickMealModal(true)
+      return
+    }
     handleCategorySelect(pendingCategoryId)
     setPendingCategoryId(null)
+  }
+
+  const startQuickGenerate = () => {
+    const categoryId = pendingCategoryId || selectedCategory
+    if (!categoryId || !quickMeal) return
+    if (categoryId === '5-2' && !quickDayType) return
+    setShowQuickMealModal(false)
+    setPendingCategoryId(null)
+    handleGenerateRecipe(categoryId, {
+      quickRecipe: true,
+      maaltid: quickMeal,
+      dayType: quickDayType || undefined,
+    })
   }
 
   const fetchSourceRecipe = async () => {
@@ -426,7 +501,7 @@ export default function CreateRecipePage() {
     }
   }
 
-  const handleGenerateRecipe = async (categoryOverride?: string) => {
+  const handleGenerateRecipe = async (categoryOverride?: string, quick?: QuickGenerateOptions) => {
     const activeCategory = categoryOverride || selectedCategory
     if (!activeCategory) return
 
@@ -459,29 +534,23 @@ export default function CreateRecipePage() {
         requestBody.sourceRecipe = sourceRecipe
       }
       
-      // Add parameters for familiemad
-      if (activeCategory === 'familiemad') {
+      if (quick?.quickRecipe) {
+        requestBody.parameters = {
+          quickRecipe: true,
+          maaltid: quick.maaltid,
+          ...(activeCategory === '5-2' ? { dayType: quick.dayType === '5' ? '5' : '2' } : {}),
+        }
+      } else if (activeCategory === 'familiemad') {
         requestBody.parameters = familiemadParams
-      }
-      
-      // Add parameters for keto
-      if (activeCategory === 'keto') {
+      } else if (activeCategory === 'keto') {
         requestBody.parameters = ketoParams
-      }
-
-      if (activeCategory === '5-2') {
+      } else if (activeCategory === '5-2') {
         requestBody.parameters = fiveTwoParams
-      }
-
-      if (activeCategory === 'proteinrig-kost') {
+      } else if (activeCategory === 'proteinrig-kost') {
         requestBody.parameters = proteinrigParams
-      }
-
-      if (activeCategory === 'glp1') {
+      } else if (activeCategory === 'glp1') {
         requestBody.parameters = glp1Params
-      }
-
-      if (activeCategory === 'sense') {
+      } else if (activeCategory === 'sense') {
         requestBody.parameters = senseParams
       }
       
@@ -928,6 +997,9 @@ export default function CreateRecipePage() {
     }
   }
 
+  const quickCategoryName =
+    RECIPE_CATEGORIES.find((category) => category.id === (pendingCategoryId || selectedCategory))?.name || ''
+
   return (
     <>
       {/* Recipe Source Link Modal */}
@@ -979,10 +1051,110 @@ export default function CreateRecipePage() {
                   Annuller
                 </button>
                 <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  Quick recipe
+                </button>
+                <button
                   onClick={continueFromRecipeSourceModal}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Fortsæt
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQuickMealModal && (pendingCategoryId || selectedCategory) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-start gap-4 mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Quick recipe{quickCategoryName ? ` · ${quickCategoryName}` : ''}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Opskriften må ligge hvor som helst i de intervaller, der allerede virker. Vælg måltid, så starter genereringen.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeQuickMeal}
+                  className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              {(pendingCategoryId || selectedCategory) === '5-2' && (
+                <div className="mb-5">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Dagstype</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        { id: '2' as const, label: "2'er — fastedag" },
+                        { id: '5' as const, label: "5'er — spisedag" },
+                      ]
+                    ).map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setQuickDayType(option.id)}
+                        className={`py-2 px-3 rounded-lg text-sm transition-colors ${
+                          quickDayType === option.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-sm font-medium text-gray-700 mb-2">Måltid</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {quickMealsFor(pendingCategoryId || selectedCategory || '').map((meal) => (
+                  <button
+                    key={meal}
+                    type="button"
+                    onClick={() => setQuickMeal(meal)}
+                    className={`py-2 px-3 rounded-lg text-sm transition-colors ${
+                      quickMeal === meal
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {mealLabel(meal)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex space-x-3 mt-8 pt-5 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={closeQuickMeal}
+                  className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={startQuickGenerate}
+                  disabled={
+                    isGenerating ||
+                    !quickMeal ||
+                    ((pendingCategoryId || selectedCategory) === '5-2' && !quickDayType)
+                  }
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? 'Genererer...' : 'Start quick recipe'}
                 </button>
               </div>
             </div>
@@ -1011,8 +1183,7 @@ export default function CreateRecipePage() {
               </div>
               
               <p className="text-gray-600 mb-6">
-                Juster parametrene for at styre hvilken type familiemad/kalorietælling-opskrift der genereres (samme motor som før). 
-                Du kan også ignorere dette og bruge standardværdier.
+                Juster parametrene, eller brug Quick recipe. Den holder sig inden for hele intervallet og spørger kun om måltid.
               </p>
               
               <div className="space-y-6">
@@ -1213,6 +1384,14 @@ export default function CreateRecipePage() {
                   Annuller
                 </button>
                 <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Quick recipe
+                </button>
+                <button
                   onClick={handleFamiliemadGenerate}
                   disabled={isGenerating}
                   className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1246,8 +1425,7 @@ export default function CreateRecipePage() {
               </div>
               
               <p className="text-gray-600 mb-6">
-                Juster parametrene for at styre hvilken type keto opskrift der genereres. 
-                Du kan også ignorere dette og bruge standardværdier.
+                Juster parametrene, eller brug Quick recipe. Protein, fedt, kulhydrat og kompleksitet må så ligge hvor som helst fra 0 til 3.
               </p>
               
               <div className="space-y-6">
@@ -1510,6 +1688,14 @@ export default function CreateRecipePage() {
                   Annuller
                 </button>
                 <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Quick recipe
+                </button>
+                <button
                   onClick={handleKetoGenerate}
                   disabled={isGenerating}
                   className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1623,6 +1809,14 @@ export default function CreateRecipePage() {
                   className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Quick recipe
                 </button>
                 <button
                   onClick={handleProteinrigGenerate}
@@ -1750,6 +1944,14 @@ export default function CreateRecipePage() {
                   className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                 >
                   Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Quick recipe
                 </button>
                 <button
                   onClick={handleSenseGenerate}
@@ -1893,6 +2095,14 @@ export default function CreateRecipePage() {
                   Annuller
                 </button>
                 <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                >
+                  Quick recipe
+                </button>
+                <button
                   onClick={handleGlp1Generate}
                   disabled={isGenerating}
                   className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1983,6 +2193,14 @@ export default function CreateRecipePage() {
                   className="flex-1 py-2 px-4 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
                 >
                   Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={openQuickMeal}
+                  disabled={isGenerating}
+                  className="flex-1 py-2 px-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  Quick recipe
                 </button>
                 <button
                   type="button"

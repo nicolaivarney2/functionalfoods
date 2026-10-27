@@ -151,6 +151,25 @@ describe('resolveRecipeCall', () => {
     assert.match(source.userPrompt, /TILPAS KILDEOPSKRIFTEN/)
     assert.match(source.userPrompt, /Oksegryde/)
     assert.match(source.systemPrompt, /DET HER ER EN SENSE-RET/)
+    assert.doesNotMatch(source.userPrompt, /MÅLTID:/)
+  })
+
+  it('beholder måltid og quick-interval når kilden er et link', () => {
+    const call = resolveRecipeCall({
+      niche: 'keto',
+      mealType: 'frokost',
+      constraints: ['Kulhydrat-strikthed 0–3'],
+      sourceRecipe: {
+        url: 'https://example.com/frokost',
+        title: 'Kyllingesalat',
+        ingredientsText: 'kylling',
+        instructionsText: 'Bland.',
+      },
+    })
+    assert.equal(call.mode, 'source')
+    assert.match(call.userPrompt, /MÅLTID: frokost/)
+    assert.match(call.userPrompt, /Kulhydrat-strikthed 0–3/)
+    assert.match(call.systemPrompt, /FROKOST/)
   })
 
   it('tæller kun titler fra samme niche', () => {

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { generateFfNicheRecipe, nicheGenerationResponse } from '@/lib/ff-recipe-generation'
+import { quickRecipeRangeInstruction } from '@/lib/quick-recipe-ranges'
 import type { SourceRecipePayload } from '@/lib/recipe-source-adaptation'
 
 interface SenseParameters {
@@ -7,6 +8,7 @@ interface SenseParameters {
   stivelse?: 'ingen' | 'standard' | 'ekstra'
   recipeType?: string
   inspiration?: string
+  quickRecipe?: boolean
 }
 
 function namedWish(recipeType?: string, inspiration?: string): string {
@@ -20,8 +22,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const params: SenseParameters = body.parameters || {}
     const constraints: string[] = []
-    if (params.stivelse === 'ingen') constraints.push('Ingen stivelse. Håndfuld 4 skal være tom.')
-    if (params.stivelse === 'ekstra') {
+    if (params.quickRecipe) {
+      constraints.push(quickRecipeRangeInstruction('sense'))
+    } else if (params.stivelse === 'ingen') {
+      constraints.push('Ingen stivelse. Håndfuld 4 skal være tom.')
+    } else if (params.stivelse === 'ekstra') {
       constraints.push('Stivelsen må ligge i den øvre ende af Sense-intervallet, stadig kun én slags.')
     }
 

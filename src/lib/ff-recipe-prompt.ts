@@ -225,12 +225,15 @@ export function resolveRecipeCall(input: {
   const mealGuidance = guidanceMeal ? ketoMealGuidance(guidanceMeal) : null
 
   if (isSourceRecipe(input.sourceRecipe)) {
+    const sourcePrompt = buildSourceRecipeUserPrompt(input.sourceRecipe, NICHE_PROMPT_NAME[input.niche])
+    const mealNote = meal ? `MÅLTID: ${meal}. Tilpas kilden så retten passer som ${meal}.` : ''
+    const extra = [mealNote, ...constraints.map((line) => line.trim())].filter(Boolean)
     return {
       mode: 'source',
       temperature: recipeGenerationTemperature('source'),
       familyLabel: null,
       systemPrompt: buildFfRecipeSystemPrompt({ niche: input.niche, titles, familyLabel: null, mealGuidance }),
-      userPrompt: buildSourceRecipeUserPrompt(input.sourceRecipe, NICHE_PROMPT_NAME[input.niche]),
+      userPrompt: extra.length ? `${sourcePrompt}\n\n${extra.join('\n\n')}` : sourcePrompt,
     }
   }
 
