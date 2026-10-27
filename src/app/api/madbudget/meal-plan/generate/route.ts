@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { mealPlanGenerator } from '@/lib/meal-plan-system'
 import { collectRecentlyUsedRecipeIds } from '@/lib/meal-plan-recent-recipes'
+import type { CookAheadGrid } from '@/lib/madbudget/cook-ahead'
 import {
   applyMealSlotStylesToGrids,
   inferBreakfastStyle,
@@ -424,17 +425,20 @@ export async function POST(request: NextRequest) {
       lunchStyle: inferLunchStyle(owner?.mealsPerDay, owner?.lunchStyle),
     }
     const styledGrids = applyMealSlotStylesToGrids(
-      weeksToSave.map((week) => week.grid),
+      weeksToSave.map((week) => week.grid as CookAheadGrid),
       styleProfile
     )
     for (let i = 0; i < weeksToSave.length; i += 1) {
-      weeksToSave[i] = { ...weeksToSave[i], grid: styledGrids[i] ?? weeksToSave[i].grid }
+      weeksToSave[i] = {
+        ...weeksToSave[i],
+        grid: (styledGrids[i] ?? weeksToSave[i].grid) as (typeof weeksToSave)[number]['grid'],
+      }
     }
     const rebuiltList = await rebuildShoppingListForUser(supabase, ownerId, weeksToSave[0].grid as any, {
       shop: shopMeta,
       weekStartDate: weeksToSave[0].weekStartDate,
     })
-    if (rebuiltList) weekPlan.shoppingList = rebuiltList
+    if (rebuiltList) weekPlan.shoppingList = rebuiltList as typeof weekPlan.shoppingList
 
     const familyProfileSnapshot = {
       adults: profile.adults,

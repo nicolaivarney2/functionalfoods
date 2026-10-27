@@ -64,8 +64,6 @@ import {
   isKetoLikeDiet,
   lunchStyleHint,
   lunchStyleLabel,
-  type BreakfastStyle,
-  type LunchStyle,
 } from '@/lib/madbudget/meal-slot-style'
 
 const STEP = {

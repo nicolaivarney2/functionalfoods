@@ -1275,9 +1275,7 @@ export class MealPlanGenerator {
     });
     
     const slot =
-      mealType === 'breakfast' || mealType === 'lunch' || mealType === MealType.Breakfast || mealType === MealType.Lunch
-        ? (String(mealType) as 'breakfast' | 'lunch')
-        : null
+      mealType === MealType.Breakfast || mealType === MealType.Lunch ? mealType : null
     const styled = slot
       ? filteredRecipes.filter((recipe) =>
           recipeFitsSlotStyle(
