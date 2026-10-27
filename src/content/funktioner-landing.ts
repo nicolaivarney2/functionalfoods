@@ -259,33 +259,33 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
     title: 'Community | Functional Foods',
     shortTitle: 'Community',
     description:
-      'Vægttabsforløb i grupper à 10 i appen. I starter samme dag, skriver i samme tråd i 30 dage, og madplan og madlog følger med.',
+      'Personlig vejledning i mindre rum à 10 personer. Vi er med i alle rum og hjælper med vejledning, guides og mere.',
     iconName: 'Users',
-    heroEyebrow: 'Community er gratis',
-    heroTitle: 'Et rum på 10, samme startdato',
+    heroEyebrow: 'Community og vejledning',
+    heroTitle: 'Personlig vejledning i små rum',
     heroLeadParagraphs: [
-      'Community er vægttabsforløb i små grupper. I er 10 personer på samme madstil, I starter samme dag, og forløbet kører 30 dage. I skriver i samme tråd. Vejledningen lægges ind undervejs.',
-      'Rummet ligger i appen og er gratis, ligesom madplan, madlog og personlig vejledning på Messenger.',
+      'Community er personlig vejledning i mindre rum à 10 personer. Vi er med i alle rum, og hjælper med vejledning, guides og meget mere.',
+      'I skriver i samme tråd i appen. Rummet er gratis, ligesom madplan, madlog og personlig vejledning på Messenger.',
     ],
     bullets: [
       {
-        title: 'Grupper à 10',
+        title: 'Mindre rum à 10',
         text: 'Ikke et åbent forum. Et rum med plads til 10, så I kan følge hinanden uden at det bliver en væg af beskeder.',
       },
       {
-        title: 'Fast startdato',
-        text: 'I går i gang sammen. Det gør det lettere at blive ved, fordi de andre i rummet er samme sted i forløbet.',
+        title: 'Vi er med i alle rum',
+        text: 'Nicolai og Functional Foods er med fra start. I får vejledning, guides og hjælp i tråden - ikke et rum I sidder alene i.',
       },
       {
-        title: '30 dage i samme tråd',
-        text: 'Beskeder, vejledning og hverdagen ligger ét sted. Når forløbet er slut, kan I stadig læse med.',
+        title: 'Samme tråd',
+        text: 'Beskeder, vejledning og hverdagen ligger ét sted. Du skriver, når det passer dig.',
       },
       {
         title: 'Madplan og madlog er med',
         text: 'Rum, madplan, madlog og prisalarmer er gratis. Du opretter en konto og slår dig løs.',
       },
       {
-        title: 'Vejledning er med',
+        title: 'Også på Messenger',
         text: 'Personlig vejledning på Messenger er også gratis. Jeg gør mit bedste for at hjælpe så hurtigt jeg kan.',
       },
     ],
@@ -327,7 +327,7 @@ export const FUNKTIONER: Record<FunktionSlug, FunktionLanding> = {
       },
     ],
     howItHelps:
-      'Personlig vejledning og grupper à 10 er gratis.',
+      'Personlig vejledning og community-rum à 10 er gratis.',
     ctaLabel: 'Kom i gang',
     ctaHref: '/kom-i-gang',
     secondaryCta: { label: 'Læs om Community', href: '/funktioner/community' },

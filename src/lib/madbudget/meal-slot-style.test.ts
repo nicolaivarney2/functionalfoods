@@ -9,6 +9,7 @@ import {
   recipeFitsLunchStyle,
   recipeFitsSlotStyle,
   recipePrepMinutes,
+  slotRepeatUniqueCount,
 } from './meal-slot-style'
 
 describe('meal-slot-style', () => {
@@ -63,6 +64,14 @@ describe('meal-slot-style', () => {
       true
     )
     assert.equal(recipeFitsSlotStyle({ title: 'Lasagne' }, 'dinner', profile), true)
+  })
+
+  it('sætter 2–3 unikke retter pr. slot', () => {
+    assert.equal(slotRepeatUniqueCount('breakfast', { breakfastStyle: 'repeat' }), 2)
+    assert.equal(slotRepeatUniqueCount('breakfast', { breakfastStyle: 'fast' }), 3)
+    assert.equal(slotRepeatUniqueCount('breakfast', { breakfastStyle: 'skip' }), null)
+    assert.equal(slotRepeatUniqueCount('lunch', { lunchStyle: 'packed' }), 3)
+    assert.equal(slotRepeatUniqueCount('lunch', { lunchStyle: 'leftovers' }), null)
   })
 
   it('gentager højst tre morgenmads- og frokostretter', () => {

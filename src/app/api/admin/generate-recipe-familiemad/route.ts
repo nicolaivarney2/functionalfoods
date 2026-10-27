@@ -192,9 +192,8 @@ INGREDIENS FORMATERING - VIGTIGT:
 - Brug ALTID små bogstaver i ingrediensnavne (name feltet) - IKKE stort forbogstav!
 - Eksempler: "kartofler" (IKKE "Kartofler"), "kyllingebryst" (IKKE "Kyllingebryst"), "løg" (IKKE "Løg")
 - Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
-- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
-- Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
-- Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
+- Ikke friske krydderurter. Brug krydderier fra glas: "0,5 tsk paprika", "0,5 tsk oregano", "0,5 tsk spidskommen". Aldrig bundt persille, basilikum, dild eller purløg
+- Cherrytomater: gram, ca. 10 g pr. tomat (fx "80 g cherrytomater"). Aldrig stk
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
 ${PLANOMA_INSTRUCTION_AMOUNT_RULE}
@@ -209,7 +208,7 @@ Opskriften er ALTID til 2 personer. Brug REALISTISKE mængder - ikke for meget!
 - Grøntsager (broccoli, blomkål, etc.): 200-300 g
 - Gulerødder: 2-3 stk (ikke 4-5 stk)
 - Løg: 1 stk (ikke 2 stk)
-- Tomater: 2-3 stk (ikke 4-5 stk)
+- Tomater: 2-3 stk (ikke 4-5 stk). Cherrytomater: gram, ca. 10 g pr. tomat, aldrig stk
 - Æg: 2-3 stk (ikke 4 stk)
 - Mælk/fløde: 2-3 dl (ikke 5 dl)
 - Smør/olie: 20-30 g (ikke 50g)
@@ -313,9 +312,8 @@ INGREDIENS FORMATERING - FØLG DISSE REGLER:
 - Brug ALTID små bogstaver i ingrediensnavne (name feltet) - IKKE stort forbogstav!
 - Eksempler: "kartofler" (IKKE "Kartofler"), "kyllingebryst" (IKKE "Kyllingebryst"), "løg" (IKKE "Løg")
 - Hvidløg: "1 stk hvidløgsfed" (IKKE "2 fed hvidløg" eller "1 stk hvidløg")
-- Persille: "0,25 bundt persille" (IKKE "1 håndfuld persille" eller "1 bundt persille")
-- Purløg: "1 stk purløg" med "fintsnittet" i notes feltet (IKKE "fintsnittet purløg")
-- Andre krydderurter: "0,5 bundt timian", "0,25 bundt rosmarin"
+- Ikke friske krydderurter. Brug krydderier fra glas: "0,5 tsk paprika", "0,5 tsk oregano", "0,5 tsk spidskommen". Aldrig bundt persille, basilikum, dild eller purløg
+- Cherrytomater: gram, ca. 10 g pr. tomat (fx "80 g cherrytomater"). Aldrig stk
 - UNDGÅ duplikationer: Skriv kun "1 stk hvidløgsfed" ikke "1 stk hvidløgsfed" og "1 stk hvidløg"
 
 ${PLANOMA_INSTRUCTION_AMOUNT_RULE}
@@ -330,7 +328,7 @@ Opskriften er ALTID til 2 personer. Brug REALISTISKE mængder - ikke for meget!
 - Grøntsager (broccoli, blomkål, etc.): 200-300 g
 - Gulerødder: 2-3 stk (ikke 4-5 stk)
 - Løg: 1 stk (ikke 2 stk)
-- Tomater: 2-3 stk (ikke 4-5 stk)
+- Tomater: 2-3 stk (ikke 4-5 stk). Cherrytomater: gram, ca. 10 g pr. tomat, aldrig stk
 - Æg: 2-3 stk (ikke 4 stk)
 - Mælk/fløde: 200-300 ml (ikke 500 ml) - Brug ALTID "ml" i stedet for "dl" (1 dl = 100 ml)
 - Smør/olie: 20-30 g (ikke 50g)

@@ -238,32 +238,46 @@ export async function POST(request: NextRequest) {
         const derivedComplete = fieldsComplete(p)
         if (!derivedComplete && !p.isComplete) continue
 
-        const { error: adultError } = await supabase
-          .from('adult_weight_loss_profiles')
-          .upsert(
-            {
-              user_id: ownerId,
-              adult_index: index,
-              gender: p.gender,
-              age: p.age,
-              height: p.height,
-              weight: p.weight,
-              activity_level: p.activityLevel,
-              dietary_approach: p.dietaryApproach,
-              excluded_foods: [],
-              meals_per_day: (p.mealsPerDay as string[]) || ['dinner'],
-              breakfast_style: p.breakfastStyle ?? null,
-              lunch_style: p.lunchStyle ?? null,
-              weight_goal: p.weightGoal,
-              is_complete: derivedComplete || Boolean(p.isComplete),
-              updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: 'user_id,adult_index',
-            }
-          )
+        const adultRow: Record<string, unknown> = {
+          user_id: ownerId,
+          adult_index: index,
+          gender: p.gender,
+          age: p.age,
+          height: p.height,
+          weight: p.weight,
+          activity_level: p.activityLevel,
+          dietary_approach: p.dietaryApproach,
+          excluded_foods: [],
+          meals_per_day: (p.mealsPerDay as string[]) || ['dinner'],
+          breakfast_style: p.breakfastStyle ?? null,
+          lunch_style: p.lunchStyle ?? null,
+          weight_goal: p.weightGoal,
+          is_complete: derivedComplete || Boolean(p.isComplete),
+          updated_at: new Date().toISOString(),
+        }
 
-        if (adultError) {
+        let { error: adultError } = await supabase
+          .from('adult_weight_loss_profiles')
+          .upsert(adultRow, {
+            onConflict: 'user_id,adult_index',
+          })
+
+        const missingStyleColumn =
+          adultError &&
+          /breakfast_style|lunch_style/.test(`${adultError.message || ''} ${adultError.code || ''}`)
+        if (missingStyleColumn) {
+          const withoutStyles = { ...adultRow }
+          delete withoutStyles.breakfast_style
+          delete withoutStyles.lunch_style
+          const retry = await supabase.from('adult_weight_loss_profiles').upsert(withoutStyles, {
+            onConflict: 'user_id,adult_index',
+          })
+          adultError = retry.error
+          console.error(
+            `adult_weight_loss_profiles mangler breakfast_style/lunch_style — gemte uden dem (kør migration 20261022120000).`,
+            adultError
+          )
+        } else if (adultError) {
           console.error(`Error saving adult profile ${index}:`, adultError)
         }
       }

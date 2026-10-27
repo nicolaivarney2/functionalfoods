@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       tier === 'community'
         ? {
             name: 'Functional Foods Community',
-            description: 'Vægttabsforløb i grupper à 10, plus madplaner, madlog og prisalarmer.',
+            description: 'Personlig vejledning i rum à 10, plus madplaner, madlog og prisalarmer.',
           }
         : TIER_PRODUCT[tier]
 

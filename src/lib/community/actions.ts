@@ -5,6 +5,9 @@ import { sendLoopsEvent } from '@/lib/loops-subscribe'
 import { sendExpoPush, type ExpoPushMessage } from '@/lib/push/send-expo-push'
 import {
   addDaysIso,
+  COMMUNITY_GUIDE_EMAIL,
+  COMMUNITY_GUIDE_HANDLE,
+  COMMUNITY_GUIDE_NAME,
   copenhagenLocalToUtc,
   copenhagenTodayIso,
   extractMentionHandles,
@@ -107,6 +110,118 @@ async function memberIds(service: SupabaseClient, roomId: string): Promise<strin
   return (data ?? []).map((r) => String((r as { user_id: string }).user_id))
 }
 
+function isGuideEmail(email?: string | null): boolean {
+  return Boolean(email && email.trim().toLowerCase() === COMMUNITY_GUIDE_EMAIL)
+}
+
+async function resolveGuideUserId(service: SupabaseClient): Promise<string | null> {
+  const { data } = await service
+    .from('user_profiles')
+    .select('id')
+    .ilike('email', COMMUNITY_GUIDE_EMAIL)
+    .maybeSingle()
+  const fromProfile = (data as { id?: string } | null)?.id
+  if (fromProfile) return fromProfile
+
+  const admin = service.auth.admin as {
+    getUserByEmail?: (email: string) => Promise<{ data: { user: User | null } | null }>
+  }
+  if (typeof admin.getUserByEmail === 'function') {
+    try {
+      const byEmail = await admin.getUserByEmail(COMMUNITY_GUIDE_EMAIL)
+      if (byEmail.data?.user?.id) return byEmail.data.user.id
+    } catch {
+      // fald tilbage til listUsers
+    }
+  }
+
+  for (let page = 1; page <= 10; page += 1) {
+    const listed = await service.auth.admin.listUsers({ page, perPage: 200 })
+    const match = listed.data.users.find((u) => u.email?.toLowerCase() === COMMUNITY_GUIDE_EMAIL)
+    if (match?.id) return match.id
+    if (listed.data.users.length < 200) break
+  }
+  return null
+}
+
+async function isGuideUser(service: SupabaseClient, user: User): Promise<boolean> {
+  if (isGuideEmail(user.email)) return true
+  return (await staffUserIds(service)).includes(user.id)
+}
+
+async function occupantCount(service: SupabaseClient, roomId: string): Promise<number> {
+  const { data, error } = await service.from('community_memberships').select('is_guide').eq('room_id', roomId)
+  if (error) {
+    const fallback = await service.from('community_memberships').select('user_id').eq('room_id', roomId)
+    return (fallback.data ?? []).length
+  }
+  return (data ?? []).filter((row) => !(row as { is_guide?: boolean }).is_guide).length
+}
+
+async function staffUserIds(service: SupabaseClient): Promise<string[]> {
+  const { data } = await service.from('community_staff').select('user_id')
+  return (data ?? [])
+    .map((row) => (row as { user_id?: string | null }).user_id)
+    .filter((id): id is string => Boolean(id))
+}
+
+async function pushRecipients(service: SupabaseClient, roomId: string, exceptUserId?: string): Promise<string[]> {
+  const ids = new Set<string>([...(await memberIds(service, roomId)), ...(await staffUserIds(service))])
+  if (exceptUserId) ids.delete(exceptUserId)
+  return [...ids]
+}
+
+let guideEnsuredAt = 0
+
+async function ensureGuideInAllRooms(service: SupabaseClient, forceUserId?: string): Promise<void> {
+  if (!forceUserId && Date.now() - guideEnsuredAt < 60_000) return
+  try {
+    const userId = forceUserId ?? (await resolveGuideUserId(service))
+    if (!userId) return
+
+    await service.from('community_staff').upsert({
+      handle: COMMUNITY_GUIDE_HANDLE,
+      user_id: userId,
+      display_name: COMMUNITY_GUIDE_NAME,
+    })
+
+    const [{ data: rooms }, { data: existing }] = await Promise.all([
+      service.from('community_rooms').select('id'),
+      service.from('community_memberships').select('room_id, is_guide').eq('user_id', userId),
+    ])
+    const have = new Map(
+      (existing ?? []).map((row) => [
+        String((row as { room_id: string }).room_id),
+        Boolean((row as { is_guide?: boolean }).is_guide),
+      ])
+    )
+    for (const room of rooms ?? []) {
+      const roomId = String((room as { id: string }).id)
+      if (have.get(roomId) === true) continue
+      if (have.has(roomId)) {
+        await service.from('community_memberships').update({ is_guide: true }).eq('room_id', roomId).eq('user_id', userId)
+        continue
+      }
+      const withFlag = await service.from('community_memberships').insert({
+        room_id: roomId,
+        user_id: userId,
+        display_name: COMMUNITY_GUIDE_NAME,
+        is_guide: true,
+      })
+      if (withFlag.error) {
+        await service.from('community_memberships').insert({
+          room_id: roomId,
+          user_id: userId,
+          display_name: COMMUNITY_GUIDE_NAME,
+        })
+      }
+    }
+    guideEnsuredAt = Date.now()
+  } catch (err) {
+    console.error('ensureGuideInAllRooms', err)
+  }
+}
+
 async function insertMessage(
   service: SupabaseClient,
   input: {
@@ -141,7 +256,7 @@ export async function joinCommunityRoom(params: {
   roomId: string
 }): Promise<{ room: CommunityRoomRow; alreadyMember: boolean }> {
   const service = communityServiceClient()
-  const today = copenhagenTodayIso()
+  await ensureGuideInAllRooms(service)
   const { data: room, error: roomErr } = await service
     .from('community_rooms')
     .select('*')
@@ -158,15 +273,28 @@ export async function joinCommunityRoom(params: {
     .maybeSingle()
   if (existing) return { room: typed, alreadyMember: true }
 
-  if (typed.status !== 'open' || typed.start_date <= today) {
-    throw Object.assign(new Error('Tilmelding er lukket — rummet er startet.'), { status: 409 })
+  const guide = await isGuideUser(service, params.user)
+  if (guide) {
+    guideEnsuredAt = 0
+    await ensureGuideInAllRooms(service, params.user.id)
+    const { data: fresh } = await service.from('community_rooms').select('*').eq('id', typed.id).single()
+    return { room: (fresh ?? typed) as CommunityRoomRow, alreadyMember: true }
   }
-  if (typed.member_count >= typed.capacity) {
+
+  if (typed.status === 'archived') {
+    throw Object.assign(new Error('Forløbet er afsluttet.'), { status: 409 })
+  }
+  if ((await occupantCount(service, typed.id)) >= typed.capacity) {
     throw Object.assign(new Error('Rummet er fyldt.'), { status: 409 })
   }
 
-  const { data: mine } = await service.from('community_memberships').select('room_id').eq('user_id', params.user.id)
-  const mineIds = (mine ?? []).map((r) => String((r as { room_id: string }).room_id))
+  const { data: mine } = await service
+    .from('community_memberships')
+    .select('room_id, is_guide')
+    .eq('user_id', params.user.id)
+  const mineIds = (mine ?? [])
+    .filter((row) => !(row as { is_guide?: boolean }).is_guide)
+    .map((r) => String((r as { room_id: string }).room_id))
   if (mineIds.length) {
     const { data: live } = await service
       .from('community_rooms')
@@ -215,7 +343,7 @@ export async function joinCommunityRoom(params: {
     body: welcome,
   })
 
-  const others = (await memberIds(service, typed.id)).filter((id) => id !== params.user.id)
+  const others = await pushRecipients(service, typed.id, params.user.id)
   await pushToUsers(service, others, {
     title: dietaryApproachLabel(typed.niche),
     body: `${name} er joinet rummet.`,
@@ -242,6 +370,7 @@ export async function postCommunityMessage(params: {
   if (text.length > 2000) throw Object.assign(new Error('Beskeden er for lang.'), { status: 400 })
 
   const service = communityServiceClient()
+  await ensureGuideInAllRooms(service)
   const { data: room } = await service.from('community_rooms').select('*').eq('id', params.roomId).maybeSingle()
   if (!room) throw Object.assign(new Error('Rummet findes ikke.'), { status: 404 })
   const typed = room as CommunityRoomRow
@@ -255,9 +384,12 @@ export async function postCommunityMessage(params: {
     .eq('room_id', typed.id)
     .eq('user_id', params.user.id)
     .maybeSingle()
-  if (!membership) throw Object.assign(new Error('Du er ikke med i rummet.'), { status: 403 })
+  const isGuide = (await staffUserIds(service)).includes(params.user.id)
+  if (!membership && !isGuide) throw Object.assign(new Error('Du er ikke med i rummet.'), { status: 403 })
 
-  const name = String((membership as { display_name: string }).display_name)
+  const name = membership
+    ? String((membership as { display_name: string }).display_name)
+    : COMMUNITY_GUIDE_NAME
   const message = await insertMessage(service, {
     roomId: typed.id,
     userId: params.user.id,
@@ -289,7 +421,7 @@ export async function postCommunityMessage(params: {
     }
   }
 
-  const others = (await memberIds(service, typed.id)).filter((id) => id !== params.user.id)
+  const others = await pushRecipients(service, typed.id, params.user.id)
   await pushToUsers(service, others, {
     title: dietaryApproachLabel(typed.niche),
     body: `${name}: ${text.slice(0, 80)}`,
@@ -301,6 +433,7 @@ export async function postCommunityMessage(params: {
 
 export async function runCommunityTick(now = new Date()) {
   const service = communityServiceClient()
+  await ensureGuideInAllRooms(service)
   const today = copenhagenTodayIso(now)
   const tomorrow = addDaysIso(today, 1)
 
@@ -337,7 +470,7 @@ export async function runCommunityTick(now = new Date()) {
           roomId: room.id,
           startDate: room.start_date,
         })
-        const ids = await memberIds(service, room.id)
+        const ids = await pushRecipients(service, room.id)
         await pushToUsers(service, ids, {
           title: 'Jeres rum starter i morgen',
           body: `${dietaryApproachLabel(room.niche)}-forløbet begynder ${room.start_date}.`,
@@ -391,7 +524,7 @@ export async function runCommunityTick(now = new Date()) {
         roomId: room.id,
         startDate: room.start_date,
       })
-      const ids = await memberIds(service, room.id)
+      const ids = await pushRecipients(service, room.id)
       await pushToUsers(service, ids, {
         title: `${dietaryApproachLabel(room.niche)} · dag ${day}`,
         body: body.slice(0, 100),
@@ -417,8 +550,38 @@ async function markEvent(
   return !error
 }
 
+export async function listAppCommunityRooms() {
+  const service = communityServiceClient()
+  await ensureGuideInAllRooms(service)
+  const { data, error } = await service
+    .from('community_rooms')
+    .select('*')
+    .order('start_date', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CommunityRoomRow[]
+}
+
+export async function listMyCommunity(user: User) {
+  const service = communityServiceClient()
+  const guide = await isGuideUser(service, user)
+  if (guide) {
+    guideEnsuredAt = 0
+    await ensureGuideInAllRooms(service, user.id)
+  }
+  const { data, error } = await service
+    .from('community_memberships')
+    .select('room_id, user_id, display_name')
+    .eq('user_id', user.id)
+  if (error) throw new Error(error.message)
+  return {
+    isGuide: guide,
+    memberships: (data ?? []) as { room_id: string; user_id: string; display_name: string }[],
+  }
+}
+
 export async function listAdminCommunity() {
   const service = communityServiceClient()
+  await ensureGuideInAllRooms(service)
   const [{ data: rooms }, { data: templates }] = await Promise.all([
     service.from('community_rooms').select('*').order('start_date', { ascending: false }),
     service.from('community_guidance_templates').select('*').order('niche').order('day_offset'),
@@ -453,6 +616,8 @@ export async function createCommunityRoom(input: {
     .select('*')
     .single()
   if (error || !data) throw new Error(error?.message || 'Kunne ikke oprette rum')
+  guideEnsuredAt = 0
+  await ensureGuideInAllRooms(service)
   return data as CommunityRoomRow
 }
 
@@ -478,7 +643,7 @@ export async function addCommunityMember(params: { roomId: string; email: string
   if (roomErr || !room) throw new Error('Rummet findes ikke.')
   const typed = room as CommunityRoomRow
   if (typed.status === 'archived') throw new Error('Rummet er afsluttet.')
-  if (typed.member_count >= typed.capacity) throw new Error('Rummet er fyldt.')
+  if ((await occupantCount(service, typed.id)) >= typed.capacity) throw new Error('Rummet er fyldt.')
 
   const { data: existing } = await service
     .from('community_memberships')
@@ -488,8 +653,10 @@ export async function addCommunityMember(params: { roomId: string; email: string
     .maybeSingle()
   if (existing) throw new Error('Personen er allerede med i rummet.')
 
-  const { data: mine } = await service.from('community_memberships').select('room_id').eq('user_id', userId)
-  const mineIds = (mine ?? []).map((row) => String((row as { room_id: string }).room_id))
+  const { data: mine } = await service.from('community_memberships').select('room_id, is_guide').eq('user_id', userId)
+  const mineIds = (mine ?? [])
+    .filter((row) => !(row as { is_guide?: boolean }).is_guide)
+    .map((row) => String((row as { room_id: string }).room_id))
   if (mineIds.length) {
     const { data: live } = await service
       .from('community_rooms')
@@ -645,7 +812,7 @@ export async function postAdminRoomMessage(params: { roomId: string; userId: str
     body: text,
   })
 
-  const ids = (await memberIds(service, typed.id)).filter((id) => id !== params.userId)
+  const ids = await pushRecipients(service, typed.id, params.userId)
   await pushToUsers(service, ids, {
     title: name,
     body: text.slice(0, 80),

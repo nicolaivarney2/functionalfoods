@@ -41,9 +41,9 @@ describe('normalizeAiRecipeIngredients', () => {
       { name: 'løg, finthakket', amount: 1, unit: 'stk' },
       { name: 'sort peber', amount: 1, unit: 'tsk' },
     ])
-    assert.equal(parsley.name, 'frisk persille')
-    assert.equal(parsley.unit, 'bundt')
-    assert.equal(parsley.amount, 0.25)
+    assert.equal(parsley.name, 'persille')
+    assert.equal(parsley.unit, 'tsk')
+    assert.equal(parsley.amount, 0.5)
     assert.equal(eggs.unit, 'stk')
     assert.equal(eggs.amount, 2)
     assert.equal(oil.name, 'olivenolie')
@@ -150,5 +150,39 @@ describe('normalizeAiRecipeInstructions', () => {
     )
     assert.match(steps[0].instruction, /ærter\]\], frosne/)
     assert.equal(ingredients[0].notes, 'frosne')
+  })
+
+  it('sætter cherrytomater i gram og krydderurter som krydderi fra glas', () => {
+    const [few, many, grams, parsley, basil, oregano] = normalizeAiRecipeIngredients([
+      { name: 'cherrytomater', amount: 2, unit: 'stk' },
+      { name: 'cherry tomater', amount: 10, unit: 'stk' },
+      { name: 'cherrytomater', amount: 120, unit: 'g' },
+      { name: 'frisk persille', amount: 0.25, unit: 'bundt' },
+      { name: 'basilikum', amount: 1, unit: 'bundt' },
+      { name: 'oregano', amount: 0.5, unit: 'tsk' },
+    ])
+    assert.equal(few.name, 'cherrytomater')
+    assert.equal(few.unit, 'g')
+    assert.equal(few.amount, 20)
+    assert.equal(many.unit, 'g')
+    assert.equal(many.amount, 100)
+    assert.equal(grams.amount, 120)
+    assert.equal(grams.unit, 'g')
+    assert.equal(parsley.name, 'persille')
+    assert.equal(parsley.unit, 'tsk')
+    assert.equal(parsley.amount, 0.5)
+    assert.equal(parsley.notes, null)
+    assert.equal(basil.name, 'basilikum')
+    assert.equal(basil.unit, 'tsk')
+    assert.equal(oregano.name, 'oregano')
+    assert.equal(oregano.amount, 0.5)
+
+    const steps = normalizeAiRecipeInstructions(
+      [{ stepNumber: 1, instruction: 'Halvér [[ing:cherrytomater]] og drys med [[ing:frisk persille]].' }],
+      [few, parsley],
+    )
+    assert.match(steps[0].instruction, /\[\[ing:cherrytomater\]\]/)
+    assert.match(steps[0].instruction, /\[\[ing:persille\]\]/)
+    assert.doesNotMatch(steps[0].instruction, /frisk persille/)
   })
 })

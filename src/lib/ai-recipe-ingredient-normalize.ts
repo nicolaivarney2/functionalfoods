@@ -130,6 +130,8 @@ const NAME_CANONICAL_FIXES: [RegExp, string][] = [
     'pasta',
   ],
   [new RegExp(`^${PASTA_SHAPE.source}$`, 'i'), 'pasta'],
+  [/^cherry[\s-]*tomater?$/i, 'cherrytomater'],
+  [/^cherrytomat$/i, 'cherrytomater'],
   // Krydderurter — hold basisnavn
   [/^frisk\s+persille$/i, 'persille'],
   [/^tørret\s+persille(?:,\s*kan\s+undværes)?$/i, 'persille'],
@@ -440,7 +442,24 @@ function isBroccoliName(name: string): boolean {
   return /^broccoli$/i.test(name.trim())
 }
 
-/** Friske krydderurter: aldrig et helt bundt til 2 portioner — ¼–½. */
+/** Forårsløg og salatløg er grønt, ikke et krydderiglas. */
+const ALLIUM_HERBS = new Set(['forårsløg', 'foraarsloeg', 'salatløg'])
+
+/** Krydderurter bliver krydderi fra glas, så en ugeplan ikke kræver et bundt pr. ret. */
+const JAR_SPICE_HERBS = new Set([
+  'persille',
+  'basilikum',
+  'timian',
+  'mynte',
+  'koriander',
+  'dild',
+  'oregano',
+  'rosmarin',
+  'purløg',
+  'purloeg',
+])
+
+/** Friske krydderurter: aldrig et helt bundt til 2 portioner — ¼–½. Kun forårsløg og salatløg. */
 const MAX_HERB_BUNDLES = 0.5
 const DEFAULT_HERB_BUNDLES = 0.25
 
@@ -528,6 +547,42 @@ function formatFreshHerbName(baseName: string): string {
   return `frisk ${baseName}`
 }
 
+function jarSpiceHerbName(name: string): string | null {
+  const stripped = name.trim().replace(/^(?:frisk(?:e)?|t[øo]rrede?|t[øo]rret)\s+/i, '')
+  const base = getFreshHerbBaseName(stripped)
+  if (!base || !JAR_SPICE_HERBS.has(base)) return null
+  return base === 'purloeg' ? 'purløg' : base
+}
+
+function isCherryTomatoName(name: string): boolean {
+  return /^cherrytomater?$/i.test(name.trim())
+}
+
+/** 1 cherrytomat vejer ca. 10 g. Stk ganges om, gram bliver stående. */
+const GRAMS_PER_CHERRY_TOMATO = 10
+
+function cherryTomatoGrams(amount: number, unit: string): number {
+  if (unit === 'g' || unit === 'gram') return Math.max(1, Math.round(amount))
+  if (unit === 'stk' || unit === 'st' || unit === 'stykke' || unit === 'stykker') {
+    return Math.max(GRAMS_PER_CHERRY_TOMATO, Math.round(amount * GRAMS_PER_CHERRY_TOMATO))
+  }
+  if (unit === 'bakke' || unit === 'bæger' || unit === 'baeger' || unit === 'pk' || unit === 'pakke') {
+    return Math.round(Math.max(1, amount) * 250)
+  }
+  return Math.max(GRAMS_PER_CHERRY_TOMATO, Math.round(amount * GRAMS_PER_CHERRY_TOMATO))
+}
+
+function jarSpiceMeasure(amount: number, unit: string): { amount: number; unit: string } {
+  const dry = drySpiceUnit(unit)
+  if (dry === 'knivspids') return { amount: 0.25, unit: 'tsk' }
+  if (dry === 'spsk') return { amount: 1, unit: 'tsk' }
+  if (dry === 'tsk') {
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 1) return { amount: 0.5, unit: 'tsk' }
+    return { amount, unit: 'tsk' }
+  }
+  return { amount: 0.5, unit: 'tsk' }
+}
+
 /** tsk/spsk/knivspids er tørret krydderi — ikke et bundt frisk urt. */
 function drySpiceUnit(u: string): string | null {
   if (u === 'tsk' || u === 'tesk' || u === 'teskefuld' || u === 'teskefulde') return 'tsk'
@@ -541,7 +596,7 @@ function adjustUnitsAndAmounts(
   name: string,
   amount: number,
   unit: string,
-  options?: { peppercornSource?: boolean; driedHerb?: boolean; explicitFresh?: boolean },
+  options?: { peppercornSource?: boolean },
 ): { name: string; amount: number; unit: string } {
   let u = normalizeUnit(unit)
   const n = name
@@ -605,14 +660,21 @@ function adjustUnitsAndAmounts(
     return { name: n, amount: pieces, unit: 'stk' }
   }
 
-  // Friske krydderurter: enhed bundt. tsk/spsk uden «frisk» i kilden er krydderiglas.
-  const freshHerb = getFreshHerbBaseName(n)
-  const keptDryUnit = drySpiceUnit(u)
-  if (freshHerb && !options?.explicitFresh && (keptDryUnit || options?.driedHerb)) {
-    const unitOut = keptDryUnit ?? (u === 'g' || u === 'gram' ? 'g' : 'tsk')
-    return { name: freshHerb, amount: a, unit: unitOut }
+  // Cherrytomater er de små: ca. 10 g stykket, altid i gram.
+  if (isCherryTomatoName(n)) {
+    return { name: 'cherrytomater', amount: cherryTomatoGrams(a, u), unit: 'g' }
   }
-  if (freshHerb) {
+
+  // Krydderurter er krydderi fra glas. Et bundt på hver ret kan ikke købes ind for en hel uge.
+  const spiceHerb = jarSpiceHerbName(n)
+  if (spiceHerb) {
+    const spice = jarSpiceMeasure(a, u)
+    return { name: spiceHerb, amount: spice.amount, unit: spice.unit }
+  }
+
+  // Forårsløg og salatløg: enhed bundt, når modellen har skrevet dem som urt.
+  const freshHerb = getFreshHerbBaseName(n)
+  if (freshHerb && ALLIUM_HERBS.has(freshHerb)) {
     let bundles = a
     if (u === 'g' || u === 'gram') {
       bundles = Math.round((a / GRAMS_PER_HERB_BUNDLE) * 4) / 4
@@ -726,15 +788,9 @@ function adjustUnitsAndAmounts(
 function normalizeOneAiIngredient(raw: AiIngredientInput): AiIngredientOutput {
   const rawName = String(raw.name || '')
   const split = splitNameAndPrep(rawName, raw.notes)
-  const sourceText = `${rawName} ${raw.notes || ''} ${split.notes || ''}`
-  const driedHerb = /\b(tørret|torret|tørrede|torrede)\b/i.test(sourceText)
-  const explicitFresh = !driedHerb && /\bfrisk(?:e)?\b/i.test(sourceText)
-  const adj = adjustUnitsAndAmounts(
-    split.name,
-    Number(raw.amount),
-    String(raw.unit || 'stk'),
-    { peppercornSource: isPeppercornSourceName(rawName), driedHerb, explicitFresh },
-  )
+  const adj = adjustUnitsAndAmounts(split.name, Number(raw.amount), String(raw.unit || 'stk'), {
+    peppercornSource: isPeppercornSourceName(rawName),
+  })
   if (adj.name === 'blomkålsris' && (adj.unit === 'stk' || adj.unit === 'pose' || adj.unit === 'pk')) {
     adj.amount = Math.round((adj.amount || 1) * 400)
     adj.unit = 'g'
@@ -754,11 +810,21 @@ function normalizeOneAiIngredient(raw: AiIngredientInput): AiIngredientOutput {
     adj.unit = 'stk'
   }
 
+  let notes = broccoliRice?.notes ?? split.notes
+  if (jarSpiceHerbName(adj.name) && notes) {
+    notes = mergeNotes(
+      ...notes
+        .split(';')
+        .map((part) => part.trim())
+        .filter((part) => part && !/^(?:frisk(?:e)?|t[øo]rre(?:t|de))$/i.test(part)),
+    )
+  }
+
   return {
     name: adj.name,
     amount: adj.amount,
     unit: adj.unit,
-    notes: broccoliRice?.notes ?? split.notes,
+    notes,
   }
 }
 
@@ -1157,6 +1223,12 @@ function weavePrepNotesIntoInstructions(
 
 function rewriteCreamTags(text: string): string {
   return text.replace(/\[\[ing:\s*([^\]#]+?)\s*(#\d+)?\]\]/gi, (full, raw: string, hash?: string) => {
+    const spice = jarSpiceHerbName(raw)
+    if (spice) return `[[ing:${spice}${hash || ''}]]`
+    const tomato = raw.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (/^cherry[\s-]*tomater?$/.test(tomato) || /^cherrytomater?$/.test(tomato)) {
+      return `[[ing:cherrytomater${hash || ''}]]`
+    }
     const mapped = canonicalCreamName(raw)
     if (!mapped) return full
     return `[[ing:${mapped}${hash || ''}]]`

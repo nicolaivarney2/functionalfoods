@@ -1,5 +1,10 @@
 import { dietaryApproachLabel } from '@/lib/dietary-approach-options'
 
+/** Fast guide-konto. Med i alle rum, uden at fylde en plads. */
+export const COMMUNITY_GUIDE_EMAIL = 'w@nicolaivarney.dk'
+export const COMMUNITY_GUIDE_NAME = 'Nicolai'
+export const COMMUNITY_GUIDE_HANDLE = 'nicolai'
+
 export type CommunityRoomStatus = 'open' | 'active' | 'archived'
 export type CommunityMessageKind = 'user' | 'system' | 'guidance'
 
@@ -82,6 +87,28 @@ export function copenhagenLocalToUtc(isoDate: string, hhmm: string): Date {
   const asUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), hour, Number(parts.minute))
   const offset = asUtc - utcGuess.getTime()
   return new Date(utcGuess.getTime() - offset)
+}
+
+/** Kun rum der endnu ikke har passeret startdatoen. Aktive/forældede rum vises ikke. */
+export function communityRoomIsListed(
+  room: { start_date: string; status?: string },
+  today = copenhagenTodayIso()
+): boolean {
+  const start = String(room.start_date || '').slice(0, 10)
+  if (!start || start < today) return false
+  return room.status !== 'archived'
+}
+
+/** Tilmeldte rum vises i 60 dage fra startdato, derefter væk fra listen. */
+export const COMMUNITY_JOINED_KEEP_DAYS = 60
+
+export function communityRoomIsJoinedListed(
+  room: { start_date: string },
+  today = copenhagenTodayIso()
+): boolean {
+  const start = String(room.start_date || '').slice(0, 10)
+  if (!start) return false
+  return addDaysIso(start, COMMUNITY_JOINED_KEEP_DAYS) > today
 }
 
 export function roomStatusForDates(

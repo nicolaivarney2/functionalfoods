@@ -264,7 +264,7 @@ Uden tilbehør er det ikke et færdigt måltid. Retten er to dele: hovedretten o
 Tilbehøret er præcis én af disse. Egne ingredienslinjer. Eget trin. Server det ved siden af eller under kødet. Rør det ikke i sovsen.
 - 400 g blomkålsris. Navnet er blomkålsris, notes er frosne. Det er frostposen fra butikken. Riv ikke et hoved blomkål, og køb ikke blomkål i stedet.
 - 0,5 stk broccoli som ris-tilbehør. Navnet er broccoli. Notes er "til ris-tilbehør", så linjen ikke er broccoli i sovsen. Ca. 100 g pr. person. Til 2 personer er 0,5 stk nok. Samme 0,5 stk er nok til 4 personer, når 2 af dem er børn. Skriv aldrig 1 stk og aldrig gram.
-- 1 stk spidskål, hakket og stegt i smør med ost eller urter. Navnet er spidskål.
+- 1 stk spidskål, hakket og stegt i smør med ost eller paprika. Navnet er spidskål.
 - 1 stk salat bygget som tilbehør, med olie eller dressing og ost, avocado eller nødder. Navnet er salat.
 
 Vælg ét tilbehør, og skift fra gang til gang. Ikke blomkålsris hver aften. Grønkål, spinat, champignon og squash må gerne være i sovsen. De erstatter ikke listen ovenfor.

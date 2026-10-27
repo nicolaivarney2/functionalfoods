@@ -143,21 +143,21 @@ const PROTEINRIG_FORMATS: Record<string, string[]> = {
   ],
 }
 
-const KETO_FLAVORS = ['citron og urter', 'røget paprika og hvidløg', 'timian, rosmarin og svampe', 'karry og kokos', 'chili og lime']
-const GLP1_FLAVORS = ['citron og urter', 'mild karry', 'frisk grønt med urter', 'middelhav med urter', 'ingefær og lime']
+const KETO_FLAVORS = ['citron og paprika', 'røget paprika og hvidløg', 'spidskommen, hvidløg og svampe', 'karry og kokos', 'chili og lime']
+const GLP1_FLAVORS = ['citron og paprika', 'mild karry', 'frisk grønt med citron', 'middelhav med oregano og paprika', 'ingefær og lime']
 
 const PROTEINRIG_FLAVORS = [
-  'urter, dill og citron',
+  'spidskommen og citron',
   'middelhav med tomat, oliven og oregano',
   'asiatisk soy, sesam og ingefær',
   'indisk-inspireret med garam masala og yoghurt',
   'mexicansk med spidskommen, lime og chili (uden ekstra sukker)',
   'mellemøstlig med tahin, citron og hvidløg',
-  'fransk urter og hvidløg',
+  'paprika og hvidløg',
   'thai-inspireret med limeblade og kokos (måltid, ikke dessert)',
-  'tyrkisk mynte og yoghurt',
+  'tyrkisk paprika og yoghurt',
   'koreansk-inspireret gochujang/sesam (mild varme)',
-  'italiensk basilikum og tomat',
+  'italiensk oregano og tomat',
   'smøret svamp og timian',
 ]
 
@@ -195,20 +195,20 @@ const SENSE_FORMATS: Record<string, string[]> = {
 }
 
 const SENSE_FLAVORS = [
-  'klassisk med persille, timian og citron',
-  'ovnristet med rosmarin og hvidløg',
-  'dild og citron (fisk og kartofler)',
-  'tomat, hvidløg og basilikum (pastaret eller gryde)',
+  'klassisk med paprika, timian og citron',
+  'ovnristet med paprika og hvidløg',
+  'citron og peber (fisk og kartofler)',
+  'tomat, hvidløg og oregano (pastaret eller gryde)',
   'mild paprika og løg (gryderet)',
   'mild karry (hverdagsniveau, ikke restaurant-thai)',
   'eddike eller lime mod fedme (sur balance uden honning)',
-  'kapers, citron og urter (ingen sød dressing)',
+  'kapers, citron og peber (ingen sød dressing)',
   'ingefær, sesam og forårsløg (lidt soy — hverdagsniveau)',
   'røget paprika, løg og timian',
   'tahin, citron og hvidløg (cremet uden sød glace)',
   'miso og appelsin eller lime (små mængder)',
   'pul biber eller mild urfa (varme uden sødme)',
-  'græsk yoghurt, mynte og agurk (koldt tilbehør)',
+  'græsk yoghurt, oregano og agurk (koldt tilbehør)',
   'balsamico og tomat (lidt sødme fra tomat, ikke honning)',
 ]
 
@@ -226,7 +226,7 @@ const SENSE_KANT_POOL = [
 
 const KETO_KANT_POOL = [
   'aioli eller hvidløgsmayo',
-  'brev bearnaise (1 stk + 30 g smør + 200 ml fløde eller mælk) eller smeltet smør med urter',
+  'brev bearnaise (1 stk + 30 g smør + 200 ml fløde eller mælk) eller smeltet smør med paprika',
   'ranch eller creme fraiche-dip med salt og peber',
   'pesto eller chimichurri i lille skål',
   'olivenolie-citron-dressing til grønt',
@@ -274,7 +274,7 @@ const SENSE_PRODUCE_POOL = [
   'selleri eller porre',
   'æbler eller pærer (til måltid, ikke dessert)',
   'bær som topping',
-  'friske krydderurter',
+  'paprika, oregano eller spidskommen',
 ]
 
 const KETO_PRODUCE_ROTATIONS = [
@@ -319,7 +319,7 @@ const PROTEINRIG_PRODUCE_POOL = [
   'majs',
   'peberfrugt',
   'ingefær og hvidløg som smagsbund',
-  'friske urter (fx koriander, basilikum, timian)',
+  'tørrede krydderier (paprika, oregano, spidskommen)',
   'citron eller lime',
   'kikærter (kun hvis det passer til retten — ikke i hver opskrift)',
   'sorte bønner eller kidneybønner',

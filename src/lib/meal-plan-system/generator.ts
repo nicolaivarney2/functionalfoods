@@ -23,7 +23,7 @@ import {
 import { getPeoplePerMealFromAdultsProfiles } from './people-per-meal';
 import { computeChildPersonEquivalent } from '../madbudget/person-equivalent';
 import { shoppingPeopleEating } from '../madbudget/next-lunch-leftover';
-import { recipeFitsSlotStyle } from '../madbudget/meal-slot-style';
+import { recipeFitsSlotStyle, slotRepeatUniqueCount } from '../madbudget/meal-slot-style';
 
 import { RecipeCategory } from '../ingredient-system';
 
@@ -185,6 +185,9 @@ export class MealPlanGenerator {
   private currentOffers: Map<string, any[]> = new Map(); // Cache for current offers by ingredient
   private selectedIngredientIds: Set<string> = new Set(); // Track selected ingredients for overlap scoring
   private leftoverIngredientKeys: Set<string> = new Set();
+  /** 2–3 faste morgenmad/frokost-retter der lægges på skift i samme generering. */
+  private repeatingSlotPools: Record<'breakfast' | 'lunch', Recipe[]> = { breakfast: [], lunch: [] }
+  private repeatingSlotIndex: Record<'breakfast' | 'lunch', number> = { breakfast: 0, lunch: 0 }
   /** Afvent altid denne før generering — ellers er `this.recipes` tom ved første klik (race). */
   private readonly recipesLoadPromise: Promise<void>
 
@@ -200,6 +203,8 @@ export class MealPlanGenerator {
     this.selectedIngredientIds.clear()
     this.leftoverIngredientKeys.clear()
     this.currentOffers.clear()
+    this.repeatingSlotPools = { breakfast: [], lunch: [] }
+    this.repeatingSlotIndex = { breakfast: 0, lunch: 0 }
   }
 
   /** Undgå gentagne retter fra seneste madplaner (typisk forrige uge). */
@@ -1274,8 +1279,7 @@ export class MealPlanGenerator {
       return true;
     });
     
-    const slot =
-      mealType === MealType.Breakfast || mealType === MealType.Lunch ? mealType : null
+    const slot = mealType ? this.mealSlot(mealType) : null
     const styled = slot
       ? filteredRecipes.filter((recipe) =>
           recipeFitsSlotStyle(
@@ -1477,6 +1481,43 @@ export class MealPlanGenerator {
     return reasons;
   }
 
+  private mealSlot(mealType: MealType | string): 'breakfast' | 'lunch' | null {
+    const type = String(mealType)
+    if (type === MealType.Breakfast || type === 'breakfast') return 'breakfast'
+    if (type === MealType.Lunch || type === 'lunch') return 'lunch'
+    return null
+  }
+
+  /** Fyld 2–3 retter første gang, derefter samme retter på skift. */
+  private selectRepeatingSlotRecipe(
+    slot: 'breakfast' | 'lunch',
+    count: number,
+    scoredRecipes: RecipeScore[],
+    dailyUsed: Set<string>
+  ): Recipe {
+    const pool = this.repeatingSlotPools[slot]
+    if (pool.length < count) {
+      const inPool = new Set(pool.map((recipe) => recipe.id))
+      const next =
+        scoredRecipes.find((score) => !inPool.has(score.recipe.id) && !dailyUsed.has(score.recipe.id)) ??
+        scoredRecipes.find((score) => !inPool.has(score.recipe.id)) ??
+        scoredRecipes[0]
+      if (next && !inPool.has(next.recipe.id)) pool.push(next.recipe)
+    }
+    const selected = pool[this.repeatingSlotIndex[slot] % Math.max(1, pool.length)] ?? scoredRecipes[0].recipe
+    this.repeatingSlotIndex[slot] += 1
+    return selected
+  }
+
+  private markRecipeUsed(recipe: Recipe, date: Date, dailyUsed: Set<string>): void {
+    ;(recipe.ingredients ?? []).forEach((ing) => {
+      this.selectedIngredientIds.add(ing.ingredientId)
+    })
+    dailyUsed.add(recipe.id)
+    this.usedRecipes.add(recipe.id)
+    this.recipeLastUsed.set(recipe.id, date)
+  }
+
   /**
    * Select the best recipe with variety consideration
    */
@@ -1499,6 +1540,20 @@ export class MealPlanGenerator {
     }
     
     const dailyUsed = this.dailyUsedRecipes.get(dateKey)!;
+
+    const slot = this.mealSlot(mealType)
+    const repeatCount = slot
+      ? slotRepeatUniqueCount(slot, {
+          breakfastStyle: config.breakfastStyle,
+          lunchStyle: config.lunchStyle,
+        })
+      : null
+    if (slot && repeatCount) {
+      const selectedRecipe = this.selectRepeatingSlotRecipe(slot, repeatCount, scoredRecipes, dailyUsed)
+      this.markRecipeUsed(selectedRecipe, date, dailyUsed)
+      console.log(`✅ Repeated ${slot} for ${mealKey}: ${selectedRecipe.title} (${repeatCount} retter på skift)`)
+      return selectedRecipe
+    }
     
     // Filter out recipes that have been used today
     const unusedTodayRecipes = scoredRecipes.filter(score => !dailyUsed.has(score.recipe.id));
@@ -1538,16 +1593,7 @@ export class MealPlanGenerator {
 
     const randomIndex = Math.floor(Math.random() * Math.min(3, topRecipes.length));
     const selectedRecipe = topRecipes[randomIndex].recipe;
-    
-    // Track selected ingredients for overlap scoring
-    ;(selectedRecipe.ingredients ?? []).forEach((ing) => {
-      this.selectedIngredientIds.add(ing.ingredientId);
-    });
-    
-    // Mark as used today
-    dailyUsed.add(selectedRecipe.id);
-    this.usedRecipes.add(selectedRecipe.id);
-    this.recipeLastUsed.set(selectedRecipe.id, date);
+    this.markRecipeUsed(selectedRecipe, date, dailyUsed)
     
     console.log(`✅ Selected recipe for ${mealKey}: ${selectedRecipe.title} (overlap: ${this.countIngredientOverlap(selectedRecipe)} ingredients)`);
     console.log(`📊 Daily usage for ${dateKey}: ${dailyUsed.size} recipes used`);

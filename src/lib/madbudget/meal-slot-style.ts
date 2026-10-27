@@ -246,6 +246,19 @@ function applyLeftoversToGrid(
   return next
 }
 
+/** Hvor mange unikke retter der skal gå på skift. `null` = spring over (fast eller rester). */
+export function slotRepeatUniqueCount(
+  meal: 'breakfast' | 'lunch',
+  profile: MealSlotStyleProfile
+): number | null {
+  if (meal === 'breakfast') {
+    if (profile.breakfastStyle === 'skip') return null
+    return profile.breakfastStyle === 'repeat' ? 2 : 3
+  }
+  if (profile.lunchStyle === 'skip' || profile.lunchStyle === 'leftovers') return null
+  return 3
+}
+
 /** Efter generering: rester-frokost plus 2–3 gentagne morgenmad/frokost-retter. */
 export function applyMealSlotStylesToGrids(
   grids: CookAheadGrid[],
@@ -253,11 +266,10 @@ export function applyMealSlotStylesToGrids(
   isLocked?: (day: string, meal: 'breakfast' | 'lunch' | 'dinner') => boolean
 ): CookAheadGrid[] {
   let next = profile.lunchStyle === 'leftovers' ? grids.map((grid) => applyLeftoversToGrid(grid, isLocked)) : grids
-  const breakfastCount = profile.breakfastStyle === 'repeat' ? 2 : 3
-  next = repeatMealSlotsAcrossGrids(next, 'breakfast', breakfastCount)
-  if (profile.lunchStyle !== 'leftovers') {
-    next = repeatMealSlotsAcrossGrids(next, 'lunch', 3)
-  }
+  const breakfastCount = slotRepeatUniqueCount('breakfast', profile)
+  if (breakfastCount) next = repeatMealSlotsAcrossGrids(next, 'breakfast', breakfastCount)
+  const lunchCount = slotRepeatUniqueCount('lunch', profile)
+  if (lunchCount) next = repeatMealSlotsAcrossGrids(next, 'lunch', lunchCount)
   return next
 }
 

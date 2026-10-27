@@ -88,7 +88,7 @@ const HERO_LABELS = [
   { text: 'Nem at følge' },
   { text: 'Spar 70-250 kr om ugen på maden' },
   { text: 'Madlogger (indtal eller tag billede af maden)' },
-  { text: 'Vægttabsforløb à 10 med startdato sammen' },
+  { text: 'Personlig vejledning i rum à 10' },
   { text: 'Vægttabscoaching' },
   { text: 'Bygget til vægttab' },
 ] as const
@@ -471,18 +471,18 @@ export default function Home() {
             <div className="order-1 lg:order-2">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-700">Madplan og madlog</p>
               <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-900 md:text-4xl">
-                Madplan <span className="text-emerald-600">og</span> madlog — samme sted
+                Madplan <span className="text-emerald-600">og</span> madlog - samme sted
               </h2>
               <p className="mt-4 text-lg leading-relaxed text-gray-600">
                 Lav en madplan ud fra tilbud, og log resten af det du spiser i maddagbogen. Indtal hvad du har spist,
-                importer fra link, eller vælg en opskrift — vi estimerer kalorier og næring (Frida) og viser dig om du
+                importer fra link, eller vælg en opskrift - vi estimerer kalorier og næring (Frida) og viser dig om du
                 rammer dit mål. Foto-logning findes i appen.
               </p>
               <ul className="mt-6 flex flex-col gap-3">
                 {[
                   'Maddagbog med kalorier, makro og mikro mod dit personlige mål',
-                  'Stemme, link eller opskrift — måltidet lægges ind for dig',
-                  'Madplan synkroniseres til dagbogen — log kun det ekstra',
+                  'Stemme, link eller opskrift - måltidet lægges ind for dig',
+                  'Madplan synkroniseres til dagbogen - log kun det ekstra',
                   'Vægttracker på web; skridt fra Apple Sundhed / Health Connect i appen',
                   'Indkøbsliste, dagligvarer, prisalarmer og personlig vejledning',
                 ].map((item) => (
@@ -698,15 +698,14 @@ export default function Home() {
                 <Users className="h-5 w-5" aria-hidden />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Et lille rum, samme startdato</h3>
+                <h3 className="text-xl font-bold text-gray-900">Personlig vejledning i små rum</h3>
                 <p className="mt-2 text-sm leading-relaxed text-gray-700">
-                  Community er ikke et åbent forum. Det er et rum med 10 personer på samme madstil, der starter samme
-                  dag og kører 30 dage sammen. I skriver i samme tråd i appen.
+                  Community er personlig vejledning i mindre rum à 10 personer. Vi er med i alle rum, og hjælper med
+                  vejledning, guides og meget mere.
                 </p>
                 <p className="mt-3 text-sm leading-relaxed text-gray-700">
-                  Det virker, fordi I står til ansvar over for hinanden. Det er sværere at springe dagen over, når I
-                  støtter og står til ansvar for hinanden. 66 % holdt vægttabet, når de fik social støtte. Alene var
-                  det 24 %.
+                  I skriver i samme tråd i appen. Det er sværere at springe dagen over, når I støtter hinanden. 66 %
+                  holdt vægttabet, når de fik social støtte. Alene var det 24 %.
                 </p>
                 <a
                   href="https://pubmed.ncbi.nlm.nih.gov/10028217/"
