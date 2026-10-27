@@ -292,8 +292,8 @@ export default function DagbogPage() {
     setSyncMsg(null)
     setError(null)
     try {
-      // Fuld uge-synk (ikke fromDate-filter) — find plan der dækker valgt dag, ellers aktiv/nyeste med mad.
-      const res = await syncMealPlanToDiary({ preferDate: dateKey })
+      // Kun madplanen for den uge man kigger på. Ingen plan den uge → intet at lægge ind.
+      const res = await syncMealPlanToDiary({ preferDate: dateKey, mode: 'sync' })
       if (res.weekStart) {
         const planMonday = parseIsoDateLocal(res.weekStart)
         const planEnd = res.weekEnd || isoDate(new Date(planMonday.getFullYear(), planMonday.getMonth(), planMonday.getDate() + 6))
@@ -306,9 +306,10 @@ export default function DagbogPage() {
       } else {
         await load()
       }
+      const changed = res.inserted > 0 || (res.removed ?? 0) > 0
       setSyncMsg(
-        res.inserted > 0
-          ? `${res.inserted} måltid${res.inserted === 1 ? '' : 'er'} synket fra madplanen${
+        changed
+          ? `Dagbogen følger madplanen${
               res.weekStart ? ` (${formatWeekRange(res.weekStart, res.weekEnd)})` : ''
             }`
           : res.weekStart

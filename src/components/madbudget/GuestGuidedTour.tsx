@@ -23,6 +23,7 @@ import {
 } from '@/lib/madbudget/guest-demo-data'
 import { MADBUDGET_SELECTABLE_STORES } from '@/lib/madbudget-stores'
 import { ActivityLevel, WeightGoal } from '@/lib/dietary-system'
+import { EXCLUSION_TAGS } from '@/lib/dietary-exclusions/constants'
 
 export type GuestTourFamilyState = {
   adults: number
@@ -58,18 +59,10 @@ const STORE_OPTIONS = MADBUDGET_SELECTABLE_STORES.map((store, index) => ({
   color: STORE_COLORS[index % STORE_COLORS.length],
 }))
 
-const EXCLUDED_OPTIONS = [
-  { id: 'red-meat', label: 'Rødt kød' },
-  { id: 'poultry', label: 'Fjerkræ' },
-  { id: 'pork', label: 'Svinekød' },
-  { id: 'fish', label: 'Fisk' },
-  { id: 'eggs', label: 'Æg' },
-  { id: 'shellfish', label: 'Skaldyr' },
-  { id: 'nuts', label: 'Nødder' },
-  { id: 'dairy', label: 'Mælkeprodukter' },
-  { id: 'gluten', label: 'Gluten' },
-  { id: 'soy', label: 'Soja' },
-] as const
+const EXCLUDED_OPTIONS = EXCLUSION_TAGS.map((tag) => ({
+  id: tag.id,
+  label: tag.label,
+}))
 
 const STEPS = [
   { id: 'family', label: 'Familie' },

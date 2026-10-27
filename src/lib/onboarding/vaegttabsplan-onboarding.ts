@@ -2,6 +2,7 @@ import { ActivityLevel, DietaryCalculator, UserProfile, WeightGoal } from '@/lib
 import { DIETARY_APPROACH_OPTIONS } from '@/lib/dietary-approach-options'
 import { MADBUDGET_SELECTABLE_STORES, selectableMadbudgetStoreIds } from '@/lib/madbudget-stores'
 import { mealsPerDayFromScope } from '@/lib/adult-plan-profile'
+import { EXCLUSION_TAGS } from '@/lib/dietary-exclusions/constants'
 import {
   inferBreakfastStyle,
   inferLunchStyle,
@@ -35,18 +36,10 @@ export const WEIGHT_GOAL_OPTIONS = [
   { value: WeightGoal.MuscleGain, label: 'Tage på', desc: 'Byg styrke og muskelmasse', icon: '💪' },
 ] as const
 
-export const EXCLUDED_FOOD_OPTIONS = [
-  { id: 'red-meat', label: 'Rødt kød' },
-  { id: 'poultry', label: 'Fjerkræ' },
-  { id: 'pork', label: 'Svinekød' },
-  { id: 'fish', label: 'Fisk' },
-  { id: 'eggs', label: 'Æg' },
-  { id: 'shellfish', label: 'Skaldyr' },
-  { id: 'nuts', label: 'Nødder' },
-  { id: 'dairy', label: 'Mælkeprodukter' },
-  { id: 'gluten', label: 'Gluten' },
-  { id: 'soy', label: 'Soja' },
-] as const
+export const EXCLUDED_FOOD_OPTIONS = EXCLUSION_TAGS.map((tag) => ({
+  id: tag.id,
+  label: tag.label,
+}))
 
 export type MealPlanScope = 'full' | 'dinner-only'
 

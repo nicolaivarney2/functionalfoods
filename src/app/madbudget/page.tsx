@@ -65,6 +65,7 @@ import {
 import { FF_GUEST_TOUR_STEPS, FF_GUEST_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-guest-tour-steps'
 import { FF_USER_TOUR_STEPS, FF_USER_TOUR_STORAGE_KEY } from '@/lib/madbudget/ff-user-tour-steps'
 import { hasPendingOnboardingData, consumeAutoFirstPlanPending, FF_AUTO_FIRST_PLAN_KEY } from '@/lib/onboarding/vaegttabsplan-onboarding'
+import { EXCLUSION_TAGS } from '@/lib/dietary-exclusions/constants'
 import { syncMealPlanToDiary } from '@/lib/diary-client'
 import { Cite } from '@/components/Cite'
 import HealthInformationNotice from '@/components/HealthInformationNotice'
@@ -6288,18 +6289,7 @@ export default function MadbudgetPage() {
                       Madvarer vi ikke kan lide (ekskluder fra madplan)
                     </label>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {[
-                        { id: 'red-meat', label: 'Rødt kød' },
-                        { id: 'poultry', label: 'Fjerkræ' },
-                        { id: 'pork', label: 'Svinekød' },
-                        { id: 'fish', label: 'Fisk' },
-                        { id: 'eggs', label: 'Æg' },
-                        { id: 'shellfish', label: 'Skaldyr' },
-                        { id: 'nuts', label: 'Nødder' },
-                        { id: 'dairy', label: 'Mælkeprodukter' },
-                        { id: 'gluten', label: 'Gluten' },
-                        { id: 'soy', label: 'Soja' },
-                      ].map((food) => (
+                      {EXCLUSION_TAGS.map((food) => (
                         <label
                           key={food.id}
                           className="flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white p-2.5 hover:bg-gray-50"

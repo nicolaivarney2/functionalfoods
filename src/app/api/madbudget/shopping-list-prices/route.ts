@@ -26,7 +26,12 @@ import {
   foldLiveOffer,
   type PricedOfferState,
 } from '@/lib/madbudget/shopping-list-pricing'
-import { liveOffersForCuratedSnapshots } from '@/lib/madbudget/leaflet-name-match'
+import {
+  liveOffersForCuratedProductLine,
+  liveOffersForCuratedSnapshots,
+  productLinePhrase,
+  productLinePrefixFilter,
+} from '@/lib/madbudget/leaflet-name-match'
 
 const priceResponseCache = new Map<string, { body: object; expiresAt: number }>()
 const PRICE_RESPONSE_CACHE_TTL_MS = 5 * 60 * 1000
@@ -55,6 +60,7 @@ function buildShoppingPricesCacheKey(
  * 4. Loads live prices from products + product_offers (fooddata catalog in FF cache)
  * 5. Filters by store and matches volume (closest >= needed, or largest if insufficient)
  * 6. Snapshot fallback only for fooddata matches in the same store (no Goma/name guessing)
+ * 7. If that product id is gone, a live catalog row on the same product line as the curated snapshot
  */
 export async function POST(request: NextRequest) {
   try {
@@ -684,6 +690,77 @@ export async function POST(request: NextRequest) {
       productOffersByStore.set(externalId, byStore)
     }
 
+    // Fuldt katalog: kurateret varenummer er ofte udgået, mens samme produktlinje
+    // ligger under et nyt id. Hentes kun for de snapshots der ikke har et live tilbud.
+    const successorOffersByStore = new Map<string, any[]>()
+    await Promise.all(
+      storeKeys
+        .filter((storeKey) => !storeNeedsGuidePrices(storeKey))
+        .map(async (storeKey) => {
+          const phrases = new Set<string>()
+          for (const matches of matchesByIngredient.values()) {
+            const storeMatches = selectMatchesForStore(matches, storeKey)
+            const hasLiveOffer = storeMatches.some(
+              (match) => (productOffersByStore.get(match.product_external_id)?.get(storeKey) || []).length > 0
+            )
+            if (hasLiveOffer) continue
+            for (const match of storeMatches) {
+              const phrase = productLinePhrase(match.product_name_snapshot)
+              const filter = productLinePrefixFilter(phrase)
+              if (filter) phrases.add(phrase)
+            }
+          }
+          if (phrases.size === 0) return
+
+          const phraseList = [...phrases]
+          const rows: any[] = []
+          for (let i = 0; i < phraseList.length; i += 20) {
+            const orFilter = phraseList
+              .slice(i, i + 20)
+              .map((phrase) => productLinePrefixFilter(phrase))
+              .filter((filter): filter is string => Boolean(filter))
+              .join(',')
+            if (!orFilter) continue
+
+            const { data, error } = await supabase
+              .from('product_offers')
+              .select(
+                `
+                product_id,
+                store_id,
+                name_store,
+                current_price,
+                normal_price,
+                is_on_sale,
+                is_offer_active,
+                discount_percentage,
+                amount,
+                unit
+              `
+              )
+              .in('store_id', storeCandidatesByKey.get(storeKey) ?? [storeKey])
+              .eq('is_available', true)
+              .or(orFilter)
+              .limit(200)
+
+            if (error) {
+              console.warn(`Produktlinje for ${storeKey} kunne ikke hentes:`, error.message)
+              continue
+            }
+            rows.push(...(data ?? []))
+          }
+
+          successorOffersByStore.set(
+            storeKey,
+            rows.map((row) => ({
+              ...row,
+              product_external_id: row.product_id,
+              store_id: canonicalStoreKey(String(row.store_id || '')),
+            }))
+          )
+        })
+    )
+
     // Now build result: for each shopping list item, find best product per store
     const result: Record<string, Record<string, any>> = {}
     let itemsWithProducts = 0
@@ -842,6 +919,31 @@ export async function POST(request: NextRequest) {
                 isOrganicMatch: organicTags.length > 0,
               }
             }
+          }
+        }
+
+        // Samme produktlinje som det kuraterede snapshot, når varenummeret er udgået.
+        if (!bestProduct && !storeNeedsGuidePrices(storeKey)) {
+          const lineState = liveOffersForCuratedProductLine(
+            storeMatches.map((match) => match.product_name_snapshot),
+            successorOffersByStore.get(storeKey) ?? []
+          ).reduce(
+            (prev, offer) =>
+              foldLiveOffer(offer, prev, {
+                neededAmount,
+                neededUnit,
+                gramsPerUnit:
+                  (ingredientId ? gramsPerUnitMap.get(ingredientId) : undefined) ??
+                  gramsPerUnitByNameMap.get(normalizeName(String(item.name || ''))),
+                organicPrefs,
+                productOrganicTags: productOrganicTagsMap.get(
+                  String(offer.product_external_id || offer.product_id || '')
+                ),
+              }),
+            null as PricedOfferState | null
+          )
+          if (lineState) {
+            bestProduct = { ...lineState.product, isProductLineMatch: true }
           }
         }
 

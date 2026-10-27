@@ -9,6 +9,9 @@ export type ExclusionTagId =
   | 'dairy'
   | 'gluten'
   | 'soy'
+  | 'chili'
+  | 'fresh-coriander'
+  | 'champignon'
 
 export interface ExclusionTagDefinition {
   id: ExclusionTagId
@@ -28,6 +31,24 @@ export const EXCLUSION_TAGS: readonly ExclusionTagDefinition[] = [
   { id: 'dairy', label: 'Mælkeprodukter', description: 'Mælk, ost, fløde, smør m.m.', isAnimalProduct: true },
   { id: 'gluten', label: 'Gluten', description: 'Hvede, rug, byg og glutenholdige produkter', isAnimalProduct: false },
   { id: 'soy', label: 'Soja', description: 'Tofu, sojasovs, sojamælk m.m.', isAnimalProduct: false },
+  {
+    id: 'chili',
+    label: 'Chili',
+    description: 'Frisk chili, flager, pulver, cayenne, jalapeños og chilisauce',
+    isAnimalProduct: false,
+  },
+  {
+    id: 'fresh-coriander',
+    label: 'Frisk koriander',
+    description: 'Frisk koriander. Ikke frø eller stødt koriander.',
+    isAnimalProduct: false,
+  },
+  {
+    id: 'champignon',
+    label: 'Champignon',
+    description: 'Champignon, brune champignon og svampe',
+    isAnimalProduct: false,
+  },
 ] as const
 
 export const EXCLUSION_TAG_IDS: readonly ExclusionTagId[] = EXCLUSION_TAGS.map((t) => t.id)
@@ -48,6 +69,12 @@ const LEGACY_TAG_ALIASES: Record<string, ExclusionTagId> = {
   mælk: 'dairy',
   soja: 'soy',
   gluten: 'gluten',
+  chili: 'chili',
+  chilli: 'chili',
+  koriander: 'fresh-coriander',
+  'frisk koriander': 'fresh-coriander',
+  champignon: 'champignon',
+  svampe: 'champignon',
 }
 
 export function normalizeExclusionTag(raw: string): ExclusionTagId | null {
@@ -106,6 +133,21 @@ export function suggestExclusionTagsFromName(name: string): ExclusionTagId[] {
   }
   if (/\b(hvede|rug|byg|mel\b|pasta|brød|tortilla|bulgur|couscous)\b/.test(n)) {
     suggestions.add('gluten')
+  }
+  // Chili, ikke peberfrugt, paprika eller sort peber. "chilensk" er et land, ikke krydderiet.
+  if (
+    /(?:chili|chilli)(?!ensk)|cayenne|jalapeñ|jalapen|chipotle|sriracha|sambal|harissa|gochujang|tabasco|piri[\s-]?piri/i.test(
+      n
+    )
+  ) {
+    suggestions.add('chili')
+  }
+  // Frisk koriander er urten. Frø og stødt koriander smager anderledes.
+  if (/koriander(?!frø)|cilantro|\bcoriander\b/.test(n) && !/stødt koriander|coriander seeds?/.test(n)) {
+    suggestions.add('fresh-coriander')
+  }
+  if (/champignon|svampe|mushrooms?/.test(n)) {
+    suggestions.add('champignon')
   }
 
   return Array.from(suggestions)

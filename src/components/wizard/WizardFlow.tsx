@@ -6,6 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon, CheckIcon } from '@heroicons/react/2
 
 // Import our systems
 import { DietaryCalculator, UserProfile, ActivityLevel, WeightGoal } from '@/lib/dietary-system';
+import { EXCLUSION_TAGS } from '@/lib/dietary-exclusions/constants';
 import { mealPlanGenerator } from '@/lib/meal-plan-system';
 import MealPlanPreview from './MealPlanPreview';
 import VaegttabsbogPromoModal from './VaegttabsbogPromoModal';
@@ -717,18 +718,7 @@ const PreferencesStep: React.FC<any> = ({ state, updateState, nextStep: _nextSte
         <h3 className="font-semibold text-gray-900 mb-4">Vælg fødevarer du ikke kan tåle eller lide</h3>
         <p className="text-gray-600 mb-4">Afkryds dem vi skal ekskludere</p>
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { id: 'red-meat', label: 'Rødt kød' },
-            { id: 'poultry', label: 'Fjerkræ' },
-            { id: 'pork', label: 'Svinekød' },
-            { id: 'fish', label: 'Fisk' },
-            { id: 'eggs', label: 'Æg' },
-            { id: 'shellfish', label: 'Skaldyr' },
-            { id: 'nuts', label: 'Nødder' },
-            { id: 'dairy', label: 'Mælkeprodukter' },
-            { id: 'gluten', label: 'Gluten' },
-            { id: 'soy', label: 'Soja' }
-          ].map((food) => (
+          {EXCLUSION_TAGS.map((food) => (
             <label key={food.id} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
               <input
                 type="checkbox"

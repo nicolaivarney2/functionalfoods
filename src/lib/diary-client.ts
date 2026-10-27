@@ -268,10 +268,10 @@ export async function loadDiaryWeek(
 export async function syncMealPlanToDiary(opts?: {
   mealPlanId?: string
   fromDate?: string
-  /** Find plan der dækker denne dato (eller falder tilbage til aktiv/nyeste med mad). */
+  /** Find plan der dækker denne dato. Ældre planer uden for ugen bruges ikke. */
   preferDate?: string
-  mode?: 'fill' | 'replace' | 'update'
-}): Promise<{ inserted: number; weekStart?: string; weekEnd?: string }> {
+  mode?: 'fill' | 'replace' | 'update' | 'sync'
+}): Promise<{ inserted: number; removed?: number; weekStart?: string; weekEnd?: string }> {
   const res = await authFetch('/api/diary/sync-meal-plan', {
     method: 'POST',
     body: JSON.stringify(opts ?? {}),

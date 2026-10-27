@@ -10,11 +10,14 @@ import {
   type FfRecipeNiche,
 } from '@/lib/recipe-dish-family'
 import { getDietaryCategories } from '@/lib/recipe-tag-mapper'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   buildSourceRecipeUserPrompt,
   isSourceRecipe,
   type SourceRecipePayload,
 } from '@/lib/recipe-source-adaptation'
+import { catalogSection } from '@/lib/recipe-ingredient-guide'
 
 export type ExistingTitleRecipe = {
   title?: string
@@ -37,7 +40,7 @@ const AMOUNT_RULES = `MÆNGDER TIL 2 PERSONER:
 - Kartofler, kun når retten bruger dem: 300–500 g. Ikke kartofler som standard
 - Ris eller pasta, tør: 150–200 g
 - Broccoli: 0,5–1 stk. Aldrig gram
-- Løg: 1 stk. Gulerødder: 2–3 stk. Tomater: 2–3 stk. Æg: 2–3 stk
+- Løg: 1 stk. Gulerødder: 2–3 stk. Tomater: 2–3 stk. Cherrytomater: gram, ca. 10 g pr. tomat, aldrig stk. Æg: 2–3 stk
 - Mælk: 200–300 ml. Fløde i sovs er madlavningsfløde 18%, 100–150 ml til 2. Ikke i hver ret.
 - Piskefløde kun når den skal piskes. Navnet er piskefløde, højst 100 ml til 2. Smør eller olie: 1–2 spsk
 - I tvivl: den mindre mængde`
@@ -62,8 +65,9 @@ INGREDIENS REGLER:
 - peber, ikke "sort peber" eller "peberkorn". salt, ikke "groft salt"
 - Altid olivenolie. Aldrig olie, rapsolie eller planteolie
 - Ikke "rød peberfrugt". Brug peberfrugter
-- Friske krydderurter: name "frisk persille" (eller dild, basilikum, koriander, mynte, timian, rosmarin, purløg), enhed bundt, mængde 0.25, højst 0.5. Aldrig 1 bundt
-- Tørrede krydderurter: 0.5 tsk, uden ordet frisk
+- Krydderier fra glas, ikke friske krydderurter. Paprika, oregano, timian, spidskommen, chiliflager, karry eller ingefær: 0,5–1 tsk. Navn uden «frisk»
+- Ikke persille, basilikum, dild, koriander, mynte, rosmarin eller purløg. Et bundt på hver ret bliver en flyttekasse på en ugeplan med morgen, frokost og aften
+- Cherrytomater: enhed g. 1 tomat er ca. 10 g, så 8 styk er 80 g. Aldrig stk
 - Agurk: 0.5 stk. Broccoli: stk, aldrig gram
 - Wraps, pita og burger skal have salat, tomat eller agurk at bygge med
 
@@ -88,6 +92,20 @@ Ingen løfter om vægttab, helbredelse eller "boost".
 Format: bindestreg foran hvert tip. Ingen overskrift. Ingen nummerering.`
 
 export const FF_TIPS_FALLBACK = `- Smag sovsen til sidst. Salt og syre løfter den mere end endnu en urt.`
+
+let preferredNamesCache: string | null = null
+
+/** Navne fra public/opskrift-ingredienser.md. Tom streng hvis filen ikke er bygget endnu. */
+export function preferredIngredientNames(): string {
+  if (preferredNamesCache != null) return preferredNamesCache
+  try {
+    const markdown = readFileSync(join(process.cwd(), 'public/opskrift-ingredienser.md'), 'utf8')
+    preferredNamesCache = catalogSection(markdown)
+  } catch {
+    preferredNamesCache = ''
+  }
+  return preferredNamesCache
+}
 
 export function recipeGenerationTemperature(mode: RecipeGenerationMode): number {
   if (mode === 'source') return 0.35
@@ -152,6 +170,8 @@ EKSISTERENDE OPSKRIFTER (lav en anden slags ret):
 ${formatExistingTitles(input.titles)}
 
 ${AMOUNT_RULES}
+
+${preferredIngredientNames()}
 
 ${FF_JSON_RECIPE_FORMAT}${fatCoffeeException}`.replace(/\n{3,}/g, '\n\n')
 }
